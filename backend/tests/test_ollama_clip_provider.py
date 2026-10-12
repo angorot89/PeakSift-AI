@@ -96,7 +96,9 @@ def test_request_is_a_constrained_json_chat_with_the_shared_prompt():
 
     (req,) = seen
     assert req.method == "POST" and req.url.path == "/api/chat"
-    assert str(req.url).startswith("http://localhost:11434")
+    assert str(req.url).startswith(
+        get_settings().ollama_base_url.rstrip("/")
+    )  # the configured endpoint
     body = json.loads(req.content)
     assert body["model"] == MODEL
     assert body["stream"] is False
