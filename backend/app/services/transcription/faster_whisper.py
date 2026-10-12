@@ -3,10 +3,19 @@
 The model is loaded lazily on first use and cached per process, so importing this module
 — or starting FastAPI / the Celery app — never downloads or loads a model. Only a worker
 that actually transcribes pays that cost, once.
+
+Audio is decoded to 16 kHz mono float32 PCM with ffmpeg and handed to the model as an
+array. This bypasses faster-whisper's bundled PyAV decoder, which is incompatible with
+the PyAV release available for this environment, and keeps every media subprocess on the
+same argument-list + timeout rules as the rest of the backend.
 """
 
 import logging
+import subprocess
+from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from app.core.config import Settings
 from app.services.transcription.contract import (
@@ -21,6 +30,9 @@ from app.services.transcription.contract import (
 )
 
 logger = logging.getLogger(__name__)
+
+SAMPLE_RATE = 16_000  # what Whisper models expect
+DECODE_TIMEOUT_SECONDS = 600
 
 CAPABILITIES = ProviderCapabilities(
     supports_segment_timestamps=True,
@@ -56,6 +68,47 @@ def _load_model(model: str, device: str, compute_type: str) -> Any:
     return _MODEL_CACHE[key]
 
 
+def _decode_pcm(path: Path, ffmpeg_path: str) -> np.ndarray:
+    """Decode any audio file to 16 kHz mono float32 samples with ffmpeg."""
+    if not path.is_file():
+        raise TranscriptionProviderError("audio_missing", "The audio file to transcribe is missing")
+    command = [
+        ffmpeg_path,
+        "-v",
+        "error",
+        "-nostdin",
+        "-i",
+        str(path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        str(SAMPLE_RATE),
+        "-f",
+        "f32le",
+        "-",
+    ]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, timeout=DECODE_TIMEOUT_SECONDS, check=False
+        )
+    except FileNotFoundError:
+        raise ProviderConfigurationError(
+            "ffmpeg is not installed on the server", code="ffmpeg_missing"
+        ) from None
+    except subprocess.TimeoutExpired:
+        raise TranscriptionProviderError(
+            "audio_decode_timeout", "Decoding the audio for transcription timed out"
+        ) from None
+    if result.returncode != 0:
+        logger.warning("ffmpeg decode failed (exit %s)", result.returncode)
+        raise TranscriptionProviderError(
+            "audio_decode_failed",
+            f"The audio could not be decoded (ffmpeg exit {result.returncode})",
+        )
+    return np.frombuffer(result.stdout, dtype=np.float32)
+
+
 class FasterWhisperProvider:
     name = "faster_whisper"
     capabilities = CAPABILITIES
@@ -65,12 +118,14 @@ class FasterWhisperProvider:
         self._device = settings.faster_whisper_device
         self._compute_type = settings.faster_whisper_compute_type
         self._beam_size = settings.faster_whisper_beam_size
+        self._ffmpeg_path = settings.ffmpeg_path
 
     def transcribe(self, request: TranscriptionRequest) -> ProviderTranscriptionResult:
         model = _load_model(self.model, self._device, self._compute_type)
+        samples = _decode_pcm(request.audio_path, self._ffmpeg_path)
         try:
             raw_segments, info = model.transcribe(
-                str(request.audio_path),
+                samples,
                 beam_size=self._beam_size,
                 language=request.language_hint,
                 initial_prompt=request.prompt,
@@ -82,10 +137,6 @@ class FasterWhisperProvider:
             )
         except TranscriptionProviderError:
             raise
-        except FileNotFoundError:
-            raise TranscriptionProviderError(
-                "audio_missing", "The audio file to transcribe is missing"
-            ) from None
         except Exception as error:
             logger.exception("faster-whisper failed on %s", request.audio_path.name)
             raise TranscriptionProviderError(

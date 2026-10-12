@@ -6,6 +6,7 @@ import types
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from app.core.config import get_settings
@@ -16,7 +17,7 @@ from app.services.transcription.contract import (
     TranscriptionProviderError,
     TranscriptionRequest,
 )
-from app.services.transcription.faster_whisper import FasterWhisperProvider
+from app.services.transcription.faster_whisper import FasterWhisperProvider, _decode_pcm
 
 
 @dataclass
@@ -37,10 +38,7 @@ class FakeWhisperModel:
     """Stands in for faster_whisper.WhisperModel; records construction and calls."""
 
     constructed: list[tuple] = []
-    next_segments: list[FakeSegment] = [
-        FakeSegment(0.0, 2.0, " Hello "),
-        FakeSegment(2.0, 5.0, "world"),
-    ]
+    next_segments: list[FakeSegment] = []
     next_info: FakeInfo = FakeInfo()
     raise_on_transcribe: Exception | None = None
 
@@ -53,6 +51,9 @@ class FakeWhisperModel:
         if FakeWhisperModel.raise_on_transcribe:
             raise FakeWhisperModel.raise_on_transcribe
         return iter(FakeWhisperModel.next_segments), FakeWhisperModel.next_info
+
+
+PCM = np.array([0.0, 0.25, -0.25, 0.5], dtype=np.float32)
 
 
 @pytest.fixture
@@ -68,6 +69,14 @@ def fake_whisper(monkeypatch):
     ]
     FakeWhisperModel.next_info = FakeInfo()
     FakeWhisperModel.raise_on_transcribe = None
+    decoded: list[Path] = []
+
+    def fake_decode(path, ffmpeg_path):
+        decoded.append(path)
+        return PCM
+
+    monkeypatch.setattr(provider_module, "_decode_pcm", fake_decode)
+    FakeWhisperModel.decoded = decoded
     return FakeWhisperModel
 
 
@@ -104,11 +113,12 @@ def test_model_is_loaded_once_with_configured_options(fake_whisper, tmp_path, mo
     model = provider_module._MODEL_CACHE[("medium", "cpu", "int8")]
     assert len(model.calls) == 3
     first = model.calls[0]
-    assert first["audio"].endswith("chunk.mp3")
+    assert isinstance(first["audio"], np.ndarray) and np.array_equal(first["audio"], PCM)
     assert first["beam_size"] == 3
     assert first["language"] == "fr"
     assert first["initial_prompt"] == "previous words"
     assert model.calls[1]["language"] is None and model.calls[1]["initial_prompt"] is None
+    assert [p.name for p in fake_whisper.decoded] == ["chunk.mp3"] * 3
 
 
 # --- output normalisation -------------------------------------------------------------
@@ -166,16 +176,6 @@ def test_model_exceptions_are_normalised_without_leaking_paths(fake_whisper, tmp
     assert "RuntimeError" in excinfo.value.message
 
 
-def test_missing_audio_file(fake_whisper, tmp_path):
-    fake_whisper.raise_on_transcribe = FileNotFoundError("/private/tmp/chunk.mp3")
-
-    with pytest.raises(TranscriptionProviderError) as excinfo:
-        FasterWhisperProvider(get_settings()).transcribe(request(tmp_path))
-
-    assert excinfo.value.code == "audio_missing"
-    assert "/private" not in excinfo.value.message
-
-
 def test_model_load_failure_is_a_configuration_error(monkeypatch, tmp_path):
     class Exploding:
         def __init__(self, *a, **k):
@@ -202,6 +202,54 @@ def test_missing_dependency_is_a_configuration_error(monkeypatch, tmp_path):
         FasterWhisperProvider(get_settings()).transcribe(request(tmp_path))
 
     assert excinfo.value.code == "provider_missing"
+
+
+# --- PCM decoding (ffmpeg, mocked) -----------------------------------------------------------
+
+
+def test_decode_pcm_invokes_ffmpeg_as_argument_list(monkeypatch, tmp_path):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"mp3")
+    seen: dict = {}
+
+    def fake_run(command, **kwargs):
+        seen["command"], seen["kwargs"] = command, kwargs
+        return types.SimpleNamespace(returncode=0, stdout=PCM.tobytes(), stderr=b"")
+
+    monkeypatch.setattr(provider_module.subprocess, "run", fake_run)
+
+    samples = _decode_pcm(audio, "/opt/ffmpeg")
+
+    assert np.array_equal(samples, PCM) and samples.dtype == np.float32
+    assert seen["command"][0] == "/opt/ffmpeg" and seen["command"][-1] == "-"
+    assert "f32le" in seen["command"] and "16000" in seen["command"]
+    assert seen["kwargs"].get("shell", False) is False and seen["kwargs"]["timeout"] > 0
+
+
+def test_decode_pcm_failures(monkeypatch, tmp_path):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"mp3")
+
+    monkeypatch.setattr(
+        provider_module.subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(returncode=1, stdout=b"", stderr=b"/private/x"),
+    )
+    with pytest.raises(TranscriptionProviderError) as excinfo:
+        _decode_pcm(audio, "ffmpeg")
+    assert excinfo.value.code == "audio_decode_failed" and "/private" not in excinfo.value.message
+
+    def timeout(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(provider_module.subprocess, "run", timeout)
+    with pytest.raises(TranscriptionProviderError) as excinfo:
+        _decode_pcm(audio, "ffmpeg")
+    assert excinfo.value.code == "audio_decode_timeout"
+
+    with pytest.raises(TranscriptionProviderError) as excinfo:
+        _decode_pcm(tmp_path / "missing.mp3", "ffmpeg")
+    assert excinfo.value.code == "audio_missing"
 
 
 # --- real model (opt-in: downloads the "tiny" model, needs macOS `say`) --------------------

@@ -17,6 +17,7 @@ dependencies = [
     "celery>=5.4,<6",  # background jobs (transcription)
     "redis>=5,<9",  # Celery broker client
     "faster-whisper>=1.1,<2",  # local speech-to-text (CTranslate2 Whisper)
+    "numpy>=1.26,<3",  # PCM arrays handed to faster-whisper (decoded with ffmpeg)
 ]
 
 [project.optional-dependencies]

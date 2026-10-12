@@ -119,6 +119,8 @@ Speech-to-text sits behind one contract (`app/services/transcription/contract.py
 
 `app/services/transcription/faster_whisper.py` wraps [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2). The model is loaded **lazily on first transcription and cached per process**: importing the module, starting FastAPI, or starting the Celery app never downloads or loads a model. On first use the model is downloaded from Hugging Face into its cache (`~/.cache/huggingface`), so the first job after a fresh install takes longer. CPU + `int8` is the supported development mode (this project is developed on macOS; there is no Apple GPU path in this stack). CUDA GPUs work with `FASTER_WHISPER_DEVICE=cuda` and `FASTER_WHISPER_COMPUTE_TYPE=float16` when the CUDA libraries are installed — that is an optional deployment choice, not a requirement.
 
+Audio is decoded to 16 kHz mono float32 PCM with `ffmpeg` (argument list, timeout) and passed to the model as an array rather than letting faster-whisper decode the file itself: its bundled PyAV decoder is incompatible with the PyAV release installable in this environment (`av.open(..., metadata_errors=…)` was removed), and this keeps every media subprocess under the same rules as the rest of the backend. Chunks are bounded (10 minutes ≈ 38 MB of samples), so memory stays flat for multi-hour streams.
+
 Manual check with the real model (downloads `tiny`, ~75 MB, macOS only because it uses `say` to synthesise speech): `PEAKSIFT_REAL_WHISPER=1 pytest tests/test_faster_whisper_provider.py -k real`. Normal tests mock the model and download nothing.
 
 ## Media serving
