@@ -82,6 +82,8 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 
 Auth request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters. Project names are trimmed and must be 1–200 characters. A project is `{id, name, status, created_at, updated_at}`.
 
+Validation failures return `422` with `{"detail": [{"type", "loc", "msg"}, ...]}`. Submitted values are deliberately not echoed back (FastAPI's default would include them).
+
 ## Authentication design
 
 - **Passwords** are hashed with Argon2id (`pwdlib`, recommended parameters). Plaintext passwords are never stored, logged, or returned, and `password_hash` never appears in a response schema.

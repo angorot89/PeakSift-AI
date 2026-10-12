@@ -80,6 +80,17 @@ def test_register_rejects_invalid_email(client: TestClient):
     assert register(client, email="not-an-email").status_code == 422
 
 
+def test_validation_errors_do_not_echo_submitted_values(client: TestClient):
+    response = register(client, password="hunter2")
+
+    assert response.status_code == 422
+    assert "hunter2" not in response.text
+    error = response.json()["detail"][0]
+    assert error["loc"] == ["body", "password"]
+    assert error["msg"]
+    assert "input" not in error and "ctx" not in error
+
+
 # --- login ------------------------------------------------------------------
 
 

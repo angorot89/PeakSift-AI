@@ -5,10 +5,12 @@ from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
 from app.core.config import get_settings
+from app.core.errors import register_error_handlers
 
 settings = get_settings()
 
 app = FastAPI(title="PeakSift AI API", version="0.1.0")
+register_error_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
