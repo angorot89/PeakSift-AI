@@ -40,6 +40,10 @@ PeakSift will ship a **Global** experience available to everyone.
 
 **Morocco Mode** is a planned future localization layer that *extends* the Global experience — users keep every Global tool and library, plus Darija-aware analysis, Moroccan cultural context, local sound effects and creator assets, and Morocco-specific clip suggestions. It is not a separate app, and it is not implemented yet.
 
+## Continuous integration
+
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, and runs the test suite. CI validates only — nothing is deployed.
+
 ## Repository structure
 
 ```
