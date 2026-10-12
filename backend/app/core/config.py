@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # Server configuration only; API clients never choose a provider.
     transcription_provider: str = "faster_whisper"
 
+    # faster-whisper (local provider). The model is loaded lazily inside the worker only.
+    faster_whisper_model: str = "small"
+    faster_whisper_device: str = "cpu"
+    faster_whisper_compute_type: str = "int8"
+    faster_whisper_beam_size: int = Field(default=5, gt=0)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
