@@ -565,3 +565,89 @@ def test_real_media_pipeline_end_to_end(db_session, storage, tmp_path, transcrip
     assert storage.exists(result.audio_storage_key)
     assert not (storage.root / "transcription" / str(transcription.id) / "chunks").exists()
     assert len(segments_of(db_session, transcription)) == 2
+
+
+# --- hardening: fencing, validation, multilingual ------------------------------------------
+
+
+def test_claim_ignores_row_owned_by_a_newer_task(monkeypatch, db_session, storage, transcription):
+    FakeMedia(monkeypatch, storage)
+    transcription.celery_task_id = "task-new"
+    db_session.commit()
+    provider = FakeProvider()
+
+    run(transcription, db_session, provider, storage, task_id="task-old")
+
+    assert provider.requests == [] and transcription.status == "queued"
+
+
+def test_matching_task_id_runs_normally(monkeypatch, db_session, storage, transcription):
+    FakeMedia(monkeypatch, storage, chunks=(600,))
+    transcription.celery_task_id = "task-1"
+    db_session.commit()
+
+    result = run(transcription, db_session, FakeProvider(), storage, task_id="task-1")
+
+    assert result.status == "completed"
+
+
+def test_run_taken_over_mid_way_stops_without_writing(
+    monkeypatch, db_session, storage, transcription
+):
+    from sqlalchemy import update
+
+    media = FakeMedia(monkeypatch, storage)
+    transcription.celery_task_id = "task-old"
+    db_session.commit()
+
+    class TakenOver(FakeProvider):
+        def transcribe(self, request):
+            result = super().transcribe(request)
+            if len(self.requests) == 2:  # a retry re-queued the job while we were working
+                db_session.execute(
+                    update(Transcription)
+                    .where(Transcription.id == transcription.id)
+                    .values(celery_task_id="task-new")
+                )
+                db_session.commit()
+            return result
+
+    provider = TakenOver()
+    result = run(transcription, db_session, provider, storage, task_id="task-old")
+
+    assert len(provider.requests) == 2  # stopped before the third chunk
+    assert result.status == "transcribing" and result.error_code is None  # not marked failed
+    assert len(segments_of(db_session, transcription)) == 2  # chunk 1 committed, chunk 2 discarded
+    assert media.cleanup_calls == 0  # the newer task owns the chunk directory
+
+
+def test_provider_segments_are_revalidated_in_the_pipeline(
+    monkeypatch, db_session, storage, transcription
+):
+    FakeMedia(monkeypatch, storage, duration=50.0, chunks=(50.0,))
+    provider = FakeProvider(segments=(ProviderSegment(-1.0, 2.0, "negative start"),))
+
+    result = run(transcription, db_session, provider, storage)
+
+    assert result.status == "failed" and result.error_code == "provider_output"
+
+
+def test_multilingual_unicode_transcript(monkeypatch, db_session, storage, transcription):
+    FakeMedia(monkeypatch, storage, duration=20.0, chunks=(20.0,))
+    provider = FakeProvider(
+        segments=(
+            ProviderSegment(0.0, 3.0, "مرحبا بكم في بيك سيفت"),
+            ProviderSegment(3.0, 6.0, "Ça va? Très bien — 🎬"),
+        ),
+        language="ar",
+        language_probability=0.71,
+    )
+
+    result = run(transcription, db_session, provider, storage)
+
+    assert result.status == "completed" and result.language == "ar"
+    assert result.full_text == "مرحبا بكم في بيك سيفت Ça va? Très bien — 🎬"
+    assert [s.text for s in segments_of(db_session, transcription)] == [
+        "مرحبا بكم في بيك سيفت",
+        "Ça va? Très bien — 🎬",
+    ]

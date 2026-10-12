@@ -15,6 +15,7 @@ from app.models import (
     VideoStatus,
 )
 from app.schemas.transcription import TranscriptionRead, TranscriptPage, TranscriptSegmentRead
+from app.services.transcription.pipeline import is_stale
 from app.workers.dispatch import JobQueueUnavailable, enqueue_transcription
 
 router = APIRouter(prefix="/projects/{project_id}/videos/{video_id}", tags=["transcription"])
@@ -61,6 +62,7 @@ def _read(db: DbSession, transcription: Transcription) -> TranscriptionRead:
         language_probability=transcription.language_probability,
         progress_percent=transcription.progress_percent,
         segment_count=_segment_count(db, transcription),
+        is_stale=is_stale(transcription, get_settings()),
         error_code=transcription.error_code,
         error_message=transcription.error_message,
         created_at=transcription.created_at,
@@ -122,14 +124,16 @@ def get_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
 
 @router.post("/transcription/retry", response_model=TranscriptionRead)
 def retry_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
-    """Re-queue a failed transcription. Running or completed jobs are not restarted."""
+    """Re-queue a failed or stale transcription. Live or completed jobs are not restarted."""
     transcription = video.transcription
     if transcription is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No transcription yet")
-    if transcription.status != TranscriptionStatus.FAILED:
+    if transcription.status != TranscriptionStatus.FAILED and not is_stale(
+        transcription, get_settings()
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Only a failed transcription can be retried",
+            detail="Only a failed or stalled transcription can be retried",
         )
     if video.status != VideoStatus.READY:
         raise HTTPException(

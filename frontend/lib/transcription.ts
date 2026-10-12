@@ -17,6 +17,7 @@ export type Transcription = {
   language_probability: number | null;
   progress_percent: number;
   segment_count: number;
+  is_stale: boolean;
   error_code: string | null;
   error_message: string | null;
   created_at: string;

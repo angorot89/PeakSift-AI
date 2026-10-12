@@ -131,6 +131,23 @@ export function TranscriptionPanel({ projectId, videoId }: Props) {
             {busy ? "Starting…" : "Transcribe video"}
           </Button>
         </div>
+      ) : isActive(transcription.status) && transcription.is_stale ? (
+        <div className="space-y-4">
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100"
+          >
+            <p className="font-medium">This transcription appears to have stalled</p>
+            <p className="mt-1">The worker stopped reporting progress. You can start it again.</p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => run(() => retryTranscription(projectId, videoId))}
+            disabled={busy}
+          >
+            {busy ? "Restarting…" : "Retry transcription"}
+          </Button>
+        </div>
       ) : isActive(transcription.status) ? (
         <div className="space-y-3">
           <p className="flex items-center gap-3 text-sm text-muted" role="status" aria-live="polite">

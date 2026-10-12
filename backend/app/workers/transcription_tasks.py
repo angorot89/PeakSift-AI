@@ -17,8 +17,8 @@ def ping() -> str:
     return "pong"
 
 
-@celery_app.task(name="peaksift.transcribe_video")
-def transcribe_video(transcription_id: str) -> None:
+@celery_app.task(name="peaksift.transcribe_video", bind=True)
+def transcribe_video(self, transcription_id: str) -> None:
     """Run the transcription pipeline for a `Transcription` row.
 
     No Celery-level autoretry: transient provider errors are retried inside the
@@ -32,4 +32,4 @@ def transcribe_video(transcription_id: str) -> None:
         logger.error("transcribe_video received an invalid id %r", transcription_id)
         return
     with SessionLocal() as db:
-        run_transcription(transcription_uuid, db)
+        run_transcription(transcription_uuid, db, task_id=self.request.id)

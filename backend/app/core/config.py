@@ -42,7 +42,9 @@ class Settings(BaseSettings):
     # backoff; a job whose heartbeat is older than the stale threshold is considered dead.
     transcription_provider_max_attempts: int = Field(default=3, ge=1)
     transcription_retry_backoff_seconds: float = Field(default=2.0, ge=0)
-    transcription_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    # Must exceed the worst-case time for one chunk on the slowest worker, or a live
+    # job could be mistaken for a dead one.
+    transcription_stale_after_seconds: int = Field(default=30 * 60, gt=0)
     transcription_prompt_tail_chars: int = Field(default=200, ge=0)
     # Provider segments may overrun a chunk by this much (encoder padding) before rejection.
     transcription_timestamp_tolerance_seconds: float = Field(default=1.5, ge=0)

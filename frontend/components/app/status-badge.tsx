@@ -8,6 +8,11 @@ const presentation: Record<string, { label: string; tone: Tone }> = {
   processing_metadata: { label: "Processing", tone: "accent" },
   ready: { label: "Ready", tone: "success" },
   failed: { label: "Failed", tone: "danger" },
+  // transcriptions
+  queued: { label: "Queued", tone: "neutral" },
+  extracting_audio: { label: "Preparing audio", tone: "accent" },
+  transcribing: { label: "Transcribing", tone: "accent" },
+  completed: { label: "Completed", tone: "success" },
 };
 
 const dot: Record<Tone, string> = {
