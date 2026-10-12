@@ -6,7 +6,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 ## Current status
 
-**Milestones 1–3 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3). What exists today:
+**Milestones 1–4 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4). What exists today:
 
 - A landing page.
 - Email/password accounts: register, log in, log out, with an HttpOnly session cookie.
@@ -15,19 +15,19 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 - **Metadata extraction** with ffprobe: duration, resolution, frame rate, video/audio codecs — shown on the project page, or a clear failure state for unreadable files.
 - **Owner-only preview** of the uploaded video with a native player (HTTP Range streaming).
 - **Background transcription**: one click turns a ready video into a timestamped transcript. Audio is normalized with FFmpeg, split into 10-minute chunks and transcribed by a Celery worker with faster-whisper (local, default) or OpenAI (`whisper-1`); the project page polls real progress, shows failures and stalled jobs with retry, and renders the transcript with `HH:MM:SS` timestamps, paging and copy.
-- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`) managed with Alembic migrations.
-- Automated tests (backend 355), linting and CI with PostgreSQL, Redis and FFmpeg.
+- **AI clip detection**: on a transcribed video, pick an AI provider and model (local Ollama or hosted OpenAI, from server allow-lists) and start a background run. The transcript is analysed in bounded windows, every proposal is validated against the transcript, deduplicated and ranked, and the project page shows candidate cards — title, time range, duration, a 0–100 editorial score with its breakdown, hook, rationale, transcript excerpt — with an in-page preview of that range of the original video and save/dismiss decisions. Details: [docs/clip-detection.md](docs/clip-detection.md).
+- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`) managed with Alembic migrations.
+- Automated tests (backend 602), linting and CI with PostgreSQL, Redis and FFmpeg.
 
 **Not built yet** (see [docs/milestones.md](docs/milestones.md)):
 
 | Feature                                   | Milestone |
 | ----------------------------------------- | --------- |
-| AI clip detection                         | 4 (next)  |
-| Clip generation                           | 5         |
+| Clip generation (cutting/exporting clips) | 5 (next)  |
 | Creator intelligence & metadata           | 6         |
 | Editor, asset libraries, Morocco Mode     | later     |
 
-The dashboard's Videos and Clips cards do not show counts yet; clip detection is not built.
+The dashboard's Videos and Clips cards do not show counts yet. Candidates are suggestions with timestamps — no clip file is produced until Milestone 5.
 
 ## Architecture (as built)
 
@@ -35,13 +35,14 @@ The dashboard's Videos and Clips cards do not show counts yet; clip detection is
 Browser ──▶ Next.js frontend (:3000) ──fetch, cookie──▶ FastAPI backend (:8000) ──▶ PostgreSQL
                                                               │                         ▲
                                                               ├──▶ MEDIA_ROOT (videos, normalized audio)
-                                                              ├──▶ ffprobe (metadata)   │ status + segments
-                                                              └──▶ Redis ──▶ Celery worker (ffmpeg → chunks → faster-whisper | OpenAI)
+                                                              ├──▶ ffprobe (metadata)   │ status, segments, candidates
+                                                              └──▶ Redis ──▶ Celery worker ──▶ transcription: ffmpeg → chunks → faster-whisper | OpenAI
+                                                                                           └─▶ clip detection: transcript windows → Ollama | OpenAI → validate → rank
 ```
 
 - **Frontend** — Next.js App Router, TypeScript, Tailwind CSS. Talks to the API with `credentials: "include"`; asks `GET /auth/me` to learn who is signed in. No tokens in browser storage.
-- **Backend** — FastAPI, SQLAlchemy 2 (sync), Alembic, psycopg 3. Argon2id password hashing; HS256 JWT delivered in an HttpOnly `SameSite=Lax` cookie; CORS limited to the frontend origin. Uploads are streamed to local storage and probed with ffprobe synchronously; transcription runs in a Celery worker over Redis, with the database as the source of truth for job state.
-- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments` tables, UUID keys, timezone-aware timestamps.
+- **Backend** — FastAPI, SQLAlchemy 2 (sync), Alembic, psycopg 3. Argon2id password hashing; HS256 JWT delivered in an HttpOnly `SameSite=Lax` cookie; CORS limited to the frontend origin. Uploads are streamed to local storage and probed with ffprobe synchronously; transcription and clip detection run in a Celery worker over Redis, with the database as the source of truth for job state.
+- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates` tables, UUID keys, timezone-aware timestamps.
 
 Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
 
@@ -53,7 +54,8 @@ Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backe
 - Python 3.11+
 - PostgreSQL 14+ — either Docker (`docker compose up -d`, which creates the `peaksift` and `peaksift_test` databases) or a local installation
 - FFmpeg (`ffprobe` for metadata, `ffmpeg` for audio): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads end in status `failed` and transcription cannot run.
-- Redis 7+ — Docker Compose (included) or `brew install redis && brew services start redis`. Broker for background jobs; the API starts without it, but starting a transcription answers `503` until it is reachable.
+- Redis 7+ — Docker Compose (included) or `brew install redis && brew services start redis`. Broker for background jobs; the API starts without it, but starting a transcription or a clip detection answers `503` until it is reachable.
+- Ollama (optional, for local AI clip detection): `brew install ollama`, `ollama serve`, `ollama pull llama3.2:3b`. Without it the local provider is listed as unavailable; the hosted OpenAI provider needs `OPENAI_API_KEY` instead.
 
 ### 1. PostgreSQL and Redis
 
@@ -74,7 +76,7 @@ uvicorn app.main:app --reload        # http://localhost:8000 — docs at /docs
 
 Uploaded videos and derived audio are written under `backend/media/` (`MEDIA_ROOT`), which is git-ignored.
 
-### 3. Celery worker (transcription)
+### 3. Celery worker (transcription and clip detection)
 
 In a second terminal, same virtualenv and directory:
 
@@ -83,7 +85,9 @@ cd backend && source .venv/bin/activate
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-The default provider is faster-whisper on CPU (`FASTER_WHISPER_MODEL=small`, `int8`); the model (~460 MB) is downloaded on the first transcription, never at startup. On macOS, CPU mode is the supported path — there is no Apple-GPU acceleration in this stack. Set `FASTER_WHISPER_MODEL=tiny` to try the mechanics quickly, or `TRANSCRIPTION_PROVIDER=openai` with `OPENAI_API_KEY` for the hosted provider.
+The default speech-to-text provider is faster-whisper on CPU (`FASTER_WHISPER_MODEL=small`, `int8`); the model (~460 MB) is downloaded on the first transcription, never at startup. On macOS, CPU mode is the supported path — there is no Apple-GPU acceleration in this stack. Set `FASTER_WHISPER_MODEL=tiny` to try the mechanics quickly, or `TRANSCRIPTION_PROVIDER=openai` with `OPENAI_API_KEY` for the hosted provider.
+
+The same worker runs clip detection. For the local AI provider, start Ollama (`ollama serve`) and pull a model from `OLLAMA_CLIP_MODELS` (default `llama3.2:3b`); the worker never pulls or loads a model itself.
 
 ### 4. Frontend
 
@@ -99,11 +103,11 @@ Open **http://localhost:3000** (not `127.0.0.1`) so the auth cookie, CORS origin
 
 ```bash
 cd backend && ruff check . && ruff format --check . && pytest
-cd backend && python scripts/celery_smoke.py      # real worker round-trip over Redis
+cd backend && python scripts/celery_smoke.py      # real worker round-trip over Redis + task registration
 cd frontend && npm run lint && npm run build
 ```
 
-Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_test`), a temporary media directory and Celery eager mode; they never touch your development data, never download a speech model (inference is mocked) and never call OpenAI. Media fixtures are generated with `ffmpeg` at test time; ffmpeg- and Redis-dependent tests skip when those are missing locally and are mandatory in CI.
+Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_test`), a temporary media directory and Celery eager mode; they never touch your development data, never download a speech model (inference is mocked), never call OpenAI and never need Ollama (the provider is tested against a mocked transport and an in-process fake server). Media fixtures are generated with `ffmpeg` at test time; ffmpeg- and Redis-dependent tests skip when those are missing locally and are mandatory in CI. Opt-in real-model checks: `PEAKSIFT_REAL_WHISPER=1` and `PEAKSIFT_REAL_OLLAMA=1`.
 
 ## Upload flow
 
@@ -140,9 +144,18 @@ PeakSift cuts clips from transcript timestamps, so a provider must return real s
 
 `queued` → `extracting_audio` → `transcribing` → `completed` | `failed`. Progress is real (5 % once audio is ready, then chunks done ÷ total). Transient provider errors (rate limits, timeouts, 5xx) are retried in-task with exponential backoff; configuration, invalid-audio and malformed-output errors fail immediately with a safe `error_message`. A job whose worker stopped reporting for `TRANSCRIPTION_STALE_AFTER_SECONDS` (30 min) is flagged `is_stale` and can be retried; a Celery task id acts as a fencing token so two workers never both complete the same job.
 
+## Clip detection flow
+
+1. On a transcribed video, the **AI clip detection** panel lists the providers and models the server allows (`OLLAMA_CLIP_MODELS`, `OPENAI_CLIP_MODELS`) and says why one is unavailable. Click **Find clip moments**; the API records the run and queues it at once.
+2. The worker prepares the transcript (normalised, validated, fingerprinted), splits it into bounded overlapping windows (default 5 minutes / 8000 characters), asks the model for candidates per window with a strict JSON schema, **validates every proposal** (snapped to transcript-line boundaries, inside the video, 15–90 s, whole-number scores 0–100, bounded texts — anything else is rejected, never clamped or invented), deduplicates overlaps and ranks by a documented weighted score, then stores the top 10 with the completed status in one transaction.
+3. The page polls every 4 s through *Preparing transcript → Analyzing (window i of n) → Validating → Ranking*, then shows ranked cards with an in-page **Preview** of that range (the owner-only video stream), **Save** / **Dismiss**, filters and run history. Failed or stalled runs can be retried (bounded); re-transcribing flags older candidates as belonging to a previous transcript.
+
+Scores are the model's editorial judgement normalised to 0–100 — not predictions of views. Full reference: [docs/clip-detection.md](docs/clip-detection.md).
+
 ## Security model (high level)
 
-- Every project and video endpoint is scoped to the signed-in owner; anything else is a `404`.
+- Every project, video, detection-run and candidate endpoint is scoped to the signed-in owner; anything else is a `404`.
+- Users choose an AI provider and model only from server allow-lists; the Ollama endpoint and the OpenAI key are server configuration and never appear in responses, errors or the frontend. Model output is validated and bounded before anything is stored.
 - Browser-supplied filenames are metadata only. Files are stored under application-generated UUID keys, and the single path-resolution function refuses anything outside `MEDIA_ROOT`.
 - Uploads are validated in layers (extension, MIME plausibility, size during streaming, then ffprobe proving the bytes are readable media). Oversized, empty or unreadable uploads leave no stray files.
 - ffprobe and ffmpeg are invoked with argument lists (no shell) and timeouts; their stderr is never stored or returned. Only database ids cross the job broker.
@@ -160,17 +173,17 @@ PeakSift cuts clips from transcript timestamps, so a provider must return real s
 - No speaker diarization, word-level timestamps, translation, transcript editing or live transcription. The `speaker` column is reserved and always null.
 - A job interrupted by a worker crash restarts from the beginning via the stale rule or retry (no chunk-level resume).
 - Transcription quality has only been sanity-checked on synthesised English speech; no Darija/Moroccan benchmarking has been done.
-- AI clip detection does not exist yet — the UI says so.
+- Clip detection analyses windows sequentially and cuts them on time/character budgets, not topics; snapping is line-granular; deduplication is temporal only; small local models yield fewer usable candidates. Candidates cannot be trimmed or exported yet (Milestone 5). The hosted provider sends transcript text to OpenAI.
 
 ## Routes
 
 **Frontend:** `/`, `/login`, `/register`, `/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`
 
-**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` — see [backend/README.md](backend/README.md#api).
+**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` · `GET /clip-detection/providers` · `POST /projects/{id}/videos/{video_id}/clip-detection` · `GET …/clip-detection` · `GET …/clip-detection/{run_id}` · `POST …/clip-detection/{run_id}/retry` · `GET …/clip-detection/{run_id}/candidates` · `GET …/candidates/{candidate_id}` · `POST …/candidates/{candidate_id}/save|dismiss|reset` — see [backend/README.md](backend/README.md#api).
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; there is no OpenAI key in CI. CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server — and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription and clip detection tasks are registered, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
@@ -186,7 +199,7 @@ PeakSift will ship a **Global** experience available to everyone.
 PeakSift-AI/
 ├── frontend/             # Next.js app — see frontend/README.md
 ├── backend/              # FastAPI service — see backend/README.md
-├── docs/                 # Architecture and milestone docs
+├── docs/                 # Architecture, milestones, clip detection reference
 ├── docker/               # PostgreSQL init script for Docker Compose
 ├── docker-compose.yml    # Local PostgreSQL
 └── .github/workflows/    # CI

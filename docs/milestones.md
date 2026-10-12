@@ -47,14 +47,25 @@ Delivered:
 
 Definition of done — a user can start a transcription on a ready video → see it queued, prepared and transcribed in the background → read the timestamped transcript → retry a failed job → log out and back in with the transcript still there.
 
-## Milestone 4 — AI Clip Detection V0.4 *(next — not started)*
+## Milestone 4 — AI Clip Detection V0.4 *(complete)*
 
-- Timestamped transcript → candidate moments
-- AI scoring/ranking of candidates
+Delivered:
 
-## Milestone 5 — Clip Generation V0.5
+- `clip_detection_runs` and `clip_candidates` tables; many runs per video with history, at most one active; each run pins the transcript snapshot it analysed (id + sha256 fingerprint) and its configuration
+- Swappable clip-analysis provider contract with one strict JSON schema and one prompt; local **Ollama** provider (operator-controlled endpoint and model allow-list) and hosted **OpenAI** provider (structured outputs); the user picks provider and model only from server allow-lists
+- Transcript preparation: normalisation, timeline validation (never repaired), bounded overlapping analysis windows so multi-hour transcripts are many small requests
+- Validation of every proposal (snap to transcript-line boundaries, inside the video, 15–90 s, whole-number scores 0–100, bounded texts; rejections counted, never clamped or invented), IoU deduplication, documented weighted ranking (0.30/0.25/0.15/0.15/0.15)
+- Background pipeline on the existing Redis + Celery worker: idempotent on database state, task id committed before enqueue as a fencing token, bounded retries for transient provider errors, real staged progress, stale detection, one-transaction completion, honest time-limit failures
+- API: providers (with live diagnostics), start / list / status / retry, paginated ranked candidates, candidate detail, save / dismiss / reset — owner-scoped, no internals exposed
+- Frontend: provider/model choice, staged progress, failed/stalled states with bounded retry, run history, candidate cards with score breakdown and transcript excerpt, in-page preview of the candidate range from the original video, save/dismiss with filters
+- Hardening, CI (fake provider end-to-end, real provider against an in-process fake Ollama, worker task registration, no models or keys) and documentation ([clip-detection.md](clip-detection.md))
 
-- Cut selected moments into short-form vertical clips
+Definition of done — a user can transcribe a video → choose a provider → start detection → watch queued/analyzing/ranking progress → receive ranked, explained candidates → preview each range → save or dismiss → log out and back in with the decisions kept → recover from a provider failure with retry.
+
+## Milestone 5 — Clip Generation V0.5 *(next — not started)*
+
+- Cut selected (saved) moments into short-form vertical clips with FFmpeg
+- Export files
 
 ## Milestone 6 — Creator Intelligence & Metadata
 
