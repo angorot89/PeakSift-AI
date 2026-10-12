@@ -39,7 +39,7 @@ npm run start    # Serve the production build
 | `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
 | `/projects` | The signed-in user's projects                                       |
 | `/projects/new` | Create a project (name only)                                   |
-| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress) and the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path |
+| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress), the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path; for a ready video, the **Transcription** panel: start, live status (polled every 4 s while queued/preparing/transcribing, real progress only), failure with retry, and the paginated timestamped transcript viewer with "Load more" and "Copy transcript" |
 
 `/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
@@ -76,6 +76,7 @@ lib/
   auth.ts          # Typed calls to /auth/* and the User type
   projects.ts      # Typed calls to /projects and the Project type
   videos.ts        # Video type, accepted formats, list + XHR upload with progress
+  transcription.ts # Transcription/transcript types, start/status/retry, paginated transcript
   use-api.ts       # Loading/error/reload hook for API data
   format.ts        # Date, bytes, duration and frame-rate formatting
 ```
