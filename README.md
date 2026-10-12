@@ -8,7 +8,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 **Milestone 1 — Foundation V0.1** (in progress)
 
-The repository currently contains project structure and documentation only. There is no application code yet; none of the features described below exist today.
+The repository currently contains a landing page (frontend) and an API with a health endpoint (backend). None of the product features described below exist yet.
 
 ## Planned workflow
 
@@ -44,7 +44,7 @@ PeakSift will ship a **Global** experience available to everyone.
 
 ```
 PeakSift-AI/
-├── frontend/   # Next.js app (not yet initialized)
-├── backend/    # FastAPI service (not yet initialized)
+├── frontend/   # Next.js app — see frontend/README.md
+├── backend/    # FastAPI service — see backend/README.md
 └── docs/       # Architecture and milestone docs
 ```

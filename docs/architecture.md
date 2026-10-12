@@ -1,6 +1,6 @@
 # Architecture (planned)
 
-This describes the **planned** high-level architecture. Nothing here is implemented yet. Details will be decided milestone by milestone.
+This describes the **planned** high-level architecture. So far only the frontend landing page and a backend health endpoint exist. Details will be decided milestone by milestone.
 
 ## Components
 
