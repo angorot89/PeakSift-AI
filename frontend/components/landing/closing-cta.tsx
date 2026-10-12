@@ -14,9 +14,9 @@ export function ClosingCta() {
               Your next long-form video already has its best clips in it.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-pretty text-muted sm:text-lg">
-              PeakSift is in early development. You can create an account
-              today; video upload and AI clip detection are next on the
-              roadmap.
+              PeakSift is in early development. You can create an account and
+              set up projects today; video upload and AI clip detection are
+              next on the roadmap.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <ButtonLink href="/register" size="lg" className="w-full sm:w-auto">

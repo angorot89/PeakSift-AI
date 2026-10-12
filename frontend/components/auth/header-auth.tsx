@@ -28,9 +28,7 @@ export function HeaderAuth() {
 
     return (
       <div className="flex items-center gap-3">
-        <span className="hidden max-w-[18ch] truncate text-sm text-muted sm:inline" title={user.email}>
-          {user.email}
-        </span>
+        <ButtonLink href="/dashboard">Dashboard</ButtonLink>
         <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
           {loggingOut ? "Logging out…" : "Log out"}
         </Button>

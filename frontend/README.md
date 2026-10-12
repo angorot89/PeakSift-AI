@@ -36,8 +36,12 @@ npm run start    # Serve the production build
 | `/`         | Landing page                                                       |
 | `/login`    | Email + password login; generic error on bad credentials           |
 | `/register` | Create an account (email, password ≥ 8 chars, confirmation)        |
+| `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
+| `/projects` | The signed-in user's projects                                       |
+| `/projects/new` | Create a project (name only)                                   |
+| `/projects/[id]` | Project name, status, created date; video upload placeholder  |
 
-Signed-in visitors to `/login` or `/register` are sent back to the app.
+`/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
 ## How authentication works in the browser
 
@@ -52,9 +56,12 @@ app/
   layout.tsx       # Root layout: fonts, metadata, global styles, AuthProvider
   page.tsx         # Landing page
   login/, register/
+  (app)/           # Signed-in area: layout.tsx = RequireAuth + AppShell
+    dashboard/, projects/, projects/new/, projects/[id]/
   globals.css      # Tailwind import, theme tokens, base styles
   icon.svg         # Favicon
 components/
+  app/             # App shell, route guard, dashboard/projects views, states
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
   ui/              # Primitives: Button, ButtonLink, Field, FormError, SectionHeading
@@ -62,6 +69,9 @@ components/
 lib/
   api.ts           # fetch wrapper (base URL, cookies, error parsing)
   auth.ts          # Typed calls to /auth/* and the User type
+  projects.ts      # Typed calls to /projects and the Project type
+  use-api.ts       # Loading/error/reload hook for API data
+  format.ts        # Date formatting
 ```
 
 ## Known dependency advisories
