@@ -1,8 +1,11 @@
 """Tiny generated video fixtures for integration tests. Nothing is checked into git."""
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 FFMPEG = shutil.which("ffmpeg")
 FFPROBE = shutil.which("ffprobe")
@@ -10,6 +13,14 @@ FFPROBE = shutil.which("ffprobe")
 
 def have_ffmpeg() -> bool:
     return FFMPEG is not None and FFPROBE is not None
+
+
+# Integration tests skip on machines without ffmpeg, but CI sets REQUIRE_FFMPEG=1 so a
+# missing binary there is a failure rather than a silently skipped test.
+requires_ffmpeg = pytest.mark.skipif(
+    not have_ffmpeg() and not os.environ.get("REQUIRE_FFMPEG"),
+    reason="ffmpeg/ffprobe not installed",
+)
 
 
 def generate_video(

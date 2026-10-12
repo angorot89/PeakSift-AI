@@ -52,8 +52,16 @@ jobs:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/peaksift_test
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/peaksift_test
       SECRET_KEY: ci-only-secret-key-not-used-anywhere-real-0123456789
+      # The video pipeline tests generate tiny fixtures with ffmpeg and probe them with
+      # ffprobe; in CI a missing binary must fail the tests, not skip them.
+      REQUIRE_FFMPEG: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: Install FFmpeg (ffprobe for metadata, ffmpeg for generated test fixtures)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+          ffprobe -version | head -1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -67,4 +75,4 @@ jobs:
           alembic upgrade head
           alembic check
           alembic downgrade base
-      - run: pytest
+      - run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible

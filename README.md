@@ -92,7 +92,7 @@ Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_te
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, and runs the test suite. CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, and runs the test suite including the real-ffprobe video tests (fixtures are generated with `ffmpeg` at test time; no media is stored in the repository). CI validates only — nothing is deployed.
 
 ## Localization: Global + Morocco Mode (future)
 
