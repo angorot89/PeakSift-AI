@@ -1,20 +1,25 @@
 # Architecture
 
-Two sections: what is **built** (Milestones 1–2) and what is **planned**. Planned parts are decided milestone by milestone and may change.
+Two sections: what is **built** (Milestones 1–3) and what is **planned**. Planned parts are decided milestone by milestone and may change.
 
-## Built (Milestones 1–2)
+## Built (Milestones 1–3)
 
 ```
-┌───────────────────┐   HTTP/JSON + HttpOnly cookie   ┌───────────────────┐        ┌────────────┐
-│  Next.js frontend │ ──────────────────────────────▶ │  FastAPI backend  │ ─────▶ │ PostgreSQL │
-│  (App Router)     │ ◀────────────────────────────── │  SQLAlchemy 2     │        │ users,     │
-│  <video> preview  │ ◀── Range-streamed bytes ────── │  Alembic          │        │ projects,  │
-└───────────────────┘                                 │  ffprobe          │        │ videos     │
-                                                      └────────┬──────────┘        └────────────┘
-                                                               ▼
-                                                      ┌───────────────────┐
-                                                      │ MEDIA_ROOT (local │
-                                                      │ files, dev only)  │
+┌───────────────────┐   HTTP/JSON + HttpOnly cookie   ┌───────────────────┐        ┌──────────────────┐
+│  Next.js frontend │ ──────────────────────────────▶ │  FastAPI backend  │ ─────▶ │ PostgreSQL       │
+│  (App Router)     │ ◀────────────────────────────── │  SQLAlchemy 2     │        │ users, projects, │
+│  <video> preview  │ ◀── Range-streamed bytes ────── │  Alembic, ffprobe │        │ videos,          │
+│  transcript view  │ ◀── polled status / pages ───── │                   │        │ transcriptions,  │
+└───────────────────┘                                 └────────┬──────────┘        │ transcript_segs  │
+                                                               │ enqueue id        └────────▲─────────┘
+                                                               ▼                            │ status, segments
+                                                      ┌───────────────────┐        ┌────────┴─────────┐
+                                                      │ Redis (broker)    │ ─────▶ │ Celery worker    │
+                                                      └───────────────────┘        │ ffmpeg → chunks  │
+                                                                                   │ → provider       │
+                                                      ┌───────────────────┐        │ (faster-whisper  │
+                                                      │ MEDIA_ROOT (local │ ◀────▶ │  or OpenAI)      │
+                                                      │ files, dev only)  │        └──────────────────┘
                                                       └───────────────────┘
 ```
 
@@ -24,15 +29,16 @@ Two sections: what is **built** (Milestones 1–2) and what is **planned**. Plan
 - Pages: landing (`/`), `/login`, `/register`, and a signed-in area (`/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`) under one route group that wraps pages in a client-side guard and an app shell.
 - Auth state lives in a small React context (`AuthProvider`). On load it calls `GET /auth/me`; the backend is the authority. Tokens are never stored in JavaScript-accessible storage.
 - A single fetch wrapper (`lib/api.ts`) adds the API base URL (`NEXT_PUBLIC_API_URL`), sends cookies, and turns error bodies into messages. Uploads use a small `XMLHttpRequest` helper (`lib/videos.ts`) because `fetch` cannot report upload progress.
-- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos.
+- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos. For ready videos a **Transcription** panel starts the job, polls `GET …/transcription` every 4 s only while it is active, shows real progress, failure/stalled states with retry, and a paginated timestamped transcript viewer.
 
 ### Backend (`backend/`)
 
-- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata) and `video_content` (streaming); request/response schemas (Pydantic) are separate from ORM models.
+- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming) and `transcriptions` (start/status/retry/transcript); request/response schemas (Pydantic) are separate from ORM models.
 - Settings from environment variables via pydantic-settings; `DATABASE_URL` and `SECRET_KEY` are required.
 - SQLAlchemy 2 with a **synchronous** engine and one session per request (`get_db`). Async was deliberately not introduced.
 - Alembic migrations are the only way the schema changes; `alembic check` runs in CI to catch model/migration drift.
-- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions).
+- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), and the `transcription/` package (provider contract, factory, chunking, pipeline, providers).
+- Workers: `app/workers/celery_app.py` (Celery on Redis) and `transcription_tasks.py`; only database ids cross the broker.
 
 ### Video pipeline (Milestone 2)
 
@@ -48,9 +54,26 @@ POST /projects/{id}/videos
 
 Probing is synchronous in Milestone 2; no queue or worker exists. The browser then fetches `GET /videos/{video_id}/content` (owner-only, HTTP `Range` support) for preview.
 
+### Transcription pipeline (Milestone 3)
+
+```
+POST …/transcription  →  Transcription row (queued)  →  Celery task id stored  →  202-style quick return
+Worker:
+  claim (DB state + fencing token)
+  → extract normalized audio   transcription/<id>/normalized.mp3   (progress 5)
+  → split into 10-minute chunks  transcription/<id>/chunks/NNNN.mp3
+  → per chunk: provider.transcribe → validate → shift to absolute time → commit segments, progress, heartbeat
+  → completed (full_text, progress 100)   |   failed (error_code, safe error_message, no partial segments)
+  → chunk files removed; normalized audio kept for retries
+```
+
+- **Providers** implement one contract (`ProviderTranscriptionResult` with ordered `ProviderSegment`s) and declare capabilities. The factory refuses any provider without segment timestamps. `faster_whisper` (default, local, lazy-loaded and cached per worker process; audio decoded with ffmpeg) and `openai` (hosted; `whisper-1` + `verbose_json` for structured timestamps — the GPT-4o transcription models are text-only in the installed SDK and are refused as the timestamp model). Timestamps are never fabricated.
+- **Reliability:** idempotent on database state (completed/live/stale/failed rules), a Celery task id as fencing token re-checked before every commit, bounded exponential backoff for transient provider errors only, heartbeat-based stale detection surfaced as `is_stale` and retryable from the API/UI, Celery `acks_late` + prefetch 1 with the Redis visibility timeout above the hard time limit.
+- **Status** is a separate state machine from the video's (`queued` → `extracting_audio` → `transcribing` → `completed` | `failed`); the frontend polls, no WebSockets.
+
 ### Storage
 
-- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
+- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
 - Nothing under `MEDIA_ROOT` is served statically. Object storage (S3/R2) is planned and will implement the same `save / exists / delete / path_for` surface.
 
 ### Authentication
@@ -76,9 +99,9 @@ Timestamps are timezone-aware. Project `status` is currently always `created`. V
 
 ### Testing and CI
 
-- Backend: pytest against a dedicated PostgreSQL test database; migrations are applied at the start of the session and every test is rolled back. Media tests use a throwaway `MEDIA_ROOT`; video fixtures are generated at test time with `ffmpeg` (none are committed). Integration tests skip locally without FFmpeg and are required in CI (`REQUIRE_FFMPEG=1`).
+- Backend: pytest against a dedicated PostgreSQL test database; migrations are applied at the start of the session and every test is rolled back. Media tests use a throwaway `MEDIA_ROOT`; fixtures are generated at test time with `ffmpeg` (none are committed). Celery runs in eager mode; speech models are mocked (an opt-in real `tiny`-model check exists for macOS). Integration tests skip locally without FFmpeg/Redis and are required in CI (`REQUIRE_FFMPEG=1`, `REQUIRE_REDIS=1`, `HF_HUB_OFFLINE=1`).
 - Frontend: ESLint and a production build.
-- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg.
+- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, and finishes with a real worker `ping` smoke.
 
 ## Planned (later milestones)
 
@@ -87,12 +110,11 @@ Backend ──▶ Object storage (source videos, generated clips)
         ──▶ Background processing (transcription, clip detection, rendering)
 ```
 
-1. **Transcription (Milestone 3)** — audio extracted with FFmpeg and transcribed with timestamps.
-2. **Clip detection (Milestone 4)** — AI analyses the transcript (later other signals) to propose and score candidate moments.
-3. **Clip generation (Milestone 5)** — FFmpeg cuts and reformats selected moments into vertical clips.
-4. **Creator intelligence (Milestone 6)** — titles, hooks and metadata.
+1. **Clip detection (Milestone 4)** — the timestamped transcript (and later other signals) is analysed to propose and score candidate moments.
+2. **Clip generation (Milestone 5)** — FFmpeg cuts and reformats selected moments into vertical clips.
+3. **Creator intelligence (Milestone 6)** — titles, hooks and metadata.
 
-Long-running work will move outside the request cycle; the mechanism (and object storage) is chosen when first needed. None of this exists yet.
+Object storage replaces `MEDIA_ROOT` when deployment requires it. None of this exists yet.
 
 ## Localization
 
