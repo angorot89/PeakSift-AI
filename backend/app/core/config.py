@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     frontend_url: str = "http://localhost:3000"
 
-    # Not used yet; reserved for upcoming milestones. Empty values are fine.
-    database_url: str | None = None
+    # SQLAlchemy URL, e.g. postgresql+psycopg://user:password@localhost:5432/peaksift
+    database_url: str
+
+    # Not used yet; reserved for upcoming milestones.
     secret_key: SecretStr | None = None
 
 

@@ -7,6 +7,9 @@ dependencies = [
     "fastapi>=0.143,<1",
     "uvicorn>=0.54,<1",
     "pydantic-settings>=2.15,<3",
+    "sqlalchemy>=2.0,<3",
+    "alembic>=1.16,<2",
+    "psycopg[binary]>=3.2,<4",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +37,10 @@ filterwarnings = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.ruff.lint.isort]
+# The local `alembic/` migrations directory shadows the package name.
+known-third-party = ["alembic"]
 
 [tool.ruff.lint]
 select = [

@@ -1,0 +1,27 @@
+# Local development services. Only PostgreSQL is needed for Milestone 1.
+#
+#   docker compose up -d
+#
+# Creates the `peaksift` (dev) and `peaksift_test` (tests) databases; credentials
+# match backend/.env.example. For local development only — not a production setup.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: peaksift
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d peaksift"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
