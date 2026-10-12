@@ -29,6 +29,15 @@ export function formatDuration(seconds: number): string {
   return `${s}s`;
 }
 
+/** "00:03:18" — always HH:MM:SS so multi-hour videos line up. */
+export function formatTimestamp(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+}
+
 /** "29.97 fps" or "30 fps". */
 export function formatFps(fps: number): string {
   return `${Number.isInteger(fps) ? fps : fps.toFixed(2)} fps`;

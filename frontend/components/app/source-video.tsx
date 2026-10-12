@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
+import { TranscriptionPanel } from "@/components/app/transcription-panel";
 import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDate, formatDuration, formatFps } from "@/lib/format";
@@ -18,7 +19,15 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function VideoDetails({ video, onReplace }: { video: Video; onReplace: () => void }) {
+function VideoDetails({
+  video,
+  projectId,
+  onReplace,
+}: {
+  video: Video;
+  projectId: string;
+  onReplace: () => void;
+}) {
   const rows: Array<[string, string]> = [];
   if (video.duration_seconds != null) rows.push(["Duration", formatDuration(video.duration_seconds)]);
   if (video.width != null && video.height != null)
@@ -67,10 +76,11 @@ function VideoDetails({ video, onReplace }: { video: Video; onReplace: () => voi
         ))}
       </dl>
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted">
-          Transcription and AI clip detection arrive in later milestones.
-        </p>
+      {video.status === "ready" ? (
+        <TranscriptionPanel projectId={projectId} videoId={video.id} />
+      ) : null}
+
+      <div className="mt-5 flex justify-end">
         <Button variant="secondary" onClick={onReplace}>
           {video.status === "failed" ? "Upload a different file" : "Replace video"}
         </Button>
@@ -97,7 +107,7 @@ export function SourceVideo({ projectId }: { projectId: string }) {
       ) : error ? (
         <ErrorState message={error} onRetry={reload} />
       ) : latest && !replacing ? (
-        <VideoDetails video={latest} onReplace={() => setReplacing(true)} />
+        <VideoDetails video={latest} projectId={projectId} onReplace={() => setReplacing(true)} />
       ) : (
         <VideoUpload
           projectId={projectId}
