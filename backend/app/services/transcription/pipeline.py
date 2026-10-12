@@ -38,6 +38,7 @@ from app.services.transcription.contract import (
     TranscriptionProvider,
     TranscriptionProviderError,
     TranscriptionRequest,
+    validate_segments,
 )
 from app.services.transcription.factory import get_transcription_provider
 
@@ -47,6 +48,10 @@ AUDIO_READY_PROGRESS = 5
 MAX_ERROR_LENGTH = 500
 
 ProviderFactory = Callable[[Settings], TranscriptionProvider]
+
+
+class PipelineSuperseded(Exception):
+    """Another task now owns this transcription (retry/stale restart); stop without writing."""
 
 
 class PipelineFailure(Exception):
@@ -84,8 +89,14 @@ def run_transcription(
     storage: LocalMediaStorage | None = None,
     provider_factory: ProviderFactory | None = None,
     sleep: Callable[[float], None] = time.sleep,
+    task_id: str | None = None,
 ) -> Transcription | None:
-    """Execute the job for a `Transcription` row. Never raises for a bad file or provider."""
+    """Execute the job for a `Transcription` row. Never raises for a bad file or provider.
+
+    ``task_id`` is the Celery task id that was enqueued for this row. It acts as a fencing
+    token: if the row has since been handed to a newer task (retry or stale restart), this
+    run stops at the next checkpoint without touching the row.
+    """
     settings = settings or get_settings()
     storage = storage or LocalMediaStorage(settings.media_root)
     provider_factory = provider_factory or get_transcription_provider  # resolved at call time
@@ -94,11 +105,15 @@ def run_transcription(
     if transcription is None:
         logger.warning("Transcription %s no longer exists; nothing to do", transcription_id)
         return None
-    if not _claim(transcription, db, settings):
+    if not _claim(transcription, db, settings, task_id):
         return transcription
 
+    superseded = False
     try:
-        _execute(transcription, db, settings, storage, provider_factory, sleep)
+        _execute(transcription, db, settings, storage, provider_factory, sleep, task_id)
+    except PipelineSuperseded:
+        superseded = True
+        logger.info("Transcription %s was taken over by a newer task; stopping", transcription.id)
     except PipelineFailure as failure:
         _fail(transcription, db, failure.code, failure.message)
     except (AudioExtractionError, ChunkingError) as error:
@@ -109,15 +124,21 @@ def run_transcription(
         logger.exception("Unexpected error transcribing %s", transcription.id)
         _fail(transcription, db, "internal_error", "Unexpected error during transcription")
     finally:
-        cleanup_chunks(storage, transcription.id)
+        if not superseded:  # the newer task owns the chunk directory now
+            cleanup_chunks(storage, transcription.id)
     return transcription
 
 
 # --- claiming -----------------------------------------------------------------------
 
 
-def _claim(transcription: Transcription, db: Session, settings: Settings) -> bool:
+def _claim(
+    transcription: Transcription, db: Session, settings: Settings, task_id: str | None
+) -> bool:
     """Move a runnable job to extracting_audio; return False for anything not runnable."""
+    if task_id and transcription.celery_task_id and transcription.celery_task_id != task_id:
+        logger.info("Transcription %s belongs to a newer task; ignoring", transcription.id)
+        return False
     if transcription.status == TranscriptionStatus.COMPLETED:
         logger.info("Transcription %s already completed; ignoring duplicate task", transcription.id)
         return False
@@ -157,6 +178,7 @@ def _execute(
     storage: LocalMediaStorage,
     provider_factory: ProviderFactory,
     sleep: Callable[[float], None],
+    task_id: str | None,
 ) -> None:
     video = transcription.video
     if video.status != VideoStatus.READY:
@@ -231,10 +253,12 @@ def _execute(
             transcription.progress_percent,
             AUDIO_READY_PROGRESS + int((100 - AUDIO_READY_PROGRESS) * position / len(chunks)),
         )
+        _ensure_still_owner(transcription, db, task_id)
         _heartbeat(transcription, db)  # one transaction per chunk
         if settings.transcription_prompt_tail_chars and result.text:
             previous_tail = result.text[-settings.transcription_prompt_tail_chars :]
 
+    _ensure_still_owner(transcription, db, task_id)
     db.refresh(transcription, attribute_names=["segments"])
     transcription.full_text = " ".join(s.text for s in transcription.segments)
     transcription.status = TranscriptionStatus.COMPLETED
@@ -253,6 +277,7 @@ def _absolute_segments(
     segments: tuple[ProviderSegment, ...], chunk: AudioChunk, settings: Settings
 ) -> tuple[ProviderSegment, ...]:
     """Shift chunk-relative times by the chunk start and refuse times beyond the chunk."""
+    segments = validate_segments(segments)  # defence in depth: never trust a provider blindly
     limit = chunk.duration_seconds + settings.transcription_timestamp_tolerance_seconds
     for segment in segments:
         if segment.end > limit:
@@ -290,6 +315,16 @@ def _transcribe_with_retry(
 
 
 # --- state helpers ----------------------------------------------------------------------
+
+
+def _ensure_still_owner(transcription: Transcription, db: Session, task_id: str | None) -> None:
+    """Re-read the fencing token; a newer task id means this run must stop writing."""
+    if task_id is None:
+        return
+    db.refresh(transcription, attribute_names=["celery_task_id"])
+    if transcription.celery_task_id and transcription.celery_task_id != task_id:
+        db.rollback()
+        raise PipelineSuperseded()
 
 
 def _heartbeat(transcription: Transcription, db: Session, *, commit: bool = True) -> None:

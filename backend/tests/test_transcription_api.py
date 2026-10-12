@@ -24,6 +24,7 @@ STATUS_KEYS = {
     "language_probability",
     "progress_percent",
     "segment_count",
+    "is_stale",
     "error_code",
     "error_message",
     "created_at",
@@ -370,3 +371,57 @@ def test_transcript_pagination_bounds(client, db_session, params):
     complete_with_segments(db_session, video_id, 1)
 
     assert client.get(f"{base(project_id, video_id)}/transcript", params=params).status_code == 422
+
+
+# --- hardening: stale jobs ------------------------------------------------------------------
+
+
+def test_status_flags_a_stale_job(client, db_session):
+    from datetime import UTC, datetime, timedelta
+
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    created = client.post(f"{base(project_id, video_id)}/transcription").json()
+    assert client.get(f"{base(project_id, video_id)}/transcription").json()["is_stale"] is False
+
+    t = db_session.get(Transcription, uuid.UUID(created["id"]))
+    t.status, t.heartbeat_at = "transcribing", datetime.now(UTC) - timedelta(hours=3)
+    db_session.commit()
+
+    body = client.get(f"{base(project_id, video_id)}/transcription").json()
+    assert body["status"] == "transcribing" and body["is_stale"] is True
+
+
+def test_retry_resets_a_stale_job(client, db_session, fake_queue):
+    from datetime import UTC, datetime, timedelta
+
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    created = client.post(f"{base(project_id, video_id)}/transcription").json()
+    t = db_session.get(Transcription, uuid.UUID(created["id"]))
+    t.status, t.heartbeat_at, t.progress_percent = (
+        "extracting_audio",
+        datetime.now(UTC) - timedelta(hours=3),
+        5,
+    )
+    db_session.commit()
+
+    response = client.post(f"{base(project_id, video_id)}/transcription/retry")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued" and response.json()["is_stale"] is False
+    assert len(fake_queue) == 2 and t.celery_task_id == "task-2"
+
+
+def test_retry_refuses_a_live_job_with_fresh_heartbeat(client, db_session, fake_queue):
+    from datetime import UTC, datetime
+
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    created = client.post(f"{base(project_id, video_id)}/transcription").json()
+    t = db_session.get(Transcription, uuid.UUID(created["id"]))
+    t.status, t.heartbeat_at = "transcribing", datetime.now(UTC)
+    db_session.commit()
+
+    assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 409
+    assert len(fake_queue) == 1

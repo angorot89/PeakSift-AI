@@ -18,6 +18,8 @@ class TranscriptionRead(BaseModel):
     language_probability: float | None
     progress_percent: int
     segment_count: int
+    # An active job whose worker stopped reporting (heartbeat older than the stale threshold).
+    is_stale: bool
     error_code: str | None
     error_message: str | None
     created_at: datetime
