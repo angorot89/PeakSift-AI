@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # Local directory for uploaded media (development storage). Never committed.
     media_root: Path = Path("./media")
+    # Largest accepted source video. Default 2 GiB.
+    max_video_upload_bytes: int = Field(default=2 * 1024**3, gt=0)
 
     @property
     def is_production(self) -> bool:
