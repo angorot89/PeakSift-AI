@@ -47,6 +47,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # Test-only values for the CI database service; not real credentials.
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/peaksift_test
@@ -55,6 +64,12 @@ jobs:
       # The video pipeline tests generate tiny fixtures with ffmpeg and probe them with
       # ffprobe; in CI a missing binary must fail the tests, not skip them.
       REQUIRE_FFMPEG: "1"
+      # Background jobs: Redis service above; the live-broker test must not skip.
+      REDIS_URL: redis://localhost:6379/0
+      REQUIRE_REDIS: "1"
+      # Provider tests mock inference. Refuse any accidental Hugging Face download.
+      HF_HUB_OFFLINE: "1"
+      # No OpenAI key in CI, ever; the OpenAI provider tests use a fake SDK client.
     steps:
       - uses: actions/checkout@v4
       - name: Install FFmpeg (ffprobe for metadata, ffmpeg for generated test fixtures)
@@ -76,3 +91,5 @@ jobs:
           alembic check
           alembic downgrade base
       - run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible
+      - name: Real broker + worker smoke (ping round-trip, no transcription)
+        run: python scripts/celery_smoke.py

@@ -132,7 +132,7 @@ Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_te
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, and runs the test suite including the real-ffprobe video tests (fixtures are generated with `ffmpeg` at test time; no media is stored in the repository). CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; there is no OpenAI key in CI. CI validates only — nothing is deployed.
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
