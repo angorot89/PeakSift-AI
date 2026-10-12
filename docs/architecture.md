@@ -69,7 +69,10 @@ Probing is synchronous in Milestone 2; no queue or worker exists. The browser th
 | `projects` | `id` (uuid), `user_id` (FK → users, cascade delete), `name`, `status`, `created_at`, `updated_at` |
 | `videos`   | `id` (uuid), `project_id` (FK → projects, cascade delete), `original_filename`, `storage_key` (unique), `content_type`, `file_size`, `duration_seconds`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `status`, `error_message`, `created_at`, `updated_at` |
 
-Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest.
+| `transcriptions` | `id` (uuid), `video_id` (FK → videos, cascade delete, **unique** — one current transcription per video), `status`, `provider`, `model`, `language`, `language_probability`, `progress_percent` (0–100, checked), `full_text`, `error_code`, `error_message`, `celery_task_id`, `audio_storage_key`, `audio_duration_seconds`, `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
+| `transcript_segments` | `id` (uuid), `transcription_id` (FK → transcriptions, cascade delete), `sequence_index`, `start_time`, `end_time`, `text`, `speaker` (nullable, reserved), `created_at`. Constraints: `start_time >= 0`, `end_time > start_time`, unique `(transcription_id, sequence_index)`; index on `(transcription_id, start_time)` |
+
+Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`).
 
 ### Testing and CI
 

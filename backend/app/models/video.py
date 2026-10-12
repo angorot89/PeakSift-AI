@@ -10,6 +10,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.project import Project
+    from app.models.transcription import Transcription
 
 
 class VideoStatus(StrEnum):
@@ -54,6 +55,9 @@ class Video(Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="videos")
+    transcription: Mapped["Transcription | None"] = relationship(
+        back_populates="video", cascade="all, delete-orphan", passive_deletes=True, uselist=False
+    )
 
     def __repr__(self) -> str:
         return (
