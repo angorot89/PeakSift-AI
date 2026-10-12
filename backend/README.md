@@ -123,6 +123,12 @@ Audio is decoded to 16 kHz mono float32 PCM with `ffmpeg` (argument list, timeou
 
 Manual check with the real model (downloads `tiny`, ~75 MB, macOS only because it uses `say` to synthesise speech): `PEAKSIFT_REAL_WHISPER=1 pytest tests/test_faster_whisper_provider.py -k real`. Normal tests mock the model and download nothing.
 
+### Long audio: chunking and absolute timestamps
+
+`app/services/transcription/chunking.py` splits `transcription/<id>/normalized.mp3` into deterministic, contiguous, non-overlapping chunks of `TRANSCRIPTION_CHUNK_SECONDS` (default 10 minutes ≈ 4.8 MB) under `transcription/<id>/chunks/NNNN.mp3`; a final remainder under one second is folded into the previous chunk. Cuts use ffmpeg input seeking on the constant-bitrate MP3, which lands within one MP3 frame (~26 ms) of the requested time. Each chunk carries its absolute start, and `shift_segments` adds it to the provider's chunk-relative times before anything is stored — a provider segment `12.4 → 18.9` in the chunk starting at `600` becomes `612.4 → 618.9`. Any failure while splitting removes every chunk file; after a job finishes the chunk directory is deleted and the normalized audio is kept for retries.
+
+**Boundary limitation (V0.3):** boundaries are plain time cuts, not silence-aware, so a word spoken exactly across a boundary can be split between two segments. There is no overlap and therefore no duplicated text; a short piece of the previous chunk's text may be passed to the provider as a prompt for continuity only. Semantic/silence-aware chunking is future work.
+
 ### OpenAI (hosted)
 
 `app/services/transcription/openai_provider.py` uses the official SDK. Set `TRANSCRIPTION_PROVIDER=openai` and `OPENAI_API_KEY`; the key is only required when this provider is selected, is never validated at startup, and is never logged, returned by the API or sent to the frontend.
@@ -151,7 +157,7 @@ app/
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
-  services/transcription/      # Provider contract, validation, factory, faster_whisper + openai providers
+  services/transcription/      # Provider contract, validation, factory, chunking, faster_whisper + openai
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
@@ -177,6 +183,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary used to extract normalized audio for transcription |
 | `AUDIO_EXTRACTION_TIMEOUT_SECONDS` | `3600`                          | Time limit for extracting one video's audio  |
+| `TRANSCRIPTION_CHUNK_SECONDS` | `600`                                | Fixed chunk length for long audio (min 30)   |
 | `TRANSCRIPTION_PROVIDER` | `faster_whisper`                          | Speech-to-text provider: `faster_whisper` or `openai` (server choice, never client input) |
 | `FASTER_WHISPER_MODEL` | `small`                                     | Whisper model size/path (`tiny`, `base`, `small`, `medium`, `large-v3`, …) |
 | `FASTER_WHISPER_DEVICE` | `cpu`                                      | `cpu` or `cuda` (no Apple-GPU path; CPU is the macOS mode) |
