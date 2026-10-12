@@ -7,8 +7,16 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models import User
+from app.services.storage import LocalMediaStorage
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def get_storage() -> LocalMediaStorage:
+    return LocalMediaStorage(get_settings().media_root)
+
+
+Storage = Annotated[LocalMediaStorage, Depends(get_storage)]
 
 
 def get_current_user(request: Request, db: DbSession) -> User:

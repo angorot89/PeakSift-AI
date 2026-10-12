@@ -6,6 +6,7 @@ per session, and every test runs inside a transaction that is rolled back afterw
 """
 
 import os
+import tempfile
 from collections.abc import Generator
 from pathlib import Path
 
@@ -24,6 +25,8 @@ TEST_DATABASE_URL = os.environ.get(
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["SECRET_KEY"] = "test-only-secret-key-not-for-production-0123456789"
 os.environ["APP_ENV"] = "test"
+# Uploaded test media goes to a throwaway directory, never the developer's MEDIA_ROOT.
+os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="peaksift-test-media-")
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     secret_key: SecretStr = Field(min_length=32)
     access_token_expire_minutes: int = Field(default=7 * 24 * 60, gt=0)
     auth_cookie_name: str = "peaksift_access_token"
+
+    # Local directory for uploaded media (development storage). Never committed.
+    media_root: Path = Path("./media")
 
     @property
     def is_production(self) -> bool:
