@@ -38,6 +38,9 @@ export function hasAcceptedExtension(filename: string): boolean {
 export const listProjectVideos = (projectId: string) =>
   apiFetch<Video[]>(`/projects/${projectId}/videos`);
 
+/** Authenticated, owner-only stream of the source bytes (supports Range requests). */
+export const videoContentUrl = (videoId: string) => `${API_URL}/videos/${videoId}/content`;
+
 /**
  * Upload with real byte progress. `fetch` cannot report upload progress, so this
  * uses XMLHttpRequest; cookies are sent with `withCredentials`.

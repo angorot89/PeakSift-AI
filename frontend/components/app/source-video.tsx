@@ -7,7 +7,7 @@ import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDate, formatDuration, formatFps } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
-import { listProjectVideos, type Video } from "@/lib/videos";
+import { listProjectVideos, videoContentUrl, type Video } from "@/lib/videos";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -38,6 +38,18 @@ function VideoDetails({ video, onReplace }: { video: Video; onReplace: () => voi
         </div>
         <StatusBadge status={video.status} />
       </div>
+
+      {video.status === "ready" ? (
+        // Native player; the browser fetches the bytes with Range requests and the
+        // session cookie (same-site), so only the owner can load it.
+        <video
+          controls
+          preload="metadata"
+          src={videoContentUrl(video.id)}
+          className="mt-4 aspect-video w-full rounded-xl bg-black"
+          aria-label={`Preview of ${video.original_filename}`}
+        />
+      ) : null}
 
       {video.status === "failed" ? (
         <div role="alert" className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200">
