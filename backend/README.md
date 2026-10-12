@@ -129,6 +129,23 @@ Manual check with the real model (downloads `tiny`, ~75 MB, macOS only because i
 
 **Boundary limitation (V0.3):** boundaries are plain time cuts, not silence-aware, so a word spoken exactly across a boundary can be split between two segments. There is no overlap and therefore no duplicated text; a short piece of the previous chunk's text may be passed to the provider as a prompt for continuity only. Semantic/silence-aware chunking is future work.
 
+### The background pipeline
+
+`app/services/transcription/pipeline.py` runs inside the Celery worker (`peaksift.transcribe_video`, which receives only the transcription id):
+
+```
+queued → extracting_audio (normalized.mp3, progress 5)
+       → chunks
+       → transcribing (per chunk: provider → validate → shift to absolute time → persist, progress 5 + 95·done/total, heartbeat)
+       → completed (full_text, progress 100)   |   failed (error_code + safe error_message, no partial segments)
+```
+
+- **Idempotent on database state:** a `completed` row ignores duplicate deliveries; a row that is `extracting_audio`/`transcribing` with a fresh heartbeat is not started twice; one whose heartbeat is older than `TRANSCRIPTION_STALE_AFTER_SECONDS` (default 15 min) is treated as dead and restarted cleanly; a `failed` row is only re-run after the retry endpoint resets it to `queued`. Every (re)start deletes segments from earlier attempts first.
+- **Retries:** transient provider errors (rate limits, timeouts, connection problems, 5xx) are retried inside the task with exponential backoff (`TRANSCRIPTION_PROVIDER_MAX_ATTEMPTS`, `TRANSCRIPTION_RETRY_BACKOFF_SECONDS`: 2 s, 4 s, …). Configuration, capability, invalid-audio, missing-file and malformed-output errors fail immediately. There is no Celery-level autoretry, so a broken file can never loop.
+- **Timestamps:** provider times are chunk-relative; the pipeline rejects a segment that ends beyond its chunk (plus `TRANSCRIPTION_TIMESTAMP_TOLERANCE_SECONDS`) and shifts the rest by the chunk's absolute start before inserting. Segments are committed per chunk with a continuous `sequence_index`.
+- **Prompting:** the last `TRANSCRIPTION_PROMPT_TAIL_CHARS` of the previous chunk's text are passed to the provider as a prompt for continuity only; nothing from it is stored.
+- **Sessions and cleanup:** the worker opens its own SQLAlchemy session per task and disposes the inherited connection pool on process start. Chunk files are deleted after success or failure; `normalized.mp3` is kept for retries.
+
 ### OpenAI (hosted)
 
 `app/services/transcription/openai_provider.py` uses the official SDK. Set `TRANSCRIPTION_PROVIDER=openai` and `OPENAI_API_KEY`; the key is only required when this provider is selected, is never validated at startup, and is never logged, returned by the API or sent to the frontend.
@@ -157,7 +174,7 @@ app/
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
-  services/transcription/      # Provider contract, validation, factory, chunking, faster_whisper + openai
+  services/transcription/      # Contract, factory, chunking, pipeline, faster_whisper + openai providers
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
@@ -184,6 +201,11 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary used to extract normalized audio for transcription |
 | `AUDIO_EXTRACTION_TIMEOUT_SECONDS` | `3600`                          | Time limit for extracting one video's audio  |
 | `TRANSCRIPTION_CHUNK_SECONDS` | `600`                                | Fixed chunk length for long audio (min 30)   |
+| `TRANSCRIPTION_PROVIDER_MAX_ATTEMPTS` | `3`                           | Attempts per chunk for *transient* provider errors |
+| `TRANSCRIPTION_RETRY_BACKOFF_SECONDS` | `2`                           | Base backoff (doubles per attempt)           |
+| `TRANSCRIPTION_STALE_AFTER_SECONDS` | `900`                           | Heartbeat age after which a running job is considered dead |
+| `TRANSCRIPTION_PROMPT_TAIL_CHARS` | `200`                             | Previous-chunk text passed as prompt (0 disables) |
+| `TRANSCRIPTION_TIMESTAMP_TOLERANCE_SECONDS` | `1.5`                   | Allowed segment overrun past a chunk's end   |
 | `TRANSCRIPTION_PROVIDER` | `faster_whisper`                          | Speech-to-text provider: `faster_whisper` or `openai` (server choice, never client input) |
 | `FASTER_WHISPER_MODEL` | `small`                                     | Whisper model size/path (`tiny`, `base`, `small`, `medium`, `large-v3`, …) |
 | `FASTER_WHISPER_DEVICE` | `cpu`                                      | `cpu` or `cuda` (no Apple-GPU path; CPU is the macOS mode) |

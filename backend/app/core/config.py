@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # ~4.8 MB, comfortably under hosted upload limits.
     transcription_chunk_seconds: int = Field(default=600, ge=30)
 
+    # Pipeline behaviour. Transient provider errors are retried in-task with exponential
+    # backoff; a job whose heartbeat is older than the stale threshold is considered dead.
+    transcription_provider_max_attempts: int = Field(default=3, ge=1)
+    transcription_retry_backoff_seconds: float = Field(default=2.0, ge=0)
+    transcription_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    transcription_prompt_tail_chars: int = Field(default=200, ge=0)
+    # Provider segments may overrun a chunk by this much (encoder padding) before rejection.
+    transcription_timestamp_tolerance_seconds: float = Field(default=1.5, ge=0)
+
     # Which speech-to-text provider the pipeline uses: "faster_whisper" (local) or "openai".
     # Server configuration only; API clients never choose a provider.
     transcription_provider: str = "faster_whisper"
