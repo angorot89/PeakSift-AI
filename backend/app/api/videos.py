@@ -59,3 +59,22 @@ def upload_video(
 
     # Synchronous for Milestone 2: the response already carries ready/failed.
     return process_video_metadata(db, storage, video)
+
+
+@router.get("", response_model=list[VideoRead])
+def list_videos(project: OwnedProject, db: DbSession) -> list[Video]:
+    """The project's videos, newest first."""
+    statement = (
+        select(Video)
+        .where(Video.project_id == project.id)
+        .order_by(Video.created_at.desc(), Video.id.desc())
+    )
+    return list(db.scalars(statement))
+
+
+@router.get("/{video_id}", response_model=VideoRead)
+def get_video(video_id: uuid.UUID, project: OwnedProject, db: DbSession) -> Video:
+    video = db.scalar(select(Video).where(Video.id == video_id, Video.project_id == project.id))
+    if video is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+    return video

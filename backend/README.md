@@ -81,6 +81,10 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | POST   | `/projects`      | yes  | Create a project from `{"name": "..."}`; `201`. Status starts as `created`. |
 | GET    | `/projects/{id}` | yes  | One of the current user's projects; `404` if it does not exist or belongs to someone else. |
 | POST   | `/projects/{id}/videos` | yes | Upload a source video as `multipart/form-data` (field `file`); `201`. `.mp4`, `.mov`, `.webm` only (`415` otherwise), up to `MAX_VIDEO_UPLOAD_BYTES` (`413`), non-empty (`400`). `404` for projects that are not yours. The file is probed with ffprobe before the response, so `status` is already `ready` or `failed`. |
+| GET    | `/projects/{id}/videos` | yes | The project's videos, newest first.                  |
+| GET    | `/projects/{id}/videos/{video_id}` | yes | One video; `404` unless it belongs to that project and the project is yours. |
+
+A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
 Auth request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters. Project names are trimmed and must be 1–200 characters. A project is `{id, name, status, created_at, updated_at}`.
 

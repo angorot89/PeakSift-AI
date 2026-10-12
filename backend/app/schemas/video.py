@@ -14,5 +14,13 @@ class VideoRead(BaseModel):
     original_filename: str
     content_type: str
     file_size: int
+    duration_seconds: float | None
+    width: int | None
+    height: int | None
+    fps: float | None
+    video_codec: str | None
+    audio_codec: str | None
     status: str
+    error_message: str | None
     created_at: datetime
+    updated_at: datetime
