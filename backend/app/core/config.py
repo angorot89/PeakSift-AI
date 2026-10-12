@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     ollama_clip_models: str = "llama3.2:3b"
     ollama_connect_timeout_seconds: float = Field(default=5, gt=0)
     ollama_timeout_seconds: float = Field(default=300, gt=0)
+    # Context window requested per call; must hold the system prompt plus one analysis window.
+    ollama_num_ctx: int = Field(default=8192, ge=2048)
 
     # Hosted provider: OpenAI structured outputs. Uses OPENAI_API_KEY (shared with
     # transcription). Comma-separated allow-list of models (first = default).

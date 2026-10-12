@@ -18,7 +18,8 @@ dependencies = [
     "redis>=5,<9",  # Celery broker client
     "faster-whisper>=1.1,<2",  # local speech-to-text (CTranslate2 Whisper)
     "numpy>=1.26,<3",  # PCM arrays handed to faster-whisper (decoded with ffmpeg)
-    "openai>=3,<4",  # hosted speech-to-text (official SDK)
+    "openai>=3,<4",  # hosted speech-to-text and clip analysis (official SDK)
+    "httpx>=0.28,<1",  # local clip analysis over an Ollama-compatible HTTP endpoint
 ]
 
 [project.optional-dependencies]
