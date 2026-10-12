@@ -1,4 +1,5 @@
-"""Tiny real-broker smoke test: start a worker, round-trip `peaksift.ping`, stop the worker.
+"""Tiny real-broker smoke test: start a worker, round-trip `peaksift.ping`, check that the
+transcription and clip detection tasks are registered, stop the worker.
 
 Used by CI (against the Redis service) and by the acceptance checklist. It proves that the
 broker, the worker process and task registration work together; it transcribes nothing.
@@ -18,6 +19,20 @@ os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "0")
 
 from app.workers.celery_app import celery_app  # noqa: E402
 from app.workers.transcription_tasks import ping  # noqa: E402
+
+EXPECTED_TASKS = ("peaksift.ping", "peaksift.transcribe_video", "peaksift.detect_clips")
+
+
+def _check_registered_tasks() -> int:
+    """The live worker must know every job the API can enqueue, or jobs would be lost."""
+    registered = celery_app.control.inspect(timeout=10).registered() or {}
+    names = {task for tasks in registered.values() for task in tasks}
+    missing = [task for task in EXPECTED_TASKS if task not in names]
+    if missing:
+        print(f"worker is missing tasks: {', '.join(missing)}", file=sys.stderr)
+        return 1
+    print("worker registered:", ", ".join(EXPECTED_TASKS))
+    return 0
 
 
 def main() -> int:
@@ -54,7 +69,7 @@ def main() -> int:
                 continue
             if value == "pong":
                 print("worker round-trip: pong")
-                return 0
+                return _check_registered_tasks()
         print("worker did not answer within 60s", file=sys.stderr)
         return 1
     finally:

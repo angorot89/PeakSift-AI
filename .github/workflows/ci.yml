@@ -70,6 +70,11 @@ jobs:
       # Provider tests mock inference. Refuse any accidental Hugging Face download.
       HF_HUB_OFFLINE: "1"
       # No OpenAI key in CI, ever; the OpenAI provider tests use a fake SDK client.
+      # Clip detection: no Ollama in CI. Point the endpoint at a closed port with a short
+      # connect timeout so an accidental real inference call fails fast instead of hanging;
+      # the provider tests use a mocked transport or an in-process fake server.
+      OLLAMA_BASE_URL: http://127.0.0.1:9
+      OLLAMA_CONNECT_TIMEOUT_SECONDS: "1"
     steps:
       - uses: actions/checkout@v4
       - name: Install FFmpeg (ffprobe for metadata, ffmpeg for generated test fixtures)
@@ -91,5 +96,5 @@ jobs:
           alembic check
           alembic downgrade base
       - run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible
-      - name: Real broker + worker smoke (ping round-trip, no transcription)
+      - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
