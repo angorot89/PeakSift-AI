@@ -1,6 +1,6 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It currently provides a health check, email/password authentication, and a per-user project API.
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It provides a health check, email/password authentication, a per-user project API, and source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development).
 
 ## Prerequisites
 
