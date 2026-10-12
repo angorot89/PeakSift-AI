@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Largest accepted source video. Default 2 GiB.
     max_video_upload_bytes: int = Field(default=2 * 1024**3, gt=0)
 
+    # ffprobe binary used to read video metadata, and how long one probe may take.
+    ffprobe_path: str = "ffprobe"
+    ffprobe_timeout_seconds: float = Field(default=30, gt=0)
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

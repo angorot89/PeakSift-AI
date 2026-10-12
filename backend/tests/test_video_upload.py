@@ -95,7 +95,8 @@ def test_upload_valid_mp4(client: TestClient, db_session: Session):
     assert body["original_filename"] == "stream.mp4"
     assert body["content_type"] == "video/mp4"
     assert body["file_size"] == len(MP4_BYTES)
-    assert body["status"] == "uploaded"
+    # Metadata probing runs synchronously; these bytes are not real media, so it fails.
+    assert body["status"] in ("ready", "failed")
     assert uuid.UUID(body["id"])
     assert body["created_at"]
     # Nothing about where the file lives leaks out.

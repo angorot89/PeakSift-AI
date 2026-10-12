@@ -8,6 +8,7 @@ from app.api.deps import CurrentUser, DbSession, Storage
 from app.core.config import get_settings
 from app.models import Project, Video
 from app.schemas.video import VideoRead
+from app.services.video_processing import process_video_metadata
 from app.services.video_upload import UploadValidationError, check_declared_size, store_upload
 
 router = APIRouter(prefix="/projects/{project_id}/videos", tags=["videos"])
@@ -50,8 +51,11 @@ def upload_video(
     file: Annotated[UploadFile, File()],
 ) -> Video:
     try:
-        return store_upload(
+        video = store_upload(
             db, storage, project, file, max_bytes=get_settings().max_video_upload_bytes
         )
     except UploadValidationError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from None
+
+    # Synchronous for Milestone 2: the response already carries ready/failed.
+    return process_video_metadata(db, storage, video)
