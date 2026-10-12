@@ -402,9 +402,13 @@ def test_list_runs_is_newest_first_and_paginated(client, db_session, settings):
     sign_up(client)
     project_id, video_id = transcribed_video(client, db_session)
     ids = []
-    for _ in range(3):
+    for index in range(3):
         run_id = start(client, project_id, video_id).json()["id"]
-        complete_run(db_session, run_id, candidates=1)
+        run = complete_run(db_session, run_id, candidates=1)
+        # The suite runs inside one transaction, so the server-side now() default is the
+        # same for every row; give each run its own creation time as real requests would.
+        run.created_at = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(minutes=index)
+        db_session.commit()
         ids.append(run_id)
 
     page = client.get(base(project_id, video_id), params={"limit": 2}).json()
