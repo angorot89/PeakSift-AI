@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.clip_detection import ClipDetectionRun
     from app.models.project import Project
     from app.models.transcription import Transcription
 
@@ -57,6 +58,12 @@ class Video(Base):
     project: Mapped["Project"] = relationship(back_populates="videos")
     transcription: Mapped["Transcription | None"] = relationship(
         back_populates="video", cascade="all, delete-orphan", passive_deletes=True, uselist=False
+    )
+    clip_detection_runs: Mapped[list["ClipDetectionRun"]] = relationship(
+        back_populates="video",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ClipDetectionRun.created_at.desc()",
     )
 
     def __repr__(self) -> str:
