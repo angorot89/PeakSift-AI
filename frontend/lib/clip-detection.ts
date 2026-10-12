@@ -32,7 +32,8 @@ export type DetectionRun = {
   attempt: number;
   candidate_count: number;
   is_stale: boolean;
-  transcript_current: boolean;
+  /** null while the run is active (not evaluated on every poll). */
+  transcript_current: boolean | null;
   config: Record<string, number>;
   error_code: string | null;
   error_message: string | null;

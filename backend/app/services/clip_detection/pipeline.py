@@ -18,6 +18,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -120,6 +121,16 @@ def run_clip_detection(
         logger.info("Clip detection %s was taken over by a newer task; stopping", run.id)
     except (PipelineFailure, TranscriptError, ClipProviderError) as error:
         _fail(run, db, error.code, error.message)
+    except SoftTimeLimitExceeded:
+        # Celery's soft limit: record an honest, retryable-by-the-user failure instead of a
+        # generic one, and leave the row consistent before the hard limit kills the process.
+        _fail(
+            run,
+            db,
+            "time_limit",
+            "The detection ran longer than the worker allows; retry with a faster model "
+            "or a smaller transcript",
+        )
     except Exception:
         logger.exception("Unexpected error detecting clips for run %s", run.id)
         _fail(run, db, "internal_error", "Unexpected error during clip detection")

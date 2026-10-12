@@ -7,6 +7,7 @@ validated against server allow-lists; endpoints and keys never leave the server.
 
 import uuid
 from datetime import UTC, datetime
+from types import EllipsisType
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -135,8 +136,14 @@ def _current_fingerprint(db: DbSession, video: Video) -> str | None:
 
 
 def _read(
-    db: DbSession, run: ClipDetectionRun, *, current_fingerprint: str | None
+    db: DbSession, run: ClipDetectionRun, *, current_fingerprint: str | None | EllipsisType
 ) -> DetectionRunRead:
+    """``current_fingerprint`` is ``...`` when the caller did not evaluate it (active runs are
+    polled every few seconds; hashing a multi-hour transcript each time would be waste)."""
+    if current_fingerprint is Ellipsis:
+        transcript_current = None
+    else:
+        transcript_current = current_fingerprint == run.transcript_fingerprint
     return DetectionRunRead(
         id=run.id,
         video_id=run.video_id,
@@ -150,7 +157,7 @@ def _read(
         attempt=run.attempt,
         candidate_count=_candidate_count(db, run),
         is_stale=is_stale(run, get_settings()),
-        transcript_current=current_fingerprint == run.transcript_fingerprint,
+        transcript_current=transcript_current,
         config=run.config or {},
         error_code=run.error_code,
         error_message=run.error_message,
@@ -323,7 +330,10 @@ def list_runs(
 
 @router.get("/{run_id}", response_model=DetectionRunRead)
 def get_run(run: OwnedRun, video: OwnedVideo, db: DbSession) -> DetectionRunRead:
-    return _read(db, run, current_fingerprint=_current_fingerprint(db, video))
+    # While a run is active this endpoint is polled; the transcript check only matters once
+    # there are results to compare against, so skip the full-transcript hash until then.
+    active = run.status in {s.value for s in ACTIVE_CLIP_DETECTION_STATUSES}
+    return _read(db, run, current_fingerprint=... if active else _current_fingerprint(db, video))
 
 
 @router.post("/{run_id}/retry", response_model=DetectionRunRead)
@@ -338,6 +348,11 @@ def retry_run(run: OwnedRun, video: OwnedVideo, db: DbSession) -> DetectionRunRe
     if video.status != VideoStatus.READY:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="The video must be ready first"
+        )
+    if run.attempt >= settings.clip_detection_max_attempts:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This detection has been retried too many times; start a new detection",
         )
     current = _current_fingerprint(db, video)
     if current != run.transcript_fingerprint:

@@ -219,6 +219,7 @@ export function ClipDetectionPanel({
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [startingNew, setStartingNew] = useState(false);
+  const [loadVersion, setLoadVersion] = useState(0);
 
   const handleError = useCallback(
     (err: unknown) => {
@@ -248,7 +249,7 @@ export function ClipDetectionPanel({
     return () => {
       cancelled = true;
     };
-  }, [projectId, videoId, transcriptReady, handleError]);
+  }, [projectId, videoId, transcriptReady, handleError, loadVersion]);
 
   const selected = runs?.find((run) => run.id === selectedId) ?? null;
 
@@ -305,7 +306,15 @@ export function ClipDetectionPanel({
       </p>
     );
   } else if (loadError) {
-    body = <ErrorState message={loadError} onRetry={() => window.location.reload()} />;
+    body = (
+      <ErrorState
+        message={loadError}
+        onRetry={() => {
+          setLoadError(null);
+          setLoadVersion((v) => v + 1);
+        }}
+      />
+    );
   } else if (providers === null || runs === null) {
     body = <LoadingState label="Loading clip detection…" />;
   } else if (selected === null || startingNew) {
@@ -353,7 +362,7 @@ export function ClipDetectionPanel({
           {selected.error_message ? <p className="mt-1">{selected.error_message}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {selected.transcript_current ? (
+          {selected.transcript_current !== false ? (
             <Button
               variant="secondary"
               onClick={() => run(() => retryRun(projectId, videoId, selected.id))}
@@ -381,7 +390,7 @@ export function ClipDetectionPanel({
             Run again
           </Button>
         </div>
-        {!selected.transcript_current ? (
+        {selected.transcript_current === false ? (
           <p
             role="status"
             className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100"

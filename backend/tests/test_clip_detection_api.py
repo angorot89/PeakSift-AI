@@ -390,6 +390,7 @@ def test_transcript_current_flag_turns_false_when_the_transcript_changes(
     sign_up(client)
     project_id, video_id = transcribed_video(client, db_session)
     run_id = start(client, project_id, video_id).json()["id"]
+    complete_run(db_session, run_id)  # the flag is only evaluated once a run is no longer active
     video = db_session.get(Video, uuid.UUID(video_id))
     video.transcription.segments[0].text = "re-transcribed"
     db_session.commit()
@@ -594,3 +595,33 @@ def test_candidate_of_another_run_is_not_found(client, db_session, settings):
         ).status_code
         == 404
     )
+
+
+# --- hardening ----------------------------------------------------------------------------
+
+
+def test_transcript_current_is_not_evaluated_while_a_run_is_active(client, db_session, settings):
+    sign_up(client)
+    project_id, video_id = transcribed_video(client, db_session)
+    run_id = start(client, project_id, video_id).json()["id"]
+
+    assert client.get(f"{base(project_id, video_id)}/{run_id}").json()["transcript_current"] is None
+    complete_run(db_session, run_id)
+    assert client.get(f"{base(project_id, video_id)}/{run_id}").json()["transcript_current"] is True
+
+
+def test_retries_are_bounded_per_run(client, db_session, settings):
+    sign_up(client)
+    project_id, video_id = transcribed_video(client, db_session)
+    run_id = start(client, project_id, video_id).json()["id"]
+    run = db_session.get(ClipDetectionRun, uuid.UUID(run_id))
+    run.status, run.attempt = "failed", settings.clip_detection_max_attempts
+    db_session.commit()
+
+    response = client.post(f"{base(project_id, video_id)}/{run_id}/retry")
+    assert response.status_code == 409
+    assert "start a new detection" in response.json()["detail"]
+
+    run.attempt = settings.clip_detection_max_attempts - 1
+    db_session.commit()
+    assert client.post(f"{base(project_id, video_id)}/{run_id}/retry").status_code == 200
