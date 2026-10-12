@@ -271,9 +271,11 @@ def test_database_failure_removes_stored_file(client: TestClient, db_session: Se
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(db_session, "commit", failing_commit)
-    with pytest.raises(RuntimeError):
-        upload(client, project["id"])
+    response = upload(client, project["id"])
 
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}
+    assert "database unavailable" not in response.text
     assert stored_files() == []
     monkeypatch.undo()
     db_session.rollback()
@@ -290,3 +292,76 @@ def test_check_declared_size():
     with pytest.raises(Exception) as excinfo:
         check_declared_size(str(100 + 64 * 1024 + 1), 100)
     assert excinfo.value.status_code == 413
+
+
+# --- reliability: interrupted / chunked bodies, resource cleanup -------------------
+
+BOUNDARY = "testboundary"
+MULTIPART_TYPE = f"multipart/form-data; boundary={BOUNDARY}"
+PART_HEAD = (
+    f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="clip.mp4"\r\n'
+    "Content-Type: video/mp4\r\n\r\n"
+).encode()
+PART_TAIL = f"\r\n--{BOUNDARY}--\r\n".encode()
+
+
+def test_truncated_multipart_body_stores_nothing(client: TestClient, db_session: Session):
+    sign_up(client, "owner@example.com")
+    project = create_project(client)
+    body = PART_HEAD + b"x" * 4096 + PART_TAIL
+
+    response = client.post(
+        f"/projects/{project['id']}/videos",
+        content=body[: len(body) // 2],  # connection dropped halfway
+        headers={"Content-Type": MULTIPART_TYPE},
+    )
+
+    assert 400 <= response.status_code < 500
+    assert stored_files() == []
+    assert db_session.scalar(select(Video)) is None
+
+
+def test_chunked_upload_without_content_length_is_still_limited(client, monkeypatch, db_session):
+    monkeypatch.setattr(get_settings(), "max_video_upload_bytes", 4096)
+    sign_up(client, "owner@example.com")
+    project = create_project(client)
+
+    def body():
+        yield PART_HEAD
+        yield b"y" * 4097
+        yield PART_TAIL
+
+    response = client.post(
+        f"/projects/{project['id']}/videos",
+        content=body(),
+        headers={"Content-Type": MULTIPART_TYPE, "Transfer-Encoding": "chunked"},
+    )
+
+    assert response.status_code == 413
+    assert stored_files() == []
+    assert db_session.scalar(select(Video)) is None
+
+
+def test_extension_only_filename_is_unsupported(client: TestClient):
+    sign_up(client, "owner@example.com")
+    project = create_project(client)
+
+    assert upload(client, project["id"], filename=".mp4").status_code == 415
+    assert stored_files() == []
+
+
+def test_repeated_uploads_do_not_leak_file_descriptors(client: TestClient):
+    sign_up(client, "owner@example.com")
+    project = create_project(client)
+    fd_dir = Path("/dev/fd")
+    if not fd_dir.exists():
+        pytest.skip("/dev/fd not available")
+    upload(client, project["id"])  # warm up pools and caches
+    before = len(list(fd_dir.iterdir()))
+
+    for _ in range(20):
+        assert upload(client, project["id"]).status_code == 201
+
+    after = len(list(fd_dir.iterdir()))
+    assert after - before <= 3, f"file descriptors grew from {before} to {after}"
+    assert not [p for p in stored_files() if p.name.endswith(".part")]

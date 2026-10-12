@@ -12,7 +12,7 @@ from app.core.errors import register_error_handlers
 settings = get_settings()
 
 app = FastAPI(title="PeakSift AI API", version="0.1.0")
-register_error_handlers(app)
+register_error_handlers(app)  # before CORS, so error responses still get CORS headers
 
 app.add_middleware(
     CORSMiddleware,
