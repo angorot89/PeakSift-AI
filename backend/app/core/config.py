@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     ffmpeg_path: str = "ffmpeg"
     audio_extraction_timeout_seconds: float = Field(default=3600, gt=0)
 
+    # Long audio is transcribed in fixed-duration chunks (seconds). 10 minutes at 64 kbps is
+    # ~4.8 MB, comfortably under hosted upload limits.
+    transcription_chunk_seconds: int = Field(default=600, ge=30)
+
     # Which speech-to-text provider the pipeline uses: "faster_whisper" (local) or "openai".
     # Server configuration only; API clients never choose a provider.
     transcription_provider: str = "faster_whisper"
