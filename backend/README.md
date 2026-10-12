@@ -109,6 +109,12 @@ Validation failures return `422` with `{"detail": [{"type", "loc", "msg"}, ...]}
 - **Unknown email vs wrong password** return the identical `401` response, and the unknown-email path still performs an Argon2 verification so response time does not reveal which case occurred.
 - **CSRF**: `SameSite=Lax` stops the cookie being sent on cross-site `POST`s from other origins, all state-changing endpoints take JSON bodies (not form posts), and CORS only allows `FRONTEND_URL`. That is the Milestone 1 position; a CSRF token scheme should be added before any cookie-authenticated endpoint accepts form submissions or `SameSite=None` is needed.
 
+## Transcription providers
+
+Speech-to-text sits behind one contract (`app/services/transcription/contract.py`). A provider receives a `TranscriptionRequest` (audio path, optional language hint and short prompt) and returns a `ProviderTranscriptionResult` — text, detected language (+ probability), provider/model names and ordered `ProviderSegment`s with start/end seconds. Each provider declares `ProviderCapabilities` (segment timestamps, word timestamps, language detection, diarization).
+
+**Timestamp contract:** the pipeline cuts clips from segment times, so `get_transcription_provider()` refuses any provider that does not return segment timestamps, and `validate_segments` rejects negative, inverted, out-of-order or NaN times instead of "fixing" them. Timestamps are never fabricated. `TRANSCRIPTION_PROVIDER` selects `faster_whisper` or `openai`; anything else is a configuration error.
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a video's bytes is `GET /videos/{video_id}/content`, which resolves the video through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -129,6 +135,7 @@ app/
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
+  services/transcription/      # Provider contract, validation, factory (providers in later PRs)
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
@@ -154,6 +161,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary used to extract normalized audio for transcription |
 | `AUDIO_EXTRACTION_TIMEOUT_SECONDS` | `3600`                          | Time limit for extracting one video's audio  |
+| `TRANSCRIPTION_PROVIDER` | `faster_whisper`                          | Speech-to-text provider: `faster_whisper` or `openai` (server choice, never client input) |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |
