@@ -1,6 +1,6 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It currently provides a health check and email/password authentication, and defines the `users` and `projects` tables.
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It currently provides a health check, email/password authentication, and a per-user project API.
 
 ## Prerequisites
 
@@ -76,8 +76,11 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | POST   | `/auth/login`    | no   | `200` + sets the auth cookie. `401` with a generic message on bad credentials. |
 | POST   | `/auth/logout`   | no   | `204`; clears the auth cookie.                           |
 | GET    | `/auth/me`       | yes  | The current user: `id`, `email`, `created_at`.           |
+| GET    | `/projects`      | yes  | The current user's projects, newest first.               |
+| POST   | `/projects`      | yes  | Create a project from `{"name": "..."}`; `201`. Status starts as `created`. |
+| GET    | `/projects/{id}` | yes  | One of the current user's projects; `404` if it does not exist or belongs to someone else. |
 
-Request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters.
+Auth request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters. Project names are trimmed and must be 1–200 characters. A project is `{id, name, status, created_at, updated_at}`.
 
 ## Authentication design
 
@@ -93,7 +96,7 @@ Request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimm
 ```
 app/
   main.py            # FastAPI app, CORS, routers
-  api/               # Routers: health, auth; deps.py has `DbSession` and `CurrentUser`
+  api/               # Routers: health, auth, projects; deps.py has `DbSession` and `CurrentUser`
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
