@@ -18,7 +18,12 @@ import {
 
 const POLL_INTERVAL_MS = 4000;
 
-type Props = { projectId: string; videoId: string };
+type Props = {
+  projectId: string;
+  videoId: string;
+  /** Lets the page share the transcription state with sibling sections (clip detection). */
+  onTranscriptionChange?: (transcription: Transcription | null, loaded: boolean) => void;
+};
 
 function statusCopy(transcription: Transcription): string {
   switch (transcription.status) {
@@ -38,10 +43,14 @@ function statusCopy(transcription: Transcription): string {
 }
 
 /** Start / status / retry / transcript for a ready video. Polls while a job is active. */
-export function TranscriptionPanel({ projectId, videoId }: Props) {
+export function TranscriptionPanel({ projectId, videoId, onTranscriptionChange }: Props) {
   const { setUser } = useAuth();
   const [transcription, setTranscription] = useState<Transcription | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    onTranscriptionChange?.(transcription, loaded);
+  }, [transcription, loaded, onTranscriptionChange]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -199,7 +208,6 @@ export function TranscriptionPanel({ projectId, videoId }: Props) {
             {transcription.model}
           </p>
           <TranscriptViewer projectId={projectId} videoId={videoId} total={transcription.segment_count} />
-          <p className="text-sm text-muted">AI clip detection comes in Milestone 4.</p>
         </div>
       )}
 

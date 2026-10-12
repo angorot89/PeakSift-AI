@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { ClipDetectionPanel } from "@/components/app/clip-detection-panel";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TranscriptionPanel } from "@/components/app/transcription-panel";
 import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDate, formatDuration, formatFps } from "@/lib/format";
+import type { Transcription } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
 import { listProjectVideos, videoContentUrl, type Video } from "@/lib/videos";
 
@@ -37,6 +39,17 @@ function VideoDetails({
   if (video.audio_codec) rows.push(["Audio codec", video.audio_codec]);
   rows.push(["File size", formatBytes(video.file_size)]);
   rows.push(["Uploaded", formatDate(video.created_at)]);
+
+  // Transcription state is owned by the transcription panel and shared with clip detection.
+  const [transcriptState, setTranscriptState] = useState<{
+    transcription: Transcription | null;
+    loaded: boolean;
+  }>({ transcription: null, loaded: false });
+  const onTranscriptionChange = useCallback(
+    (transcription: Transcription | null, loaded: boolean) =>
+      setTranscriptState({ transcription, loaded }),
+    [],
+  );
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-5">
@@ -77,7 +90,19 @@ function VideoDetails({
       </dl>
 
       {video.status === "ready" ? (
-        <TranscriptionPanel projectId={projectId} videoId={video.id} />
+        <>
+          <TranscriptionPanel
+            projectId={projectId}
+            videoId={video.id}
+            onTranscriptionChange={onTranscriptionChange}
+          />
+          <ClipDetectionPanel
+            projectId={projectId}
+            videoId={video.id}
+            transcription={transcriptState.transcription}
+            transcriptionLoaded={transcriptState.loaded}
+          />
+        </>
       ) : null}
 
       <div className="mt-5 flex justify-end">
