@@ -1,6 +1,6 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It provides a health check, email/password authentication, a per-user project API, and source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development).
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), and background transcription with timestamped segments (faster-whisper locally or OpenAI).
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ Background jobs need a worker in a second terminal (same virtualenv, same `backe
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run.
+The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run. On macOS, run the worker with `--pool=solo` if you see fork-related problems. `python scripts/celery_smoke.py` verifies a real broker + worker round-trip.
 
 ## Test
 

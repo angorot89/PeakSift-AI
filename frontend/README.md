@@ -1,6 +1,6 @@
 # PeakSift AI — Frontend
 
-Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata and preview — all backed by the FastAPI API.
+Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata, preview and transcription workflow — all backed by the FastAPI API.
 
 ## Run locally
 

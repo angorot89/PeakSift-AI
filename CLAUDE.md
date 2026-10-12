@@ -21,9 +21,9 @@ Long-term:
 
 ## Current state
 
-**Milestone 1 — Foundation V0.1** and **Milestone 2 — Video Upload V0.2** are complete (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload to local storage, ffprobe metadata, owner-only preview, PostgreSQL schema with Alembic, tests and CI with FFmpeg.
+**Milestones 1–3 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, and background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), with tests and CI.
 
-**Next is Milestone 3 — Transcription.** Do not start it, or any later feature (audio extraction, Whisper, AI, clip detection, clip generation, editor, Morocco Mode, payments), until explicitly instructed.
+**Next is Milestone 4 — AI Clip Detection.** Do not start it, or any later feature (candidate clips, virality/hook/retention scoring, clip generation, editor, Morocco Mode, payments), until explicitly instructed.
 
 ## Stack (as built)
 
@@ -31,9 +31,11 @@ Long-term:
 - Backend: FastAPI, SQLAlchemy 2 (synchronous), Alembic, psycopg 3, pydantic-settings in `backend/`
 - Database: PostgreSQL
 - Auth: Argon2id (`pwdlib`), HS256 JWT (`PyJWT`) in an HttpOnly `SameSite=Lax` cookie
-- Media: local filesystem storage under `MEDIA_ROOT` (dev only); `ffprobe` for metadata (argument-list subprocess with timeout); `python-multipart` for uploads
+- Media: local filesystem storage under `MEDIA_ROOT` (dev only); `ffprobe`/`ffmpeg` via argument-list subprocesses with timeouts; `python-multipart` for uploads
+- Background jobs: Celery on Redis (`app/workers/`), one job per worker, database is the source of truth
+- Speech-to-text: provider contract in `app/services/transcription/`; `faster-whisper` (local, lazy) and the OpenAI SDK (`whisper-1` for timestamps); provider is server configuration
 - Tooling: pytest, Ruff, ESLint, GitHub Actions (backend job installs FFmpeg)
-- Planned later: S3-compatible object storage, background jobs, speech-to-text + LLM clip analysis
+- Planned later: S3-compatible object storage, LLM clip analysis
 
 ## Conventions
 
@@ -44,7 +46,10 @@ Long-term:
 - Frontend: call the API only through `lib/api.ts`; keep auth state in `AuthProvider`; no tokens in browser storage; the API is the security boundary.
 - Prefer small, honest UI: real data or clearly labelled placeholders, never fake numbers.
 - Media: never use a browser-supplied filename as a path; storage keys are generated and resolved only through `LocalMediaStorage.path_for`. Never commit anything under `media/`; test fixtures are generated with `ffmpeg` at test time. External tools are run with argument lists and timeouts, never `shell=True`, and their stderr is never stored or returned.
-- Error messages and responses must not contain filesystem paths, storage keys or submitted values.
+- Error messages and responses must not contain filesystem paths, storage keys, submitted values, API keys or task ids.
+- Transcript timestamps are never fabricated: a provider without segment timestamps is refused; segments are validated (and re-validated in the pipeline) and shifted to absolute time before persisting. Provider SDK objects never leave the provider module.
+- Celery tasks receive database ids only and must stay idempotent on database state; never load a speech model at import or API startup.
+- Tests: Celery eager mode, mocked speech models and a fake OpenAI client; CI sets `HF_HUB_OFFLINE=1` and never has an API key.
 - Read `README.md`, `docs/architecture.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
