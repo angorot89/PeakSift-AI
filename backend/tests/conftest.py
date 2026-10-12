@@ -20,7 +20,10 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 # Must happen before anything imports `app.*`: settings are read at import time.
+# Test-only values take priority over a developer's `.env`.
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["SECRET_KEY"] = "test-only-secret-key-not-for-production-0123456789"
+os.environ["APP_ENV"] = "test"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,8 +15,14 @@ class Settings(BaseSettings):
     # SQLAlchemy URL, e.g. postgresql+psycopg://user:password@localhost:5432/peaksift
     database_url: str
 
-    # Not used yet; reserved for upcoming milestones.
-    secret_key: SecretStr | None = None
+    # Signs auth tokens. Required and deliberately has no default; see .env.example.
+    secret_key: SecretStr = Field(min_length=32)
+    access_token_expire_minutes: int = Field(default=7 * 24 * 60, gt=0)
+    auth_cookie_name: str = "peaksift_access_token"
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
 
 
 @lru_cache
