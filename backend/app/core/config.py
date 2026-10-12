@@ -86,7 +86,11 @@ class Settings(BaseSettings):
     # Pipeline behaviour (same semantics as transcription).
     clip_detection_provider_max_attempts: int = Field(default=3, ge=1)
     clip_detection_retry_backoff_seconds: float = Field(default=2.0, ge=0)
+    # Must exceed the worst-case time for one analysis window on the slowest worker, or a
+    # live run could be mistaken for a dead one (a retry would then fence it out).
     clip_detection_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    # How many times one run may be retried before the user must start a new detection.
+    clip_detection_max_attempts: int = Field(default=5, ge=1)
 
     # Local provider: an Ollama-compatible endpoint. The operator controls the endpoint and
     # the comma-separated allow-list of models (first = default); clients only pick from it.

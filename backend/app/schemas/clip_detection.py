@@ -40,8 +40,9 @@ class DetectionRunRead(BaseModel):
     attempt: int
     candidate_count: int
     is_stale: bool
-    # True when the video's current transcript is still the one this run analysed.
-    transcript_current: bool
+    # True when the video's current transcript is still the one this run analysed; null
+    # while the run is active (not evaluated on every poll).
+    transcript_current: bool | None
     config: dict[str, Any]
     error_code: str | None
     error_message: str | None
