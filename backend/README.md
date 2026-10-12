@@ -6,6 +6,7 @@ FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It currentl
 
 - Python 3.11+ (check with `python3 --version`)
 - PostgreSQL 14+ — either Docker (`docker compose up -d` from the repository root) or a local installation
+- FFmpeg (for `ffprobe`, which reads uploaded video metadata): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads still succeed but end in status `failed`.
 
 All commands below are run from the `backend/` directory.
 
@@ -79,7 +80,7 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | GET    | `/projects`      | yes  | The current user's projects, newest first.               |
 | POST   | `/projects`      | yes  | Create a project from `{"name": "..."}`; `201`. Status starts as `created`. |
 | GET    | `/projects/{id}` | yes  | One of the current user's projects; `404` if it does not exist or belongs to someone else. |
-| POST   | `/projects/{id}/videos` | yes | Upload a source video as `multipart/form-data` (field `file`); `201`. `.mp4`, `.mov`, `.webm` only (`415` otherwise), up to `MAX_VIDEO_UPLOAD_BYTES` (`413`), non-empty (`400`). `404` for projects that are not yours. |
+| POST   | `/projects/{id}/videos` | yes | Upload a source video as `multipart/form-data` (field `file`); `201`. `.mp4`, `.mov`, `.webm` only (`415` otherwise), up to `MAX_VIDEO_UPLOAD_BYTES` (`413`), non-empty (`400`). `404` for projects that are not yours. The file is probed with ffprobe before the response, so `status` is already `ready` or `failed`. |
 
 Auth request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters. Project names are trimmed and must be 1–200 characters. A project is `{id, name, status, created_at, updated_at}`.
 
@@ -106,6 +107,9 @@ app/
   models/            # SQLAlchemy models: User, Project
   schemas/           # Pydantic request/response schemas
   services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
+  services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
+  services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
+  services/video_processing.py # uploaded -> processing_metadata -> ready | failed
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
@@ -124,3 +128,5 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
 | `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
+| `FFPROBE_PATH`      | `ffprobe`                                      | ffprobe binary (name on `PATH` or absolute path) |
+| `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
