@@ -1,6 +1,6 @@
 # PeakSift AI — Frontend
 
-Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page and the login / register flow backed by the FastAPI API.
+Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata and preview — all backed by the FastAPI API.
 
 ## Run locally
 
@@ -48,6 +48,11 @@ npm run start    # Serve the production build
 - The API sets an **HttpOnly** cookie on login/register; the frontend never sees or stores the token (nothing in `localStorage`/`sessionStorage`), and every API call uses `credentials: "include"`.
 - On page load `AuthProvider` calls `GET /auth/me` to find out who is signed in; the backend is the source of truth. The header shows **Log in / Get Started** or the user's email with **Log out**.
 - Logout calls `POST /auth/logout`, which clears the cookie.
+- The video preview is a plain `<video src="…/videos/{id}/content">`; the browser attaches the cookie because the frontend and API are same-site (`localhost` in development), and the API checks ownership on every byte-range request.
+
+## Uploads
+
+`lib/videos.ts` uploads with `XMLHttpRequest` (for real progress events) to `POST /projects/{id}/videos`. Accepted: `.mp4`, `.mov`, `.webm`. The size limit is enforced by the API (`MAX_VIDEO_UPLOAD_BYTES`, default 2 GiB → `413`); the UI shows the API's message. After the bytes are sent the UI shows "Reading video metadata…" while the server runs ffprobe, then renders the returned metadata — only fields that exist — or the failure state.
 
 ## Structure
 

@@ -15,12 +15,22 @@ Delivered:
 
 Definition of done — a user can register → log in → open the dashboard → create a project → view their projects → open a project → log out → log in again, with data persisted.
 
-## Milestone 2 — Video Upload V0.2
+## Milestone 2 — Video Upload V0.2 *(complete)*
 
-- Upload long-form video files to object storage
-- Store media and basic metadata on a project
+Delivered:
 
-## Milestone 3 — Transcription V0.3
+- `videos` table and `Video` model (status `uploaded` → `processing_metadata` → `ready` | `failed`)
+- Secure local media storage (`MEDIA_ROOT`): generated UUID keys, chunked writes, no path escapes, nothing committed
+- `POST /projects/{id}/videos`: authenticated, owner-only upload of MP4/MOV/WebM, streamed with a configurable size limit, layered validation, cleanup on failure
+- ffprobe metadata extraction (duration, resolution, frame rate, codecs) with a timeout and safe error messages
+- `GET /projects/{id}/videos`, `GET /projects/{id}/videos/{video_id}`: owner-scoped metadata
+- `GET /videos/{video_id}/content`: owner-only streaming with HTTP Range support
+- Frontend: drag-and-drop/file-picker upload with real progress, metadata display, failure state, native `<video>` preview
+- Hardening pass (CORS-aware 500s, interrupted/chunked uploads, fd cleanup) and CI with FFmpeg
+
+Definition of done — a user can open a project → upload a source video → see real ffprobe metadata → preview the video → log out and back in with the video still there.
+
+## Milestone 3 — Transcription V0.3 *(next — not started)*
 
 - Extract audio (FFmpeg) and generate timestamped transcripts
 

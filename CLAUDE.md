@@ -21,9 +21,9 @@ Long-term:
 
 ## Current state
 
-**Milestone 1 — Foundation V0.1 is complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, PostgreSQL schema with Alembic, tests and CI.
+**Milestone 1 — Foundation V0.1** and **Milestone 2 — Video Upload V0.2** are complete (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload to local storage, ffprobe metadata, owner-only preview, PostgreSQL schema with Alembic, tests and CI with FFmpeg.
 
-**Next is Milestone 2 — Video Upload.** Do not start it, or any later feature (transcription, AI, clip generation, editor, Morocco Mode, payments), until explicitly instructed.
+**Next is Milestone 3 — Transcription.** Do not start it, or any later feature (audio extraction, Whisper, AI, clip detection, clip generation, editor, Morocco Mode, payments), until explicitly instructed.
 
 ## Stack (as built)
 
@@ -31,8 +31,9 @@ Long-term:
 - Backend: FastAPI, SQLAlchemy 2 (synchronous), Alembic, psycopg 3, pydantic-settings in `backend/`
 - Database: PostgreSQL
 - Auth: Argon2id (`pwdlib`), HS256 JWT (`PyJWT`) in an HttpOnly `SameSite=Lax` cookie
-- Tooling: pytest, Ruff, ESLint, GitHub Actions
-- Planned later: S3-compatible object storage, FFmpeg, speech-to-text + LLM clip analysis
+- Media: local filesystem storage under `MEDIA_ROOT` (dev only); `ffprobe` for metadata (argument-list subprocess with timeout); `python-multipart` for uploads
+- Tooling: pytest, Ruff, ESLint, GitHub Actions (backend job installs FFmpeg)
+- Planned later: S3-compatible object storage, background jobs, speech-to-text + LLM clip analysis
 
 ## Conventions
 
@@ -42,6 +43,8 @@ Long-term:
 - Every project endpoint is scoped to the current user; return `404` rather than revealing another user's resources.
 - Frontend: call the API only through `lib/api.ts`; keep auth state in `AuthProvider`; no tokens in browser storage; the API is the security boundary.
 - Prefer small, honest UI: real data or clearly labelled placeholders, never fake numbers.
+- Media: never use a browser-supplied filename as a path; storage keys are generated and resolved only through `LocalMediaStorage.path_for`. Never commit anything under `media/`; test fixtures are generated with `ffmpeg` at test time. External tools are run with argument lists and timeouts, never `shell=True`, and their stderr is never stored or returned.
+- Error messages and responses must not contain filesystem paths, storage keys or submitted values.
 - Read `README.md`, `docs/architecture.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
