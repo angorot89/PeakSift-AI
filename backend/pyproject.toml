@@ -16,6 +16,7 @@ dependencies = [
     "python-multipart>=0.0.20,<1",  # multipart/form-data parsing for uploads
     "celery>=5.4,<6",  # background jobs (transcription)
     "redis>=5,<9",  # Celery broker client
+    "faster-whisper>=1.1,<2",  # local speech-to-text (CTranslate2 Whisper)
 ]
 
 [project.optional-dependencies]
