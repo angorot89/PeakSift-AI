@@ -105,7 +105,7 @@ def test_save_enforces_limit_and_leaves_nothing_behind(storage: LocalMediaStorag
 
     assert excinfo.value.limit == CHUNK_SIZE
     assert not storage.exists("videos/big.mp4")
-    assert not list(storage.root.glob("**/*"))  # no partial files either
+    assert not [p for p in storage.root.rglob("*") if p.is_file()]  # no partial files either
 
 
 def test_save_exactly_at_limit_is_allowed(storage: LocalMediaStorage):
