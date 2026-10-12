@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -69,6 +69,38 @@ class Settings(BaseSettings):
     # Hosted uploads are limited to 25 MB; keep a safety margin below it.
     openai_max_upload_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
 
+    # --- AI clip detection (Milestone 4) ---------------------------------------------
+    # The transcript is analysed in bounded windows; each window is one model request.
+    clip_detection_window_seconds: int = Field(default=300, ge=60)
+    clip_detection_window_overlap_seconds: int = Field(default=20, ge=0)
+    clip_detection_window_max_chars: int = Field(default=8000, ge=1000)
+    clip_detection_max_windows: int = Field(default=500, ge=1)
+    # Accepted clip length and how many ranked candidates a run keeps.
+    clip_detection_min_clip_seconds: float = Field(default=15, gt=0)
+    clip_detection_max_clip_seconds: float = Field(default=90, gt=0)
+    clip_detection_target_candidates: int = Field(default=10, ge=1, le=50)
+    clip_detection_candidates_per_window: int = Field(default=3, ge=1, le=10)
+    # Candidates overlapping more than this fraction (intersection / union) are duplicates.
+    clip_detection_overlap_threshold: float = Field(default=0.5, ge=0, le=1)
+    clip_detection_timestamp_tolerance_seconds: float = Field(default=1.0, ge=0)
+    # Pipeline behaviour (same semantics as transcription).
+    clip_detection_provider_max_attempts: int = Field(default=3, ge=1)
+    clip_detection_retry_backoff_seconds: float = Field(default=2.0, ge=0)
+    clip_detection_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+
+    # Local provider: an Ollama-compatible endpoint. The operator controls the endpoint and
+    # the comma-separated allow-list of models (first = default); clients only pick from it.
+    clip_detection_ollama_enabled: bool = True
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_clip_models: str = "llama3.2:3b"
+    ollama_connect_timeout_seconds: float = Field(default=5, gt=0)
+    ollama_timeout_seconds: float = Field(default=300, gt=0)
+
+    # Hosted provider: OpenAI structured outputs. Uses OPENAI_API_KEY (shared with
+    # transcription). Comma-separated allow-list of models (first = default).
+    openai_clip_models: str = "gpt-5-mini,gpt-5"
+    openai_clip_timeout_seconds: float = Field(default=120, gt=0)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
@@ -76,6 +108,15 @@ class Settings(BaseSettings):
     # Limits for one transcription job: a 4-hour stream on CPU can legitimately take hours.
     celery_task_soft_time_limit_seconds: int = Field(default=6 * 3600, gt=0)
     celery_task_time_limit_seconds: int = Field(default=6 * 3600 + 600, gt=0)
+
+    @model_validator(mode="after")
+    def _clip_bounds_are_ordered(self) -> "Settings":
+        if self.clip_detection_min_clip_seconds >= self.clip_detection_max_clip_seconds:
+            raise ValueError(
+                "CLIP_DETECTION_MIN_CLIP_SECONDS must be smaller than "
+                "CLIP_DETECTION_MAX_CLIP_SECONDS"
+            )
+        return self
 
     @property
     def is_production(self) -> bool:
