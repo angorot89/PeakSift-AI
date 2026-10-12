@@ -54,4 +54,22 @@ Long-term:
 6. **Test important backend functionality.** Run `pytest`, `ruff check`, `ruff format --check`, `npm run lint`, `npm run build` before committing.
 7. **Report after every task:** list changed files and test results.
 8. **Never continue automatically into the next task.** Stop and wait for instructions.
-9. **IMPORTANT: after every completed task, commit and push the change to GitHub before starting the next modification.** Never force-push or rewrite pushed commits.
+9. **IMPORTANT: every change reaches GitHub immediately** — never accumulate unpushed local work. Never force-push or rewrite pushed commits.
+10. **Never commit feature development directly to `main`.** Follow the Git workflow below.
+
+## Git workflow
+
+The GitHub history should let someone understand PeakSift's development by reading the Pull Requests. For every logical feature:
+
+1. Make sure `main` is current (`git checkout main && git pull --ff-only`).
+2. Create a descriptively named branch (`feat/video-upload-api`, `fix/login-error-copy`, `chore/...`, `docs/...`).
+3. Implement the feature.
+4. Run all relevant checks: `pytest`, `ruff check`, `ruff format --check`, `npm run lint`, `npm run build`.
+5. Commit with meaningful messages.
+6. Push the branch immediately.
+7. Open a Pull Request into `main` with: a clear human-readable title, a concise summary, a **What changed** section, a **Testing** section, and any important architectural notes.
+8. Wait for CI to pass.
+9. Merge the PR into `main`.
+10. Verify local `main` matches `origin/main`.
+11. Delete the merged feature branch (remote and local).
+12. Only then begin the next logical feature.
