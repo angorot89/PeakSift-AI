@@ -21,9 +21,9 @@ Long-term:
 
 ## Current state
 
-**Milestones 1–3 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, and background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), with tests and CI.
+**Milestones 1–4 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), and AI clip detection (transcript windows → Ollama / OpenAI structured output → validation → ranking → candidates with preview and save/dismiss; see [docs/clip-detection.md](docs/clip-detection.md)), with tests and CI.
 
-**Next is Milestone 4 — AI Clip Detection.** Do not start it, or any later feature (candidate clips, virality/hook/retention scoring, clip generation, editor, Morocco Mode, payments), until explicitly instructed.
+**Next is Milestone 5 — Clip Generation.** Do not start it, or any later feature (cutting/exporting clips, captions, reframing, editor, Morocco Mode, payments), until explicitly instructed.
 
 ## Stack (as built)
 
@@ -34,8 +34,9 @@ Long-term:
 - Media: local filesystem storage under `MEDIA_ROOT` (dev only); `ffprobe`/`ffmpeg` via argument-list subprocesses with timeouts; `python-multipart` for uploads
 - Background jobs: Celery on Redis (`app/workers/`), one job per worker, database is the source of truth
 - Speech-to-text: provider contract in `app/services/transcription/`; `faster-whisper` (local, lazy) and the OpenAI SDK (`whisper-1` for timestamps); provider is server configuration
+- Clip detection: provider contract in `app/services/clip_detection/` (windowing, validation, ranking, pipeline); `ollama` (httpx against an operator-configured endpoint) and `openai` (structured outputs); users choose provider/model only from server allow-lists
 - Tooling: pytest, Ruff, ESLint, GitHub Actions (backend job installs FFmpeg)
-- Planned later: S3-compatible object storage, LLM clip analysis
+- Planned later: S3-compatible object storage, clip rendering
 
 ## Conventions
 
@@ -48,9 +49,10 @@ Long-term:
 - Media: never use a browser-supplied filename as a path; storage keys are generated and resolved only through `LocalMediaStorage.path_for`. Never commit anything under `media/`; test fixtures are generated with `ffmpeg` at test time. External tools are run with argument lists and timeouts, never `shell=True`, and their stderr is never stored or returned.
 - Error messages and responses must not contain filesystem paths, storage keys, submitted values, API keys or task ids.
 - Transcript timestamps are never fabricated: a provider without segment timestamps is refused; segments are validated (and re-validated in the pipeline) and shifted to absolute time before persisting. Provider SDK objects never leave the provider module.
-- Celery tasks receive database ids only and must stay idempotent on database state; never load a speech model at import or API startup.
+- Celery tasks receive database ids only and must stay idempotent on database state; never load a speech model at import or API startup. Generate a job's task id before committing its row (fencing token), then enqueue with that id.
+- Clip candidates: everything a model returns is untrusted until `validation.py` has snapped it to transcript lines and checked bounds; never clamp or invent values, never store a model's quotation as the transcript excerpt, keep scores on the documented 0–100 editorial scale and never present them as performance predictions.
 - Tests: Celery eager mode, mocked speech models and a fake OpenAI client; CI sets `HF_HUB_OFFLINE=1` and never has an API key.
-- Read `README.md`, `docs/architecture.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

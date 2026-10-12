@@ -1,6 +1,6 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), and background transcription with timestamped segments (faster-whisper locally or OpenAI).
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), background transcription with timestamped segments (faster-whisper locally or OpenAI), and AI clip detection — ranked, validated clip candidates derived from the transcript by a local Ollama model or OpenAI (see [docs/clip-detection.md](../docs/clip-detection.md)).
 
 ## Prerequisites
 
@@ -8,6 +8,7 @@ FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery
 - PostgreSQL 14+ — either Docker (`docker compose up -d` from the repository root) or a local installation
 - FFmpeg (for `ffprobe`, which reads uploaded video metadata): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads still succeed but end in status `failed`.
 - Redis 7+ — either Docker Compose (included) or `brew install redis && brew services start redis`. It is the broker for background jobs; the API starts without it, but queuing a job fails with `503` until it is reachable.
+- Ollama (optional, local AI clip detection) — `brew install ollama`, `ollama serve`, `ollama pull llama3.2:3b`. Without it the local provider is reported unavailable; the hosted provider needs `OPENAI_API_KEY`.
 
 All commands below are run from the `backend/` directory.
 
@@ -50,7 +51,7 @@ Background jobs need a worker in a second terminal (same virtualenv, same `backe
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run. On macOS, run the worker with `--pool=solo` if you see fork-related problems. `python scripts/celery_smoke.py` verifies a real broker + worker round-trip.
+The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run. On macOS, run the worker with `--pool=solo` if you see fork-related problems. `python scripts/celery_smoke.py` verifies a real broker + worker round-trip and that the `peaksift.transcribe_video` and `peaksift.detect_clips` tasks are registered. The same worker runs transcription and clip detection.
 
 ## Test
 
@@ -97,6 +98,16 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | GET    | `/projects/{id}/videos/{video_id}/transcription` | yes | Job status: `status`, `progress_percent`, `segment_count`, `is_stale`, `language`, `error_code`/`error_message`, timestamps. `404` before the first start. No transcript text, task ids or paths. |
 | POST   | `/projects/{id}/videos/{video_id}/transcription/retry` | yes | Re-queue a `failed` or stale transcription (`409` otherwise). |
 | GET    | `/projects/{id}/videos/{video_id}/transcript` | yes | Timestamped segments in `sequence_index` order, paginated with `offset` (≥ 0) and `limit` (1–500, default 200): `{transcription_id, total, offset, limit, segments[{sequence_index, start, end, text, speaker}], full_text}`. `full_text` is only filled with `?include_text=true`. `409` until the transcription is `completed` (partial transcripts are never exposed); `404` before the first start. |
+| GET    | `/clip-detection/providers` | yes | AI providers the user may choose: `[{name, label, models, default_model, configured, available, detail}]`. `models` are the server allow-lists; with `?diagnose=true` configured providers are probed and `available`/`detail` are filled. Never endpoints or keys. |
+| POST   | `/projects/{id}/videos/{video_id}/clip-detection` | yes | Start a detection run: `{"provider": "ollama" \| "openai", "model": optional}` → `201` run. `409` without a completed transcript, if the video is not ready, or if a run is already active; `400` for a provider/model outside the allow-lists; `503` if the queue is unreachable (no row is left). |
+| GET    | `/projects/{id}/videos/{video_id}/clip-detection` | yes | Runs for the video, newest first: `{total, offset, limit, runs}` (`offset` ≥ 0, `limit` 1–100). |
+| GET    | `/projects/{id}/videos/{video_id}/clip-detection/{run_id}` | yes | Run status: `status`, `progress_percent`, `windows_total`, `windows_done`, `attempt`, `candidate_count`, `is_stale`, `transcript_current` (null while active), `config`, `error_code`/`error_message`, timestamps. No task ids, fingerprints or paths. |
+| POST   | `/projects/{id}/videos/{video_id}/clip-detection/{run_id}/retry` | yes | Re-queue a `failed` or stale run (`409` otherwise, if the transcript changed, if another run is active, or after `CLIP_DETECTION_MAX_ATTEMPTS`). |
+| GET    | `/projects/{id}/videos/{video_id}/clip-detection/{run_id}/candidates` | yes | Ranked candidates of a `completed` run (`409` before), paginated (`offset`, `limit` 1–100) and filterable with `decision=undecided\|saved\|dismissed`. |
+| GET    | `…/clip-detection/{run_id}/candidates/{candidate_id}` | yes | One candidate. |
+| POST   | `…/clip-detection/{run_id}/candidates/{candidate_id}/save` · `/dismiss` · `/reset` | yes | Record the user's decision; returns the candidate. |
+
+A candidate is `{id, run_id, video_id, rank, start, end, duration, title, hook, rationale, category, transcript_excerpt, overall_score, scores{hook, entertainment, clarity, payoff, completeness}, decision, decided_at, created_at}` — times in absolute seconds on transcript-line boundaries, scores integers 0–100.
 
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
@@ -160,6 +171,10 @@ queued → extracting_audio (normalized.mp3, progress 5)
 
 Each chunk is checked against `OPENAI_MAX_UPLOAD_BYTES` (default 20 MB, a margin under the API's 25 MB limit) before upload. Rate limits, timeouts, connection problems and 5xx responses are reported as *retryable* errors for the pipeline's bounded retries; authentication, permission and 4xx problems are not retried.
 
+## AI clip detection
+
+`app/services/clip_detection/` turns a completed transcript into ranked candidates: `windowing.py` (normalise, validate, fingerprint, bounded overlapping windows), `contract.py` (provider protocol, shared strict JSON schema, typed errors), `prompt.py` (one prompt for every provider), `factory.py` (allow-lists → provider), `ollama_provider.py` / `openai_provider.py`, `validation.py` (snap to transcript lines, bounds, scores, texts — reject rather than clamp), `ranking.py` (weighted score, IoU deduplication, deterministic order), `pipeline.py` (the Celery job: claim, stages, fencing, retries, one-transaction completion). Users choose a provider and model only from `OLLAMA_CLIP_MODELS` / `OPENAI_CLIP_MODELS`; `OLLAMA_BASE_URL` and `OPENAI_API_KEY` are server configuration and never appear in responses. The full design, scoring methodology, configuration and limitations are in [docs/clip-detection.md](../docs/clip-detection.md).
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a video's bytes is `GET /videos/{video_id}/content`, which resolves the video through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -169,11 +184,11 @@ Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a v
 ```
 app/
   main.py            # FastAPI app, CORS, routers
-  api/               # Routers: health, auth, projects, videos, video_content, transcriptions
+  api/               # Routers: health, auth, projects, videos, video_content, transcriptions, clip_detection
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
-  models/            # SQLAlchemy models: User, Project
+  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate
   schemas/           # Pydantic request/response schemas
   services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
@@ -181,9 +196,12 @@ app/
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
   services/transcription/      # Contract, factory, chunking, pipeline, faster_whisper + openai providers
+  services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
+                               # validation, ranking, detection_config, pipeline
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
-  workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
+  workers/clip_detection_tasks.py # peaksift.detect_clips
+  workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
@@ -222,6 +240,20 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `OPENAI_TRANSCRIPTION_MODEL` / `OPENAI_HIGH_ACCURACY_MODEL` | `gpt-4o-mini-transcribe` / `gpt-4o-transcribe` | Hosted text-only options (recorded, not used for timing) |
 | `OPENAI_TIMEOUT_SECONDS` | `600`                                      | Per-request timeout                          |
 | `OPENAI_MAX_UPLOAD_BYTES` | `20971520` (20 MB)                        | Per-chunk upload guard below the 25 MB API limit |
+| `CLIP_DETECTION_OLLAMA_ENABLED` | `true`                            | Offer the local clip-analysis provider        |
+| `OLLAMA_BASE_URL`   | `http://localhost:11434`                       | Ollama-compatible endpoint (server configuration only) |
+| `OLLAMA_CLIP_MODELS` | `llama3.2:3b`                                 | Allowed local models (comma-separated; first = default) |
+| `OLLAMA_CONNECT_TIMEOUT_SECONDS` / `OLLAMA_TIMEOUT_SECONDS` / `OLLAMA_NUM_CTX` | `5` / `300` / `8192` | Per-request timeouts and context window |
+| `OPENAI_CLIP_MODELS` | `gpt-5-mini,gpt-5`                            | Allowed hosted clip-analysis models (needs `OPENAI_API_KEY`) |
+| `OPENAI_CLIP_TIMEOUT_SECONDS` / `OPENAI_CLIP_MAX_OUTPUT_TOKENS` | `120` / `4000` | Per-request limits for hosted analysis |
+| `CLIP_DETECTION_WINDOW_SECONDS` / `_OVERLAP_SECONDS` / `_MAX_CHARS` / `_MAX_WINDOWS` | `300` / `20` / `8000` / `500` | Analysis windows |
+| `CLIP_DETECTION_MIN_CLIP_SECONDS` / `_MAX_CLIP_SECONDS` | `15` / `90`              | Accepted candidate length                    |
+| `CLIP_DETECTION_TARGET_CANDIDATES` / `_CANDIDATES_PER_WINDOW` | `10` / `3`         | Results kept per run / asked per window      |
+| `CLIP_DETECTION_OVERLAP_THRESHOLD` | `0.5`                           | IoU above which candidates are duplicates    |
+| `CLIP_DETECTION_TIMESTAMP_TOLERANCE_SECONDS` | `1`                   | Allowed overrun past the video end           |
+| `CLIP_DETECTION_PROVIDER_MAX_ATTEMPTS` / `_RETRY_BACKOFF_SECONDS` | `3` / `2`      | In-task retries for transient provider errors |
+| `CLIP_DETECTION_STALE_AFTER_SECONDS` | `900`                         | Heartbeat age after which a running detection counts as dead |
+| `CLIP_DETECTION_MAX_ATTEMPTS` | `5`                                  | User retries per run before a new detection is required |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |
