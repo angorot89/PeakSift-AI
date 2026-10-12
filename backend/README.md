@@ -83,6 +83,7 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | POST   | `/projects/{id}/videos` | yes | Upload a source video as `multipart/form-data` (field `file`); `201`. `.mp4`, `.mov`, `.webm` only (`415` otherwise), up to `MAX_VIDEO_UPLOAD_BYTES` (`413`), non-empty (`400`). `404` for projects that are not yours. The file is probed with ffprobe before the response, so `status` is already `ready` or `failed`. |
 | GET    | `/projects/{id}/videos` | yes | The project's videos, newest first.                  |
 | GET    | `/projects/{id}/videos/{video_id}` | yes | One video; `404` unless it belongs to that project and the project is yours. |
+| GET    | `/videos/{video_id}/content` | yes | The source bytes, owner-only (`404` otherwise). Streams in 1 MiB chunks with the stored content type, `Accept-Ranges: bytes`, and single-range `Range` support (`206` / `416`); multi-range or malformed `Range` headers serve the whole file. `Cache-Control: private, no-store`. |
 
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
@@ -98,6 +99,10 @@ Validation failures return `422` with `{"detail": [{"type", "loc", "msg"}, ...]}
 - **Logout** clears the cookie in the browser. Tokens are not revoked server-side (no blocklist) — a copied token stays valid until it expires. Acceptable for Milestone 1; revisit with refresh tokens/sessions later.
 - **Unknown email vs wrong password** return the identical `401` response, and the unknown-email path still performs an Argon2 verification so response time does not reveal which case occurred.
 - **CSRF**: `SameSite=Lax` stops the cookie being sent on cross-site `POST`s from other origins, all state-changing endpoints take JSON bodies (not form posts), and CORS only allows `FRONTEND_URL`. That is the Milestone 1 position; a CSRF token scheme should be added before any cookie-authenticated endpoint accepts form submissions or `SameSite=None` is needed.
+
+## Media serving
+
+Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a video's bytes is `GET /videos/{video_id}/content`, which resolves the video through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
 
 ## Structure
 
