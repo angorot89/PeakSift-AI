@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     # transcription). Comma-separated allow-list of models (first = default).
     openai_clip_models: str = "gpt-5-mini,gpt-5"
     openai_clip_timeout_seconds: float = Field(default=120, gt=0)
+    openai_clip_max_output_tokens: int = Field(default=4000, ge=256)
 
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
