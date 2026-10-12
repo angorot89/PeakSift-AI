@@ -56,4 +56,7 @@ class Video(Base):
     project: Mapped["Project"] = relationship(back_populates="videos")
 
     def __repr__(self) -> str:
-        return f"Video(id={self.id!r}, original_filename={self.original_filename!r}, status={self.status!r})"
+        return (
+            f"Video(id={self.id!r}, original_filename={self.original_filename!r}, "
+            f"status={self.status!r})"
+        )

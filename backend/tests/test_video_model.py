@@ -77,7 +77,9 @@ def test_file_size_supports_multi_gigabyte_files(db_session: Session):
 
 def test_project_video_relationship(db_session: Session):
     project = make_project(db_session)
-    project.videos.extend([make_video(project, "videos/a.mp4"), make_video(project, "videos/b.mp4")])
+    project.videos.extend(
+        [make_video(project, "videos/a.mp4"), make_video(project, "videos/b.mp4")]
+    )
     db_session.commit()
     db_session.expire_all()
 
