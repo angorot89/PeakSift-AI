@@ -40,8 +40,9 @@ Two sections: what is **built** (Milestone 1) and what is **planned**. Planned p
 | ---------- | ----------------------------------------------------------------------- |
 | `users`    | `id` (uuid), `email` (unique, indexed), `password_hash`, `created_at`   |
 | `projects` | `id` (uuid), `user_id` (FK → users, cascade delete), `name`, `status`, `created_at`, `updated_at` |
+| `videos`   | `id` (uuid), `project_id` (FK → projects, cascade delete), `original_filename`, `storage_key` (unique), `content_type`, `file_size`, `duration_seconds`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `status`, `error_message`, `created_at`, `updated_at` |
 
-Timestamps are timezone-aware. `status` is currently always `created`.
+Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them.
 
 ### Testing and CI
 
