@@ -14,6 +14,8 @@ dependencies = [
     "pyjwt>=2.10,<3",
     "email-validator>=2.2,<3",  # enables pydantic's EmailStr
     "python-multipart>=0.0.20,<1",  # multipart/form-data parsing for uploads
+    "celery>=5.4,<6",  # background jobs (transcription)
+    "redis>=5,<9",  # Celery broker client
 ]
 
 [project.optional-dependencies]

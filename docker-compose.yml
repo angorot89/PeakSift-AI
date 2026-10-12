@@ -1,4 +1,4 @@
-# Local development services. Only PostgreSQL is needed for Milestone 1.
+# Local development services for Milestone 3: PostgreSQL (data) and Redis (job broker).
 #
 #   docker compose up -d
 #
@@ -19,6 +19,16 @@ services:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d peaksift"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
