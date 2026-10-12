@@ -41,7 +41,7 @@ def parse_range(header: str | None, size: int) -> tuple[int, int] | None:
     end = min(int(last), size - 1) if last else size - 1
     if start >= size or start > end:
         raise HTTPException(
-            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            status_code=status.HTTP_416_RANGE_NOT_SATISFIABLE,
             headers={"Content-Range": f"bytes */{size}"},
         )
     return start, end
