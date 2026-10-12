@@ -39,7 +39,7 @@ export function DashboardView() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard label="Projects" value={projects ? projects.length : "–"} />
-          <StatCard label="Videos" value={0} note="Video upload arrives in Milestone 2." />
+          <StatCard label="Videos" value="–" note="Upload a source video from a project page." />
           <StatCard label="Clips Found" value={0} note="AI clip detection arrives in Milestone 4." />
         </div>
       </section>

@@ -53,7 +53,7 @@ export function NewProjectForm() {
           </Link>
         }
         title="New project"
-        description="Name the recording you want to clip. You can upload the video once Milestone 2 ships."
+        description="Name the recording you want to clip, then upload its source video on the next page."
       />
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <Field

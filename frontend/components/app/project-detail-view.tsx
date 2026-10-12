@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
 import { PageHeader } from "@/components/app/page-header";
+import { SourceVideo } from "@/components/app/source-video";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -80,17 +81,7 @@ export function ProjectDetailView() {
         </div>
       </dl>
 
-      <section aria-labelledby="video-heading" className="mt-8">
-        <div className="rounded-2xl border border-dashed border-white/15 px-6 py-12 text-center">
-          <h2 id="video-heading" className="font-medium">
-            Video upload will be added in Milestone 2.
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            This project is ready for its long-form source. Uploading, transcription and AI
-            clip detection follow in the next milestones.
-          </p>
-        </div>
-      </section>
+      <SourceVideo projectId={project.id} />
     </>
   );
 }

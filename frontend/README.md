@@ -39,7 +39,7 @@ npm run start    # Serve the production build
 | `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
 | `/projects` | The signed-in user's projects                                       |
 | `/projects/new` | Create a project (name only)                                   |
-| `/projects/[id]` | Project name, status, created date; video upload placeholder  |
+| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress) and the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path |
 
 `/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
@@ -70,8 +70,9 @@ lib/
   api.ts           # fetch wrapper (base URL, cookies, error parsing)
   auth.ts          # Typed calls to /auth/* and the User type
   projects.ts      # Typed calls to /projects and the Project type
+  videos.ts        # Video type, accepted formats, list + XHR upload with progress
   use-api.ts       # Loading/error/reload hook for API data
-  format.ts        # Date formatting
+  format.ts        # Date, bytes, duration and frame-rate formatting
 ```
 
 ## Known dependency advisories
