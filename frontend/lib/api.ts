@@ -17,7 +17,7 @@ export class ApiError extends Error {
 
 type ValidationItem = { msg?: string; loc?: (string | number)[] };
 
-function messageFrom(data: unknown, status: number): string {
+export function messageFrom(data: unknown, status: number): string {
   const detail = (data as { detail?: unknown } | null)?.detail;
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
