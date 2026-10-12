@@ -10,6 +10,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.video import Video
 
 
 class ProjectStatus(StrEnum):
@@ -33,6 +34,9 @@ class Project(Base):
     )
 
     owner: Mapped["User"] = relationship(back_populates="projects")
+    videos: Mapped[list["Video"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"Project(id={self.id!r}, name={self.name!r}, status={self.status!r})"
