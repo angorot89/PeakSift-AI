@@ -13,6 +13,11 @@ const presentation: Record<string, { label: string; tone: Tone }> = {
   extracting_audio: { label: "Preparing audio", tone: "accent" },
   transcribing: { label: "Transcribing", tone: "accent" },
   completed: { label: "Completed", tone: "success" },
+  // clip detection runs
+  preparing_transcript: { label: "Preparing transcript", tone: "accent" },
+  analyzing: { label: "Analyzing", tone: "accent" },
+  validating: { label: "Validating", tone: "accent" },
+  ranking: { label: "Ranking", tone: "accent" },
 };
 
 const dot: Record<Tone, string> = {
