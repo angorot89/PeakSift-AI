@@ -93,6 +93,10 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | GET    | `/projects/{id}/videos` | yes | The project's videos, newest first.                  |
 | GET    | `/projects/{id}/videos/{video_id}` | yes | One video; `404` unless it belongs to that project and the project is yours. |
 | GET    | `/videos/{video_id}/content` | yes | The source bytes, owner-only (`404` otherwise). Streams in 1 MiB chunks with the stored content type, `Accept-Ranges: bytes`, and single-range `Range` support (`206` / `416`); multi-range or malformed `Range` headers serve the whole file. `Cache-Control: private, no-store`. |
+| POST   | `/projects/{id}/videos/{video_id}/transcription` | yes | Queue a transcription for a `ready` video and return its status. Idempotent: a queued/running/completed job is returned as-is (never duplicated); a `failed` one answers `409` (use retry); a video that is not ready answers `409`; `503` if the job queue is unreachable (no row is left behind). |
+| GET    | `/projects/{id}/videos/{video_id}/transcription` | yes | Job status: `status`, `progress_percent`, `segment_count`, `language`, `error_code`/`error_message`, timestamps. `404` before the first start. No transcript text, task ids or paths. |
+| POST   | `/projects/{id}/videos/{video_id}/transcription/retry` | yes | Re-queue a `failed` transcription (`409` otherwise). |
+| GET    | `/projects/{id}/videos/{video_id}/transcript` | yes | Timestamped segments in `sequence_index` order, paginated with `offset` (≥ 0) and `limit` (1–500, default 200): `{transcription_id, total, offset, limit, segments[{sequence_index, start, end, text, speaker}], full_text}`. `full_text` is only filled with `?include_text=true`. `409` until the transcription is `completed` (partial transcripts are never exposed); `404` before the first start. |
 
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
@@ -163,7 +167,7 @@ Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a v
 ```
 app/
   main.py            # FastAPI app, CORS, routers
-  api/               # Routers: health, auth, projects; deps.py has `DbSession` and `CurrentUser`
+  api/               # Routers: health, auth, projects, videos, video_content, transcriptions
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
