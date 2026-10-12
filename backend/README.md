@@ -7,6 +7,7 @@ FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic). It provides
 - Python 3.11+ (check with `python3 --version`)
 - PostgreSQL 14+ — either Docker (`docker compose up -d` from the repository root) or a local installation
 - FFmpeg (for `ffprobe`, which reads uploaded video metadata): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads still succeed but end in status `failed`.
+- Redis 7+ — either Docker Compose (included) or `brew install redis && brew services start redis`. It is the broker for background jobs; the API starts without it, but queuing a job fails with `503` until it is reachable.
 
 All commands below are run from the `backend/` directory.
 
@@ -42,6 +43,14 @@ uvicorn app.main:app --reload
 
 - API: http://localhost:8000/health returns `{"status": "ok"}`
 - Interactive docs: http://localhost:8000/docs
+
+Background jobs need a worker in a second terminal (same virtualenv, same `backend/` directory):
+
+```bash
+celery -A app.workers.celery_app worker --loglevel=info
+```
+
+The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run.
 
 ## Test
 
@@ -120,6 +129,9 @@ app/
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
+  workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
+  workers/transcription_tasks.py # Background tasks (ids only cross the broker)
+  workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
@@ -142,3 +154,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary used to extract normalized audio for transcription |
 | `AUDIO_EXTRACTION_TIMEOUT_SECONDS` | `3600`                          | Time limit for extracting one video's audio  |
+| `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
+| `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
+| `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |
+| `CELERY_TASK_ALWAYS_EAGER` | `false`                                 | Run tasks inline (tests only)                |

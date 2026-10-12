@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     ffmpeg_path: str = "ffmpeg"
     audio_extraction_timeout_seconds: float = Field(default=3600, gt=0)
 
+    # Background jobs. Redis is the Celery broker; the database stays the source of truth.
+    redis_url: str = "redis://localhost:6379/0"
+    # Run tasks inline in the calling process (tests only). Never enable in production.
+    celery_task_always_eager: bool = False
+    # Limits for one transcription job: a 4-hour stream on CPU can legitimately take hours.
+    celery_task_soft_time_limit_seconds: int = Field(default=6 * 3600, gt=0)
+    celery_task_time_limit_seconds: int = Field(default=6 * 3600 + 600, gt=0)
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
