@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: float = Field(default=30, gt=0)
 
+    # ffmpeg binary used to extract normalized audio for transcription, and its time limit.
+    ffmpeg_path: str = "ffmpeg"
+    audio_extraction_timeout_seconds: float = Field(default=3600, gt=0)
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
