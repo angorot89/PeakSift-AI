@@ -15,7 +15,10 @@ export function SiteHeader() {
           <ul className="hidden items-center gap-6 text-sm text-muted sm:flex">
             {navItems.map((item) => (
               <li key={item.href}>
-                <a href={item.href} className="transition-colors hover:text-foreground">
+                <a
+                  href={item.href}
+                  className="rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                >
                   {item.label}
                 </a>
               </li>

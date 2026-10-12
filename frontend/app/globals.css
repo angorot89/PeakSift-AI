@@ -6,6 +6,7 @@
   --surface: #111113;
   --border: rgb(255 255 255 / 0.08);
   --muted: #a1a1aa;
+  --subtle: #82828b;
   --accent: #f97316;
   --accent-soft: #fdba74;
 }
@@ -16,6 +17,7 @@
   --color-surface: var(--surface);
   --color-border: var(--border);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);

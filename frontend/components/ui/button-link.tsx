@@ -18,21 +18,26 @@ const sizes: Record<Size, string> = {
   lg: "h-12 px-6 text-[15px]",
 };
 
-type ButtonLinkProps = ComponentProps<typeof Link> & {
+type ButtonLinkProps = ComponentProps<"a"> & {
+  href: string;
   variant?: Variant;
   size?: Size;
 };
 
 export function ButtonLink({
+  href,
   variant = "primary",
   size = "md",
   className = "",
   ...props
 }: ButtonLinkProps) {
-  return (
-    <Link
-      className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
-      {...props}
-    />
-  );
+  const classes = `${base} ${variants[variant]} ${sizes[size]} ${className}`;
+
+  // In-page anchors use a plain <a>: next/link ignores a click on the current
+  // hash, so a repeated click (e.g. after scrolling back up) would not scroll.
+  if (href.startsWith("#")) {
+    return <a href={href} className={classes} {...props} />;
+  }
+
+  return <Link href={href} className={classes} {...props} />;
 }

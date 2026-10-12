@@ -47,8 +47,8 @@ export function Hero() {
           </ButtonLink>
         </div>
 
-        <ul className="mt-10 flex animate-fade-up flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-zinc-500 [animation-delay:320ms]">
-          <li className="text-zinc-600">Built for</li>
+        <ul className="mt-10 flex animate-fade-up flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-subtle [animation-delay:320ms]">
+          <li className="w-full sm:w-auto">Built for</li>
           {platforms.map((platform) => (
             <li key={platform} className="text-zinc-400">
               {platform}

@@ -28,12 +28,12 @@ export function ProductPreview() {
             <span className="size-2.5 rounded-full bg-white/10" />
             <span className="size-2.5 rounded-full bg-white/10" />
           </div>
-          <span className="text-xs text-zinc-500">Illustrative preview</span>
+          <span className="text-xs text-subtle">Illustrative preview</span>
         </div>
 
         <div className="grid gap-2 lg:grid-cols-5">
           <div className="rounded-xl border border-border bg-background p-4 lg:col-span-3">
-            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+            <p className="text-xs font-medium tracking-wide text-subtle uppercase">
               Long-form source
             </p>
             <div className="relative mt-3 flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950">
@@ -46,7 +46,7 @@ export function ProductPreview() {
             </div>
 
             <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-zinc-500">
+              <div className="flex items-center justify-between text-xs text-subtle">
                 <span>Timeline</span>
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-sm bg-accent" />
@@ -65,11 +65,11 @@ export function ProductPreview() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-background p-4 lg:col-span-2">
-            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+          <div className="flex flex-col rounded-xl border border-border bg-background p-4 lg:col-span-2">
+            <p className="text-xs font-medium tracking-wide text-subtle uppercase">
               Short-form clips
             </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid grid-cols-3 gap-2 lg:my-auto">
               {clips.map((platform) => (
                 <div key={platform} className="flex flex-col gap-2">
                   <div className="relative flex aspect-[9/16] flex-col justify-end overflow-hidden rounded-lg bg-gradient-to-b from-zinc-800 to-zinc-950 p-2">
@@ -79,7 +79,7 @@ export function ProductPreview() {
                       <span className="mx-auto block h-1.5 w-2/3 rounded-full bg-accent-soft/80" />
                     </div>
                   </div>
-                  <span className="truncate text-center text-[11px] text-zinc-500">
+                  <span className="text-center text-[11px] leading-tight text-subtle">
                     {platform}
                   </span>
                 </div>

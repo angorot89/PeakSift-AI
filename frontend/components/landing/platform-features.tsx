@@ -89,7 +89,7 @@ export function PlatformFeatures() {
           ))}
         </ul>
 
-        <p className="mt-6 text-center text-sm text-zinc-500">
+        <p className="mt-6 text-center text-sm text-subtle">
           PeakSift is in active development. The capabilities above describe the
           platform we&apos;re building.
         </p>
