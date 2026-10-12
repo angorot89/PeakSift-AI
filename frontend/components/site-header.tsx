@@ -1,9 +1,9 @@
+import { HeaderAuth } from "@/components/auth/header-auth";
 import { Logo } from "@/components/logo";
-import { ButtonLink } from "@/components/ui/button-link";
 
 const navItems = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#platform", label: "Platform" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#platform", label: "Platform" },
 ];
 
 export function SiteHeader() {
@@ -24,7 +24,7 @@ export function SiteHeader() {
               </li>
             ))}
           </ul>
-          <ButtonLink href="#get-started">Get Started</ButtonLink>
+          <HeaderAuth />
         </nav>
       </div>
     </header>

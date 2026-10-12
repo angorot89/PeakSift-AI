@@ -34,7 +34,7 @@ export function Hero() {
         </p>
 
         <div className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 [animation-delay:240ms] sm:flex-row">
-          <ButtonLink href="#get-started" size="lg" className="w-full sm:w-auto">
+          <ButtonLink href="/register" size="lg" className="w-full sm:w-auto">
             Get Started
           </ButtonLink>
           <ButtonLink

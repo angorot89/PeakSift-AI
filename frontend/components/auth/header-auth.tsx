@@ -1,0 +1,52 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
+import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
+
+/** Right-hand side of the site header: sign-in links or the signed-in user. */
+export function HeaderAuth() {
+  const { user, status, logout } = useAuth();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  if (status === "loading") {
+    // Same footprint as the buttons so the header does not jump once we know.
+    return <div aria-hidden="true" className="h-9 w-24 rounded-full bg-white/[0.04]" />;
+  }
+
+  if (user) {
+    async function handleLogout() {
+      setLoggingOut(true);
+      await logout();
+      router.push("/");
+      setLoggingOut(false);
+    }
+
+    return (
+      <div className="flex items-center gap-3">
+        <span className="hidden max-w-[18ch] truncate text-sm text-muted sm:inline" title={user.email}>
+          {user.email}
+        </span>
+        <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
+          {loggingOut ? "Logging out…" : "Log out"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <Link
+        href="/login"
+        className="rounded-sm text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+      >
+        Log in
+      </Link>
+      <ButtonLink href="/register">Get Started</ButtonLink>
+    </div>
+  );
+}
