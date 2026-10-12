@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
+from app.api.transcriptions import router as transcriptions_router
 from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
 from app.core.config import get_settings
@@ -28,3 +29,4 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(videos_router)
 app.include_router(video_content_router)
+app.include_router(transcriptions_router)
