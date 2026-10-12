@@ -20,6 +20,7 @@ Semantics chosen for long transcription jobs:
 """
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 from app.core.config import get_settings
 
@@ -50,3 +51,11 @@ celery_app.conf.update(
     task_always_eager=settings.celery_task_always_eager,
     task_eager_propagates=True,
 )
+
+
+@worker_process_init.connect
+def _reset_database_pool(**_: object) -> None:
+    """Forked worker processes must not share the parent's PostgreSQL connections."""
+    from app.core.database import engine
+
+    engine.dispose(close=False)

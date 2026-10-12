@@ -67,9 +67,33 @@ def test_ping_runs_inline_in_eager_mode():
     assert ping.delay().get() == "pong"
 
 
-def test_transcribe_video_stub_propagates_in_eager_mode():
-    with pytest.raises(NotImplementedError):
-        transcribe_video.delay(str(uuid.uuid4()))
+def test_transcribe_video_for_unknown_id_is_a_quiet_noop(monkeypatch, db_session):
+    monkeypatch.setattr(
+        "app.workers.transcription_tasks.SessionLocal", lambda: _Reusable(db_session)
+    )
+
+    transcribe_video.delay(str(uuid.uuid4()))  # must not raise
+
+
+class _Reusable:
+    def __init__(self, session):
+        self.session = session
+
+    def __enter__(self):
+        return self.session
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_worker_processes_reset_the_database_pool():
+    from celery.signals import worker_process_init
+
+    from app.workers import celery_app as module
+
+    receivers = [r for r in worker_process_init.receivers]
+    assert receivers, "worker_process_init handler must be registered"
+    assert hasattr(module, "_reset_database_pool")
 
 
 def test_enqueue_returns_task_id_and_passes_only_the_id(monkeypatch):
