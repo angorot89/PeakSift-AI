@@ -7,7 +7,7 @@ import pytest
 from app.core.config import get_settings
 from app.services import ffprobe as ffprobe_module
 from app.services.ffprobe import ProbeError, parse_ffprobe_output, parse_frame_rate, probe
-from tests.media_fixtures import generate_video, have_ffmpeg
+from tests.media_fixtures import generate_video, requires_ffmpeg
 
 SAMPLE_OUTPUT = {
     "streams": [
@@ -167,8 +167,6 @@ def test_probe_missing_binary(monkeypatch, tmp_path: Path):
 
 
 # --- real ffprobe (integration) -----------------------------------------------------
-
-requires_ffmpeg = pytest.mark.skipif(not have_ffmpeg(), reason="ffmpeg/ffprobe not installed")
 
 
 @requires_ffmpeg

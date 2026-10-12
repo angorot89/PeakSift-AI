@@ -12,7 +12,7 @@ from app.models import Project, User, Video, VideoStatus
 from app.services import video_processing
 from app.services.ffprobe import ProbeError, VideoMetadata
 from app.services.storage import LocalMediaStorage
-from tests.media_fixtures import generate_video, have_ffmpeg
+from tests.media_fixtures import generate_video, requires_ffmpeg
 
 PASSWORD = "correct horse battery"
 READY_METADATA = VideoMetadata(
@@ -137,8 +137,6 @@ def test_error_message_is_truncated(db_session, storage, monkeypatch):
 
 
 # --- end to end through the upload endpoint (real ffprobe) ---------------------------
-
-requires_ffmpeg = pytest.mark.skipif(not have_ffmpeg(), reason="ffmpeg/ffprobe not installed")
 
 
 def sign_up_with_project(client: TestClient) -> str:
