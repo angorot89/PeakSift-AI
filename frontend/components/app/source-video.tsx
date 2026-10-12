@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { CandidateReview } from "@/components/app/candidate-review";
 import { ClipDetectionPanel } from "@/components/app/clip-detection-panel";
 import { ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -101,6 +102,9 @@ function VideoDetails({
             videoId={video.id}
             transcription={transcriptState.transcription}
             transcriptionLoaded={transcriptState.loaded}
+            renderResults={(run) => (
+              <CandidateReview projectId={projectId} videoId={video.id} run={run} />
+            )}
           />
         </>
       ) : null}
