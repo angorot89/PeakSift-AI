@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     ffmpeg_path: str = "ffmpeg"
     audio_extraction_timeout_seconds: float = Field(default=3600, gt=0)
 
+    # Which speech-to-text provider the pipeline uses: "faster_whisper" (local) or "openai".
+    # Server configuration only; API clients never choose a provider.
+    transcription_provider: str = "faster_whisper"
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
