@@ -104,6 +104,7 @@ app/
   core/security.py   # Password hashing and access-token encode/decode
   models/            # SQLAlchemy models: User, Project
   schemas/           # Pydantic request/response schemas
+  services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
@@ -120,3 +121,4 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `TEST_DATABASE_URL` | `postgresql+psycopg://localhost:5432/peaksift_test` | Database used by `pytest` only          |
 | `SECRET_KEY`        | *(required, ≥ 32 chars)*                       | Signs auth tokens. Generate: `openssl rand -hex 32` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
+| `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
