@@ -123,6 +123,14 @@ Audio is decoded to 16 kHz mono float32 PCM with `ffmpeg` (argument list, timeou
 
 Manual check with the real model (downloads `tiny`, ~75 MB, macOS only because it uses `say` to synthesise speech): `PEAKSIFT_REAL_WHISPER=1 pytest tests/test_faster_whisper_provider.py -k real`. Normal tests mock the model and download nothing.
 
+### OpenAI (hosted)
+
+`app/services/transcription/openai_provider.py` uses the official SDK. Set `TRANSCRIPTION_PROVIDER=openai` and `OPENAI_API_KEY`; the key is only required when this provider is selected, is never validated at startup, and is never logged, returned by the API or sent to the frontend.
+
+**Why `whisper-1`:** PeakSift needs segment timestamps to cut clips. In the installed SDK, `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` support only the `json` text format, while `verbose_json` with `timestamp_granularities=["segment"]` — the structured timestamps — is available on `whisper-1`. The pipeline therefore calls `OPENAI_TIMESTAMP_MODEL` (default `whisper-1`); configuring a text-only model there is a capability error, never a silent fallback to invented timestamps. `OPENAI_TRANSCRIPTION_MODEL` and `OPENAI_HIGH_ACCURACY_MODEL` are recorded for future text-quality workflows; V0.3 performs one paid transcription per chunk, not two.
+
+Each chunk is checked against `OPENAI_MAX_UPLOAD_BYTES` (default 20 MB, a margin under the API's 25 MB limit) before upload. Rate limits, timeouts, connection problems and 5xx responses are reported as *retryable* errors for the pipeline's bounded retries; authentication, permission and 4xx problems are not retried.
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a video's bytes is `GET /videos/{video_id}/content`, which resolves the video through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -143,7 +151,7 @@ app/
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
-  services/transcription/      # Provider contract, validation, factory, faster_whisper provider
+  services/transcription/      # Provider contract, validation, factory, faster_whisper + openai providers
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/dispatch.py          # enqueue helpers; broker outage -> JobQueueUnavailable
@@ -174,6 +182,11 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `FASTER_WHISPER_DEVICE` | `cpu`                                      | `cpu` or `cuda` (no Apple-GPU path; CPU is the macOS mode) |
 | `FASTER_WHISPER_COMPUTE_TYPE` | `int8`                               | CTranslate2 compute type (`int8` on CPU, `float16` on CUDA) |
 | `FASTER_WHISPER_BEAM_SIZE` | `5`                                     | Decoding beam size                           |
+| `OPENAI_API_KEY`    | empty                                          | Required only when `TRANSCRIPTION_PROVIDER=openai`; never committed |
+| `OPENAI_TIMESTAMP_MODEL` | `whisper-1`                                | Timestamp-capable model used by the pipeline |
+| `OPENAI_TRANSCRIPTION_MODEL` / `OPENAI_HIGH_ACCURACY_MODEL` | `gpt-4o-mini-transcribe` / `gpt-4o-transcribe` | Hosted text-only options (recorded, not used for timing) |
+| `OPENAI_TIMEOUT_SECONDS` | `600`                                      | Per-request timeout                          |
+| `OPENAI_MAX_UPLOAD_BYTES` | `20971520` (20 MB)                        | Per-chunk upload guard below the 25 MB API limit |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |

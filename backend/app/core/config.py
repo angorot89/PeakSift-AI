@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     faster_whisper_compute_type: str = "int8"
     faster_whisper_beam_size: int = Field(default=5, gt=0)
 
+    # OpenAI (hosted provider). The key is only required when TRANSCRIPTION_PROVIDER=openai
+    # and is never validated at startup, logged, returned or sent to the frontend.
+    openai_api_key: SecretStr | None = None
+    openai_transcription_model: str = "gpt-4o-mini-transcribe"  # hosted text option
+    openai_high_accuracy_model: str = "gpt-4o-transcribe"  # higher-accuracy text option
+    openai_timestamp_model: str = "whisper-1"  # the model that returns segment timestamps
+    openai_timeout_seconds: float = Field(default=600, gt=0)
+    # Hosted uploads are limited to 25 MB; keep a safety margin below it.
+    openai_max_upload_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
