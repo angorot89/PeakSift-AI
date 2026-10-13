@@ -39,7 +39,8 @@ npm run start    # Serve the production build
 | `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
 | `/projects` | The signed-in user's projects                                       |
 | `/projects/new` | Create a project (name only)                                   |
-| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress), the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path; for a ready video, the **Transcription** panel: start, live status (polled every 4 s while queued/preparing/transcribing, real progress only), failure with retry, and the paginated timestamped transcript viewer with "Load more" and "Copy transcript"; once the transcript is complete, the **AI clip detection** panel: provider and model `<select>`s filled from `GET /clip-detection/providers` (unavailable providers are explained), "Find clip moments", staged status polled every 4 s while active, stalled/failed states with bounded retry or "Start a new detection", run history, and the candidate review — ranked cards with time range, duration, overall score and five score meters, hook, rationale, collapsible transcript excerpt, an in-page preview of just that range of the source video, Save / Dismiss / Restore with All / Saved / Dismissed filters and "Load more"; on each card a **Generated clip** box: "Generate clip" (dismissed candidates must be restored first), the backend's real render states *Queued / Rendering… / Validating…* with stage progress, polled every 4 s only while active, "Render failed" with the safe message and "Retry render" (also for stalled renders), and once ready the **Rendered clip** player with duration, resolution and size plus **Download MP4**; under a ready clip, **Make a vertical short**: edit settings (Layout — Blur background / Center crop / Fit; "Burn in captions from the transcript"; Caption style — Bold / Clean / Creator; Caption position — Top / Center / Bottom; a schematic labelled "Layout guide — not the rendered result") and **Render short**, then **Rendered shorts** — one card per variant, newest first, with its live state (polled every 4 s only while that variant is active), "Render failed" / stalled with "Retry render", or the 9:16 player with duration, 1080 × 1920, size and caption cue count plus **Download short**; a **Generated clips** list for the video |
+| `/projects/[id]` | The project workspace. A **workflow stepper** (Upload, Transcribe, Find clips, Generate, Edit — Done / In progress / Next / Needs attention, each linking to its section, nothing locked) above four numbered panels: **1 Source video** (upload drop zone with real progress, then a labelled "Source preview" player beside duration/resolution/size/upload date; codecs behind "Show technical details"; Replace), **2 Transcript** (start, live status with real progress, stalled/failed alerts with retry, a bounded scrollable timestamped transcript, Copy transcript), **3 Clip moments** (provider/model choice from server allow-lists, "Find clip moments", staged progress, run history, and ranked candidate cards: rank, title, time range, one prominent overall score, the hook, "Why it was selected" (clamped), score breakdown and transcript excerpt behind a disclosure, Saved/Dismissed chips, Preview source in a labelled frame, Generate clip with real render states, and a compact "Generated clip" player with **Create vertical short** and **Download MP4**), **4 Generated clips** (frame thumbnails, status, number of shorts, Download, Create short / Open editor) |
+| `/projects/[id]/clips/[clipId]` | The **short-form editor** for one ready clip: a 9:16 stage (labelled approximate **Preview** with a real transcript caption, or the **Rendered short**), visual settings (layout cards, Captions switch, caption-style cards with typographic samples, Top/Center/Bottom picker), **Render short** replaced by the real Queued/Rendering/Validating state while it runs, the rendered result with **Download short** / **Create another version** / **Back to clip**, and the versions list named by settings (status, play, download, retry) |
 
 `/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
@@ -49,6 +50,12 @@ npm run start    # Serve the production build
 - On page load `AuthProvider` calls `GET /auth/me` to find out who is signed in; the backend is the source of truth. The header shows **Log in / Get Started** or the user's email with **Log out**.
 - Logout calls `POST /auth/logout`, which clears the cookie.
 - The video preview is a plain `<video src="…/videos/{id}/content">`; the browser attaches the cookie because the frontend and API are same-site (`localhost` in development), and the API checks ownership on every byte-range request. Candidate previews ("Preview source") reuse the same stream with a media fragment (`#t=start,end`) and stop at the end of the range. Rendered clips play from `<video src="…/clips/{id}/content">` with the same cookie mechanism, and **Download MP4** is a plain link to `…/clips/{id}/download` (an attachment), so nothing is buffered in JavaScript. Edited shorts work the same way through `…/edits/{id}/content` and `…/edits/{id}/download`.
+
+## Design system
+
+- **Tokens** (`app/globals.css`): three surface levels (`surface`, `surface-2`, `surface-3`), `border` / `border-strong`, text (`foreground`, `muted`, `subtle`), one accent (`accent`, `accent-soft`) used sparingly, status colours (`success`, `warning`, `danger`), restrained `fade-in` / `shimmer` motion, and tabular numerals for `<time>` and `.tabular`. `prefers-reduced-motion` disables animation and transitions.
+- **Components** (`components/ui/`): every section is a `Panel` (one radius, one border, a header row with optional step number, status and actions); state is a `StatusPill` (dot + words, never colour alone); problems are an `InlineAlert` (heading, explanation, recovery action); empty states are an icon + one-line title + one-line next step; loading uses skeletons or a context-specific `WorkingState` with backend progress only; every video sits in a labelled `MediaFrame` (Source preview, Generated clip) or the editor's 9:16 frame.
+- **Icons**: `lucide-react` (pinned exact version); no emoji as UI icons.
 
 ## Uploads
 
@@ -68,11 +75,13 @@ app/
 components/
   app/             # App shell, route guard, dashboard/projects views, states, source video,
                    # transcription panel + viewer, clip detection panel + candidate review,
-                   # clip render controls + rendered clip, short-form editor (edit settings) +
-                   # edited shorts (variant cards, 9:16 player, download)
+                   # clip render controls + rendered clip, project workflow stepper,
+                   # generated clips panel, short-editor view; editor/ = stage, controls, versions
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
-  ui/              # Primitives: Button, ButtonLink, Field, FormError, SectionHeading
+  ui/              # Design system: Button/ButtonLink (one shape; primary/secondary/ghost/danger,
+                   # sm/md/lg), Panel, StatusPill, InlineAlert, EmptyState, Skeleton,
+                   # ProgressBar/Spinner/WorkingState, MediaFrame, Field, FormError, SectionHeading
   logo.tsx, site-header.tsx, site-footer.tsx
 lib/
   api.ts           # fetch wrapper (base URL, cookies, error parsing)
