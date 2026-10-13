@@ -179,7 +179,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           <video
             controls
             preload="metadata"
-            src={videoContentUrl(latest.id)}
+            src={`${videoContentUrl(latest.id)}#t=0.1`}
             className="aspect-video w-full bg-black"
             aria-label={`Preview of ${latest.original_filename}`}
           />

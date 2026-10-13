@@ -1,17 +1,21 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { Clapperboard, Download, Smartphone } from "lucide-react";
+import { CheckCircle2, Clapperboard, Download, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
 import { MediaFrame } from "@/components/ui/media-frame";
+import { LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { WorkingState } from "@/components/ui/progress";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
   clipContentUrl,
   clipDownloadUrl,
   clipStageLabel,
+  friendlyClipError,
   generateClip,
   getClip,
   isClipActive,
@@ -114,85 +118,75 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
 
   let body: ReactNode;
   if (!known) {
-    body = <p className="text-sm text-muted">Checking clip…</p>;
+    body = <LoadingState label="Checking clip…" />;
   } else if (clip === null) {
     body = (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">
           {dismissed
             ? "Restore this candidate to generate a clip."
             : "Render this moment from the original video as an MP4."}
         </p>
         <Button onClick={generate} disabled={busy || dismissed}>
+          <Clapperboard aria-hidden="true" />
           {busy ? "Starting…" : "Generate clip"}
         </Button>
       </div>
     );
   } else if (isClipActive(clip.status) && clip.is_stale) {
     body = (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p role="alert" className="text-sm text-amber-200">
-          This render appears to have stalled — the worker stopped reporting.
-        </p>
-        <Button variant="secondary" onClick={retry} disabled={busy}>
-          {busy ? "Restarting…" : "Retry render"}
-        </Button>
-      </div>
+      <InlineAlert
+        tone="warning"
+        title="Clip render stalled"
+        action={
+          <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
+            {busy ? "Restarting…" : "Retry render"}
+          </Button>
+        }
+      >
+        The worker stopped reporting progress. Start it again to continue.
+      </InlineAlert>
     );
   } else if (isClipActive(clip.status)) {
     body = (
-      <div className="space-y-2">
-        <p className="flex items-center gap-3 text-sm text-muted" role="status" aria-live="polite">
-          <span
-            aria-hidden="true"
-            className="size-4 animate-spin rounded-full border-2 border-white/15 border-t-accent"
-          />
-          {clipStageLabel(clip)}
-          {clip.progress_percent > 0 ? ` — ${clip.progress_percent}%` : ""}
-        </p>
-        {clip.progress_percent > 0 ? (
-          <div
-            role="progressbar"
-            aria-label="Clip render progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={clip.progress_percent}
-            className="h-1.5 overflow-hidden rounded-full bg-white/10"
-          >
-            <div className="h-full bg-accent transition-[width]" style={{ width: `${clip.progress_percent}%` }} />
-          </div>
-        ) : null}
-      </div>
+      <WorkingState
+        label={clipStageLabel(clip).replace("…", "")}
+        progress={clip.status === "queued" ? null : clip.progress_percent}
+        progressLabel="Clip render progress"
+        detail="Rendering clip from the original video."
+      />
     );
   } else if (clip.status === "failed") {
     body = (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div role="alert" className="min-w-0 text-sm text-rose-200">
-          <p className="font-medium">Render failed</p>
-          {clip.error_message ? <p className="mt-0.5 break-words">{clip.error_message}</p> : null}
-        </div>
-        <Button variant="secondary" onClick={retry} disabled={busy}>
-          {busy ? "Retrying…" : "Retry render"}
-        </Button>
-      </div>
+      <InlineAlert
+        title="Render failed"
+        action={
+          <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
+            {busy ? "Retrying…" : "Retry render"}
+          </Button>
+        }
+      >
+        We couldn&apos;t render this clip.
+        <span className="block text-xs text-subtle">{friendlyClipError(clip)}</span>
+      </InlineAlert>
     );
   } else {
     body = <RenderedClip clip={clip} projectId={projectId} />;
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-border px-3 py-3 sm:px-4" aria-label="Generated clip">
+    <div className="mt-4 border-t border-border pt-4" aria-label="Generated clip" role="group">
       {body}
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-rose-300">
-          {error}
-        </p>
+        <div className="mt-3">
+          <InlineAlert title="That didn't work">{error}</InlineAlert>
+        </div>
       ) : null}
     </div>
   );
 }
 
-/** The rendered clip: labelled player, the facts a creator needs, download and the next step. */
+/** The rendered clip: a compact labelled player beside what a creator needs next. */
 export function RenderedClip({ clip, projectId }: { clip: GeneratedClip; projectId: string }) {
   const meta = [
     formatDuration(clip.duration_seconds),
@@ -202,31 +196,41 @@ export function RenderedClip({ clip, projectId }: { clip: GeneratedClip; project
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="space-y-3">
-      <MediaFrame icon={Clapperboard} label="Generated clip" meta={meta}>
+    <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,420px)_1fr] sm:gap-6">
+      <MediaFrame icon={Clapperboard} label="Generated clip">
         {/* The browser sends the HttpOnly session cookie (same-site); the API checks ownership. */}
         <video
           controls
           preload="metadata"
-          src={clipContentUrl(clip.id)}
+          src={`${clipContentUrl(clip.id)}#t=0.1`}
           className="aspect-video w-full bg-black object-contain"
           aria-label={`Rendered clip: ${clip.title}`}
         />
       </MediaFrame>
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <a
-          href={clipDownloadUrl(clip.id)}
-          className={buttonClasses("secondary", "md")}
-          download
-          aria-label={`Download MP4 — ${clip.title}`}
-        >
-          <Download aria-hidden="true" />
-          Download MP4
-        </a>
-        <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
-          <Smartphone aria-hidden="true" />
-          Create vertical short
-        </Link>
+      <div className="flex min-w-0 flex-col gap-3 sm:pt-6">
+        <div>
+          <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <CheckCircle2 aria-hidden="true" className="size-4 text-success" />
+            Clip ready
+          </p>
+          <p className="tabular mt-0.5 text-xs text-subtle">{meta} · original aspect ratio</p>
+        </div>
+        <p className="text-sm text-muted">Make a 9:16 version with captions for Shorts, TikTok and Reels.</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
+            <Smartphone aria-hidden="true" />
+            Create vertical short
+          </Link>
+          <a
+            href={clipDownloadUrl(clip.id)}
+            className={buttonClasses("secondary", "md")}
+            download
+            aria-label={`Download MP4 — ${clip.title}`}
+          >
+            <Download aria-hidden="true" />
+            Download MP4
+          </a>
+        </div>
       </div>
     </div>
   );
