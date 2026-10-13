@@ -25,6 +25,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - name: Type check
+        run: npx tsc --noEmit
       - run: npm run build
 
   backend:
@@ -80,6 +82,14 @@ jobs:
       OLLAMA_CONNECT_TIMEOUT_SECONDS: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: No model weights or media are tracked
+        # Detector weights are fetched by an operator script (pinned sha256), never committed;
+        # test media is generated at test time.
+        run: |
+          set -euo pipefail
+          tracked="$(git ls-files '*.onnx' '*.tflite' '*.pt' '*.pth' '*.bin' '*.safetensors' 'backend/models/*' 'media/*' '*.mp4' '*.mov' '*.wav')"
+          [ -z "$tracked" ] || { echo "model weights or media committed:"; echo "$tracked"; exit 1; }
+          echo "no weights or media in the repository"
       - name: Install FFmpeg and caption fonts
         # ffprobe for metadata, ffmpeg for rendering and generated fixtures; Noto Sans (OFL,
         # installed from the distribution, never committed) is the caption font, with Noto
@@ -118,15 +128,20 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: ruff format --check .
-      - name: Migrations apply cleanly and match the models
+      - name: Migrations apply cleanly, match the models and survive a full cycle
         run: |
           alembic upgrade head
           alembic check
+          alembic downgrade base
+          alembic upgrade head
           alembic downgrade base
       - name: libass really draws caption text (burned-in probe frame)
         run: >-
           python -c "from app.services.clip_edit.composition import require_caption_rendering;
           require_caption_rendering('ffmpeg', 'Noto Sans'); print('caption probe: text drawn')"
+      - name: Smart reframe renders the deepest allowed crop path on this FFmpeg
+        # The moving crop is an FFmpeg expression tree; expression limits differ by build.
+        run: python scripts/smart_crop_probe.py
       - run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
