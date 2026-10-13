@@ -204,7 +204,7 @@ def test_square_and_odd_sized_sources(tmp_path: Path):
     square = solid_video(tmp_path / "square.mp4", (200, 200), "0xFF0000")
     odd = solid_video(tmp_path / "odd.mp4", (162, 92), "0xFF0000")
     for source in (square, odd):
-        for layout in Layout:
+        for layout in (Layout.CENTER_CROP, Layout.BLUR_BACKGROUND, Layout.FIT):
             short = compose_short(
                 source, tmp_path / f"{source.stem}-{layout}.mp4", layout=layout, options=OPTIONS
             )

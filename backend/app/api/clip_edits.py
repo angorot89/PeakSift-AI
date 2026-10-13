@@ -26,6 +26,8 @@ from app.models import (
     ClipEditStatus,
     ClipStatus,
     Project,
+    ReframeAnalysis,
+    ReframeStatus,
     TranscriptionStatus,
     Video,
 )
@@ -36,6 +38,7 @@ from app.services.clip_edit.config import (
     OUTPUT_WIDTH,
     RENDER_PROFILE_VERTICAL_V1,
     EditConfig,
+    Layout,
 )
 from app.services.clip_edit.pipeline import is_stale
 from app.services.clip_render.storage import safe_download_filename
@@ -87,6 +90,7 @@ def _read(edit: ClipEdit) -> ClipEditRead:
         captions_enabled=edit.captions_enabled,
         caption_style=edit.caption_style,
         caption_position=edit.caption_position,
+        reframe_analysis_id=edit.reframe_analysis_id,
         output_width=edit.output_width,
         output_height=edit.output_height,
         render_profile=edit.render_profile,
@@ -132,11 +136,23 @@ def _existing(db: DbSession, clip: Clip, fingerprint: str) -> ClipEdit | None:
     )
 
 
-def _require_renderable(clip: Clip, video: Video, config: EditConfig) -> None:
+def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditConfig) -> None:
     if clip.status != ClipStatus.READY:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Generate the clip before editing it"
         )
+    if config.layout == Layout.SMART_REFRAME:
+        analysis = db.get(ReframeAnalysis, uuid.UUID(str(config.reframe_analysis_id)))
+        # Another clip's analysis is indistinguishable from a missing one (no existence leak).
+        if (
+            analysis is None
+            or analysis.clip_id != clip.id
+            or analysis.status != ReframeStatus.COMPLETED
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Analyze the framing of this clip before rendering a smart reframe",
+            )
     if config.captions_enabled:
         transcription = video.transcription
         if transcription is None or transcription.status != TranscriptionStatus.COMPLETED:
@@ -190,6 +206,7 @@ def create_edit(
             captions_enabled=body.captions_enabled,
             caption_style=body.caption_style,
             caption_position=body.caption_position,
+            reframe_analysis_id=body.reframe_analysis_id,
         )
     except ValueError as error:
         raise HTTPException(
@@ -207,7 +224,7 @@ def create_edit(
         response.status_code = status.HTTP_200_OK
         return _read(existing)
 
-    _require_renderable(clip, video, config)
+    _require_renderable(db, clip, video, config)
     edit = ClipEdit(
         clip_id=clip.id,
         video_id=video.id,
@@ -218,6 +235,9 @@ def create_edit(
         captions_enabled=config.captions_enabled,
         caption_style=config.caption_style.value if config.caption_style else None,
         caption_position=config.caption_position.value if config.caption_position else None,
+        reframe_analysis_id=(
+            uuid.UUID(config.reframe_analysis_id) if config.reframe_analysis_id else None
+        ),
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
         render_profile=RENDER_PROFILE_VERTICAL_V1,
@@ -285,7 +305,7 @@ def retry_edit(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="This edit has been retried too many times"
         )
-    _require_renderable(clip, video, EditConfig.from_snapshot(edit.config))
+    _require_renderable(db, clip, video, EditConfig.from_snapshot(edit.config))
     edit.status = ClipEditStatus.QUEUED
     edit.progress_percent = 0
     edit.attempt += 1

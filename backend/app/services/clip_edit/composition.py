@@ -18,11 +18,12 @@ Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio.
 import logging
 import subprocess
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, Layout
+from app.services.clip_edit.smart_crop import CropPoint, smart_crop_filter
 from app.services.clip_render.renderer import (
     AUDIO_CODEC,
     PIXEL_FORMAT,
@@ -32,6 +33,7 @@ from app.services.clip_render.renderer import (
     run_ffmpeg,
 )
 from app.services.ffprobe import ProbeError, VideoMetadata, probe
+from app.services.reframe.sampling import SamplingError, probe_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +188,8 @@ def layout_filter(layout: Layout, width: int = OUTPUT_WIDTH, height: int = OUTPU
             f"[fg]{fit}[front];"
             "[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1[framed]"
         )
+    if layout == Layout.SMART_REFRAME:
+        raise ValueError("Smart reframe is built from a crop path (smart_crop_filter)")
     raise ValueError(f"Unsupported layout: {layout!r}")
 
 
@@ -200,8 +204,10 @@ def build_edit_command(
     preset: str,
     crf: int,
     audio_bitrate: str,
+    video_graph: str | None = None,
 ) -> list[str]:
-    graph = layout_filter(layout)
+    # Smart reframe passes its own validated crop graph; every other layout uses constants.
+    graph = video_graph if video_graph is not None else layout_filter(layout)
     if captions:
         # A fixed relative name: FFmpeg runs with the workspace as its working directory.
         graph += f";[framed]subtitles=filename={CAPTIONS_FILENAME}[out]"
@@ -253,11 +259,14 @@ def compose_short(
     captions: bool = False,
     caption_font: str = DEFAULT_CAPTION_FONT,
     heartbeat: Callable[[], None] | None = None,
+    crop_points: Sequence[CropPoint] | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
 
     With ``captions``, ``workspace/captions.ass`` must exist; FFmpeg runs inside
-    ``workspace``. The partial output is removed on any failure.
+    ``workspace``. Smart reframe needs ``crop_points`` (a validated crop path): the moving crop
+    is applied first, then scaling to 1080 × 1920, then captions — so captions stay fixed on
+    screen while the framing moves. The partial output is removed on any failure.
     """
     if not source.is_file() or source.stat().st_size == 0:
         raise RenderError("source_missing", "The generated clip file is missing")
@@ -273,6 +282,21 @@ def compose_short(
         raise RenderError("source_unreadable", "The generated clip has no duration")
     has_audio = source_meta.audio_codec is not None
 
+    video_graph = None
+    if layout == Layout.SMART_REFRAME:
+        if not crop_points:
+            raise RenderError("reframe_unavailable", "The framing path is not available")
+        try:
+            geometry = probe_geometry(source, ffprobe_path=options.ffprobe_path)
+        except SamplingError:
+            raise RenderError("source_unreadable", "The generated clip could not be read") from None
+        try:
+            video_graph = smart_crop_filter(
+                crop_points, geometry.width, geometry.height, OUTPUT_WIDTH, OUTPUT_HEIGHT
+            )
+        except ValueError:
+            raise RenderError("invalid_path", "The framing path is not valid") from None
+
     command = build_edit_command(
         options.ffmpeg_path,
         source,
@@ -283,6 +307,7 @@ def compose_short(
         preset=options.preset,
         crf=options.crf,
         audio_bitrate=options.audio_bitrate,
+        video_graph=video_graph,
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
