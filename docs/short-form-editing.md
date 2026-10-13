@@ -208,17 +208,27 @@ Install fonts:
 
 ## Frontend
 
-- **Make a vertical short.** Under a ready clip's **Rendered clip** player, this section is the edit settings form:
-  - **Layout**: Blur background, Center crop or Fit.
-  - **Burn in captions from the transcript**: a checkbox.
-  - **Caption style** and **Caption position**: disabled when captions are off.
-- **Layout guide.** A small schematic shows the chosen layout and caption placement. It is labelled "Layout guide — not the rendered result". The rendered file is the only authoritative output.
-- **Accessibility.** The radio groups are real inputs in labelled fieldsets. They have keyboard arrows, a visible focus ring and a check mark, so state is not shown by colour alone. Errors are announced.
-- **Rendered shorts.** Each variant is a card, newest first:
-  - While rendering, the card shows Queued, Rendering… or Validating… with the backend's stage percentage. It polls every 4 s only while that variant is active.
-  - When failed or stalled, it shows the safe message and **Retry render**.
-  - When ready, it shows a 9:16 player on `/edits/{id}/content`, the duration, 1080 × 1920, the size and caption cue count, and **Download short**.
-- **Repeat settings.** Re-submitting existing settings says the variant already exists. It does not start a new render.
+The editor is its own page, `/projects/[id]/clips/[clipId]`. It opens from **Create vertical short** on a ready clip, or from **Create short** / **Open editor** under *Generated clips*.
+
+- **Stage.** A 9:16 frame is the focal point, with a **Preview** / **Rendered short** switch.
+  - **Preview** plays the generated clip composed for the chosen layout. Center crop fills the frame, blur background uses a blurred copy kept in sync behind the full frame, and fit uses a dark background.
+  - The preview caption shows real words from the transcript, styled with each preset's size ratio (corrected for libass's line-height sizing), weight, colour, outline or box, and margins.
+  - It is labelled *"Preview only — layout and caption placement are approximate. The rendered MP4 is the final result."*
+  - **Rendered short** plays the actual output file from `/edits/{id}/content`.
+- **Edit settings.**
+  - Layout cards with miniature diagrams.
+  - A **Captions** switch.
+  - Caption-style cards with typographic samples: Clean, Bold, and Creator (yellow on a box).
+  - A visual Top / Center / Bottom position picker.
+  - Style and position are disabled while captions are off.
+  - All controls are real radio inputs or a `role="switch"`, so arrow keys, focus rings and labels work. The selection is also marked with a check, never by colour alone.
+- **Primary action.** **Render short** comes with a subtle summary of the output.
+  - While a render runs, the button is replaced by the real Queued, Rendering or Validating state with backend progress, so a second submission is impossible.
+  - Settings that were already rendered offer **View this version**.
+  - A failed or stalled render shows *"Render failed — We couldn't generate this version of your short."* with **Retry render**. Error codes are explained in creator language, without infrastructure detail.
+- **Result.** When the render finishes, the stage switches to the rendered short and shows "Your short is ready.", with **Download short**, **Create another version** and **Back to clip**.
+- **Versions.** Every variant is listed by its settings, for example "Blur background · Bold captions · Bottom", never by id. Each shows its status, a real frame thumbnail, **Play** and download. The list polls every 4 s only while something renders.
+- **Project page.** *Generated clips* shows each clip's number of shorts. The project's workflow stepper reports **Edit · Done** once a short is ready.
 
 ## Testing
 
@@ -255,9 +265,9 @@ All tests use tiny sources generated with FFmpeg at test time, and nothing is co
 2. **Transcribe video**.
 3. **Find clip moments** in *AI clip detection*.
 4. **Generate clip** on a candidate and wait for **Rendered clip**.
-5. Under it, open **Make a vertical short**.
+5. Click **Create vertical short** to open the short-form editor.
 6. Choose a layout: **Blur background**, **Center crop** or **Fit**.
 7. Configure captions: on or off, then a style and a position.
 8. Click **Render short** and wait for *Queued → Rendering → Validating*.
-9. Preview the result in its 9:16 player under **Rendered shorts**.
+9. Preview the result: the editor switches to the rendered 9:16 short.
 10. Click **Download short**.
