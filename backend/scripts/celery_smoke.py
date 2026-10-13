@@ -26,6 +26,7 @@ EXPECTED_TASKS = (
     "peaksift.detect_clips",
     "peaksift.render_clip",
     "peaksift.render_clip_edit",
+    "peaksift.analyze_reframe",
 )
 
 

@@ -7,6 +7,7 @@ from kombu.exceptions import OperationalError
 from app.workers.clip_detection_tasks import detect_clips
 from app.workers.clip_edit_tasks import render_clip_edit_task
 from app.workers.clip_render_tasks import render_clip_task
+from app.workers.reframe_tasks import analyze_reframe_task
 from app.workers.transcription_tasks import transcribe_video
 
 
@@ -56,6 +57,15 @@ def enqueue_clip_edit(edit_id: uuid.UUID, *, task_id: str) -> str:
     """Queue `render_clip_edit` under a pre-chosen task id and return it."""
     try:
         render_clip_edit_task.apply_async(args=[str(edit_id)], task_id=task_id, retry=False)
+    except OperationalError as error:
+        raise JobQueueUnavailable("The job queue is unavailable") from error
+    return task_id
+
+
+def enqueue_reframe_analysis(analysis_id: uuid.UUID, *, task_id: str) -> str:
+    """Queue `analyze_reframe` under a pre-chosen task id and return it."""
+    try:
+        analyze_reframe_task.apply_async(args=[str(analysis_id)], task_id=task_id, retry=False)
     except OperationalError as error:
         raise JobQueueUnavailable("The job queue is unavailable") from error
     return task_id
