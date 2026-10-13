@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from kombu.exceptions import OperationalError
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -189,7 +189,9 @@ class SpyComposer:
         self.db, self.edit, self.error, self.on_call = db, edit, error, on_call
         self.calls: list[dict] = []
 
-    def __call__(self, source, target, *, layout, options, workspace, captions, heartbeat):
+    def __call__(
+        self, source, target, *, layout, options, workspace, captions, caption_font, heartbeat
+    ):
         self.calls.append(
             {
                 "source": source,
@@ -197,6 +199,7 @@ class SpyComposer:
                 "layout": layout,
                 "workspace": workspace,
                 "captions": captions,
+                "caption_font": caption_font,
             }
         )
         self.captions_text = (workspace / "captions.ass").read_text() if captions else None
@@ -539,6 +542,56 @@ def test_stalled_attempt_cannot_complete_the_new_attempt(db_session, settings, s
     row = db_session.get(ClipEdit, edit.id)
     assert row.status == "rendering" and row.completed_at is None
     assert not EditArtifactStore(storage).exists(edit.id)
+
+
+def test_edit_deleted_mid_render_stops_quietly_and_leaves_no_files(db_session, settings, storage):
+    """The project/video/clip (and so the edit) is removed while the worker renders."""
+    edit = make_edit(db_session, storage)
+    edit_id = edit.id
+
+    def delete_row():
+        db_session.execute(delete(ClipEdit).where(ClipEdit.id == edit_id))
+        db_session.commit()
+
+    execute(edit, db_session, settings, storage, SpyComposer(db_session, edit, on_call=delete_row))
+    db_session.expire_all()
+    assert db_session.get(ClipEdit, edit_id) is None
+    assert not storage.path_for(f"edits/{edit_id}").exists()
+
+
+def test_disk_errors_are_reported_as_storage_failures(db_session, settings, storage):
+    edit = make_edit(db_session, storage)
+    disk_full = OSError(28, "No space left on device", str(storage.root / "edits"))
+    result = execute(
+        edit, db_session, settings, storage, SpyComposer(db_session, edit, error=disk_full)
+    )
+    assert result.status == ClipEditStatus.FAILED and result.error_code == "storage_failure"
+    assert str(storage.root) not in result.error_message
+    assert not storage.path_for(f"edits/{edit.id}").exists()
+
+
+def test_a_failing_database_while_recording_a_failure_does_not_raise(
+    monkeypatch, db_session, settings, storage
+):
+    edit = make_edit(db_session, storage)
+
+    def database_down(*args, **kwargs):
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(pipeline, "_fail", database_down)
+    composer = SpyComposer(db_session, edit, error=RenderError("ffmpeg_failed", "Rendering failed"))
+    execute(edit, db_session, settings, storage, composer)  # must not raise into Celery
+    db_session.expire_all()
+    row = db_session.get(ClipEdit, edit.id)
+    assert row.status == ClipEditStatus.RENDERING  # left for stale recovery + retry
+    assert not storage.path_for(workspace_key(edit.id, 1)).exists()
+
+
+def test_the_configured_caption_font_reaches_the_renderer(db_session, settings, storage):
+    edit = make_edit(db_session, storage)
+    composer = SpyComposer(db_session, edit)
+    execute(edit, db_session, settings, storage, composer)
+    assert composer.calls[0]["caption_font"] == settings.caption_font_family
 
 
 def test_unknown_edit_is_a_quiet_noop(db_session, settings, storage):

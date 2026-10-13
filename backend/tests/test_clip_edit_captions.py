@@ -1,8 +1,10 @@
 import math
+import unicodedata
 
 import pytest
 
 from app.services.clip_edit.captions import (
+    MAX_TOKEN_WIDTH,
     MIN_CUE_SECONDS,
     WORD_JOINER,
     Cue,
@@ -10,6 +12,7 @@ from app.services.clip_edit.captions import (
     build_cues,
     clean_text,
     escape_ass_text,
+    split_long_token,
 )
 
 
@@ -145,7 +148,8 @@ def test_overlapping_transcript_segments_do_not_stack():
     [
         "Bonjour à tous, ça va ? C'est l'été !",
         "مرحبا بكم في الفيديو، كيف حالكم؟",
-        "Rock & roll — \"quotes\" and 'apostrophes' 🙂",
+        "Rock & roll — \"quotes\" and 'apostrophes' ©",
+        "ZWNJ in Persian: می‌خواهم",
     ],
 )
 def test_unicode_and_punctuation_are_preserved_exactly(text):
@@ -159,10 +163,71 @@ def test_clean_text_only_normalises_whitespace_and_control_characters():
 
 
 def test_clean_text_keeps_joiners_and_marks_but_drops_bidi_overrides():
-    family = "\U0001f469\u200d\U0001f467"  # ZWJ emoji sequence
-    assert clean_text(f"hi {family}") == f"hi {family}"
+    assert clean_text("a\u200db \u200c c") == "a\u200db \u200c c"
     assert clean_text("\u200fمرحبا\u200e ok") == "\u200fمرحبا\u200e ok"
     assert clean_text("abc\u202edcba\u202c") == "abcdcba"  # right-to-left override removed
+
+
+# --- emoji and unbreakable tokens -----
+
+
+def test_emoji_are_left_out_of_captions_instead_of_burning_in_as_boxes():
+    text = "so funny 😂😂 I love it ❤️ 👨\u200d👩\u200d👧 family 🇲🇦 ok"
+    cues = cues_for([seg(0.0, 5.0, text)], 0.0, 5.0)
+    joined = " ".join(c.text for c in cues)
+    assert joined == "so funny I love it family ok"
+    # what is left of a ZWJ sequence (bare joiners) never becomes a "word"
+    assert all(word.strip("\u200d") for c in cues for word in c.text.split(" "))
+
+
+def test_a_segment_of_only_emoji_gives_no_cue():
+    assert cues_for([seg(0.0, 3.0, "😂 😂 🔥")], 0.0, 3.0) == []
+
+
+def display_width(text: str) -> int:
+    """Independent of the implementation: wide CJK = 2, marks/format = 0, others = 1."""
+    total = 0
+    for ch in text:
+        if unicodedata.category(ch)[0] in "MC":
+            continue
+        total += 2 if unicodedata.east_asian_width(ch) in "WF" else 1
+    return total
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "https://example.com/a/very/long/path/that/never/wraps/anywhere",
+        "今天我们一起去机场接朋友然后一起吃晚饭",
+        "Donaudampfschifffahrtsgesellschaftskapitän",
+        "e\u0301" * 30,  # combining accents stay attached to their letter
+    ],
+)
+def test_unbreakable_tokens_are_split_to_fit_one_line(token):
+    pieces = split_long_token(token)
+    assert "".join(pieces) == token  # nothing lost, nothing added, order kept
+    assert len(pieces) > 1 and max(display_width(p) for p in pieces) <= MAX_TOKEN_WIDTH
+    assert not any(unicodedata.category(p[0]).startswith("M") for p in pieces)
+    cues = cues_for([seg(0.0, 6.0, f"look {token} now")], 0.0, 6.0)
+    assert "".join(c.text.replace(" ", "") for c in cues) == f"look{token}now"
+
+
+def test_split_pieces_are_balanced_and_no_text_is_lost():
+    text = (
+        "visit https://example.com/watch/this/very/long/link today "
+        "今天我们一起去机场接朋友然后吃晚饭"
+    )
+    cues = cues_for([seg(0.0, 3.6, text)], 0.0, 4.0)
+    assert "".join(c.text.replace(" ", "") for c in cues) == text.replace(" ", "")
+    assert all(c.end - c.start >= MIN_CUE_SECONDS for c in cues)
+    pieces = split_long_token("今天我们一起去机场接朋友然后一起吃晚饭")
+    widths = [display_width(p) for p in pieces]
+    assert max(widths) - min(widths) <= 2  # no tiny tail piece
+
+
+def test_normal_words_are_not_split():
+    assert split_long_token("unbelievable") == ["unbelievable"]
+    assert split_long_token("كيف") == ["كيف"]
 
 
 # --- ASS escaping -----

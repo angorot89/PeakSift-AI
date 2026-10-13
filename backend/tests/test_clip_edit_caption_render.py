@@ -4,6 +4,7 @@ the background afterwards, and sit where the position says)."""
 
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,8 +16,16 @@ from app.services.clip_edit.caption_styles import (
     ass_time,
     build_ass_document,
 )
-from app.services.clip_edit.captions import WORD_JOINER, Cue
-from app.services.clip_edit.composition import CAPTIONS_FILENAME, compose_short, supports_captions
+from app.services.clip_edit.captions import WORD_JOINER, Cue, SourceSegment, build_cues
+from app.services.clip_edit.composition import (
+    CAPTIONS_FILENAME,
+    PROBE_SIZE,
+    caption_text_renders,
+    compose_short,
+    ffmpeg_filters,
+    require_caption_rendering,
+    supports_captions,
+)
 from app.services.clip_edit.config import CaptionPosition, CaptionStyle, Layout
 from app.services.clip_render.renderer import RenderError, RenderOptions
 from tests.media_fixtures import FFMPEG, requires_ffmpeg, requires_libass
@@ -144,6 +153,10 @@ def plain_source(target: Path, seconds: float = 4.0, audio: bool = True) -> Path
 
 
 def region(path: Path, t: float, y: int, h: int) -> bytes:
+    return crop(path, t, 0, y, 1080, h)
+
+
+def crop(path: Path, t: float, x: int, y: int, w: int, h: int) -> bytes:
     return subprocess.run(
         [
             FFMPEG,
@@ -156,7 +169,7 @@ def region(path: Path, t: float, y: int, h: int) -> bytes:
             "-frames:v",
             "1",
             "-vf",
-            f"crop=1080:{h}:0:{y}",
+            f"crop={w}:{h}:{x}:{y}",
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -291,3 +304,92 @@ def test_missing_libass_is_a_clear_failure(tmp_path: Path):
             captions=True,
         )
     assert info.value.code == "captions_unavailable" and "libass" in info.value.message
+
+
+# --- hardening: unbreakable lines, missing renderer, missing fonts -----
+
+EDGE = 24  # outer columns a caption must never reach (the side margin is 90 px)
+
+
+def edges(path: Path, t: float, band) -> bytes:
+    y, h = band
+    return crop(path, t, 0, y, EDGE, h) + crop(path, t, 1080 - EDGE, y, EDGE, h)
+
+
+@requires_ffmpeg
+@requires_libass
+def test_long_unspaced_caption_is_split_and_stays_inside_the_frame(tmp_path: Path):
+    token = "https://example.com/watch/this/very/long/link/that/never/wraps"
+    # Control: drawn as one cue, libass cannot wrap it and it runs off both sides.
+    raw = render(tmp_path, [Cue(0.2, 3.6, token)], name="unsplit")
+    assert difference(edges(raw.path, 1.0, BOTTOM_BAND), edges(raw.path, 3.9, BOTTOM_BAND)) > 1
+
+    cues = build_cues([SourceSegment(0.0, 3.6, token)], clip_start=0.0, clip_end=4.0)
+    assert len(cues) > 1 and "".join(c.text for c in cues) == token
+    short = render(tmp_path, cues, name="split")
+    background = region(short.path, 3.9, *BOTTOM_BAND)
+    for cue in cues:
+        t = (cue.start + cue.end) / 2
+        assert difference(region(short.path, t, *BOTTOM_BAND), background) > 1  # text drawn
+        assert (
+            difference(edges(short.path, t, BOTTOM_BAND), edges(short.path, 3.9, BOTTOM_BAND))
+            < 0.05
+        )
+
+
+def fake_ffmpeg(path: Path, *, filters: str, frame: str = "") -> str:
+    path.write_text(
+        "#!/bin/sh\n"
+        'case "$*" in\n'
+        f"  *-filters*) echo '{filters}' ;;\n"
+        f"  *) {frame or 'exit 1'} ;;\n"
+        "esac\n"
+    )
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return str(path)
+
+
+def test_missing_ffmpeg_is_not_reported_as_missing_libass(tmp_path: Path):
+    missing = str(tmp_path / "not-installed" / "ffmpeg")
+    assert ffmpeg_filters(missing) is None and supports_captions(missing) is False
+    with pytest.raises(RenderError) as info:
+        require_caption_rendering(missing, "Noto Sans")
+    assert info.value.code == "ffmpeg_missing" and "libass" not in info.value.message
+    assert missing not in info.value.message
+
+
+def test_caption_renderer_that_draws_nothing_is_refused(tmp_path: Path):
+    """libass present, but no usable font: the probe frame stays black."""
+    width, height = (int(v) for v in PROBE_SIZE.split("x"))
+    fake = fake_ffmpeg(
+        tmp_path / "ffmpeg-no-fonts",
+        filters=" .. subtitles  V->V  Render text subtitles onto input video using libass.",
+        frame=f"head -c {width * height} /dev/zero",
+    )
+    assert supports_captions(fake) is True
+    assert caption_text_renders(fake, "Noto Sans") is False
+    with pytest.raises(RenderError) as info:
+        require_caption_rendering(fake, "Noto Sans")
+    assert info.value.code == "caption_font_unavailable"
+    assert "font" in info.value.message and str(tmp_path) not in info.value.message
+    assert caption_text_renders(fake, "Noto Sans") is False  # failures are not cached
+
+
+@requires_ffmpeg
+@requires_libass
+def test_real_caption_probe_draws_text():
+    assert caption_text_renders(get_settings().ffmpeg_path, "Noto Sans") is True
+
+
+@requires_ffmpeg
+@requires_libass
+@pytest.mark.skipif(sys.platform != "linux", reason="fontconfig-only check (CI runs Linux)")
+def test_a_server_without_any_font_is_detected(tmp_path: Path, monkeypatch):
+    conf = tmp_path / "fonts.conf"
+    conf.write_text(
+        '<?xml version="1.0"?>\n'
+        f"<fontconfig><cachedir>{tmp_path / 'cache'}</cachedir></fontconfig>\n"
+    )
+    monkeypatch.setenv("FONTCONFIG_FILE", str(conf))
+    # A family name of its own, so no earlier successful probe is reused from the cache.
+    assert caption_text_renders(get_settings().ffmpeg_path, "No Font Probe") is False

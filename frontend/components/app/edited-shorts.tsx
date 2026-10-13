@@ -260,10 +260,10 @@ function RenderedShort({ edit, label }: { edit: ClipEdit; label: string }) {
         <a
           href={editDownloadUrl(edit.id)}
           className={buttonClasses("primary", "md", "w-full")}
-          aria-label={`Download MP4 — ${label}`}
+          aria-label={`Download short — ${label}`}
           download
         >
-          Download MP4
+          Download short
         </a>
       </div>
     </div>

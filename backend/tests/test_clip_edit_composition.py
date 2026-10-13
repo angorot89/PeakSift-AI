@@ -291,3 +291,75 @@ def test_wrong_output_size_is_rejected_and_removed(tmp_path: Path):
         )
     assert info.value.code == "invalid_output" and "not 1080x1920" in info.value.message
     assert not target.exists()
+
+
+# --- hardening: variable frame rate, timeouts -----
+
+
+def vfr_video(target: Path) -> Path:
+    """30 fps for the first half second, then every third frame (10 fps): truly variable."""
+    subprocess.run(
+        [
+            FFMPEG,
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=320x180:r=30:d=3",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=3",
+            "-vf",
+            r"select='lt(n\,15)+not(mod(n\,3))'",
+            "-fps_mode",
+            "vfr",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(target),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    return target
+
+
+@requires_ffmpeg
+def test_variable_frame_rate_source_composes_with_the_right_duration(tmp_path: Path):
+    source = vfr_video(tmp_path / "vfr.mp4")
+    meta = probe(source)
+    short = compose_short(
+        source, tmp_path / "out.mp4", layout=Layout.BLUR_BACKGROUND, options=OPTIONS
+    )
+    assert (short.width, short.height) == (1080, 1920) and short.fps and short.fps > 0
+    assert abs(short.duration_seconds - meta.duration_seconds) <= 0.5
+    assert short.audio_codec == "aac"
+
+
+@requires_ffmpeg
+def test_hung_ffmpeg_times_out_and_leaves_no_partial_output(tmp_path: Path):
+    source = solid_video(tmp_path / "src.mp4", (320, 180))
+    fake = tmp_path / "ffmpeg-hangs"
+    fake.write_text("#!/bin/sh\nexec sleep 30\n")
+    fake.chmod(0o755)
+    target = tmp_path / "out.mp4"
+    options = RenderOptions(
+        ffmpeg_path=str(fake),
+        ffprobe_path=OPTIONS.ffprobe_path,
+        timeout_seconds=1,
+        heartbeat_interval_seconds=0.2,
+    )
+    with pytest.raises(RenderError) as info:
+        compose_short(source, target, layout=Layout.FIT, options=options)
+    assert info.value.code == "render_timeout" and str(tmp_path) not in info.value.message
+    assert not target.exists()
