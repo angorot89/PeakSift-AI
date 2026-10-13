@@ -235,6 +235,7 @@ def _execute(
         caption_font=settings.caption_font_family,
         heartbeat=lambda: _heartbeat(edit, db, task_id),
         crop_points=crop_points,
+        focus=((config.focus_x, config.focus_y) if config.layout == Layout.MANUAL_CROP else None),
     )
     edit.progress_percent = RENDER_DONE_PROGRESS
     _heartbeat(edit, db, task_id)

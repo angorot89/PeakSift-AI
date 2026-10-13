@@ -16,6 +16,7 @@ Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio.
 """
 
 import logging
+import math
 import subprocess
 import tempfile
 from collections.abc import Callable, Sequence
@@ -33,6 +34,7 @@ from app.services.clip_render.renderer import (
     run_ffmpeg,
 )
 from app.services.ffprobe import ProbeError, VideoMetadata, probe
+from app.services.reframe.path import CropGeometry
 from app.services.reframe.sampling import SamplingError, probe_geometry
 
 logger = logging.getLogger(__name__)
@@ -188,8 +190,8 @@ def layout_filter(layout: Layout, width: int = OUTPUT_WIDTH, height: int = OUTPU
             f"[fg]{fit}[front];"
             "[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1[framed]"
         )
-    if layout == Layout.SMART_REFRAME:
-        raise ValueError("Smart reframe is built from a crop path (smart_crop_filter)")
+    if layout in (Layout.SMART_REFRAME, Layout.MANUAL_CROP):
+        raise ValueError("Smart and manual crops are built from crop points (smart_crop_filter)")
     raise ValueError(f"Unsupported layout: {layout!r}")
 
 
@@ -249,6 +251,25 @@ def build_edit_command(
     return command
 
 
+def manual_crop_point(width: int, height: int, focus: tuple[float, float]) -> CropPoint:
+    """A fixed 9:16 crop centred on the focal point, clamped inside the source."""
+    fx, fy = focus
+    if not all(isinstance(v, int | float) and math.isfinite(v) and 0 <= v <= 1 for v in (fx, fy)):
+        raise RenderError("invalid_focus", "The focal point must lie inside the frame")
+    geometry = CropGeometry.for_source(width, height)
+    cx = min(1 - geometry.crop_width / 2, max(geometry.crop_width / 2, fx))
+    cy = min(1 - geometry.crop_height / 2, max(geometry.crop_height / 2, fy))
+    return CropPoint(0.0, cx, cy, geometry.crop_width, geometry.crop_height)
+
+
+def _manual_point(source: Path, focus: tuple[float, float], options: RenderOptions) -> CropPoint:
+    try:
+        geometry = probe_geometry(source, ffprobe_path=options.ffprobe_path)
+    except SamplingError:
+        raise RenderError("source_unreadable", "The generated clip could not be read") from None
+    return manual_crop_point(geometry.width, geometry.height, focus)
+
+
 def compose_short(
     source: Path,
     target: Path,
@@ -260,6 +281,7 @@ def compose_short(
     caption_font: str = DEFAULT_CAPTION_FONT,
     heartbeat: Callable[[], None] | None = None,
     crop_points: Sequence[CropPoint] | None = None,
+    focus: tuple[float, float] | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
 
@@ -283,7 +305,11 @@ def compose_short(
     has_audio = source_meta.audio_codec is not None
 
     video_graph = None
-    if layout == Layout.SMART_REFRAME:
+    if layout == Layout.MANUAL_CROP:
+        if focus is None:
+            raise RenderError("invalid_focus", "The focal point is missing")
+        crop_points = [_manual_point(source, focus, options)]
+    if layout in (Layout.SMART_REFRAME, Layout.MANUAL_CROP):
         if not crop_points:
             raise RenderError("reframe_unavailable", "The framing path is not available")
         try:

@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.services.clip_edit.config import AspectRatio, CaptionPosition, CaptionStyle, Layout
 
@@ -20,6 +20,9 @@ class EditRequest(BaseModel):
     caption_position: CaptionPosition | None = None
     # Required for layout "smart_reframe": a completed analysis of this clip (never a path).
     reframe_analysis_id: uuid.UUID | None = None
+    # Required for layout "manual_crop": the focal point, fractions of the frame (0..1).
+    focus_x: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)] | None = None
+    focus_y: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)] | None = None
 
 
 class ClipEditRead(BaseModel):
@@ -39,6 +42,8 @@ class ClipEditRead(BaseModel):
     caption_style: str | None
     caption_position: str | None
     reframe_analysis_id: uuid.UUID | None
+    focus_x: float | None
+    focus_y: float | None
     output_width: int
     output_height: int
     render_profile: str

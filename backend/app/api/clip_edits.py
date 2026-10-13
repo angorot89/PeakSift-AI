@@ -91,6 +91,8 @@ def _read(edit: ClipEdit) -> ClipEditRead:
         caption_style=edit.caption_style,
         caption_position=edit.caption_position,
         reframe_analysis_id=edit.reframe_analysis_id,
+        focus_x=edit.focus_x,
+        focus_y=edit.focus_y,
         output_width=edit.output_width,
         output_height=edit.output_height,
         render_profile=edit.render_profile,
@@ -207,6 +209,8 @@ def create_edit(
             caption_style=body.caption_style,
             caption_position=body.caption_position,
             reframe_analysis_id=body.reframe_analysis_id,
+            focus_x=body.focus_x,
+            focus_y=body.focus_y,
         )
     except ValueError as error:
         raise HTTPException(
@@ -238,6 +242,8 @@ def create_edit(
         reframe_analysis_id=(
             uuid.UUID(config.reframe_analysis_id) if config.reframe_analysis_id else None
         ),
+        focus_x=config.focus_x,
+        focus_y=config.focus_y,
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
         render_profile=RENDER_PROFILE_VERTICAL_V1,
