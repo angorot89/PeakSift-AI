@@ -152,7 +152,7 @@ class Settings(BaseSettings):
     # Speed limit of the crop centre, in source widths per second.
     reframe_max_pan_per_second: float = Field(default=0.35, gt=0, le=5)
     # A track missing for longer than this stops steering the crop (then fall back to centre).
-    reframe_max_gap_seconds: float = Field(default=1.0, gt=0, le=10)
+    reframe_max_gap_seconds: float = Field(default=1.5, gt=0, le=10)
     reframe_sampling_timeout_seconds: float = Field(default=600, gt=0)
     reframe_heartbeat_seconds: float = Field(default=15, gt=0)
     reframe_stale_after_seconds: int = Field(default=15 * 60, gt=0)
