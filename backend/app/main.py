@@ -11,6 +11,7 @@ from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
+from app.api.reframe import router as reframe_router
 from app.api.transcriptions import router as transcriptions_router
 from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
@@ -44,3 +45,4 @@ app.include_router(video_clips_router)
 app.include_router(clip_media_router)
 app.include_router(clip_edits_router)
 app.include_router(edit_media_router)
+app.include_router(reframe_router)
