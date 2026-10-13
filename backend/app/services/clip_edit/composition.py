@@ -16,8 +16,10 @@ Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio.
 """
 
 import logging
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, Layout
@@ -51,6 +53,24 @@ class ComposedShort:
     fps: float | None
     video_codec: str
     audio_codec: str | None
+
+
+@lru_cache(maxsize=8)
+def supports_captions(ffmpeg_path: str) -> bool:
+    """Whether this FFmpeg build has libass (the ``subtitles`` filter). Cached per binary."""
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-hide_banner", "-filters"],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return any(
+        line.split()[1:2] == ["subtitles"]
+        for line in result.stdout.decode(errors="replace").splitlines()
+    )
 
 
 def layout_filter(layout: Layout, width: int = OUTPUT_WIDTH, height: int = OUTPUT_HEIGHT) -> str:
@@ -150,6 +170,11 @@ def compose_short(
         raise RenderError("source_missing", "The generated clip file is missing")
     if captions and (workspace is None or not (workspace / CAPTIONS_FILENAME).is_file()):
         raise RenderError("captions_missing", "The caption file was not prepared")
+    if captions and not supports_captions(options.ffmpeg_path):
+        raise RenderError(
+            "captions_unavailable",
+            "This server's FFmpeg cannot render captions (libass is missing)",
+        )
     try:
         source_meta = probe(source, ffprobe_path=options.ffprobe_path)
     except ProbeError:
