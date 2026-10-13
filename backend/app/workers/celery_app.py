@@ -30,7 +30,11 @@ celery_app = Celery(
     "peaksift",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.workers.transcription_tasks", "app.workers.clip_detection_tasks"],
+    include=[
+        "app.workers.transcription_tasks",
+        "app.workers.clip_detection_tasks",
+        "app.workers.clip_render_tasks",
+    ],
 )
 
 celery_app.conf.update(

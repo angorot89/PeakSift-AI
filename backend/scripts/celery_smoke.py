@@ -20,7 +20,12 @@ os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "0")
 from app.workers.celery_app import celery_app  # noqa: E402
 from app.workers.transcription_tasks import ping  # noqa: E402
 
-EXPECTED_TASKS = ("peaksift.ping", "peaksift.transcribe_video", "peaksift.detect_clips")
+EXPECTED_TASKS = (
+    "peaksift.ping",
+    "peaksift.transcribe_video",
+    "peaksift.detect_clips",
+    "peaksift.render_clip",
+)
 
 
 def _check_registered_tasks() -> int:
