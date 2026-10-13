@@ -235,10 +235,13 @@ def test_session_is_created_lazily_once():
 # --- model file integrity -----
 
 
-def test_missing_or_tampered_model_is_refused(tmp_path: Path):
+def test_missing_or_tampered_model_is_refused(tmp_path: Path, caplog):
     with pytest.raises(DetectorUnavailable) as info:
         verify_model(tmp_path / "missing.onnx")
-    assert str(tmp_path) not in info.value.message and "fetch_reframe_model" in info.value.message
+    # The stored/shown message is generic; the operator hint goes to the server log only.
+    assert str(tmp_path) not in info.value.message
+    assert ".onnx" not in info.value.message and "scripts/" not in info.value.message
+    assert "fetch_reframe_model" in caplog.text
     tampered = tmp_path / "model.onnx"
     tampered.write_bytes(b"not the model")
     assert hashlib.sha256(tampered.read_bytes()).hexdigest() != MODEL_SHA256

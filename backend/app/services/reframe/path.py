@@ -24,6 +24,15 @@ From subject to camera, at a fixed internal step of ``STEP`` seconds:
    axis per second) — a detector jump can never become a camera teleport.
 5. **Bounds.** The centre is clamped so the crop never leaves the source.
 
+**Shot changes.** When tracking flags a *hand-off* (the followed face vanished and a face that
+appeared after it takes over — what a hard cut looks like) and the new position is more than
+``CUT_MIN_JUMP`` of the crop away, the camera cuts too: two keyframes ``CUT_GAP`` apart, halfway
+between the last sample of the old subject and the first of the new one (so the framing
+switches within half a sample period of the real cut). Smoothing and the speed limit restart
+from the new position, and the look-ahead never reads across a cut — the crop does not drift
+toward a subject before it appears, nor pan slowly across unrelated shots afterwards. Faces
+leaving and entering one continuous shot without a hand-off keep the smooth behaviour.
+
 The dense path is reduced to sparse keyframes: a point is dropped when linear interpolation
 between its neighbours reproduces it within ``SIMPLIFY_TOLERANCE`` (mode changes are always
 kept). The renderer and the browser preview both interpolate linearly between keyframes.
@@ -43,6 +52,8 @@ SIMPLIFY_TOLERANCE = 0.002  # in fractions of the panned axis (~4 px across a 19
 MAX_KEYFRAMES = 5000
 GROUP_MIN_RELATIVE_SIZE = 0.6  # a second face joins the frame only if it is this prominent
 GROUP_HOLD_SECONDS = 1.0  # entering/leaving group framing needs this much stable evidence
+CUT_MIN_JUMP = 0.25  # a hand-off cuts the camera only if it moves this much (crop fractions)
+CUT_GAP = 0.001  # seconds between the two keyframes of a camera cut
 
 # Confidence summary thresholds (documented; not a probability of "correct" framing).
 HIGH_COVERAGE = 0.8
@@ -101,8 +112,9 @@ class CropPlan:
     fallback_fraction: float
     subject_switches: int
     # Engineering diagnostics (not user-facing claims).
-    max_pan_speed: float  # fractions of the panned axis per second
+    max_pan_speed: float  # fractions of the panned axis per second (camera cuts excluded)
     subject_in_crop_fraction: float  # sampled moments whose followed face lies fully in the crop
+    camera_cuts: int = 0  # hand-offs turned into cuts instead of pans
 
 
 @dataclass(frozen=True)
@@ -207,10 +219,13 @@ def _desired(
 
 
 def _simplify(
-    points: list[tuple[float, float, float, KeyframeMode]], tolerance: float
+    points: list[tuple[float, float, float, KeyframeMode]],
+    tolerance: float,
+    forced: set[int] | frozenset[int] = frozenset(),
 ) -> list[int]:
-    """Indices to keep (iterative Douglas–Peucker on (t, centre); mode changes always kept)."""
-    keep = {0, len(points) - 1}
+    """Indices to keep (iterative Douglas–Peucker on (t, centre); mode changes and ``forced``
+    points — the two sides of a camera cut — are always kept)."""
+    keep = {0, len(points) - 1} | set(forced)
     keep.update(i for i in range(1, len(points)) if points[i][3] != points[i - 1][3])
     anchors = sorted(keep)
     result = set(anchors)
@@ -253,28 +268,68 @@ def plan_crop_path(
         else [_Target(0.0, 0.5, 0.5, 0.5, 0.0, KeyframeMode.FALLBACK)]
     )
     steps = max(1, math.ceil(duration / STEP - 1e-9))
-    times = [min(duration, round(i * STEP, 6)) for i in range(steps + 1)]
     lead = config.smoothing_seconds
     alpha = 1 - math.exp(-STEP / config.smoothing_seconds) if config.smoothing_seconds > 0 else 1.0
     max_step = config.max_pan_per_second * STEP
 
+    # Hand-offs: (cut moment, first sample of the new subject). The cut sits halfway between
+    # the old subject's last sample and the new subject's first.
+    cuts: list[tuple[float, float]] = []
+    for before, after in zip(ordered, ordered[1:], strict=False):
+        if after.cut and geometry.axis is not None:
+            moment = round((before.timestamp + after.timestamp) / 2, 6)
+            if CUT_GAP < moment < duration and (not cuts or moment - cuts[-1][0] > 2 * CUT_GAP):
+                cuts.append((moment, after.timestamp))
+    times = sorted(
+        {min(duration, round(i * STEP, 6)) for i in range(steps + 1)}
+        | {round(m - CUT_GAP, 6) for m, _ in cuts}
+        | {m for m, _ in cuts}
+    )
+    times = [t for t in times if not any(1e-7 < abs(t - m) < CUT_GAP - 1e-7 for m, _ in cuts)]
+
+    def lookahead(t: float) -> float:
+        """t + lead, but never across the next cut (no drifting toward an unseen subject)."""
+        ahead = min(duration, t + lead)
+        for moment, _ in cuts:
+            if t < moment <= ahead:
+                return moment - CUT_GAP
+        return ahead
+
     dense: list[tuple[float, float, float, KeyframeMode]] = []
-    current = geometry.clamp(_desired(0.5, _target_at(targets, lead), geometry, config))
+    forced: set[int] = set()
+    excluded: set[int] = set()  # dense intervals that are camera cuts (not pans)
+    cut_at = dict(cuts)
+    camera_cuts = 0
+    current = geometry.clamp(_desired(0.5, _target_at(targets, lookahead(0.0)), geometry, config))
     if geometry.axis is None:
         current = 0.5
     for t in times:
-        target = _target_at(targets, min(duration, t + lead))  # offline look-ahead cancels lag
+        if t in cut_at and dense:
+            first_new = cut_at[t]
+            target = _target_at(targets, max(first_new, lookahead(t)))
+            here = _target_at(targets, first_new)
+            desired = _desired(current, target, geometry, config)
+            if abs(desired - current) > CUT_MIN_JUMP * geometry.size:
+                current = geometry.clamp(desired)  # cut with the shot: no smoothing, no limit
+                forced.update({len(dense) - 1, len(dense)})
+                excluded.add(len(dense))
+                camera_cuts += 1
+                dense.append((t, current, here.confidence, here.mode))
+                continue
+        target = _target_at(targets, lookahead(t))  # offline look-ahead cancels lag
         here = _target_at(targets, t)
         if geometry.axis is not None:
             desired = _desired(current, target, geometry, config)
-            moved = current + (desired - current) * alpha
+            step = max_step * (t - dense[-1][0]) / STEP if dense else max_step
+            fraction = 1 - math.exp(-(t - dense[-1][0]) / lead) if dense and lead > 0 else alpha
+            moved = current + (desired - current) * fraction
             if abs(desired - moved) < SETTLE_EPSILON:
                 moved = desired  # settle exactly instead of creeping asymptotically
-            moved = current + max(-max_step, min(max_step, moved - current))  # speed limit
+            moved = current + max(-step, min(step, moved - current))  # speed limit
             current = geometry.clamp(moved)
         dense.append((t, current, here.confidence, here.mode))
 
-    kept = _simplify(dense, SIMPLIFY_TOLERANCE)
+    kept = _simplify(dense, SIMPLIFY_TOLERANCE, forced)
     if len(kept) > MAX_KEYFRAMES:  # pragma: no cover - bounded by duration / STEP in practice
         stride = math.ceil(len(kept) / MAX_KEYFRAMES)
         kept = sorted(set(kept[::stride]) | {kept[-1]})
@@ -308,9 +363,9 @@ def plan_crop_path(
     else:
         level = ReframeConfidence.MIXED
     speeds = [
-        abs(b[1] - a[1]) / (b[0] - a[0])
-        for a, b in zip(dense, dense[1:], strict=False)
-        if b[0] > a[0]
+        abs(dense[i][1] - dense[i - 1][1]) / (dense[i][0] - dense[i - 1][0])
+        for i in range(1, len(dense))
+        if dense[i][0] > dense[i - 1][0] and i not in excluded
     ]
     inside = 0
     for sample in covered:
@@ -330,6 +385,7 @@ def plan_crop_path(
         subject_switches=switches,
         max_pan_speed=round(max(speeds, default=0.0), 4),
         subject_in_crop_fraction=round(inside / len(covered), 4) if covered else 1.0,
+        camera_cuts=camera_cuts,
     )
 
 

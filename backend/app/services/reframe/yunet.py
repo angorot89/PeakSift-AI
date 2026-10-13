@@ -20,6 +20,7 @@ exp(log-size) × stride, then non-maximum suppression.
 """
 
 import hashlib
+import logging
 import math
 import threading
 from collections.abc import Callable
@@ -38,6 +39,8 @@ from app.services.reframe.detection import (
     strongest,
 )
 from app.services.reframe.sampling import SampledFrame
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "face_detection_yunet_2023mar"
 MODEL_SHA256 = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
@@ -65,10 +68,9 @@ def _default_session(model_path: str) -> Any:
 def verify_model(path: Path) -> None:
     """The model must be the pinned file. Raises DetectorUnavailable (no path in the message)."""
     if not path.is_file():
-        raise DetectorUnavailable(
-            "The face detector model is not installed on the server "
-            "(run scripts/fetch_reframe_model.py)"
-        )
+        # The operator hint goes to the server log; the stored/shown message stays generic.
+        logger.warning("Face detector model missing; run scripts/fetch_reframe_model.py")
+        raise DetectorUnavailable("The face detector model is not installed on the server")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if digest != MODEL_SHA256:
         raise DetectorUnavailable("The face detector model file is not the expected version")

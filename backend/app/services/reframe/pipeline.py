@@ -263,12 +263,14 @@ def _execute(
     )
     _heartbeat(analysis, db, task_id)
     logger.info(
-        "Reframe analysis %s completed: %d frames, %d detections, %d tracks, %d keyframes, %s",
+        "Reframe analysis %s completed: %d frames, %d detections, %d tracks, %d keyframes, "
+        "%d camera cuts, %s",
         analysis.id,
         len(frames),
         detections,
         len(tracking.tracks),
         len(plan.keyframes),
+        plan.camera_cuts,
         plan.confidence_level.value,
     )
 
