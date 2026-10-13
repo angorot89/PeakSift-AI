@@ -199,18 +199,29 @@ def render_clip(
         raise
 
 
-def _run_ffmpeg(
+def run_ffmpeg(
     command: list[str],
     options: RenderOptions,
     heartbeat: Callable[[], None] | None,
     redactions: dict[str, str] | None = None,
+    *,
+    cwd: Path | None = None,
 ) -> None:
+    """Run an FFmpeg argument list with heartbeat, timeout kill and safe errors.
+
+    Shared by clip and edit rendering. ``cwd`` lets a caller reference files (e.g. a caption
+    file) by a fixed relative name instead of embedding paths in a filtergraph.
+    """
     # stderr goes to a temp file (never a pipe that could fill up and stall FFmpeg); only a
     # bounded tail is logged, and nothing from it is ever shown to users.
     with tempfile.TemporaryFile() as stderr:
         try:
             process = subprocess.Popen(
-                command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=stderr
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=stderr,
+                cwd=cwd,
             )
         except FileNotFoundError:
             raise RenderError("ffmpeg_missing", "ffmpeg is not installed on the server") from None
@@ -247,6 +258,9 @@ def _run_ffmpeg(
             raise RenderError(
                 "ffmpeg_failed", f"Rendering failed (ffmpeg exit code {process.returncode})"
             )
+
+
+_run_ffmpeg = run_ffmpeg  # historical internal name
 
 
 def _validate_output(
