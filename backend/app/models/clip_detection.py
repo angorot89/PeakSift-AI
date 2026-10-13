@@ -31,6 +31,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.clip import Clip
     from app.models.transcription import Transcription
     from app.models.video import Video
 
@@ -220,6 +221,13 @@ class ClipCandidate(Base):
     )
 
     run: Mapped["ClipDetectionRun"] = relationship(back_populates="candidates")
+    # The rendered artifact, once the user generates one (Milestone 5); at most one.
+    clip: Mapped["Clip | None"] = relationship(
+        back_populates="candidate",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
 
     def __repr__(self) -> str:
         return (
