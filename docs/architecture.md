@@ -1,8 +1,8 @@
 # Architecture
 
-Two sections: what is **built** (Milestones 1–4) and what is **planned**. Planned parts are decided milestone by milestone and may change.
+Two sections: what is **built** (Milestones 1–5) and what is **planned**. Planned parts are decided milestone by milestone and may change.
 
-## Built (Milestones 1–4)
+## Built (Milestones 1–5)
 
 ```
 ┌───────────────────┐   HTTP/JSON + HttpOnly cookie   ┌───────────────────┐        ┌──────────────────┐
@@ -39,12 +39,12 @@ Two sections: what is **built** (Milestones 1–4) and what is **planned**. Plan
 
 ### Backend (`backend/`)
 
-- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript) and `clip_detection` (providers, runs, candidates, decisions); request/response schemas (Pydantic) are separate from ORM models.
+- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript), `clip_detection` (providers, runs, candidates, decisions), `clips` (generate/status/retry/list) and `clip_media` (private clip preview and download, sharing `media_streaming.py` with source preview); request/response schemas (Pydantic) are separate from ORM models.
 - Settings from environment variables via pydantic-settings; `DATABASE_URL` and `SECRET_KEY` are required.
 - SQLAlchemy 2 with a **synchronous** engine and one session per request (`get_db`). Async was deliberately not introduced.
 - Alembic migrations are the only way the schema changes; `alembic check` runs in CI to catch model/migration drift.
 - Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), the `transcription/` package (provider contract, factory, chunking, pipeline, providers) and the `clip_detection/` package (provider contract + shared schema and prompt, factory with allow-lists, Ollama and OpenAI providers, windowing, validation, ranking, config snapshot, pipeline).
-- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py` and `dispatch.py` (enqueue helpers; the clip detection task id is chosen before the row is committed); only database ids cross the broker.
+- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py`, `clip_render_tasks.py` and `dispatch.py` (enqueue helpers; detection and render task ids are chosen before the row is committed); only database ids cross the broker.
 
 ### Video pipeline (Milestone 2)
 
@@ -100,9 +100,33 @@ Worker:
 
 Full reference: [clip-detection.md](clip-detection.md).
 
+### Clip generation pipeline (Milestone 5)
+
+```
+POST …/candidates/{id}/clip  →  re-validate the candidate's [start, end] against the source
+                             →  Clip row (queued, boundary snapshot, render_profile source_mp4_v1,
+                                pre-chosen task id; unique per candidate)  →  enqueue  →  201 / 200 if it exists
+Worker (app/services/clip_render/):
+  claim (DB state + fencing token), discard stale/orphaned artifacts
+  → rendering    ffmpeg -ss <start> -i <source> -t <duration> → libx264/yuv420p + aac, +faststart
+                 into clips/<id>/clip-tmp-<attempt>.mp4, heartbeat while running              (10)
+  →              ffprobe validation: h264, size, duration ±1 s, audio iff source has audio   (80)
+  → validating   ownership re-checked                                                         (90)
+  → atomic rename to clips/<id>/clip.mp4, then one commit: storage_key + metadata + ready     (100)
+  | failed       safe error_code/message, all artifacts removed
+GET /clips/{id}/content | /download  →  owner check → path_for(storage_key) → Range stream
+```
+
+- **Accuracy:** re-encoding with input seeking (never `-c copy`), so the first frame is the first one at or after the candidate start; the output keeps the source's resolution, aspect ratio and (decoded) orientation, rounding odd sizes to even for `yuv420p`.
+- **Consistency:** file first, row second — `ready` always means a validated file exists at `storage_key`; a `ready` row whose file vanished is reconciled to `failed`/`artifact_missing` and becomes retryable.
+- **Fencing:** every pipeline commit re-reads the task id; a worker taken over by a retry stops at its next heartbeat (FFmpeg killed), never writes the row and only deletes its own per-attempt temp file.
+- **Delivery:** one shared Range implementation for source and clip media (200/206/416, chunked reads, `private, no-store`), downloads as attachments with a sanitised title slug.
+
+Full reference: [clip-generation.md](clip-generation.md).
+
 ### Storage
 
-- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
+- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
 - Nothing under `MEDIA_ROOT` is served statically. Object storage (S3/R2) is planned and will implement the same `save / exists / delete / path_for` surface.
 
 ### Authentication
@@ -125,24 +149,25 @@ Full reference: [clip-detection.md](clip-detection.md).
 | `transcript_segments` | `id` (uuid), `transcription_id` (FK → transcriptions, cascade delete), `sequence_index`, `start_time`, `end_time`, `text`, `speaker` (nullable, reserved), `created_at`. Constraints: `start_time >= 0`, `end_time > start_time`, unique `(transcription_id, sequence_index)`; index on `(transcription_id, start_time)` |
 | `clip_detection_runs` | `id` (uuid), `video_id` (FK → videos, cascade), `transcription_id` (FK → transcriptions, cascade), `transcript_fingerprint` (sha256), `provider`, `model`, `config` (JSONB snapshot), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `windows_total`, `windows_done`, `error_code`, `error_message`, `celery_task_id`, `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at`. Partial unique index on `video_id` where status is active (one running detection per video) |
 | `clip_candidates` | `id` (uuid), `run_id` (FK → clip_detection_runs, cascade), `video_id` (FK → videos, cascade), `start_time`, `end_time`, `duration_seconds` (checked = end − start), `title` (120), `hook` (300), `rationale` (1000), `category`, `transcript_excerpt`, `overall_score` + five dimension scores (each checked 0–100), `rank` (≥ 1, unique per run), `decision` (`undecided`/`saved`/`dismissed`), `decided_at`, `created_at`, `updated_at`; index on `(video_id, decision)` |
+| `clips` | `id` (uuid), `candidate_id` (FK → clip_candidates, cascade, **unique**), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `start_time`, `end_time`, `duration_seconds` (snapshot; checked start ≥ 0, end > start, duration = end − start), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
 
-Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`). Clip detection `status` is a third state machine — `queued` → `preparing_transcript` → `analyzing` → `validating` → `ranking` → `completed` | `failed` — and candidate times are absolute seconds on transcript-line boundaries; scores are integers on one 0–100 editorial scale.
+Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`). Clip detection `status` is a third state machine — `queued` → `preparing_transcript` → `analyzing` → `validating` → `ranking` → `completed` | `failed` — and candidate times are absolute seconds on transcript-line boundaries; scores are integers on one 0–100 editorial scale. Clip `status` is a fourth — `queued` → `rendering` → `validating` → `ready` | `failed` — describing the health of the rendered artifact.
 
 ### Testing and CI
 
 - Backend: pytest against a dedicated PostgreSQL test database; migrations are applied at the start of the session and every test is rolled back. Media tests use a throwaway `MEDIA_ROOT`; fixtures are generated at test time with `ffmpeg` (none are committed). Celery runs in eager mode; speech models are mocked (an opt-in real `tiny`-model check exists for macOS); clip-analysis providers are tested with a mocked transport / fake SDK client plus an in-process fake Ollama HTTP server (an opt-in real check runs against a local Ollama with `PEAKSIFT_REAL_OLLAMA=1`). Integration tests skip locally without FFmpeg/Redis and are required in CI (`REQUIRE_FFMPEG=1`, `REQUIRE_REDIS=1`, `HF_HUB_OFFLINE=1`, `OLLAMA_BASE_URL` on a closed port).
 - Frontend: ESLint and a production build.
-- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, and finishes with a real worker smoke (`ping` round-trip and registration of the transcription and clip detection tasks).
+- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, checks that FFmpeg provides the `libx264` and `aac` encoders, runs real clip renders end-to-end through the API, and finishes with a real worker smoke (`ping` round-trip and registration of the transcription, clip detection and clip rendering tasks).
 
 ## Planned (later milestones)
 
 ```
 Backend ──▶ Object storage (source videos, generated clips)
-        ──▶ Background processing (rendering)
+        ──▶ Render profiles beyond source_mp4_v1 (vertical layouts, captions)
 ```
 
-1. **Clip generation (Milestone 5)** — FFmpeg cuts and reformats saved candidates into vertical clips and exports files.
-2. **Creator intelligence (Milestone 6)** — titles, hooks and metadata for generated clips.
+1. **Short-form editing (Milestone 6)** — vertical layouts, captions and trimming on top of generated clips (new render profiles alongside `source_mp4_v1`).
+2. **Later** — creator intelligence and metadata, publishing, asset libraries.
 
 Object storage replaces `MEDIA_ROOT` when deployment requires it. None of this exists yet.
 

@@ -1,6 +1,6 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), background transcription with timestamped segments (faster-whisper locally or OpenAI), and AI clip detection — ranked, validated clip candidates derived from the transcript by a local Ollama model or OpenAI (see [docs/clip-detection.md](../docs/clip-detection.md)).
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), background transcription with timestamped segments (faster-whisper locally or OpenAI), and AI clip detection — ranked, validated clip candidates derived from the transcript by a local Ollama model or OpenAI (see [docs/clip-detection.md](../docs/clip-detection.md)), and clip generation — a candidate rendered by FFmpeg into a validated private MP4 with Range-streamed preview and download (see [docs/clip-generation.md](../docs/clip-generation.md)).
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ Background jobs need a worker in a second terminal (same virtualenv, same `backe
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
-The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run. On macOS, run the worker with `--pool=solo` if you see fork-related problems. `python scripts/celery_smoke.py` verifies a real broker + worker round-trip and that the `peaksift.transcribe_video` and `peaksift.detect_clips` tasks are registered. The same worker runs transcription and clip detection.
+The worker takes one job at a time (`worker_prefetch_multiplier=1`, `task_acks_late=True`), so a crashed worker's job is re-queued rather than lost; the database — not Celery's result backend — is the source of truth for job status. Redis's visibility timeout is kept above the hard task time limit so long jobs are not handed to a second worker mid-run. On macOS, run the worker with `--pool=solo` if you see fork-related problems. `python scripts/celery_smoke.py` verifies a real broker + worker round-trip and that the `peaksift.transcribe_video`, `peaksift.detect_clips` and `peaksift.render_clip` tasks are registered. The same worker runs transcription, clip detection and clip rendering; rendering needs an FFmpeg with the `libx264` and `aac` encoders (Homebrew and Ubuntu builds include both) and runs on the CPU.
 
 ## Test
 
@@ -108,6 +108,19 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | POST   | `…/clip-detection/{run_id}/candidates/{candidate_id}/save` · `/dismiss` · `/reset` | yes | Record the user's decision; returns the candidate. |
 
 A candidate is `{id, run_id, video_id, rank, start, end, duration, title, hook, rationale, category, transcript_excerpt, overall_score, scores{hook, entertainment, clarity, payoff, completeness}, decision, decided_at, created_at}` — times in absolute seconds on transcript-line boundaries, scores integers 0–100.
+
+Generated clips:
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| POST   | `…/clip-detection/{run_id}/candidates/{candidate_id}/clip` | yes | Render the candidate. Boundaries come from the persisted candidate (any body is ignored) and are re-validated against the source. `201` new clip; `200` with the existing clip if one is queued/rendering/validating/ready (repeat clicks never duplicate); `409` if the last render failed (use retry), the candidate is dismissed (restore first), the video is not ready, or the boundaries fall outside the source; `503` if the queue is unreachable (no row is left). |
+| GET    | `…/candidates/{candidate_id}/clip` | yes | Clip state: `status` (`queued`/`rendering`/`validating`/`ready`/`failed`), stage `progress_percent`, `attempt`, `is_stale`, boundary snapshot, `render_profile`, output metadata once ready, safe `error_code`/`error_message`, timestamps. `404` before generation. A `ready` clip whose file is missing is reported as `failed`/`artifact_missing`. |
+| POST   | `…/candidates/{candidate_id}/clip/retry` | yes | Re-queue a failed or stale clip on the same row (`409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
+| GET    | `/projects/{id}/videos/{video_id}/clips` | yes | The video's clips, newest first (`offset`, `limit` 1–100). |
+| GET    | `/clips/{clip_id}/content` | yes | The rendered MP4 inline for `<video>`: `Accept-Ranges: bytes`, `206` + `Content-Range` for a single range (suffix ranges included), `416` when unsatisfiable, `Cache-Control: private, no-store`. `404` unless the clip is yours and ready. |
+| GET    | `/clips/{clip_id}/download` | yes | The same bytes as an attachment named after a sanitised title slug plus a short id (e.g. `that-was-crazy-3f2c9a1e.mp4`). |
+
+A clip is `{id, candidate_id, run_id, video_id, title, status, progress_percent, attempt, is_stale, start_time, end_time, duration_seconds, render_profile, content_type, file_size, width, height, fps, video_codec, audio_codec, error_code, error_message, created_at, started_at, completed_at}`. Storage keys, paths and task ids are never returned.
 
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
@@ -175,20 +188,25 @@ Each chunk is checked against `OPENAI_MAX_UPLOAD_BYTES` (default 20 MB, a margin
 
 `app/services/clip_detection/` turns a completed transcript into ranked candidates: `windowing.py` (normalise, validate, fingerprint, bounded overlapping windows), `contract.py` (provider protocol, shared strict JSON schema, typed errors), `prompt.py` (one prompt for every provider), `factory.py` (allow-lists → provider), `ollama_provider.py` / `openai_provider.py`, `validation.py` (snap to transcript lines, bounds, scores, texts — reject rather than clamp), `ranking.py` (weighted score, IoU deduplication, deterministic order), `pipeline.py` (the Celery job: claim, stages, fencing, retries, one-transaction completion). Users choose a provider and model only from `OLLAMA_CLIP_MODELS` / `OPENAI_CLIP_MODELS`; `OLLAMA_BASE_URL` and `OPENAI_API_KEY` are server configuration and never appear in responses. The full design, scoring methodology, configuration and limitations are in [docs/clip-detection.md](../docs/clip-detection.md).
 
+## Clip generation
+
+`app/services/clip_render/` turns a candidate into a validated MP4: `storage.py` (keys `clips/<uuid>/clip-tmp-<attempt>.mp4` → `clips/<uuid>/clip.mp4`, atomic finalize, discard, download-name sanitiser), `renderer.py` (FFmpeg argument list — `-ss` before `-i` and re-encoding, never stream copy; libx264/yuv420p + aac, `+faststart`, source geometry and orientation; stderr to a temp file with a bounded, path-redacted tail in logs; heartbeat callback; timeout kill; ffprobe validation of codec, size, duration and audio), `pipeline.py` (the Celery job: claim on database state, fencing on every commit, honest stage progress 10/80/90/100, file-first-then-row finalization, safe failure codes). The full design, configuration and limitations are in [docs/clip-generation.md](../docs/clip-generation.md).
+
 ## Media serving
 
-Nothing under `MEDIA_ROOT` is exposed as static files. The only way to fetch a video's bytes is `GET /videos/{video_id}/content`, which resolves the video through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
+Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) and `GET /clips/{clip_id}/content` / `/download` (rendered clips); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
 
 ## Structure
 
 ```
 app/
   main.py            # FastAPI app, CORS, routers
-  api/               # Routers: health, auth, projects, videos, video_content, transcriptions, clip_detection
+  api/               # Routers: health, auth, projects, videos, video_content, transcriptions, clip_detection,
+                     # clips, clip_media; media_streaming.py = shared Range streaming
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
-  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate
+  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip
   schemas/           # Pydantic request/response schemas
   services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
@@ -196,11 +214,13 @@ app/
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
   services/transcription/      # Contract, factory, chunking, pipeline, faster_whisper + openai providers
+  services/clip_render/        # Artifact storage, FFmpeg renderer, Celery render pipeline
   services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
                                # validation, ranking, detection_config, pipeline
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/clip_detection_tasks.py # peaksift.detect_clips
+  workers/clip_render_tasks.py # peaksift.render_clip
   workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
@@ -254,6 +274,11 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `CLIP_DETECTION_PROVIDER_MAX_ATTEMPTS` / `_RETRY_BACKOFF_SECONDS` | `3` / `2`      | In-task retries for transient provider errors |
 | `CLIP_DETECTION_STALE_AFTER_SECONDS` | `900`                         | Heartbeat age after which a running detection counts as dead |
 | `CLIP_DETECTION_MAX_ATTEMPTS` | `5`                                  | User retries per run before a new detection is required |
+| `CLIP_RENDER_PRESET` / `CLIP_RENDER_CRF` / `CLIP_AUDIO_BITRATE` | `veryfast` / `20` / `128k` | libx264 preset and quality, AAC bitrate for generated clips |
+| `CLIP_RENDER_TIMEOUT_SECONDS` | `1800`                              | Kill FFmpeg after this long                  |
+| `CLIP_RENDER_DURATION_TOLERANCE_SECONDS` / `CLIP_RENDER_SOURCE_TOLERANCE_SECONDS` | `1` / `1` | Accepted rendered-duration difference / overrun past the source end |
+| `CLIP_RENDER_HEARTBEAT_SECONDS` / `CLIP_RENDER_STALE_AFTER_SECONDS` | `15` / `900` | Render heartbeat interval / age after which a render counts as dead |
+| `CLIP_RENDER_MAX_ATTEMPTS` | `5`                                     | Retries per clip                             |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |
