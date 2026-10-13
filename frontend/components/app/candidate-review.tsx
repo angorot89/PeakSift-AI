@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ClipRenderControls } from "@/components/app/clip-render-controls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
@@ -13,6 +14,7 @@ import {
   type ClipCandidate,
   type DetectionRun,
 } from "@/lib/clip-detection";
+import { listVideoClips, type GeneratedClip } from "@/lib/clips";
 import { formatDuration, formatTimestamp } from "@/lib/format";
 import { videoContentUrl } from "@/lib/videos";
 
@@ -121,6 +123,7 @@ function CandidateCard({
   onPreview,
   busy,
   onDecide,
+  clipControls,
 }: {
   candidate: ClipCandidate;
   videoId: string;
@@ -128,6 +131,7 @@ function CandidateCard({
   onPreview: () => void;
   busy: boolean;
   onDecide: (action: "save" | "dismiss" | "reset") => void;
+  clipControls: ReactNode;
 }) {
   const [showExcerpt, setShowExcerpt] = useState(false);
   const dismissed = candidate.decision === "dismissed";
@@ -206,7 +210,7 @@ function CandidateCard({
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="secondary" onClick={onPreview} aria-pressed={previewing}>
-          {previewing ? "Close preview" : "Preview"}
+          {previewing ? "Close source preview" : "Preview source"}
         </Button>
         {saved ? (
           <Button variant="secondary" onClick={() => onDecide("reset")} disabled={busy}>
@@ -227,6 +231,8 @@ function CandidateCard({
           </Button>
         )}
       </div>
+
+      {clipControls}
     </li>
   );
 }
@@ -243,6 +249,10 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  // candidate_id → clip, loaded once so render state survives refresh and re-login.
+  const [clips, setClips] = useState<Map<string, GeneratedClip> | null>(null);
+  // False when the listing failed: each card then fetches its own clip state.
+  const [clipsKnown, setClipsKnown] = useState(false);
 
   const decision = filter === "all" ? undefined : filter;
 
@@ -285,6 +295,26 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
       cancelled = true;
     };
   }, [projectId, videoId, run.id, decision]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listVideoClips(projectId, videoId)
+      .then((page) => {
+        if (cancelled) return;
+        setClips(new Map(page.clips.map((clip) => [clip.candidate_id, clip])));
+        setClipsKnown(true);
+      })
+      .catch(() => {
+        if (!cancelled) setClips(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, videoId]);
+
+  const rememberClip = useCallback((clip: GeneratedClip) => {
+    setClips((previous) => new Map(previous ?? []).set(clip.candidate_id, clip));
+  }, []);
 
   async function decide(candidate: ClipCandidate, action: "save" | "dismiss" | "reset") {
     setBusyId(candidate.id);
@@ -334,7 +364,7 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
         </p>
       </div>
 
-      {loading && candidates.length === 0 ? (
+      {(loading && candidates.length === 0) || clips === null ? (
         <LoadingState label="Loading candidates…" />
       ) : error && candidates.length === 0 ? (
         <ErrorState message={error} onRetry={() => void load(0)} />
@@ -358,6 +388,16 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
               onPreview={() => setPreviewId((id) => (id === candidate.id ? null : candidate.id))}
               busy={busyId === candidate.id}
               onDecide={(action) => void decide(candidate, action)}
+              clipControls={
+                <ClipRenderControls
+                  projectId={projectId}
+                  videoId={videoId}
+                  runId={run.id}
+                  candidate={candidate}
+                  initialClip={clipsKnown ? (clips.get(candidate.id) ?? null) : undefined}
+                  onChange={rememberClip}
+                />
+              }
             />
           ))}
         </ol>
