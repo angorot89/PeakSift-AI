@@ -5,6 +5,7 @@ import uuid
 from kombu.exceptions import OperationalError
 
 from app.workers.clip_detection_tasks import detect_clips
+from app.workers.clip_render_tasks import render_clip_task
 from app.workers.transcription_tasks import transcribe_video
 
 
@@ -35,6 +36,15 @@ def enqueue_clip_detection(run_id: uuid.UUID, *, task_id: str) -> str:
     """Queue `detect_clips` under a pre-chosen task id and return it."""
     try:
         detect_clips.apply_async(args=[str(run_id)], task_id=task_id, retry=False)
+    except OperationalError as error:
+        raise JobQueueUnavailable("The job queue is unavailable") from error
+    return task_id
+
+
+def enqueue_clip_render(clip_id: uuid.UUID, *, task_id: str) -> str:
+    """Queue `render_clip` under a pre-chosen task id and return it."""
+    try:
+        render_clip_task.apply_async(args=[str(clip_id)], task_id=task_id, retry=False)
     except OperationalError as error:
         raise JobQueueUnavailable("The job queue is unavailable") from error
     return task_id
