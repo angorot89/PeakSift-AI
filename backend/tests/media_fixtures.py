@@ -51,3 +51,19 @@ def generate_video(
     command += ["-shortest", str(target)]
     subprocess.run(command, check=True, capture_output=True, timeout=60)
     return target
+
+
+def have_libass() -> bool:
+    """Whether the *configured* FFmpeg (``FFMPEG_PATH``) can burn in captions."""
+    from app.core.config import get_settings
+    from app.services.clip_edit.composition import supports_captions
+
+    return supports_captions(get_settings().ffmpeg_path)
+
+
+# Caption rendering needs libass. CI sets REQUIRE_LIBASS=1 so a build without it fails loudly
+# instead of skipping; locally the tests skip with a clear reason.
+requires_libass = pytest.mark.skipif(
+    not os.environ.get("REQUIRE_LIBASS") and not (have_ffmpeg() and have_libass()),
+    reason="the configured FFmpeg has no libass (subtitles filter)",
+)

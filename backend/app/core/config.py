@@ -123,6 +123,14 @@ class Settings(BaseSettings):
     clip_render_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     clip_render_max_attempts: int = Field(default=5, ge=1)
 
+    # --- Short-form editing (Milestone 6) ------------------------------------------------
+    # Burned-in captions need an FFmpeg built with libass (the `subtitles` filter) and an
+    # installed open font. The family is looked up through fontconfig; Arabic and other
+    # scripts fall back to installed fonts that have the glyphs (e.g. Noto Sans Arabic).
+    caption_font_family: str = Field(default="Noto Sans", pattern=r"^[A-Za-z0-9 _-]{1,64}$")
+    caption_max_words: int = Field(default=7, ge=1, le=20)
+    caption_max_chars: int = Field(default=32, ge=8, le=80)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
