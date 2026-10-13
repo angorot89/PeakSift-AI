@@ -35,6 +35,7 @@ celery_app = Celery(
         "app.workers.clip_detection_tasks",
         "app.workers.clip_render_tasks",
         "app.workers.clip_edit_tasks",
+        "app.workers.reframe_tasks",
     ],
 )
 
