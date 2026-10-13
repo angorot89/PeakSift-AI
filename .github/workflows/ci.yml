@@ -64,6 +64,9 @@ jobs:
       # The video pipeline tests generate tiny fixtures with ffmpeg and probe them with
       # ffprobe; in CI a missing binary must fail the tests, not skip them.
       REQUIRE_FFMPEG: "1"
+      # Short-form editing burns in captions with libass; the caption tests must run (and
+      # fail if libass or a font is missing), never skip.
+      REQUIRE_LIBASS: "1"
       # Background jobs: Redis service above; the live-broker test must not skip.
       REDIS_URL: redis://localhost:6379/0
       REQUIRE_REDIS: "1"
@@ -77,20 +80,36 @@ jobs:
       OLLAMA_CONNECT_TIMEOUT_SECONDS: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg (ffprobe for metadata, ffmpeg for generated test fixtures)
+      - name: Install FFmpeg and caption fonts
+        # ffprobe for metadata, ffmpeg for rendering and generated fixtures; Noto Sans (OFL,
+        # installed from the distribution, never committed) is the caption font, with Noto
+        # Sans Arabic and the rest of fonts-noto-core as fontconfig fallbacks.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg fontconfig fonts-noto-core
           ffprobe -version | head -1
-      - name: FFmpeg provides the encoders clip rendering uses (libx264, aac)
-        # Clips are rendered with libx264 + aac in production and development; CI must
-        # exercise the same encoders rather than silently falling back to another path.
+      - name: FFmpeg provides the encoders and filters rendering uses
+        # Clips and shorts are rendered with libx264 + aac, and shorts use the filters below
+        # (subtitles = libass for captions). CI must exercise the same render path as
+        # production and development, not discover on release day that it cannot.
         run: |
           set -euo pipefail
           encoders="$(ffmpeg -hide_banner -encoders)"
           grep -qE '^ V\S* libx264 ' <<<"$encoders" || { echo "libx264 encoder missing"; exit 1; }
           grep -qE '^ A\S* aac ' <<<"$encoders" || { echo "aac encoder missing"; exit 1; }
-          echo "libx264 and aac available"
+          filters="$(ffmpeg -hide_banner -filters)"
+          for name in subtitles scale crop pad overlay gblur split setsar color; do
+            grep -qE "^ \S+ $name " <<<"$filters" || { echo "ffmpeg filter missing: $name"; exit 1; }
+          done
+          ffmpeg -hide_banner -version | grep -q -- '--enable-libass' || { echo "ffmpeg built without libass"; exit 1; }
+          echo "libx264, aac, libass (subtitles) and layout filters available"
+      - name: Caption fonts resolve through fontconfig
+        run: |
+          set -euo pipefail
+          family="$(fc-match -f '%{family[0]}' 'Noto Sans')"
+          [ "$family" = "Noto Sans" ] || { echo "Noto Sans not installed (got: $family)"; exit 1; }
+          fc-list ':lang=ar' family | grep -q 'Noto Sans Arabic' || { echo "no Arabic fallback font"; exit 1; }
+          echo "Noto Sans + Noto Sans Arabic available"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -104,6 +123,10 @@ jobs:
           alembic upgrade head
           alembic check
           alembic downgrade base
+      - name: libass really draws caption text (burned-in probe frame)
+        run: >-
+          python -c "from app.services.clip_edit.composition import require_caption_rendering;
+          require_caption_rendering('ffmpeg', 'Noto Sans'); print('caption probe: text drawn')"
       - run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
