@@ -5,6 +5,11 @@
 *.pem
 *.key
 
+# ---------- Model weights (fetched by scripts, never committed) ----------
+*.onnx
+*.tflite
+backend/models/
+
 # ---------- Python ----------
 __pycache__/
 *.py[cod]
