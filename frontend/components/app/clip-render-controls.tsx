@@ -1,8 +1,10 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Clapperboard, Download, Smartphone } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
-import { ShortFormSection } from "@/components/app/edited-shorts";
+import { MediaFrame } from "@/components/ui/media-frame";
 import { Button } from "@/components/ui/button";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -17,6 +19,7 @@ import {
   type GeneratedClip,
 } from "@/lib/clips";
 import type { ClipCandidate } from "@/lib/clip-detection";
+import { editorHref } from "@/lib/edits";
 import { formatBytes, formatDuration } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
@@ -174,12 +177,7 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
       </div>
     );
   } else {
-    body = (
-      <div className="space-y-5">
-        <RenderedClip clip={clip} />
-        <ShortFormSection projectId={projectId} clip={clip} />
-      </div>
-    );
+    body = <RenderedClip clip={clip} projectId={projectId} />;
   }
 
   return (
@@ -194,37 +192,41 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
   );
 }
 
-/** The actual generated output: native player on the private stream + Download MP4. */
-export function RenderedClip({ clip }: { clip: GeneratedClip }) {
-  const facts = [
+/** The rendered clip: labelled player, the facts a creator needs, download and the next step. */
+export function RenderedClip({ clip, projectId }: { clip: GeneratedClip; projectId: string }) {
+  const meta = [
     formatDuration(clip.duration_seconds),
     clip.width && clip.height ? `${clip.width} × ${clip.height}` : null,
     clip.file_size != null ? formatBytes(clip.file_size) : null,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <p className="text-sm font-medium text-foreground">
-          Rendered clip <span className="font-normal text-emerald-300">· Ready</span>
-        </p>
-        <p className="text-xs text-muted">{facts.join(" · ")}</p>
-      </div>
-      {/* Same pattern as the source preview: the browser sends the HttpOnly session cookie
-          (same-site) and the API checks ownership on every byte-range request. */}
-      <video
-        controls
-        preload="metadata"
-        src={clipContentUrl(clip.id)}
-        className="aspect-video w-full rounded-lg bg-black object-contain"
-        aria-label={`Rendered clip: ${clip.title}`}
-      />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-muted">
-          MP4 · H.264{clip.audio_codec ? " + AAC" : " · no audio"} · original aspect ratio
-        </p>
-        <a href={clipDownloadUrl(clip.id)} className={buttonClasses("primary", "md")} download>
+      <MediaFrame icon={Clapperboard} label="Generated clip" meta={meta}>
+        {/* The browser sends the HttpOnly session cookie (same-site); the API checks ownership. */}
+        <video
+          controls
+          preload="metadata"
+          src={clipContentUrl(clip.id)}
+          className="aspect-video w-full bg-black object-contain"
+          aria-label={`Rendered clip: ${clip.title}`}
+        />
+      </MediaFrame>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <a
+          href={clipDownloadUrl(clip.id)}
+          className={buttonClasses("secondary", "md")}
+          download
+          aria-label={`Download MP4 — ${clip.title}`}
+        >
+          <Download aria-hidden="true" />
           Download MP4
         </a>
+        <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
+          <Smartphone aria-hidden="true" />
+          Create vertical short
+        </Link>
       </div>
     </div>
   );
