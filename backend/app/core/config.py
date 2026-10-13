@@ -108,6 +108,21 @@ class Settings(BaseSettings):
     openai_clip_timeout_seconds: float = Field(default=120, gt=0)
     openai_clip_max_output_tokens: int = Field(default=4000, ge=256)
 
+    # --- Clip rendering (Milestone 5) ------------------------------------------------
+    # Output is always a fast-start MP4 with H.264 (libx264, yuv420p) and AAC when the source
+    # has audio, at the source's resolution and orientation. CPU encoding; no GPU required.
+    clip_render_preset: str = Field(default="veryfast", pattern=r"^[a-z]+$")
+    clip_render_crf: int = Field(default=20, ge=0, le=51)
+    clip_audio_bitrate: str = Field(default="128k", pattern=r"^\d{2,4}k$")
+    clip_render_timeout_seconds: float = Field(default=1800, gt=0)
+    # Rendered duration may differ from the request by this much (frame/container rounding).
+    clip_render_duration_tolerance_seconds: float = Field(default=1.0, ge=0)
+    # A clip may end this far past the probed source duration (encoder padding).
+    clip_render_source_tolerance_seconds: float = Field(default=1.0, ge=0)
+    clip_render_heartbeat_seconds: float = Field(default=15, gt=0)
+    clip_render_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    clip_render_max_attempts: int = Field(default=5, ge=1)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.

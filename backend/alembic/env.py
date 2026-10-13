@@ -10,7 +10,9 @@ from app.models import *  # noqa: F403 — registers every model on Base.metadat
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep application loggers alive: the default would silence every logger created
+    # before migrations run (e.g. during test collection), hiding warnings from tests.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Single source of truth: the same DATABASE_URL the application uses.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)

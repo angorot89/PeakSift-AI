@@ -1,5 +1,6 @@
 """OpenAI clip provider tests with a fake SDK client. No network, no key, no billing."""
 
+import logging
 from types import SimpleNamespace
 
 import httpx
@@ -140,12 +141,22 @@ def test_real_client_is_built_with_key_timeout_and_minimal_retries(monkeypatch):
     assert built == {"api_key": "sk-test-not-real", "timeout": 42, "max_retries": 1}
 
 
-def test_key_never_appears_in_provider_state_or_errors(provider: OpenAIClipProvider, client):
+def test_key_never_appears_in_provider_state_errors_or_logs(
+    provider: OpenAIClipProvider, client, caplog
+):
     client.responses.error = status_error(openai.AuthenticationError, 401)
     with pytest.raises(ClipProviderError) as info:
         provider.analyze(request())
     assert "sk-test" not in info.value.message
     assert "sk-test" not in repr(vars(provider))
+
+    # Even an SDK error whose message echoes the key must not reach the logs.
+    client.responses.error = openai.OpenAIError("boom sk-test-not-real")
+    with caplog.at_level(logging.DEBUG), pytest.raises(ClipProviderError) as info:
+        provider.analyze(request())
+    assert "sk-test" not in info.value.message
+    assert "sk-test" not in caplog.text
+    assert "OpenAIError" in caplog.text  # the type is still logged for operators
 
 
 # --- request shape ---------------------------------------------------------------------------

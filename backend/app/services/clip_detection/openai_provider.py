@@ -124,7 +124,8 @@ class OpenAIClipProvider:
                 "openai_request_rejected",
                 f"OpenAI rejected the request (HTTP {error.status_code})",
             ) from error
-        logger.exception("OpenAI SDK error")
+        # Type only: an SDK error message could echo request details (even the key).
+        logger.warning("OpenAI SDK error (%s)", type(error).__name__)
         raise ClipProviderError(
             "openai_error", f"OpenAI request failed ({type(error).__name__})"
         ) from error
