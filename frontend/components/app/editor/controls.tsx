@@ -9,7 +9,7 @@ import {
   STYLE_OPTIONS,
   type CaptionPosition,
   type CaptionStyle,
-  type Layout,
+  type PickableLayout,
 } from "@/lib/edits";
 
 /** Section label + optional helper for one group of editor controls. */
@@ -82,10 +82,16 @@ function OptionCard({
 }
 
 /** Miniature 9:16 diagram of a layout (what is filled, what is cropped). */
-function LayoutDiagram({ layout }: { layout: Layout }) {
+function LayoutDiagram({ layout }: { layout: PickableLayout }) {
   return (
     <span aria-hidden="true" className="relative block h-14 w-8 overflow-hidden rounded-[5px] border border-white/15 bg-black">
-      {layout === "center_crop" ? (
+      {layout === "smart_reframe" ? (
+        <>
+          <span className="absolute inset-0 bg-gradient-to-b from-accent/45 to-accent/25" />
+          <span className="absolute top-[30%] left-[58%] size-2.5 rounded-full border border-white/80 bg-white/30" />
+          <span className="absolute top-[18%] left-[32%] h-[36%] w-[58%] rounded-[3px] border border-dashed border-white/70" />
+        </>
+      ) : layout === "center_crop" ? (
         <>
           <span className="absolute inset-0 bg-gradient-to-b from-accent/55 to-accent/30" />
           <span className="absolute inset-y-0 -left-2 w-2 border-r border-dashed border-white/40" />
@@ -105,10 +111,18 @@ function LayoutDiagram({ layout }: { layout: Layout }) {
   );
 }
 
-export function LayoutPicker({ value, onChange, name }: { value: Layout; onChange: (v: Layout) => void; name: string }) {
+export function LayoutPicker({
+  value,
+  onChange,
+  name,
+}: {
+  value: PickableLayout;
+  onChange: (v: PickableLayout) => void;
+  name: string;
+}) {
   return (
     <ControlGroup legend="Layout">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
         {LAYOUT_OPTIONS.map((option) => (
           <OptionCard
             key={option.value}
@@ -117,11 +131,13 @@ export function LayoutPicker({ value, onChange, name }: { value: Layout; onChang
             label={`${option.label}: ${option.hint}`}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
-            className="items-center gap-2 px-2 pt-3 pb-2.5 text-center"
+            className="flex-row items-center gap-3 px-3 py-2.5 text-left"
           >
             <LayoutDiagram layout={option.value} />
-            <span className="text-[13px] leading-tight font-medium text-foreground">{option.label}</span>
-            <span className="hidden text-[11px] leading-snug text-subtle sm:block">{option.hint}</span>
+            <span className="min-w-0 pr-3">
+              <span className="block text-[13px] leading-tight font-medium text-foreground">{option.label}</span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-subtle">{option.hint}</span>
+            </span>
           </OptionCard>
         ))}
       </div>
