@@ -14,6 +14,10 @@ const PRESET = {
 } as const;
 
 const CANVAS_HEIGHT = 1920;
+// libass treats an ASS font size as the font's full line height (ascent + descent), not its em
+// size. For Noto Sans (ascent 1069 + descent 293 per 1000 em) glyphs are 1000 / 1362 ≈ 0.734 of
+// the nominal size; the browser uses em size, so the preview applies the same factor.
+const ASS_SIZE_TO_EM = 1000 / 1362;
 
 function outline(px: string): string {
   const steps = [
@@ -26,7 +30,7 @@ function outline(px: string): string {
 export function captionTextStyle(style: CaptionStyle, unit: (fractionOfHeight: number) => string): CSSProperties {
   const p = PRESET[style];
   const css: CSSProperties = {
-    fontSize: unit(p.size / CANVAS_HEIGHT),
+    fontSize: unit((p.size * ASS_SIZE_TO_EM) / CANVAS_HEIGHT),
     fontWeight: p.weight,
     color: p.color,
     lineHeight: 1.2,
