@@ -478,7 +478,7 @@ def test_enqueue_when_broker_is_down_is_a_controlled_error(monkeypatch):
         enqueue_clip_render(uuid.uuid4(), task_id=new_task_id())
 
 
-# --- hardening ----------------------------------------------------------------------------
+# --- hardening -----
 
 
 def _take_over(clip, db_session, *, new_task: str = "task-2", attempt: int = 2) -> None:

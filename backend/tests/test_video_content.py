@@ -38,7 +38,7 @@ def clean_media_root():
             path.unlink()
 
 
-# --- range parsing --------------------------------------------------------------
+# --- range parsing -----
 
 
 @pytest.mark.parametrize(
@@ -80,7 +80,7 @@ def test_content_disposition_is_inline_and_unicode_safe():
     assert "filename*=UTF-8''clip%20%22%C3%A9t%C3%A9%22%20%F0%9F%8E%AC.mp4" in value
 
 
-# --- access control ---------------------------------------------------------------
+# --- access control -----
 
 
 def test_content_requires_authentication(client: TestClient):
@@ -137,7 +137,7 @@ def test_mov_uses_quicktime_content_type(client: TestClient):
     assert client.get(f"/videos/{video_id}/content").headers["content-type"] == "video/quicktime"
 
 
-# --- range requests ---------------------------------------------------------------------
+# --- range requests -----
 
 
 def test_range_request_returns_partial_content(client: TestClient):

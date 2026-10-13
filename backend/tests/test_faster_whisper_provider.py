@@ -86,7 +86,7 @@ def request(tmp_path: Path, **kwargs) -> TranscriptionRequest:
     return TranscriptionRequest(audio_path=audio, **kwargs)
 
 
-# --- lazy loading and options -----------------------------------------------------
+# --- lazy loading and options -----
 
 
 def test_constructing_the_provider_does_not_load_a_model(fake_whisper):
@@ -121,7 +121,7 @@ def test_model_is_loaded_once_with_configured_options(fake_whisper, tmp_path, mo
     assert [p.name for p in fake_whisper.decoded] == ["chunk.mp3"] * 3
 
 
-# --- output normalisation -------------------------------------------------------------
+# --- output normalisation -----
 
 
 def test_segments_language_and_text_are_normalised(fake_whisper, tmp_path):
@@ -161,7 +161,7 @@ def test_missing_language_info_is_tolerated(fake_whisper, tmp_path):
     assert result.language is None and result.language_probability is None
 
 
-# --- failures ---------------------------------------------------------------------------
+# --- failures -----
 
 
 def test_model_exceptions_are_normalised_without_leaking_paths(fake_whisper, tmp_path):
@@ -204,7 +204,7 @@ def test_missing_dependency_is_a_configuration_error(monkeypatch, tmp_path):
     assert excinfo.value.code == "provider_missing"
 
 
-# --- PCM decoding (ffmpeg, mocked) -----------------------------------------------------------
+# --- PCM decoding (ffmpeg, mocked) -----
 
 
 def test_decode_pcm_invokes_ffmpeg_as_argument_list(monkeypatch, tmp_path):

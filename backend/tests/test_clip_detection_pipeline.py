@@ -138,7 +138,7 @@ def candidates_of(db: Session, row: ClipDetectionRun) -> list[ClipCandidate]:
     )
 
 
-# --- happy path ----------------------------------------------------------------------------
+# --- happy path -----
 
 
 def test_full_pipeline_persists_ranked_candidates(db_session, run, settings):
@@ -234,7 +234,7 @@ def test_excerpt_comes_from_the_transcript_not_the_model(db_session, run, settin
         assert "spoken line" in candidate.transcript_excerpt
 
 
-# --- failures ---------------------------------------------------------------------------------
+# --- failures -----
 
 
 def test_transcript_not_completed_fails_safely(db_session, run, settings):
@@ -362,7 +362,7 @@ def test_failure_never_touches_the_video_or_transcript(db_session, run, settings
     assert len(video.transcription.segments) == LINE_COUNT
 
 
-# --- idempotency and fencing --------------------------------------------------------------------
+# --- idempotency and fencing -----
 
 
 def test_completed_run_ignores_duplicate_delivery(db_session, run, settings):
@@ -484,7 +484,7 @@ def test_is_stale_semantics(settings):
         )
 
 
-# --- Celery task and dispatch -----------------------------------------------------------------
+# --- Celery task and dispatch -----
 
 
 def test_task_is_registered_and_runs_the_pipeline_eagerly(monkeypatch, db_session, run, settings):
@@ -547,7 +547,7 @@ def test_enqueue_when_broker_is_down_is_a_controlled_error(monkeypatch):
         enqueue_clip_detection(uuid.uuid4(), task_id=new_task_id())
 
 
-# --- configuration snapshot --------------------------------------------------------------------
+# --- configuration snapshot -----
 
 
 def test_detection_config_round_trips_and_tolerates_garbage(settings):
@@ -569,7 +569,7 @@ def test_detection_config_round_trips_and_tolerates_garbage(settings):
     assert DetectionConfig.from_run(None, settings) == DetectionConfig.from_settings(settings)
 
 
-# --- hardening ----------------------------------------------------------------------------
+# --- hardening -----
 
 
 def test_soft_time_limit_is_recorded_as_an_honest_failure(db_session, run, settings):

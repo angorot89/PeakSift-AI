@@ -102,7 +102,7 @@ def moov_before_mdat(path: Path) -> bool:
     return data.find(b"moov") < data.find(b"mdat")
 
 
-# --- command construction (no ffmpeg needed) ----------------------------------------------------
+# --- command construction (no ffmpeg needed) -----
 
 
 def test_command_reencodes_with_input_seek_and_faststart():
@@ -172,7 +172,7 @@ def test_validate_range_allows_small_overrun_and_unknown_duration():
     assert validate_range(10.0, 25.0, None, 1.0) == 15.0
 
 
-# --- real renders ------------------------------------------------------------------------------
+# --- real renders -----
 
 
 @requires_ffmpeg
@@ -327,7 +327,7 @@ def test_odd_dimensions_are_rounded_down_for_yuv420p(tmp_path: Path):
     assert (clip.width, clip.height) == (64, 48)
 
 
-# --- failures -----------------------------------------------------------------------------------
+# --- failures -----
 
 
 @requires_ffmpeg

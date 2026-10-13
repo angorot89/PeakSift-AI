@@ -126,7 +126,7 @@ def download_url(clip: Clip) -> str:
     return f"/clips/{clip.id}/download"
 
 
-# --- access control ----------------------------------------------------------------------------
+# --- access control -----
 
 
 def test_anonymous_requests_are_401(client: TestClient):
@@ -174,7 +174,7 @@ def test_corrupted_storage_key_cannot_escape_the_media_root(client, db_session, 
     assert client.get(content_url(clip)).status_code == 404
 
 
-# --- preview -----------------------------------------------------------------------------------
+# --- preview -----
 
 
 def test_full_preview_streams_inline_with_range_support(client, db_session, storage):
@@ -233,7 +233,7 @@ def test_malformed_or_multi_range_serves_everything(client, db_session, storage)
         assert response.status_code == 200 and response.content == CONTENT
 
 
-# --- download -----------------------------------------------------------------------------------
+# --- download -----
 
 
 def test_download_is_an_attachment_with_a_safe_name(client, db_session, storage):
@@ -291,7 +291,7 @@ def test_responses_never_leak_paths_or_keys(client, db_session, storage):
     )
 
 
-# --- shared helper ------------------------------------------------------------------------------
+# --- shared helper -----
 
 
 def test_content_disposition_helper_variants():

@@ -30,7 +30,7 @@ class FakeCompletedProcess:
         self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
 
 
-# --- parsing ----------------------------------------------------------------------
+# --- parsing -----
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_parse_tolerates_garbage_values():
     )
 
 
-# --- subprocess handling (mocked) ---------------------------------------------------
+# --- subprocess handling (mocked) -----
 
 
 def test_probe_invokes_ffprobe_as_argument_list(monkeypatch, tmp_path: Path):
@@ -166,7 +166,7 @@ def test_probe_missing_binary(monkeypatch, tmp_path: Path):
         probe(tmp_path / "x.mp4")
 
 
-# --- real ffprobe (integration) -----------------------------------------------------
+# --- real ffprobe (integration) -----
 
 
 @requires_ffmpeg

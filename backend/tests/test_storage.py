@@ -18,7 +18,7 @@ def storage(tmp_path: Path) -> LocalMediaStorage:
     return LocalMediaStorage(tmp_path / "media")
 
 
-# --- keys -------------------------------------------------------------------
+# --- keys -----
 
 
 def test_generate_key_is_unique_uuid_based_and_lowercases_extension():
@@ -82,7 +82,7 @@ def test_root_symlink_does_not_allow_escape(tmp_path: Path):
         storage.path_for("videos/escaped.mp4")
 
 
-# --- save / exists / delete ---------------------------------------------------
+# --- save / exists / delete -----
 
 
 def test_save_writes_in_chunks_and_reports_size(storage: LocalMediaStorage):

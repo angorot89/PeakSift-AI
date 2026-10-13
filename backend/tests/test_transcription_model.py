@@ -44,7 +44,7 @@ def segment(index: int, start: float, end: float, text: str = "words") -> Transc
     return TranscriptSegment(sequence_index=index, start_time=start, end_time=end, text=text)
 
 
-# --- transcription ----------------------------------------------------------------
+# --- transcription -----
 
 
 def test_transcription_defaults(db_session: Session):
@@ -99,7 +99,7 @@ def test_progress_must_be_a_percentage(db_session: Session):
     db_session.rollback()
 
 
-# --- segments ----------------------------------------------------------------------
+# --- segments -----
 
 
 def test_segments_are_ordered_by_sequence_index(db_session: Session):
@@ -191,7 +191,7 @@ def test_long_video_timestamps_and_unicode_text(db_session: Session):
     assert stored.text == "مرحبا — ça va? 🎬"
 
 
-# --- cascades --------------------------------------------------------------------------
+# --- cascades -----
 
 
 def test_deleting_video_deletes_transcription_and_segments(db_session: Session):

@@ -154,7 +154,7 @@ def mark_ready(db_session: Session, clip: Clip) -> None:
     db_session.commit()
 
 
-# --- authentication and ownership ---------------------------------------------------------
+# --- authentication and ownership -----
 
 
 def test_all_endpoints_require_authentication(client: TestClient):
@@ -189,7 +189,7 @@ def test_unknown_candidate_or_wrong_run_is_404(client, db_session, settings):
     assert client.post(f"{base}/{other['candidates'][0]}/clip").status_code == 404
 
 
-# --- generate ---------------------------------------------------------------------------------
+# --- generate -----
 
 
 def test_generate_creates_a_queued_clip_from_the_candidate_snapshot(
@@ -354,7 +354,7 @@ def test_generate_when_queue_is_down_leaves_no_row(client, db_session, settings,
     assert client.get(clip_url(ctx)).status_code == 404
 
 
-# --- status -------------------------------------------------------------------------------------
+# --- status -----
 
 
 def test_get_clip_404_before_generation_then_reports_state(client, db_session, settings):
@@ -393,7 +393,7 @@ def test_failed_clip_exposes_safe_error_only(client, db_session, settings):
     assert "/" not in data["error_message"]
 
 
-# --- retry -------------------------------------------------------------------------------------
+# --- retry -----
 
 
 def test_retry_resets_a_failed_clip_with_a_new_token(client, db_session, settings, fake_queues):
@@ -464,7 +464,7 @@ def test_retry_when_queue_is_down_marks_failed(client, db_session, settings, mon
     assert data["status"] == "failed" and data["error_code"] == "queue_unavailable"
 
 
-# --- listing -------------------------------------------------------------------------------------
+# --- listing -----
 
 
 def test_list_clips_for_a_video_newest_first(client, db_session, settings):
@@ -487,7 +487,7 @@ def test_list_clips_for_a_video_newest_first(client, db_session, settings):
     assert client.get(clips_url(ctx), params={"limit": 101}).status_code == 422
 
 
-# --- hardening ----------------------------------------------------------------------------
+# --- hardening -----
 
 
 def test_ready_clip_with_missing_file_becomes_retryable(client, db_session, settings, fake_queues):

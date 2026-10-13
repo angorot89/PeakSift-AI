@@ -25,7 +25,7 @@ def login(client: TestClient, email: str = EMAIL, password: str = PASSWORD):
     return client.post("/auth/login", json={"email": email, "password": password})
 
 
-# --- registration -----------------------------------------------------------
+# --- registration -----
 
 
 def test_register_creates_user_and_sets_cookie(client: TestClient):
@@ -91,7 +91,7 @@ def test_validation_errors_do_not_echo_submitted_values(client: TestClient):
     assert "input" not in error and "ctx" not in error
 
 
-# --- login ------------------------------------------------------------------
+# --- login -----
 
 
 def test_login_with_valid_credentials(client: TestClient):
@@ -127,7 +127,7 @@ def test_login_unknown_email_gives_same_response_as_wrong_password(client: TestC
     assert unknown_email.json() == wrong_password.json()
 
 
-# --- current user -----------------------------------------------------------
+# --- current user -----
 
 
 def test_me_when_authenticated(client: TestClient):
@@ -186,7 +186,7 @@ def test_me_rejects_token_for_deleted_user(client: TestClient, db_session: Sessi
     assert client.get("/auth/me").status_code == 401
 
 
-# --- logout -----------------------------------------------------------------
+# --- logout -----
 
 
 def test_logout_clears_cookie(client: TestClient):

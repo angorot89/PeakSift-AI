@@ -53,7 +53,7 @@ def clean_media_root():
         path.unlink()
 
 
-# --- authentication and ownership ---------------------------------------------
+# --- authentication and ownership -----
 
 
 def test_upload_requires_authentication(client: TestClient):
@@ -80,7 +80,7 @@ def test_upload_to_unknown_project_is_not_found(client: TestClient):
     assert upload(client, str(uuid.uuid4())).status_code == 404
 
 
-# --- happy path -----------------------------------------------------------------
+# --- happy path -----
 
 
 def test_upload_valid_mp4(client: TestClient, db_session: Session):
@@ -145,7 +145,7 @@ def test_each_upload_gets_a_unique_storage_key(client: TestClient, db_session: S
     assert len(stored_files()) == 2
 
 
-# --- validation -------------------------------------------------------------------
+# --- validation -----
 
 
 @pytest.mark.parametrize("filename", ["movie.avi", "notes.txt", "noextension", "clip.mp4.exe"])
@@ -208,7 +208,7 @@ def test_missing_file_field_is_a_validation_error(client: TestClient):
     assert client.post(f"/projects/{project['id']}/videos", data={"x": "y"}).status_code == 422
 
 
-# --- filenames ----------------------------------------------------------------------
+# --- filenames -----
 
 
 @pytest.mark.parametrize(
@@ -260,7 +260,7 @@ def test_sanitize_filename_edge_cases():
     assert sanitize_filename("a/b/c.webm") == "c.webm"
 
 
-# --- cleanup after failure ----------------------------------------------------------
+# --- cleanup after failure -----
 
 
 def test_database_failure_removes_stored_file(client: TestClient, db_session: Session, monkeypatch):

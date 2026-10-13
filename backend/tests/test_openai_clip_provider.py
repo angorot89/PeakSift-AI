@@ -118,7 +118,7 @@ def provider(client: FakeClient) -> OpenAIClipProvider:
     return OpenAIClipProvider(settings_with(), MODEL, client=client)
 
 
-# --- configuration ---------------------------------------------------------------------------
+# --- configuration -----
 
 
 def test_missing_key_is_a_configuration_error_before_any_request():
@@ -159,7 +159,7 @@ def test_key_never_appears_in_provider_state_errors_or_logs(
     assert "OpenAIError" in caplog.text  # the type is still logged for operators
 
 
-# --- request shape ---------------------------------------------------------------------------
+# --- request shape -----
 
 
 def test_uses_structured_outputs_with_the_shared_prompt(provider, client):
@@ -186,7 +186,7 @@ def test_max_output_tokens_comes_from_settings(client):
     assert client.responses.calls[0]["max_output_tokens"] == 1234
 
 
-# --- responses -----------------------------------------------------------------------------
+# --- responses -----
 
 
 def test_parsed_output_becomes_raw_candidates(provider):
@@ -228,7 +228,7 @@ def test_missing_parsed_output_is_an_output_error(provider, client):
     assert "no structured answer" in info.value.message
 
 
-# --- SDK error mapping ------------------------------------------------------------------------
+# --- SDK error mapping -----
 
 
 @pytest.mark.parametrize(
@@ -306,7 +306,7 @@ def test_model_unavailable_message_names_the_model_only(provider, client):
     assert info.value.message == f"OpenAI model '{MODEL}' is not available to this API key"
 
 
-# --- availability -----------------------------------------------------------------------------
+# --- availability -----
 
 
 def test_availability_uses_one_metadata_call(provider, client):

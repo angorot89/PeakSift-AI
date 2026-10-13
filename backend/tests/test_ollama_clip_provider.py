@@ -87,7 +87,7 @@ def provider_with(handler, **settings_overrides) -> tuple[OllamaClipProvider, li
     return OllamaClipProvider(settings, MODEL, client=client), seen
 
 
-# --- request shape ---------------------------------------------------------------------------
+# --- request shape -----
 
 
 def test_request_is_a_constrained_json_chat_with_the_shared_prompt():
@@ -130,7 +130,7 @@ def test_constructing_the_provider_makes_no_network_call():
     assert calls == [] and seen == [] and provider.model == MODEL
 
 
-# --- responses -----------------------------------------------------------------------------
+# --- responses -----
 
 
 def test_candidates_are_parsed_into_raw_candidates():
@@ -176,7 +176,7 @@ def test_unexpected_body_shape_is_an_output_error():
         provider.analyze(request())
 
 
-# --- transport and HTTP failures ------------------------------------------------------------------
+# --- transport and HTTP failures -----
 
 
 def test_connection_refused_is_retryable_unavailable():
@@ -230,7 +230,7 @@ def test_errors_never_mention_the_endpoint(monkeypatch):
     assert "11434" not in info.value.message
 
 
-# --- availability diagnostics ----------------------------------------------------------------
+# --- availability diagnostics -----
 
 
 def tags(*names: str) -> httpx.Response:

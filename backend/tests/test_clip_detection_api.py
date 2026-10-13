@@ -137,7 +137,7 @@ def complete_run(db_session: Session, run_id: str, candidates: int = 3) -> ClipD
     return run
 
 
-# --- authentication and ownership ------------------------------------------------
+# --- authentication and ownership -----
 
 
 def test_all_endpoints_require_authentication(client: TestClient):
@@ -183,7 +183,7 @@ def test_run_from_another_video_is_not_found(client, db_session, settings):
     assert client.get(f"{base(other_project, other_video)}/{run_id}").status_code == 404
 
 
-# --- providers -------------------------------------------------------------------------
+# --- providers -----
 
 
 def test_providers_list_reflects_configuration_without_secrets(client, settings, monkeypatch):
@@ -236,7 +236,7 @@ def test_providers_diagnose_with_openai_key(client, settings, monkeypatch):
     assert "sk-test" not in str(options)
 
 
-# --- start ----------------------------------------------------------------------------------
+# --- start -----
 
 
 def test_start_creates_a_queued_run_with_snapshot_and_token(
@@ -359,7 +359,7 @@ def test_start_validates_the_body(client, db_session, settings):
     assert start(client, project_id, video_id, model="x" * 200).status_code == 422
 
 
-# --- status and list -------------------------------------------------------------------------
+# --- status and list -----
 
 
 def test_get_run_reports_progress_candidates_and_staleness(client, db_session, settings):
@@ -427,7 +427,7 @@ def test_unknown_run_is_404(client, db_session, settings):
     assert client.get(f"{base(project_id, video_id)}/{uuid.uuid4()}").status_code == 404
 
 
-# --- retry ---------------------------------------------------------------------------------
+# --- retry -----
 
 
 def test_retry_resets_a_failed_run_with_a_new_token(client, db_session, settings, fake_queue):
@@ -504,7 +504,7 @@ def test_retry_when_queue_is_down_marks_the_run_failed(client, db_session, setti
     assert data["status"] == "failed" and data["error_code"] == "queue_unavailable"
 
 
-# --- candidates ------------------------------------------------------------------------------
+# --- candidates -----
 
 
 def test_candidates_are_hidden_until_completed(client, db_session, settings):
@@ -597,7 +597,7 @@ def test_candidate_of_another_run_is_not_found(client, db_session, settings):
     )
 
 
-# --- hardening ----------------------------------------------------------------------------
+# --- hardening -----
 
 
 def test_transcript_current_is_not_evaluated_while_a_run_is_active(client, db_session, settings):

@@ -67,7 +67,7 @@ def validated(start: float, end: float, **overrides) -> ValidatedCandidate:
     return ValidatedCandidate(**fields)
 
 
-# --- snapping (deterministic corrections) --------------------------------------------------
+# --- snapping (deterministic corrections) -----
 
 
 def test_exact_line_boundaries_pass_through():
@@ -108,7 +108,7 @@ def test_single_line_longer_than_the_maximum_is_rejected():
     assert "single transcript line exceeds" in reason
 
 
-# --- rejections ---------------------------------------------------------------------------
+# --- rejections -----
 
 
 @pytest.mark.parametrize(
@@ -168,7 +168,7 @@ def test_empty_text_is_rejected(field):
     assert f"empty {field}" in rejected_reason(raw_candidate(610.0, 640.0, **{field: "  \u0000 "}))
 
 
-# --- text and category corrections ----------------------------------------------------------
+# --- text and category corrections -----
 
 
 def test_text_is_normalised_and_truncated_on_a_word_boundary():
@@ -214,7 +214,7 @@ def test_empty_window_rejects_everything():
     assert "no transcript" in rejected_reason(raw_candidate(0.0, 30.0), window=window)
 
 
-# --- scoring ------------------------------------------------------------------------------
+# --- scoring -----
 
 
 def test_weights_sum_to_one_and_cover_every_dimension():
@@ -245,7 +245,7 @@ def test_overall_is_a_weighted_average_on_the_same_scale():
     assert overall_score(skewed) == 55  # 0.30 + 0.25
 
 
-# --- deduplication and ranking ------------------------------------------------------------------
+# --- deduplication and ranking -----
 
 
 def test_overlap_ratio_is_intersection_over_union():

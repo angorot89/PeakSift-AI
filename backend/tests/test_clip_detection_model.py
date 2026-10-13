@@ -97,7 +97,7 @@ def attach(db_session: Session, run: ClipDetectionRun, *candidates: ClipCandidat
     db_session.commit()
 
 
-# --- run -----------------------------------------------------------------------------
+# --- run -----
 
 
 def test_run_defaults(db_session: Session):
@@ -202,7 +202,7 @@ def test_timestamps_are_timezone_aware(db_session: Session):
     assert run.started_at.tzinfo is not None
 
 
-# --- candidates ----------------------------------------------------------------------
+# --- candidates -----
 
 
 def test_candidates_are_ordered_by_rank(db_session: Session):
@@ -287,7 +287,7 @@ def test_decision_can_be_recorded(db_session: Session):
     assert item.decision == "saved" and item.decided_at is not None
 
 
-# --- cascades --------------------------------------------------------------------------
+# --- cascades -----
 
 
 def test_deleting_a_run_deletes_its_candidates(db_session: Session):
