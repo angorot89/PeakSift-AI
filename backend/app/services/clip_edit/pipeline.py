@@ -34,13 +34,17 @@ from app.models import (
     ClipEdit,
     ClipEditStatus,
     ClipStatus,
+    ReframeAnalysis,
+    ReframeKeyframe,
+    ReframeStatus,
     TranscriptionStatus,
     TranscriptSegment,
 )
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
-from app.services.clip_edit.config import EditConfig
+from app.services.clip_edit.config import EditConfig, Layout
+from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
@@ -194,6 +198,8 @@ def _execute(
     if not source.is_file():
         raise PipelineFailure("clip_missing", "The source clip file is missing")
 
+    crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
+
     workspace = store.workspace(edit.id, attempt)
     captions = False
     if config.captions_enabled:
@@ -228,6 +234,7 @@ def _execute(
         captions=captions,
         caption_font=settings.caption_font_family,
         heartbeat=lambda: _heartbeat(edit, db, task_id),
+        crop_points=crop_points,
     )
     edit.progress_percent = RENDER_DONE_PROGRESS
     _heartbeat(edit, db, task_id)
@@ -258,6 +265,29 @@ def _execute(
         composed.duration_seconds,
         composed.size_bytes,
     )
+
+
+def _crop_path(edit: ClipEdit, db: Session, config: EditConfig) -> list[CropPoint]:
+    """The completed analysis' crop path for this clip, re-validated before rendering."""
+    analysis = db.get(ReframeAnalysis, uuid.UUID(str(config.reframe_analysis_id)))
+    if (
+        analysis is None
+        or analysis.clip_id != edit.clip_id
+        or analysis.status != ReframeStatus.COMPLETED
+    ):
+        raise PipelineFailure(
+            "reframe_unavailable",
+            "The framing analysis is not available; analyze the framing again",
+        )
+    keyframes = db.scalars(
+        select(ReframeKeyframe)
+        .where(ReframeKeyframe.reframe_analysis_id == analysis.id)
+        .order_by(ReframeKeyframe.sequence_index)
+    ).all()
+    try:
+        return crop_points_from(keyframes)
+    except ValueError:
+        raise PipelineFailure("invalid_path", "The framing path is not valid") from None
 
 
 def _transcript_segments(edit: ClipEdit, db: Session) -> list[SourceSegment]:

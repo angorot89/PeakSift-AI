@@ -161,7 +161,7 @@ def test_different_configurations_have_different_fingerprints():
         EditConfig.create(
             layout=layout, captions_enabled=enabled, caption_style=style, caption_position=position
         ).fingerprint()
-        for layout in Layout
+        for layout in (Layout.CENTER_CROP, Layout.BLUR_BACKGROUND, Layout.FIT)
         for enabled in (True, False)
         for style in CaptionStyle
         for position in CaptionPosition

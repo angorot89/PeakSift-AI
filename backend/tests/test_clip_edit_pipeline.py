@@ -190,7 +190,17 @@ class SpyComposer:
         self.calls: list[dict] = []
 
     def __call__(
-        self, source, target, *, layout, options, workspace, captions, caption_font, heartbeat
+        self,
+        source,
+        target,
+        *,
+        layout,
+        options,
+        workspace,
+        captions,
+        caption_font,
+        heartbeat,
+        crop_points=None,
     ):
         self.calls.append(
             {
@@ -200,6 +210,7 @@ class SpyComposer:
                 "workspace": workspace,
                 "captions": captions,
                 "caption_font": caption_font,
+                "crop_points": crop_points,
             }
         )
         self.captions_text = (workspace / "captions.ass").read_text() if captions else None

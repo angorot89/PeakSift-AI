@@ -18,6 +18,8 @@ class EditRequest(BaseModel):
     captions_enabled: StrictBool = False  # "yes"/1 are refused, not coerced
     caption_style: CaptionStyle | None = None
     caption_position: CaptionPosition | None = None
+    # Required for layout "smart_reframe": a completed analysis of this clip (never a path).
+    reframe_analysis_id: uuid.UUID | None = None
 
 
 class ClipEditRead(BaseModel):
@@ -36,6 +38,7 @@ class ClipEditRead(BaseModel):
     captions_enabled: bool
     caption_style: str | None
     caption_position: str | None
+    reframe_analysis_id: uuid.UUID | None
     output_width: int
     output_height: int
     render_profile: str

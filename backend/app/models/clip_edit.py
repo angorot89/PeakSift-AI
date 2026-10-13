@@ -62,7 +62,13 @@ class ClipEdit(Base):
         CheckConstraint("attempt >= 1", name="ck_clip_edits_attempt_positive"),
         CheckConstraint("output_width > 0 AND output_height > 0", name="ck_clip_edits_output"),
         CheckConstraint(
-            "layout IN ('center_crop', 'blur_background', 'fit')", name="ck_clip_edits_layout"
+            "layout IN ('center_crop', 'blur_background', 'fit', 'smart_reframe')",
+            name="ck_clip_edits_layout",
+        ),
+        CheckConstraint(
+            # A smart reframe follows exactly one analysis; other layouts never reference one.
+            "(layout = 'smart_reframe') = (reframe_analysis_id IS NOT NULL)",
+            name="ck_clip_edits_reframe",
         ),
         CheckConstraint("aspect_ratio IN ('9:16')", name="ck_clip_edits_aspect_ratio"),
         CheckConstraint(
@@ -96,6 +102,10 @@ class ClipEdit(Base):
     captions_enabled: Mapped[bool] = mapped_column(Boolean)
     caption_style: Mapped[str | None] = mapped_column(String(32))
     caption_position: Mapped[str | None] = mapped_column(String(16))
+    # Smart reframe only: the completed analysis whose crop path this render follows.
+    reframe_analysis_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("reframe_analyses.id", ondelete="CASCADE"), index=True
+    )
     output_width: Mapped[int] = mapped_column(Integer)
     output_height: Mapped[int] = mapped_column(Integer)
     render_profile: Mapped[str] = mapped_column(String(32))
