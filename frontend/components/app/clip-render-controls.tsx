@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { ShortFormEditor } from "@/components/app/short-form-editor";
+import { ShortFormSection } from "@/components/app/edited-shorts";
 import { Button } from "@/components/ui/button";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -17,7 +17,6 @@ import {
   type GeneratedClip,
 } from "@/lib/clips";
 import type { ClipCandidate } from "@/lib/clip-detection";
-import { createEdit, describeEdit, editStageLabel, type ClipEdit, type EditRequest } from "@/lib/edits";
 import { formatBytes, formatDuration } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
@@ -228,40 +227,5 @@ export function RenderedClip({ clip }: { clip: GeneratedClip }) {
         </a>
       </div>
     </div>
-  );
-}
-
-/** Edit settings for a 9:16 short of a ready clip. The clip itself is never modified. */
-function ShortFormSection({ projectId, clip }: { projectId: string; clip: GeneratedClip }) {
-  const { setUser } = useAuth();
-  const [started, setStarted] = useState<ClipEdit | null>(null);
-
-  async function submit(request: EditRequest) {
-    try {
-      const edit = await createEdit(projectId, clip.video_id, clip.id, request);
-      setStarted(edit);
-      return edit;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) setUser(null);
-      throw err;
-    }
-  }
-
-  return (
-    <section aria-labelledby={`short-${clip.id}`} className="space-y-3 border-t border-border pt-4">
-      <h4 id={`short-${clip.id}`} className="text-sm font-medium text-foreground">
-        Make a vertical short
-      </h4>
-      <ShortFormEditor
-        onSubmit={submit}
-        footer={
-          started ? (
-            <p role="status" aria-live="polite" className="text-sm text-muted">
-              {describeEdit(started)} — {editStageLabel(started)}
-            </p>
-          ) : null
-        }
-      />
-    </section>
   );
 }
