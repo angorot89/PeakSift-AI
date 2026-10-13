@@ -17,9 +17,9 @@ Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio.
 
 import logging
 import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, Layout
@@ -41,6 +41,7 @@ FIT_BACKGROUND = "0x111113"  # the app's surface colour
 # Background blur is computed at quarter resolution, then scaled up: strong and cheap.
 BLUR_SCALE_DIVISOR = 4
 BLUR_SIGMA = 12
+DEFAULT_CAPTION_FONT = "Noto Sans"
 
 
 @dataclass(frozen=True)
@@ -55,9 +56,18 @@ class ComposedShort:
     audio_codec: str | None
 
 
-@lru_cache(maxsize=8)
-def supports_captions(ffmpeg_path: str) -> bool:
-    """Whether this FFmpeg build has libass (the ``subtitles`` filter). Cached per binary."""
+# Only successful probes are cached: a transient failure is checked again next time.
+_FILTERS: dict[str, frozenset[str]] = {}
+_TEXT_RENDERS: set[tuple[str, str]] = set()
+# The probe frame is 9:16 like the output, so the caption scales as it will in the short.
+PROBE_SIZE = "360x640"
+PROBE_MIN_TEXT_PIXELS = 20
+
+
+def ffmpeg_filters(ffmpeg_path: str) -> frozenset[str] | None:
+    """The filter names this FFmpeg build offers, or ``None`` when it cannot be run."""
+    if ffmpeg_path in _FILTERS:
+        return _FILTERS[ffmpeg_path]
     try:
         result = subprocess.run(
             [ffmpeg_path, "-hide_banner", "-filters"],
@@ -65,12 +75,94 @@ def supports_captions(ffmpeg_path: str) -> bool:
             timeout=15,
             check=False,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-    return any(
-        line.split()[1:2] == ["subtitles"]
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    names = frozenset(
+        parts[1]
         for line in result.stdout.decode(errors="replace").splitlines()
+        if len(parts := line.split()) >= 2
     )
+    _FILTERS[ffmpeg_path] = names
+    return names
+
+
+def supports_captions(ffmpeg_path: str) -> bool:
+    """Whether this FFmpeg build has libass (the ``subtitles`` filter)."""
+    filters = ffmpeg_filters(ffmpeg_path)
+    return filters is not None and "subtitles" in filters
+
+
+def caption_text_renders(ffmpeg_path: str, font_family: str) -> bool:
+    """Burn a probe caption onto a black frame and check that text pixels appear.
+
+    libass draws nothing when no usable font is installed, which would otherwise produce a
+    "captioned" short without visible captions. Font fallback (any installed font) counts
+    as working; only "no glyphs at all" fails. Successful results are cached per process.
+    """
+    if (ffmpeg_path, font_family) in _TEXT_RENDERS:
+        return True
+    from app.services.clip_edit.caption_styles import build_ass_document
+    from app.services.clip_edit.captions import Cue
+    from app.services.clip_edit.config import CaptionPosition, CaptionStyle
+
+    document = build_ass_document(
+        [Cue(start=0.0, end=1.0, text="Hg PeakSift")],
+        style=CaptionStyle.BOLD,
+        position=CaptionPosition.CENTER,
+        font_family=font_family,
+    )
+    with tempfile.TemporaryDirectory(prefix="peaksift-caption-probe-") as directory:
+        (Path(directory) / CAPTIONS_FILENAME).write_text(document, encoding="utf-8")
+        command = [
+            ffmpeg_path,
+            "-v",
+            "error",
+            "-nostdin",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=black:s={PROBE_SIZE}:d=1",
+            "-vf",
+            f"subtitles=filename={CAPTIONS_FILENAME}",
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "-",
+        ]
+        try:
+            result = subprocess.run(
+                command, cwd=directory, capture_output=True, timeout=30, check=False
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    if result.returncode != 0:
+        return False
+    if sum(1 for value in result.stdout if value > 128) < PROBE_MIN_TEXT_PIXELS:
+        return False
+    _TEXT_RENDERS.add((ffmpeg_path, font_family))
+    return True
+
+
+def require_caption_rendering(ffmpeg_path: str, font_family: str) -> None:
+    """Raise a safe, specific ``RenderError`` unless captions can really be drawn."""
+    filters = ffmpeg_filters(ffmpeg_path)
+    if filters is None:
+        raise RenderError("ffmpeg_missing", "ffmpeg is not installed on the server")
+    if "subtitles" not in filters:
+        raise RenderError(
+            "captions_unavailable",
+            "This server's FFmpeg cannot render captions (libass is missing)",
+        )
+    if not caption_text_renders(ffmpeg_path, font_family):
+        raise RenderError(
+            "caption_font_unavailable",
+            "Captions could not be drawn: no usable caption font is installed on the server",
+        )
 
 
 def layout_filter(layout: Layout, width: int = OUTPUT_WIDTH, height: int = OUTPUT_HEIGHT) -> str:
@@ -159,6 +251,7 @@ def compose_short(
     options: RenderOptions,
     workspace: Path | None = None,
     captions: bool = False,
+    caption_font: str = DEFAULT_CAPTION_FONT,
     heartbeat: Callable[[], None] | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
@@ -170,11 +263,8 @@ def compose_short(
         raise RenderError("source_missing", "The generated clip file is missing")
     if captions and (workspace is None or not (workspace / CAPTIONS_FILENAME).is_file()):
         raise RenderError("captions_missing", "The caption file was not prepared")
-    if captions and not supports_captions(options.ffmpeg_path):
-        raise RenderError(
-            "captions_unavailable",
-            "This server's FFmpeg cannot render captions (libass is missing)",
-        )
+    if captions:
+        require_caption_rendering(options.ffmpeg_path, caption_font)
     try:
         source_meta = probe(source, ffprobe_path=options.ffprobe_path)
     except ProbeError:

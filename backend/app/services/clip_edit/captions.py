@@ -19,6 +19,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import NamedTuple
 
 # Readable short-form cues: a few words, one or two short lines on a 1080-wide frame.
 DEFAULT_MAX_WORDS = 7
@@ -32,6 +33,10 @@ _SENTENCE_END = re.compile(r"[.!?…。؟]['\")\]]*$")
 _CLAUSE_END = re.compile(r"[,;:،]['\")\]]*$")
 
 WORD_JOINER = "⁠"
+# libass wraps only at spaces, so one unspaced token (a URL, CJK text) can never wrap and
+# would run off a 1080-wide frame. Tokens wider than this are split into pieces; East Asian
+# wide characters count double. 18 units fit one line of the largest preset (Bold, 80 px).
+MAX_TOKEN_WIDTH = 18
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,23 @@ class Cue:
     text: str
 
 
+# Emoji have no glyphs in the caption fonts (libass cannot draw colour emoji) and would burn
+# in as empty boxes, so they are left out of captions: pictographs, dingbats, regional
+# indicators, keycap and presentation selectors, tag characters.
+_EMOJI_RANGES = (
+    (0x1F000, 0x1FAFF),
+    (0x2600, 0x27BF),
+    (0x2B00, 0x2BFF),
+    (0xE0020, 0xE007F),
+)
+_EMOJI_SINGLES = frozenset("\ufe0f\u20e3")
+
+
+def _is_emoji(ch: str) -> bool:
+    code = ord(ch)
+    return ch in _EMOJI_SINGLES or any(lo <= code <= hi for lo, hi in _EMOJI_RANGES)
+
+
 # Bidi embedding/override/isolate controls could visually reorder a caption; they are
 # dropped. Joiners (ZWJ/ZWNJ, used by emoji and Arabic shaping) and the LRM/RLM marks stay.
 _BIDI_CONTROLS = frozenset("\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
@@ -59,56 +81,101 @@ _BIDI_CONTROLS = frozenset("\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u20
 
 def clean_text(text: str) -> str:
     """Words exactly as transcribed: control characters become spaces, whitespace collapses.
-    Unicode letters, accents, Arabic, emoji and joiners are kept."""
+    Unicode letters, accents, Arabic and joiners are kept; emoji are dropped (no glyphs)."""
     out = []
     for ch in text:
-        if ch in _BIDI_CONTROLS:
+        if ch in _BIDI_CONTROLS or _is_emoji(ch):
             continue
         category = unicodedata.category(ch)
         out.append(" " if category == "Cc" else "" if category in ("Cs", "Co", "Cn") else ch)
     return _WHITESPACE.sub(" ", "".join(out)).strip()
 
 
-def _words_with_times(segment: SourceSegment) -> list[tuple[str, float, float]]:
+def _width(ch: str) -> int:
+    if unicodedata.category(ch)[0] in ("M", "C"):
+        return 0  # combining marks and joiners take no space of their own
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+
+def _visible(word: str) -> bool:
+    """False for a token made only of joiners/marks (e.g. what is left of an emoji)."""
+    return any(unicodedata.category(ch)[0] not in ("C", "M") for ch in word)
+
+
+def split_long_token(word: str, max_width: int = MAX_TOKEN_WIDTH) -> list[str]:
+    """Split a token that cannot fit on one caption line into balanced pieces that can (no
+    tiny tail piece that would flash by). Pieces never start with a combining mark or joiner,
+    so accents and shaped letters stay attached to their base character."""
+    total = sum(_width(ch) for ch in word)
+    if total <= max_width:
+        return [word]
+    count = math.ceil(total / max_width)
+    pieces, current, width, consumed = [], "", 0, 0
+    for ch in word:
+        w = _width(ch)
+        attached = unicodedata.category(ch)[0] == "M" or ch in "\u200c\u200d"
+        boundary = total * (len(pieces) + 1) / count
+        if current and not attached and (width + w > max_width or consumed + w > boundary):
+            pieces.append(current)
+            current, width = "", 0
+        current += ch
+        width += w
+        consumed += w
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+class _Word(NamedTuple):
+    text: str
+    start: float
+    end: float
+    continues: bool = False  # a later piece of a split token (no space before it)
+
+
+def _words_with_times(segment: SourceSegment) -> list[_Word]:
     """Spread the segment's duration over its words proportionally to their length."""
-    words = clean_text(segment.text).split(" ")
-    words = [w for w in words if w]
-    if not words:
+    pieces: list[tuple[str, bool]] = []
+    for word in clean_text(segment.text).split(" "):
+        if word and _visible(word):
+            parts = split_long_token(word)
+            pieces += [(part, index > 0) for index, part in enumerate(parts)]
+    if not pieces:
         return []
-    weights = [len(w) + 1 for w in words]
+    weights = [len(text) + 1 for text, _ in pieces]
     total = sum(weights)
     span = segment.end - segment.start
     timed, cursor = [], segment.start
-    for word, weight in zip(words, weights, strict=True):
+    for (text, continues), weight in zip(pieces, weights, strict=True):
         end = cursor + span * weight / total
-        timed.append((word, cursor, end))
+        timed.append(_Word(text, cursor, end, continues))
         cursor = end
-    timed[-1] = (timed[-1][0], timed[-1][1], segment.end)  # no float drift at the boundary
+    timed[-1] = timed[-1]._replace(end=segment.end)  # no float drift at the boundary
     return timed
 
 
-def _group(
-    timed: list[tuple[str, float, float]], max_words: int, max_chars: int, min_words: int
-) -> list[list[tuple[str, float, float]]]:
-    """Greedy, deterministic grouping that prefers to break after punctuation."""
-    groups: list[list[tuple[str, float, float]]] = []
-    current: list[tuple[str, float, float]] = []
+def _group(timed: list[_Word], max_words: int, max_chars: int, min_words: int) -> list[list[_Word]]:
+    """Greedy, deterministic grouping that prefers to break after punctuation. A piece of a
+    split token always starts its own cue, so pieces are never re-joined with a space."""
+    groups: list[list[_Word]] = []
+    current: list[_Word] = []
     for item in timed:
-        word = item[0]
-        length = sum(len(w) for w, _, _ in current) + len(current) + len(word)
-        if current and (len(current) >= max_words or length > max_chars):
+        length = sum(len(w.text) for w in current) + len(current) + len(item.text)
+        if current and (item.continues or len(current) >= max_words or length > max_chars):
             groups.append(current)
             current = []
         current.append(item)
-        if _SENTENCE_END.search(word) or (_CLAUSE_END.search(word) and len(current) >= min_words):
+        if _SENTENCE_END.search(item.text) or (
+            _CLAUSE_END.search(item.text) and len(current) >= min_words
+        ):
             groups.append(current)
             current = []
     if current:
         groups.append(current)
     # Avoid a lonely last word when it fits on the previous cue.
-    if len(groups) >= 2 and len(groups[-1]) == 1:
+    if len(groups) >= 2 and len(groups[-1]) == 1 and not groups[-1][0].continues:
         merged = groups[-2] + groups[-1]
-        if sum(len(w) for w, _, _ in merged) + len(merged) - 1 <= max_chars + 8:
+        if sum(len(w.text) for w in merged) + len(merged) - 1 <= max_chars + 8:
             groups[-2:] = [merged]
     return groups
 
@@ -134,20 +201,18 @@ def build_cues(
             continue  # entirely outside the clip, or not a real interval
         # Keep only the words (approximately) spoken inside the clip.
         inside = [
-            (w, s, e)
-            for w, s, e in _words_with_times(segment)
-            if (s + e) / 2 >= clip_start and (s + e) / 2 < clip_end
+            w for w in _words_with_times(segment) if clip_start <= (w.start + w.end) / 2 < clip_end
         ]
         for group in _group(inside, max_words, max_chars, min_words):
-            start = max(group[0][1], clip_start) - clip_start
-            end = min(group[-1][2], clip_end) - clip_start
+            start = max(group[0].start, clip_start) - clip_start
+            end = min(group[-1].end, clip_end) - clip_start
             start, end = max(0.0, start), min(duration, end)
             if cues and start < cues[-1].end:
                 start = cues[-1].end  # overlapping transcript segments never stack captions
             if end - start < MIN_CUE_SECONDS:
                 continue
             cues.append(
-                Cue(start=round(start, 3), end=round(end, 3), text=" ".join(w for w, _, _ in group))
+                Cue(start=round(start, 3), end=round(end, 3), text=" ".join(w.text for w in group))
             )
     return cues
 

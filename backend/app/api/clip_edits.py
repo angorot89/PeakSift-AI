@@ -147,7 +147,7 @@ def _require_renderable(clip: Clip, video: Video, config: EditConfig) -> None:
         if not supports_captions(get_settings().ffmpeg_path):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Captions are not available on this server (FFmpeg has no libass)",
+                detail="Captions are not available on this server",
             )
 
 
@@ -272,7 +272,10 @@ def retry_edit(
 ) -> ClipEditRead:
     """Re-queue a failed or stalled edit on the same row with a fresh attempt token."""
     settings = get_settings()
-    edit = _reconcile(db, edit, storage)
+    edit = _reconcile(db, edit, storage)  # may commit, so the lock is taken afterwards
+    # Lock the row until the commit below: two concurrent retries serialize, and the second
+    # one sees "queued" and gets 409 instead of enqueueing a duplicate render.
+    db.refresh(edit, with_for_update=True)
     if edit.status != ClipEditStatus.FAILED and not is_stale(edit, settings):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

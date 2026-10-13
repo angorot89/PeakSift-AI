@@ -25,6 +25,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from celery.exceptions import SoftTimeLimitExceeded
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -101,22 +102,32 @@ def run_clip_edit(
     attempt = edit.attempt
 
     def fail(code: str, message: str) -> None:
-        _fail(edit, db, store, code, message, task_id=task_id, attempt=attempt)
+        try:
+            _fail(edit, db, store, code, message, task_id=task_id, attempt=attempt)
+        except Exception:
+            # The database itself is failing. Leave the row as it is: it goes stale and the
+            # retry endpoint recovers it. Only this attempt's own files are removed.
+            logger.exception("Could not record the failure of clip edit %s", edit_id)
+            db.rollback()
+            store.discard_workspace(edit_id, attempt)
 
     try:
         _execute(edit, db, settings, store, composer, task_id, attempt)
     except PipelineSuperseded:
-        store.discard_workspace(edit.id, attempt)
-        logger.info("Clip edit %s was taken over by a newer attempt; stopping", edit.id)
+        if _row_exists(edit_id, db):
+            store.discard_workspace(edit_id, attempt)
+        else:
+            store.discard(edit_id)  # the edit is gone: none of its files are needed
+        logger.info("Clip edit %s was taken over or removed; stopping", edit_id)
     except (PipelineFailure, RenderError) as error:
         fail(error.code, error.message)
-    except StorageError:
-        logger.exception("Storage failure while finalizing clip edit %s", edit.id)
+    except (StorageError, OSError):  # disk full, permissions, a vanished directory
+        logger.exception("Storage failure while rendering clip edit %s", edit_id)
         fail("storage_failure", "The edited short could not be stored")
     except SoftTimeLimitExceeded:
         fail("time_limit", "Rendering ran longer than the worker allows; retry the edit")
     except Exception:
-        logger.exception("Unexpected error rendering clip edit %s", edit.id)
+        logger.exception("Unexpected error rendering clip edit %s", edit_id)
         fail("internal_error", "Unexpected error while rendering the short")
     return edit
 
@@ -215,6 +226,7 @@ def _execute(
         options=render_options_from(settings),
         workspace=workspace,
         captions=captions,
+        caption_font=settings.caption_font_family,
         heartbeat=lambda: _heartbeat(edit, db, task_id),
     )
     edit.progress_percent = RENDER_DONE_PROGRESS
@@ -266,10 +278,26 @@ def _transcript_segments(edit: ClipEdit, db: Session) -> list[SourceSegment]:
 
 
 def _still_owner(edit: ClipEdit, db: Session, task_id: str | None) -> bool:
+    """True while this attempt may write the row. A row deleted mid-render (its project,
+    video or clip was removed) has no owner: the worker stops and writes nothing."""
+    with db.no_autoflush:  # read the committed token; never flush our pending progress first
+        row = db.execute(select(ClipEdit.celery_task_id).where(ClipEdit.id == _key(edit))).first()
+    if row is None:
+        return False
     if task_id is None:
         return True
-    current = db.scalar(select(ClipEdit.celery_task_id).where(ClipEdit.id == edit.id))
-    return not current or current == task_id
+    return not row.celery_task_id or row.celery_task_id == task_id
+
+
+def _key(edit: ClipEdit) -> uuid.UUID:
+    """The primary key without touching the database: reading ``edit.id`` on an expired
+    instance whose row was deleted raises instead of answering."""
+    return sa_inspect(edit).identity[0]
+
+
+def _row_exists(edit_id: uuid.UUID, db: Session) -> bool:
+    db.rollback()
+    return db.scalar(select(ClipEdit.id).where(ClipEdit.id == edit_id)) is not None
 
 
 def _ensure_still_owner(edit: ClipEdit, db: Session, task_id: str | None) -> None:
@@ -296,15 +324,19 @@ def _fail(
     attempt: int = 1,
 ) -> None:
     db.rollback()
+    edit_id = _key(edit)
     if not _still_owner(edit, db, task_id):
-        store.discard_workspace(edit.id, attempt)  # our own files only
+        if _row_exists(edit_id, db):
+            store.discard_workspace(edit_id, attempt)  # our own files only
+        else:
+            store.discard(edit_id)
         logger.info(
             "Clip edit %s failed (%s) after being taken over; newer attempt untouched",
-            edit.id,
+            edit_id,
             code,
         )
         return
-    store.discard(edit.id)  # no partial render, caption file or orphaned artifact survives
+    store.discard(edit_id)  # no partial render, caption file or orphaned artifact survives
     edit.status = ClipEditStatus.FAILED
     edit.error_code = code[:64]
     edit.error_message = message[:MAX_ERROR_LENGTH]
@@ -312,4 +344,4 @@ def _fail(
     edit.completed_at = _now()
     edit.heartbeat_at = edit.completed_at
     db.commit()
-    logger.warning("Clip edit %s failed: %s — %s", edit.id, code, message)
+    logger.warning("Clip edit %s failed: %s — %s", edit_id, code, message)

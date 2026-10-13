@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from app.api import clip_edits as api
@@ -355,7 +355,8 @@ def test_captions_refused_when_ffmpeg_has_no_libass(client, db_session, monkeypa
     ctx = ready_clip(db_session, "owner@example.com")
     monkeypatch.setattr(api, "supports_captions", lambda path: False)
     response = client.post(ctx["base"], json=BLUR_BOLD)
-    assert response.status_code == 409 and "libass" in response.json()["detail"]
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Captions are not available on this server"
     assert client.post(ctx["base"], json={"layout": "center_crop"}).status_code == 201
 
 
@@ -471,6 +472,30 @@ def test_retry_refuses_live_ready_and_exhausted_edits(client, db_session, storag
     db_session.commit()
     response = client.post(f"{ctx['base']}/{edit_id}/retry")
     assert response.status_code == 409 and "too many times" in response.json()["detail"]
+
+
+def test_retry_locks_the_row_so_concurrent_retries_serialize(client, db_session, fake_queue):
+    sign_up(client)
+    ctx = ready_clip(db_session, "owner@example.com")
+    edit_id = client.post(ctx["base"], json=BLUR_BOLD).json()["id"]
+    db_session.get(ClipEdit, uuid.UUID(edit_id)).status = "failed"
+    db_session.commit()
+    statements: list[str] = []
+
+    def capture(conn, cursor, statement, *args):
+        statements.append(statement)
+
+    connection = db_session.connection()
+    event.listen(connection, "before_cursor_execute", capture)
+    try:
+        assert client.post(f"{ctx['base']}/{edit_id}/retry").status_code == 200
+    finally:
+        event.remove(connection, "before_cursor_execute", capture)
+    assert any("FROM clip_edits" in s and "FOR UPDATE" in s for s in statements)
+    # The second retry (what a concurrent one sees once the lock is released) is refused.
+    assert client.post(f"{ctx['base']}/{edit_id}/retry").status_code == 409
+    assert [q for q in fake_queue if q[0] == uuid.UUID(edit_id)] == fake_queue[-2:]
+    assert len([q for q in fake_queue if q[0] == uuid.UUID(edit_id)]) == 2  # create + 1 retry
 
 
 def test_retry_when_queue_is_down_marks_failed(client, db_session, monkeypatch):
