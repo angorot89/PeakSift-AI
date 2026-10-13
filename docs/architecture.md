@@ -1,8 +1,8 @@
 # Architecture
 
-Two sections: what is **built** (Milestones 1–6) and what is **planned**. Planned parts are decided milestone by milestone and may change.
+Two sections: what is **built** (Milestones 1–7) and what is **planned**. Planned parts are decided milestone by milestone and may change.
 
-## Built (Milestones 1–6)
+## Built (Milestones 1–7)
 
 ```
 ┌───────────────────┐   HTTP/JSON + HttpOnly cookie   ┌───────────────────┐        ┌──────────────────┐
@@ -32,6 +32,9 @@ Two sections: what is **built** (Milestones 1–6) and what is **planned**. Plan
                                                                                    │  transcript→ASS  │
                                                                                    │  → ffmpeg 9:16   │
                                                                                    │    + libass      │
+                                                                                   │ smart reframe:   │
+                                                                                   │  frames → faces  │
+                                                                                   │  → tracks → path │
                                                                                    └──────────────────┘
 ```
 
@@ -41,16 +44,16 @@ Two sections: what is **built** (Milestones 1–6) and what is **planned**. Plan
 - Pages: landing (`/`), `/login`, `/register`, and a signed-in area (`/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`) under one route group that wraps pages in a client-side guard and an app shell.
 - Auth state lives in a small React context (`AuthProvider`). On load it calls `GET /auth/me`; the backend is the authority. Tokens are never stored in JavaScript-accessible storage.
 - A single fetch wrapper (`lib/api.ts`) adds the API base URL (`NEXT_PUBLIC_API_URL`), sends cookies, and turns error bodies into messages. Uploads use a small `XMLHttpRequest` helper (`lib/videos.ts`) because `fetch` cannot report upload progress.
-- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos. For ready videos a **Transcription** panel starts the job, polls `GET …/transcription` every 4 s only while it is active, shows real progress, failure/stalled states with retry, and a paginated timestamped transcript viewer. Once the transcript is complete, an **AI clip detection** panel offers the server's provider/model allow-lists, starts a run, polls `GET …/clip-detection/{run_id}` every 4 s while active with staged progress, handles failed/stalled runs with bounded retry, lists previous runs, and renders the **candidate review** (ranked cards, score breakdown, transcript excerpt, in-page preview of the candidate range from the owner-only stream, save/dismiss with filters). The page is a workflow: a stepper (Upload, Transcribe, Find clips, Generate, Edit) fed by each section's real state, then numbered panels — Source video, Transcript, Clip moments (ranked candidate cards with a compact generated-clip block), Generated clips (thumbnails, short counts, links to the editor). The short-form editor is a separate page, `/projects/[id]/clips/[clipId]` (`components/app/short-editor-view.tsx`, `components/app/editor/*`): a 9:16 stage with a labelled approximate preview or the rendered MP4, visual settings, the render action with real states, and the versions list.
+- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos. For ready videos a **Transcription** panel starts the job, polls `GET …/transcription` every 4 s only while it is active, shows real progress, failure/stalled states with retry, and a paginated timestamped transcript viewer. Once the transcript is complete, an **AI clip detection** panel offers the server's provider/model allow-lists, starts a run, polls `GET …/clip-detection/{run_id}` every 4 s while active with staged progress, handles failed/stalled runs with bounded retry, lists previous runs, and renders the **candidate review** (ranked cards, score breakdown, transcript excerpt, in-page preview of the candidate range from the owner-only stream, save/dismiss with filters). The page is a workflow: a stepper (Upload, Transcribe, Find clips, Generate, Edit) fed by each section's real state, then numbered panels — Source video, Transcript, Clip moments (ranked candidate cards with a compact generated-clip block), Generated clips (thumbnails, short counts, links to the editor). The short-form editor is a separate page, `/projects/[id]/clips/[clipId]` (`components/app/short-editor-view.tsx`, `components/app/editor/*`): a 9:16 stage with a labelled approximate preview or the rendered MP4, visual settings, the render action with real states, and the versions list. Smart reframe (`editor/smart-reframe.tsx`, `lib/reframe.ts`) adds the framing-analysis panel (start, real progress, confidence summary, retry), a keyboard-accessible focal-point picker, and a preview that follows the completed crop path frame by frame.
 
 ### Backend (`backend/`)
 
-- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript), `clip_detection` (providers, runs, candidates, decisions), `clips` (generate/status/retry/list), `clip_media` (private clip preview and download, sharing `media_streaming.py` with source preview), `clip_edits` (create/list/status/retry of short-form edits) and `edit_media` (private short preview and download); request/response schemas (Pydantic) are separate from ORM models.
+- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript), `clip_detection` (providers, runs, candidates, decisions), `clips` (generate/status/retry/list), `clip_media` (private clip preview and download, sharing `media_streaming.py` with source preview), `clip_edits` (create/list/status/retry of short-form edits), `edit_media` (private short preview and download) and `reframe` (start/list/current/status/crop path/retry of smart-reframing analyses); request/response schemas (Pydantic) are separate from ORM models.
 - Settings from environment variables via pydantic-settings; `DATABASE_URL` and `SECRET_KEY` are required.
 - SQLAlchemy 2 with a **synchronous** engine and one session per request (`get_db`). Async was deliberately not introduced.
 - Alembic migrations are the only way the schema changes; `alembic check` runs in CI to catch model/migration drift.
-- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), the `transcription/` package (provider contract, factory, chunking, pipeline, providers) and the `clip_detection/` package (provider contract + shared schema and prompt, factory with allow-lists, Ollama and OpenAI providers, windowing, validation, ranking, config snapshot, pipeline), `clip_render/` (clip artifacts, FFmpeg renderer, pipeline) and `clip_edit/` (edit config, 9:16 composition, captions, caption styles, edit artifacts, pipeline).
-- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py`, `clip_render_tasks.py`, `clip_edit_tasks.py` and `dispatch.py` (enqueue helpers; every job's task id is chosen and committed on its row before enqueueing and serves as the attempt token); only database ids cross the broker.
+- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), the `transcription/` package (provider contract, factory, chunking, pipeline, providers) and the `clip_detection/` package (provider contract + shared schema and prompt, factory with allow-lists, Ollama and OpenAI providers, windowing, validation, ranking, config snapshot, pipeline), `clip_render/` (clip artifacts, FFmpeg renderer, pipeline) `clip_edit/` (edit config, 9:16 composition, smart and manual crops, captions, caption styles, edit artifacts, pipeline) and `reframe/` (config snapshot, frame sampling, detector contract, YuNet face detector, tracking, crop path planning, pipeline).
+- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py`, `clip_render_tasks.py`, `clip_edit_tasks.py`, `reframe_tasks.py` and `dispatch.py` (enqueue helpers; every job's task id is chosen and committed on its row before enqueueing and serves as the attempt token); only database ids cross the broker.
 
 ### Video pipeline (Milestone 2)
 
@@ -155,6 +158,32 @@ GET /edits/{id}/content | /download  →  owner check → path_for(storage_key) 
 
 Full reference: [short-form-editing.md](short-form-editing.md).
 
+### Smart reframing pipeline (Milestone 7)
+
+```
+POST …/clips/{id}/reframe  →  server config snapshot + fingerprint (unique per clip)
+                           →  existing? 200 (failed: 409, use retry) | detector not installed? 409
+                           →  ReframeAnalysis row (queued, pre-chosen task id) → enqueue peaksift.analyze_reframe → 201
+Worker (app/services/reframe/):
+  claim (DB state + attempt token), clear any old keyframes                              (5)
+  → sampling   ffprobe display geometry; one ffmpeg pipe: fps=N:round=up → scale → rgb24
+  → detecting  YuNet face detector (onnxruntime, lazy, pinned model) per frame      (10 → 80)
+  → tracking   association → tracks → subject with hysteresis, hand-offs           (85)
+  → planning   dead zone, margins, groups, look-ahead, smoothing, pan limit, cuts   (92)
+  → validate keyframes, then ONE commit: keyframes + statistics + completed          (100)
+  | failed      safe error_code/message (detector failure ≠ no face), no partial path
+POST …/edits {layout: smart_reframe, reframe_analysis_id}
+  → edit worker re-validates the keyframes → ffmpeg crop=x(t),y(t) (balanced if-tree)
+  → scale 1080×1920 → captions → the usual validation and atomic finalize
+```
+
+- **No temporary files:** frames stream through a pipe; a watchdog kills FFmpeg at the deadline.
+- **Server-controlled:** the detector, model file and every tuning value are configuration; a request can only ask "analyse this clip". The model is installed by an operator script (pinned sha256) and never downloaded automatically.
+- **Same ownership rules** as rendering: attempt-token fencing on every commit, stale detection, bounded retry under a row lock.
+- **Manual crop** (`manual_crop` layout) needs no analysis: a fixed 9:16 crop around a validated focal point.
+
+Full reference: [smart-reframing.md](smart-reframing.md).
+
 ### Storage
 
 - Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`, `edits/<edit-uuid>/work-<attempt>/{captions.ass,short.mp4}` → `edits/<edit-uuid>/edited.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
@@ -181,15 +210,17 @@ Full reference: [short-form-editing.md](short-form-editing.md).
 | `clip_detection_runs` | `id` (uuid), `video_id` (FK → videos, cascade), `transcription_id` (FK → transcriptions, cascade), `transcript_fingerprint` (sha256), `provider`, `model`, `config` (JSONB snapshot), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `windows_total`, `windows_done`, `error_code`, `error_message`, `celery_task_id`, `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at`. Partial unique index on `video_id` where status is active (one running detection per video) |
 | `clip_candidates` | `id` (uuid), `run_id` (FK → clip_detection_runs, cascade), `video_id` (FK → videos, cascade), `start_time`, `end_time`, `duration_seconds` (checked = end − start), `title` (120), `hook` (300), `rationale` (1000), `category`, `transcript_excerpt`, `overall_score` + five dimension scores (each checked 0–100), `rank` (≥ 1, unique per run), `decision` (`undecided`/`saved`/`dismissed`), `decided_at`, `created_at`, `updated_at`; index on `(video_id, decision)` |
 | `clips` | `id` (uuid), `candidate_id` (FK → clip_candidates, cascade, **unique**), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `start_time`, `end_time`, `duration_seconds` (snapshot; checked start ≥ 0, end > start, duration = end − start), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
-| `clip_edits` | `id` (uuid), `clip_id` (FK → clips, cascade), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `config` (JSONB, versioned snapshot), `config_fingerprint` (sha256; **unique with `clip_id`**), `aspect_ratio` (`9:16`), `layout` (`center_crop`/`blur_background`/`fit`), `captions_enabled`, `caption_style`, `caption_position` (both set iff captions are enabled — checked), `output_width`/`output_height` (1080 × 1920), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `duration_seconds`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `caption_cue_count`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
+| `clip_edits` | `id` (uuid), `clip_id` (FK → clips, cascade), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `config` (JSONB, versioned snapshot), `config_fingerprint` (sha256; **unique with `clip_id`**), `aspect_ratio` (`9:16`), `layout` (`center_crop`/`blur_background`/`fit`/`smart_reframe`/`manual_crop`), `reframe_analysis_id` (FK → reframe_analyses, cascade; set iff `smart_reframe` — checked), `focus_x`/`focus_y` (0–1; set iff `manual_crop` — checked), `captions_enabled`, `caption_style`, `caption_position` (both set iff captions are enabled — checked), `output_width`/`output_height` (1080 × 1920), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `duration_seconds`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `caption_cue_count`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
+| `reframe_analyses` | `id` (uuid), `clip_id` (FK → clips, cascade), `video_id` (FK → videos, cascade), `status` (`queued`/`sampling`/`detecting`/`tracking`/`planning`/`completed`/`failed`), `progress_percent` (0–100), `attempt` (≥ 1), `provider`, `provider_version`, `algorithm_version`, `config` (JSONB snapshot), `config_fingerprint` (sha256; **unique with `clip_id`**), `sample_fps`, `target_aspect_ratio`, `source_width`/`source_height` (both or neither — checked), `overall_confidence`, `confidence_level` (`high`/`mixed`/`fallback`), `frames_sampled`, `detections_count`, `tracks_count`, `subject_switches`, `fallback_fraction`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
+| `reframe_keyframes` | `id` (uuid), `reframe_analysis_id` (FK → reframe_analyses, cascade), `sequence_index` (unique per analysis), `timestamp` (≥ 0, clip-local seconds), `center_x`, `center_y`, `crop_width`, `crop_height` (fractions of the display-oriented source; checked so the crop stays inside the frame), `confidence` (0–1), `mode` (`tracked`/`group`/`fallback`) |
 
 Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`). Clip detection `status` is a third state machine — `queued` → `preparing_transcript` → `analyzing` → `validating` → `ranking` → `completed` | `failed` — and candidate times are absolute seconds on transcript-line boundaries; scores are integers on one 0–100 editorial scale. Clip `status` is a fourth — `queued` → `rendering` → `validating` → `ready` | `failed` — describing the health of the rendered artifact; each clip edit has the same lifecycle for its own short.
 
 ### Testing and CI
 
 - Backend: pytest against a dedicated PostgreSQL test database; migrations are applied at the start of the session and every test is rolled back. Media tests use a throwaway `MEDIA_ROOT`; fixtures are generated at test time with `ffmpeg` (none are committed). Celery runs in eager mode; speech models are mocked (an opt-in real `tiny`-model check exists for macOS); clip-analysis providers are tested with a mocked transport / fake SDK client plus an in-process fake Ollama HTTP server (an opt-in real check runs against a local Ollama with `PEAKSIFT_REAL_OLLAMA=1`). Integration tests skip locally without FFmpeg/Redis and are required in CI (`REQUIRE_FFMPEG=1`, `REQUIRE_REDIS=1`, `HF_HUB_OFFLINE=1`, `OLLAMA_BASE_URL` on a closed port).
-- Frontend: ESLint and a production build.
-- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, installs the Noto fonts, checks that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption draws text, runs real clip renders end-to-end through the API and real captioned 9:16 renders verified on frame pixels (`REQUIRE_LIBASS=1`), and finishes with a real worker smoke (`ping` round-trip and registration of the transcription, clip detection, clip rendering and short-form edit tasks).
+- Frontend: ESLint, a type check (`next typegen` + `tsc --noEmit`) and a production build.
+- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, installs the Noto fonts, checks that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption draws text, runs real clip renders end-to-end through the API and real captioned 9:16 renders verified on frame pixels (`REQUIRE_LIBASS=1`), renders the deepest allowed smart-crop path on the runner's FFmpeg (`scripts/smart_crop_probe.py`), refuses tracked model weights or media, runs a full Alembic up/down cycle, and finishes with a real worker smoke (`ping` round-trip and registration of the transcription, clip detection, clip rendering, short-form edit and smart-reframe tasks). Face detection is tested against a fake ONNX session; real YuNet inference is an opt-in local test (`PEAKSIFT_REAL_DETECTOR=1`), so CI never downloads a model.
 
 ## Planned (later milestones)
 
@@ -197,7 +228,7 @@ Timestamps are timezone-aware. Project `status` is currently always `created`. V
 Backend ──▶ Object storage (source videos, generated clips, edited shorts)
 ```
 
-No milestone after V0.6 has been defined. Possible later work — creator intelligence and metadata, publishing, asset libraries, object storage replacing `MEDIA_ROOT` when deployment requires it — is not committed scope, and none of it exists yet.
+No milestone after V0.7 has been defined. Possible later work — creator intelligence and metadata, publishing, asset libraries, object storage replacing `MEDIA_ROOT` when deployment requires it — is not committed scope, and none of it exists yet.
 
 ## Localization
 
