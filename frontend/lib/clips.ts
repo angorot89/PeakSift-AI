@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, postJson } from "@/lib/api";
+import { API_URL, ApiError, apiFetch, postJson } from "@/lib/api";
 
 export type ClipStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
 
@@ -80,3 +80,9 @@ export function listVideoClips(projectId: string, videoId: string, limit = 100, 
   const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   return apiFetch<ClipPage>(`/projects/${projectId}/videos/${videoId}/clips?${params}`);
 }
+
+/** Owner-only, Range-capable stream for <video> (the session cookie goes along, same-site). */
+export const clipContentUrl = (clipId: string) => `${API_URL}/clips/${clipId}/content`;
+
+/** Same bytes as an attachment with a safe server-chosen filename. */
+export const clipDownloadUrl = (clipId: string) => `${API_URL}/clips/${clipId}/download`;

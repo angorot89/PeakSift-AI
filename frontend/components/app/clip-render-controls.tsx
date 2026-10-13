@@ -3,8 +3,11 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
+  clipContentUrl,
+  clipDownloadUrl,
   clipStageLabel,
   generateClip,
   getClip,
@@ -13,6 +16,7 @@ import {
   type GeneratedClip,
 } from "@/lib/clips";
 import type { ClipCandidate } from "@/lib/clip-detection";
+import { formatBytes, formatDuration } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -169,11 +173,7 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
       </div>
     );
   } else {
-    body = (
-      <p className="text-sm text-emerald-300" role="status">
-        Clip ready
-      </p>
-    );
+    body = <RenderedClip clip={clip} />;
   }
 
   return (
@@ -184,6 +184,42 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
           {error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** The actual generated output: native player on the private stream + Download MP4. */
+export function RenderedClip({ clip }: { clip: GeneratedClip }) {
+  const facts = [
+    formatDuration(clip.duration_seconds),
+    clip.width && clip.height ? `${clip.width} × ${clip.height}` : null,
+    clip.file_size != null ? formatBytes(clip.file_size) : null,
+  ].filter(Boolean);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+        <p className="text-sm font-medium text-foreground">
+          Rendered clip <span className="font-normal text-emerald-300">· Ready</span>
+        </p>
+        <p className="text-xs text-muted">{facts.join(" · ")}</p>
+      </div>
+      {/* Same pattern as the source preview: the browser sends the HttpOnly session cookie
+          (same-site) and the API checks ownership on every byte-range request. */}
+      <video
+        controls
+        preload="metadata"
+        src={clipContentUrl(clip.id)}
+        className="aspect-video w-full rounded-lg bg-black object-contain"
+        aria-label={`Rendered clip: ${clip.title}`}
+      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-muted">
+          MP4 · H.264{clip.audio_codec ? " + AAC" : " · no audio"} · original aspect ratio
+        </p>
+        <a href={clipDownloadUrl(clip.id)} className={buttonClasses("primary", "md")} download>
+          Download MP4
+        </a>
+      </div>
     </div>
   );
 }
