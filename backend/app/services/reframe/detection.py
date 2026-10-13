@@ -22,6 +22,7 @@ import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 from app.core.config import Settings
@@ -164,6 +165,23 @@ def _registry() -> dict[str, ProviderFactory]:
     from app.services.reframe.yunet import YuNetFaceDetector
 
     return {YuNetFaceDetector.name: YuNetFaceDetector.from_settings}
+
+
+def detector_available(settings: Settings) -> bool:
+    """Whether the configured detector could run here (known name, verified model file).
+
+    Cheap and load-free — the API uses it to refuse an analysis up front instead of letting it
+    fail in the worker. It never loads a model or the inference runtime.
+    """
+    if settings.reframe_detector not in _registry():
+        return False
+    from app.services.reframe.yunet import verify_model
+
+    try:
+        verify_model(Path(settings.reframe_model_path))
+    except DetectorUnavailable:
+        return False
+    return True
 
 
 def get_detector(settings: Settings) -> SubjectDetectionProvider:
