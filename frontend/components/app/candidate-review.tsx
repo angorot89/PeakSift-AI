@@ -4,7 +4,6 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { ClipRenderControls } from "@/components/app/clip-render-controls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
-import { buttonClasses } from "@/components/ui/button-styles";
 import { FormError } from "@/components/ui/form-error";
 import { errorMessage } from "@/lib/api";
 import {
@@ -15,8 +14,8 @@ import {
   type ClipCandidate,
   type DetectionRun,
 } from "@/lib/clip-detection";
-import { clipDownloadUrl, clipStageLabel, listVideoClips, type GeneratedClip } from "@/lib/clips";
-import { formatBytes, formatDuration, formatTimestamp } from "@/lib/format";
+import type { GeneratedClip } from "@/lib/clips";
+import { formatDuration, formatTimestamp } from "@/lib/format";
 import { videoContentUrl } from "@/lib/videos";
 
 type Filter = "all" | CandidateDecision;
@@ -238,10 +237,19 @@ function CandidateCard({
   );
 }
 
-type Props = { projectId: string; videoId: string; run: DetectionRun };
+type Props = {
+  projectId: string;
+  videoId: string;
+  run: DetectionRun;
+  /** candidate_id → generated clip, owned by the workspace (null while loading). */
+  clips: Map<string, GeneratedClip> | null;
+  /** False when the listing failed: each card then fetches its own clip state. */
+  clipsKnown: boolean;
+  onClipChange: (clip: GeneratedClip) => void;
+};
 
 /** Ranked candidates of a completed run: filter, page, preview, save/dismiss. */
-export function CandidateReview({ projectId, videoId, run }: Props) {
+export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, onClipChange }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [candidates, setCandidates] = useState<ClipCandidate[]>([]);
   const [total, setTotal] = useState(0);
@@ -250,10 +258,6 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  // candidate_id → clip, loaded once so render state survives refresh and re-login.
-  const [clips, setClips] = useState<Map<string, GeneratedClip> | null>(null);
-  // False when the listing failed: each card then fetches its own clip state.
-  const [clipsKnown, setClipsKnown] = useState(false);
 
   const decision = filter === "all" ? undefined : filter;
 
@@ -296,26 +300,6 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
       cancelled = true;
     };
   }, [projectId, videoId, run.id, decision]);
-
-  useEffect(() => {
-    let cancelled = false;
-    listVideoClips(projectId, videoId)
-      .then((page) => {
-        if (cancelled) return;
-        setClips(new Map(page.clips.map((clip) => [clip.candidate_id, clip])));
-        setClipsKnown(true);
-      })
-      .catch(() => {
-        if (!cancelled) setClips(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, videoId]);
-
-  const rememberClip = useCallback((clip: GeneratedClip) => {
-    setClips((previous) => new Map(previous ?? []).set(clip.candidate_id, clip));
-  }, []);
 
   async function decide(candidate: ClipCandidate, action: "save" | "dismiss" | "reset") {
     setBusyId(candidate.id);
@@ -396,7 +380,7 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
                   runId={run.id}
                   candidate={candidate}
                   initialClip={clipsKnown ? (clips.get(candidate.id) ?? null) : undefined}
-                  onChange={rememberClip}
+                  onChange={onClipChange}
                 />
               }
             />
@@ -418,53 +402,10 @@ export function CandidateReview({ projectId, videoId, run }: Props) {
 
       <FormError>{actionError}</FormError>
 
-      {clips && clips.size > 0 ? <GeneratedClips clips={[...clips.values()]} /> : null}
       <p className="text-xs text-muted">
         Scores are the model&apos;s editorial judgement on a 0–100 scale, normalised across
         providers. They are not predictions of views or engagement.
       </p>
     </div>
-  );
-}
-
-/** Every clip generated for this video (any run), newest first — a simple persisted view. */
-function GeneratedClips({ clips }: { clips: GeneratedClip[] }) {
-  const ordered = [...clips].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return (
-    <section aria-labelledby="generated-clips-heading" className="space-y-2 pt-2">
-      <h4 id="generated-clips-heading" className="text-sm font-medium text-foreground">
-        Generated clips ({ordered.length})
-      </h4>
-      <ul className="divide-y divide-border rounded-xl border border-border">
-        {ordered.map((clip) => (
-          <li
-            key={clip.id}
-            className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium break-words text-foreground">{clip.title}</p>
-              <p className="font-mono text-xs text-muted">
-                {formatTimestamp(clip.start_time)} – {formatTimestamp(clip.end_time)} ·{" "}
-                {formatDuration(clip.duration_seconds)}
-                {clip.width && clip.height ? ` · ${clip.width}×${clip.height}` : ""}
-                {clip.file_size != null ? ` · ${formatBytes(clip.file_size)}` : ""}
-              </p>
-            </div>
-            {clip.status === "ready" ? (
-              <a
-                href={clipDownloadUrl(clip.id)}
-                className={buttonClasses("secondary", "md", "shrink-0")}
-                download
-                aria-label={`Download ${clip.title} as MP4`}
-              >
-                Download
-              </a>
-            ) : (
-              <span className="shrink-0 text-xs text-muted">{clipStageLabel(clip)}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

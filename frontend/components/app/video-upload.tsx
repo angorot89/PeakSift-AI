@@ -1,6 +1,8 @@
 "use client";
 
+import { UploadCloud } from "lucide-react";
 import { useId, useState, type ChangeEvent, type DragEvent } from "react";
+import { WorkingState } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { errorMessage } from "@/lib/api";
@@ -85,8 +87,8 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-6 py-10 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
-          dragging ? "border-accent bg-accent/5" : "border-white/15 hover:border-white/30"
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+          dragging ? "border-accent bg-accent/5" : "border-border-strong hover:border-white/30 hover:bg-surface-2/50"
         } ${busy ? "pointer-events-none opacity-60" : ""}`}
       >
         <input
@@ -98,8 +100,11 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
           className="sr-only"
           aria-describedby={`${inputId}-hint`}
         />
+        <span className="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-3 text-accent-soft">
+          <UploadCloud aria-hidden="true" className="size-5" />
+        </span>
         <span className="font-medium text-foreground">
-          Drag and drop a video here, or <span className="text-accent-soft underline">browse</span>
+          Drop a video here, or <span className="text-accent-soft underline underline-offset-2">browse</span>
         </span>
         <span id={`${inputId}-hint`} className="text-sm text-muted">
           {ACCEPTED_LABEL}. One long-form source video per project for now.
@@ -107,7 +112,7 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
       </label>
 
       {file ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="font-medium break-all text-foreground">{file.name}</p>
             <p className="text-sm text-muted">{formatBytes(file.size)}</p>
@@ -124,31 +129,11 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
       ) : null}
 
       {phase === "uploading" ? (
-        <div className="space-y-2">
-          <div
-            role="progressbar"
-            aria-label="Upload progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progress}
-            className="h-2 overflow-hidden rounded-full bg-white/10"
-          >
-            <div className="h-full bg-accent transition-[width]" style={{ width: `${progress}%` }} />
-          </div>
-          <p className="text-sm text-muted" aria-live="polite">
-            Uploading… {progress}%
-          </p>
-        </div>
+        <WorkingState label="Uploading video" progress={progress} progressLabel="Upload progress" />
       ) : null}
 
       {phase === "processing" ? (
-        <p className="flex items-center gap-3 text-sm text-muted" role="status">
-          <span
-            aria-hidden="true"
-            className="size-4 animate-spin rounded-full border-2 border-white/15 border-t-accent"
-          />
-          Upload complete. Reading video metadata…
-        </p>
+        <WorkingState label="Reading video metadata" detail="Upload complete. Checking that the file is readable video." />
       ) : null}
 
       <FormError>{error}</FormError>

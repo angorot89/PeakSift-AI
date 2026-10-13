@@ -39,7 +39,7 @@ export function Panel({ id, step, title, description, status, actions, children,
           </div>
         </div>
         {status || actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className={`flex shrink-0 flex-wrap items-center gap-2 ${step ? "pl-9 sm:pl-0" : ""}`}>
             {status}
             {actions}
           </div>
