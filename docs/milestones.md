@@ -92,6 +92,25 @@ Delivered:
 
 Definition of done — a user can open a generated clip → choose a layout → configure captions → Render short → watch queued/rendering/validating → preview the 9:16 MP4 → download it → render a second variant with other settings → log out and back in with every variant still there → recover from a render failure with retry, with the original clip unchanged.
 
+## Milestone 7 — Smart Reframing V0.7 *(complete)*
+
+PeakSift detects and tracks visible faces to generate a smooth vertical crop path, with centre and manual fallbacks.
+
+Delivered:
+
+- `reframe_analyses` / `reframe_keyframes` tables: one analysis per clip and server configuration (versioned snapshot + fingerprint), status `queued → sampling → detecting → tracking → planning → completed | failed`, statistics and confidence level, ordered keyframes in normalized display-oriented coordinates with crop-inside-frame constraints
+- Frame sampling through one FFmpeg pipe (`fps=N:round=up`, scaled, rotation applied; no temporary files; watchdog timeout)
+- Detector contract (faces found / no face / detector broken are distinct) and a local face detector: OpenCV Zoo YuNet (MIT weights) on onnxruntime (already a dependency), lazy, sha256-pinned model installed by an operator script — never downloaded automatically or committed. MediaPipe was evaluated first and not chosen (no bundled model, heavy dependencies, 128 × 128 short-range model); see [smart-reframing.md](smart-reframing.md)
+- Deterministic tracking: association with gap interpolation and decaying holds, subject selection by size/persistence/confidence/centrality with switch hysteresis, hand-offs at shot changes
+- Crop path planning: fixed 9:16 crop, dead zone, face margins, two-face group framing, look-ahead, exponential smoothing, pan-speed limit, centre fallback, camera cuts at hand-offs, keyframe simplification, documented confidence levels
+- Background analysis on the existing worker (`peaksift.analyze_reframe`): attempt-token fencing, heartbeats and stale detection, one-transaction finalize, safe failure codes, bounded retry
+- API: start (idempotent), list, current, status, crop path, retry — owner-scoped
+- Rendering: `smart_reframe` edit layout — a time-varying FFmpeg crop compiled into a balanced expression tree (≤ 1000 segments), then 1080 × 1920 and captions fixed on screen; analysis reused across caption changes. `manual_crop` layout with a validated focal point
+- Editor: Smart reframe layout with the analysis panel (real stages and progress, plain-language confidence, retry), path-driven live preview, keyboard-accessible focal-point picker; reviewed at 1440, 1024, 768 and 375 px
+- Hardening (shot-change cuts, failure vs no-face copy, path-free messages, symlink containment, 4K/60 fps sampling), CI (smart-crop render probe, weights guard, Alembic cycle, type check) and documentation ([smart-reframing.md](smart-reframing.md))
+
+Definition of done — a user can open a generated clip → select Smart reframe → analyze framing → watch real progress → see a confidence summary → preview the moving crop → render a 9:16 short with captions that follows the visible face → download it → fall back to a manual focal point when tracking is weak → recover from a failed analysis with retry.
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -100,6 +119,7 @@ Definition of done — a user can open a generated clip → choose a layout → 
 - V0.4 AI Clip Detection — COMPLETE
 - V0.5 Clip Generation — COMPLETE
 - V0.6 Short-form Editing — COMPLETE
+- V0.7 Smart Reframing — COMPLETE
 
 No later milestone has been defined or started.
 

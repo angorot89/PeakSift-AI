@@ -8,6 +8,8 @@ When a clip is ready, its owner picks a **layout** and **caption** options and c
 
 Each combination of settings is a separate **edit variant** of the same clip. The V0.5 clip file is the read-only source. It is never modified, replaced or deleted by editing.
 
+> **V0.7 update.** Milestone 7 added two framing layouts on top of this pipeline: **Smart reframe** (`smart_reframe`, a crop that follows tracked faces) and **Manual crop** (`manual_crop`, a fixed crop around a chosen focal point). They are described in [smart-reframing.md](smart-reframing.md); everything else on this page applies to them unchanged.
+
 V0.6 does **not** include:
 
 - AI subject or face tracking, or dynamic or automatic reframing.
@@ -48,6 +50,8 @@ Every layout keeps the source's aspect ratio. Nothing is stretched. Rotation met
 | `center_crop` (**Center crop**) | The source is scaled until it fills 1080 × 1920, then the centre is cropped. On a landscape source the sides are cut off. |
 | `blur_background` (**Blur background**, the default) | The whole source frame is scaled to fit the width and centred. Behind it is a blurred, frame-filling copy of the same video, blurred at quarter resolution with `gblur=sigma=12`. Nothing is cropped from the foreground. |
 | `fit` | The whole source frame on a plain dark background (`#111113`). |
+| `smart_reframe` (**Smart reframe**, V0.7) | A fixed-size 9:16 crop whose position follows a completed face-tracking crop path, scaled to 1080 × 1920; captions are drawn after the crop, so they stay fixed on screen. Requires `reframe_analysis_id`. See [smart-reframing.md](smart-reframing.md). |
+| `manual_crop` (**Manual crop**, V0.7) | A fixed 9:16 crop centred on `focus_x`/`focus_y` (0–1, clamped inside the frame). |
 
 Filtergraphs are built only from constants, chosen by the validated layout enum. No request value or transcript text ever reaches a filtergraph.
 
@@ -176,6 +180,7 @@ Request body:
 - `captions_enabled` must be a real boolean.
 - Style and position default to `bold` / `bottom` when captions are on, and are dropped when captions are off.
 - Unknown fields, filter strings, font names, paths and URLs are rejected.
+- V0.7: `smart_reframe` also needs `reframe_analysis_id` (a completed analysis of this clip, otherwise `409`); `manual_crop` needs `focus_x` and `focus_y` (finite, 0–1, rounded to 3 decimals). Other layouts refuse both.
 
 An edit has these fields: `id`, `clip_id`, `video_id`, `status`, `progress_percent`, `attempt`, `is_stale`, `configuration`, `aspect_ratio`, `layout`, `captions_enabled`, `caption_style`, `caption_position`, `output_width`, `output_height`, `render_profile`, `caption_cue_count`, `duration_seconds`, `width`, `height`, `fps`, `file_size`, `video_codec`, `audio_codec`, `error_code`, `error_message`, `created_at`, `started_at` and `completed_at`.
 
@@ -251,7 +256,7 @@ All tests use tiny sources generated with FFmpeg at test time, and nothing is co
 
 ## Known limitations (V0.6)
 
-- **Framing.** Crops are always centred. There is no subject or face tracking, AI or dynamic reframing, or manual crop position. Only 9:16 at 1080 × 1920 is offered.
+- **Framing.** In V0.6 crops were always centred; V0.7 adds face-following and manual focal-point crops ([smart-reframing.md](smart-reframing.md)). Only 9:16 at 1080 × 1920 is offered.
 - **Captions.** Captions are phrase-level, built from segment timestamps with proportional word timing. There are no word-by-word captions, highlighting or animation.
 - **Fixed options.** There are three fixed presets, three positions and one font family. Custom fonts, brand kits and watermarks are not supported.
 - **Scripts.** Emoji are not shown in captions. Other scripts depend on installed fallback fonts. Arabic shaping was verified visually on samples only.

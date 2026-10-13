@@ -6,7 +6,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 ## Current status
 
-**Milestones 1–6 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6). What exists today:
+**Milestones 1–7 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7). What exists today:
 
 - A landing page.
 - Email/password accounts: register, log in, log out, with an HttpOnly session cookie.
@@ -18,9 +18,10 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 - **AI clip detection**: on a transcribed video, pick an AI provider and model (local Ollama or hosted OpenAI, from server allow-lists) and start a background run. The transcript is analysed in bounded windows, every proposal is validated against the transcript, deduplicated and ranked, and the project page shows candidate cards — title, time range, duration, a 0–100 editorial score with its breakdown, hook, rationale, transcript excerpt — with an in-page preview of that range of the original video and save/dismiss decisions. Details: [docs/clip-detection.md](docs/clip-detection.md).
 - **Clip generation**: **Generate clip** on a candidate renders exactly its validated time range from the original upload into a private MP4 (H.264 + AAC, fast-start, original aspect ratio and orientation) in the background worker with FFmpeg, validates it with ffprobe, then shows the rendered clip in the page with **Download MP4**. Real render states, failure messages and retry; clips persist across sessions. Details: [docs/clip-generation.md](docs/clip-generation.md).
 - **Short-form editing**: from a ready clip, the **short-form editor** renders it as a 9:16 short (1080 × 1920) in the background worker — **Center crop**, **Blur background** or **Fit** — with optional captions burned in from the transcript (Bold / Clean / Creator presets; top, center or bottom). Each settings combination is a separate version with its own status, 9:16 player and **Download short**; the V0.5 clip is never modified.
+- **Smart reframing**: PeakSift detects and tracks visible faces to generate a smooth vertical crop path, with centre and manual fallbacks. In the editor, **Smart reframe** → **Analyze framing** runs a background analysis (frames sampled with FFmpeg → a local face detector → tracking → a crop path with a dead zone, smoothing and a pan-speed limit), shows real progress and a plain-language confidence summary, previews the moving crop in the 9:16 stage, and renders it with captions fixed on screen. When no face is clear the crop stays centred, and **Focal point** pins a fixed crop where you choose. Details: [docs/smart-reframing.md](docs/smart-reframing.md).
 - **Product design**: a shared design system (surface and status tokens, one button shape, panels, status pills, alerts, empty states, skeletons, progress), a project page organised as a workflow stepper plus numbered sections (Source video, Transcript, Clip moments, Generated clips), ranked candidate cards that lead with rank, title, score and hook, and context-specific empty, working and error states. Details: [docs/short-form-editing.md](docs/short-form-editing.md).
-- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`) managed with Alembic migrations.
-- Automated tests (950 backend tests in CI), linting and CI with PostgreSQL, Redis and FFmpeg (including real clip and captioned short renders).
+- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`, `reframe_analyses`, `reframe_keyframes`) managed with Alembic migrations.
+- Automated tests (1177 backend tests in CI), linting, type checks and CI with PostgreSQL, Redis and FFmpeg (including real clip, captioned short and moving-crop renders).
 
 **Not built yet** (see [docs/milestones.md](docs/milestones.md)):
 
@@ -29,7 +30,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 | Creator intelligence & metadata, publishing                          | later     |
 | Asset libraries, Morocco Mode                                        | later     |
 
-The dashboard's Videos and Clips cards do not show counts yet. Shorts use centred framing and phrase-level captions — no subject tracking, word-level captions, timeline editor, music or publishing (see [Known limitations](#known-limitations)).
+The dashboard's Videos and Clips cards do not show counts yet. Smart reframing follows visible faces only — no speaker identification, object tracking, zoom or split screen — and captions are phrase-level; there is no timeline editor, music or publishing (see [Known limitations](#known-limitations)).
 
 ## Architecture (as built)
 
@@ -41,12 +42,13 @@ Browser ──▶ Next.js frontend (:3000) ──fetch, cookie──▶ FastAPI 
                                                               └──▶ Redis ──▶ Celery worker ──▶ transcription: ffmpeg → chunks → faster-whisper | OpenAI
                                                                                            ├─▶ clip detection: transcript windows → Ollama | OpenAI → validate → rank
                                                                                            ├─▶ clip rendering: ffmpeg (libx264/aac) → ffprobe → MEDIA_ROOT/clips/
-                                                                                           └─▶ short-form edits: transcript → ASS captions → ffmpeg (9:16 layout + libass) → ffprobe → MEDIA_ROOT/edits/
+                                                                                           ├─▶ short-form edits: transcript → ASS captions → ffmpeg (9:16 layout | moving crop + libass) → ffprobe → MEDIA_ROOT/edits/
+                                                                                           └─▶ smart reframe: ffmpeg frames → YuNet faces → tracks → crop path → reframe_keyframes
 ```
 
 - **Frontend** — Next.js App Router, TypeScript, Tailwind CSS. Talks to the API with `credentials: "include"`; asks `GET /auth/me` to learn who is signed in. No tokens in browser storage.
 - **Backend** — FastAPI, SQLAlchemy 2 (sync), Alembic, psycopg 3. Argon2id password hashing; HS256 JWT delivered in an HttpOnly `SameSite=Lax` cookie; CORS limited to the frontend origin. Uploads are streamed to local storage and probed with ffprobe synchronously; transcription and clip detection run in a Celery worker over Redis, with the database as the source of truth for job state.
-- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits` tables, UUID keys, timezone-aware timestamps.
+- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`, `reframe_analyses`, `reframe_keyframes` tables, UUID keys, timezone-aware timestamps.
 
 Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
 
@@ -92,7 +94,15 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 The default speech-to-text provider is faster-whisper on CPU (`FASTER_WHISPER_MODEL=small`, `int8`); the model (~460 MB) is downloaded on the first transcription, never at startup. On macOS, CPU mode is the supported path — there is no Apple-GPU acceleration in this stack. Set `FASTER_WHISPER_MODEL=tiny` to try the mechanics quickly, or `TRANSCRIPTION_PROVIDER=openai` with `OPENAI_API_KEY` for the hosted provider.
 
-The same worker runs clip detection, clip rendering and short-form edits (CPU `libx264`; your FFmpeg must include the `libx264` and `aac` encoders, and libass for captions — Ubuntu's `ffmpeg` and Homebrew's `ffmpeg-full` do). For the local AI provider, start Ollama (`ollama serve`) and pull a model from `OLLAMA_CLIP_MODELS` (default `llama3.2:3b`); the worker never pulls or loads a model itself.
+The same worker runs clip detection, clip rendering, short-form edits and smart-reframing analyses (CPU `libx264`; your FFmpeg must include the `libx264` and `aac` encoders, and libass for captions — Ubuntu's `ffmpeg` and Homebrew's `ffmpeg-full` do). For the local AI provider, start Ollama (`ollama serve`) and pull a model from `OLLAMA_CLIP_MODELS` (default `llama3.2:3b`); the worker never pulls or loads a model itself.
+
+For smart reframing, install the face detector model once (MIT-licensed OpenCV Zoo YuNet, pinned sha256, git-ignored; PeakSift never downloads it by itself):
+
+```bash
+cd backend && python scripts/fetch_reframe_model.py
+```
+
+Without it, **Analyze framing** answers "Smart framing is not available on this server"; manual focal-point crops still work.
 
 ### 4. Frontend
 
@@ -109,10 +119,11 @@ Open **http://localhost:3000** (not `127.0.0.1`) so the auth cookie, CORS origin
 ```bash
 cd backend && ruff check . && ruff format --check . && pytest
 cd backend && python scripts/celery_smoke.py      # real worker round-trip over Redis + task registration
+cd backend && python scripts/smart_crop_probe.py  # this FFmpeg renders the deepest allowed smart-crop path
 cd frontend && npm run lint && npm run build
 ```
 
-Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_test`), a temporary media directory and Celery eager mode; they never touch your development data, never download a speech model (inference is mocked), never call OpenAI and never need Ollama (the provider is tested against a mocked transport and an in-process fake server). Media fixtures are generated with `ffmpeg` at test time; ffmpeg- and Redis-dependent tests skip when those are missing locally and are mandatory in CI. Opt-in real-model checks: `PEAKSIFT_REAL_WHISPER=1` and `PEAKSIFT_REAL_OLLAMA=1`.
+Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_test`), a temporary media directory and Celery eager mode; they never touch your development data, never download a speech model (inference is mocked), never call OpenAI and never need Ollama (the provider is tested against a mocked transport and an in-process fake server). Media fixtures are generated with `ffmpeg` at test time; ffmpeg- and Redis-dependent tests skip when those are missing locally and are mandatory in CI. Face detection is tested against a fake ONNX session. Opt-in real-model checks: `PEAKSIFT_REAL_WHISPER=1`, `PEAKSIFT_REAL_OLLAMA=1` and `PEAKSIFT_REAL_DETECTOR=1` (with `REFRAME_TEST_FACE_IMAGE`).
 
 ## Upload flow
 
@@ -173,11 +184,19 @@ Full reference: [docs/clip-generation.md](docs/clip-generation.md).
 
 Full reference: [docs/short-form-editing.md](docs/short-form-editing.md).
 
+## Smart reframing flow
+
+1. In the editor, choose **Smart reframe** and click **Analyze framing**. The API records an analysis for the clip and the server's configuration (repeat clicks return the same one) and queues it.
+2. The worker samples frames from the clip through an FFmpeg pipe (2 per second, downscaled, rotation applied), finds faces with a local YuNet detector, links them into tracks, chooses the subject to follow (most prominent and persistent face, with hysteresis; a close pair is framed together), and plans a fixed-size 9:16 crop path: a dead zone against jitter, face margins, look-ahead, smoothing, a pan-speed limit, a camera cut at obvious shot changes, and centre fallback when nobody is visible. The keyframes, statistics and `completed` are written in one transaction.
+3. The panel shows *Reading frames → Finding faces → Following the subject → Planning the camera path* with real progress, then a plain-language summary (**Strong tracking**, **Some center fallback** or **Manual framing recommended**). The stage previews the moving crop. **Render short** renders it as a time-varying FFmpeg crop with captions fixed on screen; changing captions reuses the analysis. **Focal point** offers a fixed manual crop instead.
+
+A detector that is missing or crashes fails the analysis with a clear message; it is never reported as "no faces". Full reference: [docs/smart-reframing.md](docs/smart-reframing.md).
+
 ## Security model (high level)
 
 - Every project, video, detection-run, candidate, clip and edit endpoint is scoped to the signed-in owner; anything else is a `404`.
 - Rendered clips and shorts are private: preview and download go through owner-checked endpoints; candidate titles only influence the sanitised download name, never a storage path.
-- Edit options are allow-listed enums; users never submit filters, fonts, paths or ASS syntax. Transcript text is untrusted: it is escaped for ASS (no override tags or line commands can form) and never reaches a shell, a filtergraph or a path.
+- Edit options are allow-listed enums (plus a validated analysis id or focal point); users never submit filters, fonts, paths or ASS syntax. Smart-reframing tuning, the detector and its model file are server configuration; stored crop paths are re-validated before they reach FFmpeg, as numbers only. Transcript text is untrusted: it is escaped for ASS (no override tags or line commands can form) and never reaches a shell, a filtergraph or a path.
 - Users choose an AI provider and model only from server allow-lists; the Ollama endpoint and the OpenAI key are server configuration and never appear in responses, errors or the frontend. Model output is validated and bounded before anything is stored.
 - Browser-supplied filenames are metadata only. Files are stored under application-generated UUID keys, and the single path-resolution function refuses anything outside `MEDIA_ROOT`.
 - Uploads are validated in layers (extension, MIME plausibility, size during streaming, then ffprobe proving the bytes are readable media). Oversized, empty or unreadable uploads leave no stray files.
@@ -198,17 +217,18 @@ Full reference: [docs/short-form-editing.md](docs/short-form-editing.md).
 - Transcription quality has only been sanity-checked on synthesised English speech; no Darija/Moroccan benchmarking has been done.
 - Clip detection analyses windows sequentially and cuts them on time/character budgets, not topics; snapping is line-granular; deduplication is temporal only; small local models yield fewer usable candidates. The hosted provider sends transcript text to OpenAI.
 - Generated clips keep the original aspect ratio; vertical output comes from short-form edits. Rendering is CPU-only with fixed MP4/H.264/AAC profiles and stage (not frame) progress; there is no clip or edit deletion, retention or render cancellation, and no publishing integrations.
-- Short-form edits: centred crops only (no subject/face tracking, AI or dynamic reframing, manual crop position); phrase-level captions with approximate word timing (no word-by-word captions, highlighting or animation); three fixed caption presets and positions, one font family; emoji are left out of captions; Arabic shaping was verified visually on samples only. No timeline, trimming, music, sound effects, B-roll or publishing.
+- Smart reframing is face-first: no speaker identification or active-speaker/audio mapping, no face recognition, no tracking of bodies, pets or objects, no dynamic zoom, no split screen and no keyframe timeline. Shot changes are inferred from one face vanishing as another appears, not from scene analysis; very small, occluded or profile faces may be missed (centre fallback). Analysis is CPU-only.
+- Short-form edits: phrase-level captions with approximate word timing (no word-by-word captions, highlighting or animation); three fixed caption presets and positions, one font family; emoji are left out of captions; Arabic shaping was verified visually on samples only. No timeline, trimming, music, sound effects, B-roll or publishing.
 
 ## Routes
 
 **Frontend:** `/`, `/login`, `/register`, `/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`, `/projects/[id]/clips/[clipId]` (short-form editor)
 
-**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` · `GET /clip-detection/providers` · `POST /projects/{id}/videos/{video_id}/clip-detection` · `GET …/clip-detection` · `GET …/clip-detection/{run_id}` · `POST …/clip-detection/{run_id}/retry` · `GET …/clip-detection/{run_id}/candidates` · `GET …/candidates/{candidate_id}` · `POST …/candidates/{candidate_id}/save|dismiss|reset` · `POST …/candidates/{candidate_id}/clip` · `GET …/candidates/{candidate_id}/clip` · `POST …/candidates/{candidate_id}/clip/retry` · `GET /projects/{id}/videos/{video_id}/clips` · `GET /clips/{clip_id}/content` · `GET /clips/{clip_id}/download` · `POST /projects/{id}/videos/{video_id}/clips/{clip_id}/edits` · `GET …/edits` · `GET …/edits/{edit_id}` · `POST …/edits/{edit_id}/retry` · `GET /edits/{edit_id}/content` · `GET /edits/{edit_id}/download` — see [backend/README.md](backend/README.md#api).
+**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` · `GET /clip-detection/providers` · `POST /projects/{id}/videos/{video_id}/clip-detection` · `GET …/clip-detection` · `GET …/clip-detection/{run_id}` · `POST …/clip-detection/{run_id}/retry` · `GET …/clip-detection/{run_id}/candidates` · `GET …/candidates/{candidate_id}` · `POST …/candidates/{candidate_id}/save|dismiss|reset` · `POST …/candidates/{candidate_id}/clip` · `GET …/candidates/{candidate_id}/clip` · `POST …/candidates/{candidate_id}/clip/retry` · `GET /projects/{id}/videos/{video_id}/clips` · `GET /clips/{clip_id}/content` · `GET /clips/{clip_id}/download` · `POST /projects/{id}/videos/{video_id}/clips/{clip_id}/edits` · `GET …/edits` · `GET …/edits/{edit_id}` · `POST …/edits/{edit_id}/retry` · `GET /edits/{edit_id}/content` · `GET /edits/{edit_id}/download` · `POST …/clips/{clip_id}/reframe` · `GET …/reframe` · `GET …/reframe/current` · `GET …/reframe/{analysis_id}` · `GET …/reframe/{analysis_id}/path` · `POST …/reframe/{analysis_id}/retry` — see [backend/README.md](backend/README.md#api).
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download, and real 9:16 short renders with burned-in captions checked against actual frame pixels — after installing the Noto fonts and checking that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption really draws text (`REQUIRE_LIBASS=1`: caption tests cannot skip), and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection, clip rendering and short-form edit tasks are registered, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint, a type check and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download, real 9:16 short renders with burned-in captions checked against actual frame pixels, the whole smart-reframing stack (sampling with real FFmpeg, tracking, path planning, the analysis job and API, and a moving-crop render verified frame by frame against a synthetic moving marker) — after installing the Noto fonts and checking that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption really draws text (`REQUIRE_LIBASS=1`: caption tests cannot skip), a render of the deepest allowed smart-crop path on the runner's FFmpeg (`scripts/smart_crop_probe.py`), a guard against tracked model weights or media, and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection, clip rendering, short-form edit and smart-reframe tasks are registered, stop). The face detector is tested against a fake ONNX session, so CI never downloads a model. Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
@@ -224,7 +244,7 @@ PeakSift will ship a **Global** experience available to everyone.
 PeakSift-AI/
 ├── frontend/             # Next.js app — see frontend/README.md
 ├── backend/              # FastAPI service — see backend/README.md
-├── docs/                 # Architecture, milestones, clip detection, clip generation and short-form editing references
+├── docs/                 # Architecture, milestones, clip detection, clip generation, short-form editing and smart reframing references
 ├── docker/               # PostgreSQL init script for Docker Compose
 ├── docker-compose.yml    # Local PostgreSQL
 └── .github/workflows/    # CI

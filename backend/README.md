@@ -127,14 +127,27 @@ Short-form edits (9:16 variants of a ready clip):
 
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
-| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit", "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator", "caption_position": "top" \| "center" \| "bottom"}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
+| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator", "caption_position": "top" \| "center" \| "bottom"}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
 | GET    | `…/clips/{clip_id}/edits` | yes | The clip's variants, newest first (`offset`, `limit` 1–50). |
 | GET    | `…/clips/{clip_id}/edits/{edit_id}` | yes | Edit state: `status`, stage `progress_percent`, `attempt`, `is_stale`, the configuration, output metadata and `caption_cue_count` once ready, safe `error_code`/`error_message`. A `ready` edit whose file is missing is reported as `failed`/`artifact_missing`. |
 | POST   | `…/edits/{edit_id}/retry` | yes | Re-queue a failed or stale edit on the same row (row-locked; `409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
 | GET    | `/edits/{edit_id}/content` | yes | The short inline for `<video>`, Range-capable (`206`/`416`), `private, no-store`; `404` unless yours and ready. |
 | GET    | `/edits/{edit_id}/download` | yes | Attachment named `<title-slug>-vertical-<short-id>.mp4`. |
 
-An edit is `{id, clip_id, video_id, status, progress_percent, attempt, is_stale, configuration, aspect_ratio, layout, captions_enabled, caption_style, caption_position, output_width, output_height, render_profile, caption_cue_count, duration_seconds, width, height, fps, file_size, video_codec, audio_codec, error_code, error_message, created_at, started_at, completed_at}` — never storage keys, paths, task ids, caption files or FFmpeg commands.
+An edit is `{id, clip_id, video_id, status, progress_percent, attempt, is_stale, configuration, aspect_ratio, layout, captions_enabled, caption_style, caption_position, reframe_analysis_id, focus_x, focus_y, output_width, output_height, render_profile, caption_cue_count, duration_seconds, width, height, fps, file_size, video_codec, audio_codec, error_code, error_message, created_at, started_at, completed_at}` — never storage keys, paths, task ids, caption files or FFmpeg commands.
+
+Smart reframing (face-tracking crop paths for a ready clip; see [docs/smart-reframing.md](../docs/smart-reframing.md)):
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| POST   | `…/clips/{clip_id}/reframe` | yes | Analyse the clip with the server's configuration. `201` new analysis; `200` with the existing one for the same configuration; `409` if the clip is not ready or its file is missing, smart framing is not installed on the server, or the last analysis failed (use retry); `503` if the queue is unreachable (no row is left). |
+| GET    | `…/clips/{clip_id}/reframe` | yes | The clip's analyses, newest first. |
+| GET    | `…/clips/{clip_id}/reframe/current` | yes | The analysis for the current configuration; `404` before the first one. |
+| GET    | `…/clips/{clip_id}/reframe/{analysis_id}` | yes | Status (`queued`/`sampling`/`detecting`/`tracking`/`planning`/`completed`/`failed`), `progress_percent`, `is_stale`, `confidence_level` (`high`/`mixed`/`fallback`), statistics, safe `error_code`/`error_message`. |
+| GET    | `…/clips/{clip_id}/reframe/{analysis_id}/path` | yes | Ordered keyframes `{timestamp, center_x, center_y, crop_width, crop_height, confidence, mode}` (fractions of the display-oriented source) and the source size; `409` until completed. |
+| POST   | `…/clips/{clip_id}/reframe/{analysis_id}/retry` | yes | Re-queue a failed or stale analysis (row-locked; `409` otherwise or after `REFRAME_MAX_ATTEMPTS`). |
+
+No task ids, model paths, storage keys or FFmpeg details are returned.
 
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
@@ -210,6 +223,20 @@ Each chunk is checked against `OPENAI_MAX_UPLOAD_BYTES` (default 20 MB, a margin
 
 `app/services/clip_edit/` turns a ready clip into a 9:16 short: `config.py` (allow-listed enums, normalized versioned snapshot, fingerprint), `composition.py` (constant filtergraphs for center crop / blur background / fit at 1080 × 1920, the FFmpeg command run inside the attempt workspace with `subtitles=captions.ass`, ffprobe validation, libass detection and the caption font probe), `captions.py` (transcript segments → clip-local cues: proportional word timing, segmentation, long-token splitting, emoji removal, ASS escaping), `caption_styles.py` (Bold/Clean/Creator presets, top/center/bottom positions, the ASS document), `storage.py` (`edits/<uuid>/work-<attempt>/` → `edits/<uuid>/edited.mp4`, atomic finalize) and `pipeline.py` (the Celery job `peaksift.render_clip_edit`: claim, attempt-token ownership on every commit, stage progress 5/15/85/90/100, file-first-then-row finalization, safe failure codes). The full design, configuration and limitations are in [docs/short-form-editing.md](../docs/short-form-editing.md).
 
+## Smart reframing
+
+`app/services/reframe/` turns a ready clip into a 9:16 crop path: `config.py` (server-controlled versioned snapshot + fingerprint), `sampling.py` (ffprobe display geometry; one FFmpeg pipe `fps=N:round=up` → scale → rgb24, watchdog timeout, no temp files), `detection.py` (detector contract, normalization, lazy factory; "no face" ≠ "detector broken"), `yunet.py` (OpenCV Zoo YuNet on onnxruntime, sha256-pinned model), `tracking.py` (association, gaps, subject selection with hysteresis, hand-offs), `path.py` (crop geometry, dead zone, margins, groups, look-ahead, smoothing, pan limit, cuts, simplification, confidence) and `pipeline.py` (the Celery job `peaksift.analyze_reframe`: claim, attempt-token ownership, progress 5/10–80/85/92/100, one-transaction finalize). `app/services/clip_edit/smart_crop.py` compiles a validated path into FFmpeg crop expressions for the `smart_reframe` edit layout.
+
+Install the face detector model once per server (it is never committed or downloaded automatically):
+
+```bash
+python scripts/fetch_reframe_model.py      # pinned URL + sha256 → ./models/face_detection_yunet_2023mar.onnx
+python scripts/smart_crop_probe.py         # optional: this FFmpeg renders the deepest allowed crop path
+PEAKSIFT_REAL_DETECTOR=1 REFRAME_TEST_FACE_IMAGE=/path/to/face.png pytest tests/test_reframe_detection.py -k real
+```
+
+The full design, configuration and limitations are in [docs/smart-reframing.md](../docs/smart-reframing.md).
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -220,11 +247,11 @@ Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch me
 app/
   main.py            # FastAPI app, CORS, routers
   api/               # Routers: health, auth, projects, videos, video_content, transcriptions, clip_detection,
-                     # clips, clip_media, clip_edits (+ edit media); media_streaming.py = shared Range streaming
+                     # clips, clip_media, clip_edits (+ edit media), reframe; media_streaming.py = shared Range streaming
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
-  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip, ClipEdit
+  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip, ClipEdit, ReframeAnalysis(+Keyframe)
   schemas/           # Pydantic request/response schemas
   services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
@@ -233,7 +260,8 @@ app/
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
   services/transcription/      # Contract, factory, chunking, pipeline, faster_whisper + openai providers
   services/clip_render/        # Artifact storage, FFmpeg renderer, Celery render pipeline
-  services/clip_edit/          # Edit config, 9:16 composition, captions + styles, edit artifacts, pipeline
+  services/clip_edit/          # Edit config, 9:16 composition, smart/manual crops, captions + styles, edit artifacts, pipeline
+  services/reframe/            # Smart reframing: config, sampling, detector contract + YuNet, tracking, crop path, pipeline
   services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
                                # validation, ranking, detection_config, pipeline
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
@@ -241,8 +269,10 @@ app/
   workers/clip_detection_tasks.py # peaksift.detect_clips
   workers/clip_render_tasks.py # peaksift.render_clip
   workers/clip_edit_tasks.py   # peaksift.render_clip_edit
+  workers/reframe_tasks.py     # peaksift.analyze_reframe
   workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
+scripts/             # celery_smoke.py, fetch_reframe_model.py, smart_crop_probe.py
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
 
@@ -301,6 +331,11 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `CLIP_RENDER_MAX_ATTEMPTS` | `5`                                     | Retries per clip and per edit (the other `CLIP_RENDER_*` values apply to shorts too) |
 | `CAPTION_FONT_FAMILY` | `Noto Sans`                                  | Caption font family for shorts (plain name; resolved by fontconfig, with fallbacks) |
 | `CAPTION_MAX_WORDS` / `CAPTION_MAX_CHARS` | `7` / `32`               | Caption cue limits                           |
+| `REFRAME_DETECTOR` / `REFRAME_MODEL_PATH` | `yunet_face` / `./models/face_detection_yunet_2023mar.onnx` | Face detector and its pinned model file (install with `scripts/fetch_reframe_model.py`) |
+| `REFRAME_SAMPLE_FPS` / `REFRAME_ANALYSIS_WIDTH` / `REFRAME_MIN_DETECTION_CONFIDENCE` | `2` / `640` / `0.5` | Frames analysed per second, detection width, score threshold |
+| `REFRAME_FACE_MARGIN` / `REFRAME_DEAD_ZONE` | `0.12` / `0.10`          | Face-to-edge margin and tolerated drift, in crop widths |
+| `REFRAME_SMOOTHING_SECONDS` / `REFRAME_MAX_PAN_PER_SECOND` / `REFRAME_MAX_GAP_SECONDS` | `0.5` / `0.35` / `1.5` | Camera smoothing, pan-speed limit, how long a lost face keeps steering |
+| `REFRAME_SAMPLING_TIMEOUT_SECONDS` / `REFRAME_HEARTBEAT_SECONDS` / `REFRAME_STALE_AFTER_SECONDS` / `REFRAME_MAX_ATTEMPTS` | `600` / `15` / `900` / `5` | Sampling deadline, liveness, stale threshold, retries |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |

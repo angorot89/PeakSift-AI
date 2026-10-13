@@ -21,9 +21,9 @@ Long-term:
 
 ## Current state
 
-**Milestones 1–6 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), and AI clip detection (transcript windows → Ollama / OpenAI structured output → validation → ranking → candidates with preview and save/dismiss; see [docs/clip-detection.md](docs/clip-detection.md)), clip generation (candidate → background FFmpeg render → validated private MP4 with preview and download; see [docs/clip-generation.md](docs/clip-generation.md)), and short-form editing (ready clip → 9:16 center crop / blur background / fit with transcript captions burned in by libass → validated private short with preview and download; see [docs/short-form-editing.md](docs/short-form-editing.md)), with tests and CI.
+**Milestones 1–7 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), and AI clip detection (transcript windows → Ollama / OpenAI structured output → validation → ranking → candidates with preview and save/dismiss; see [docs/clip-detection.md](docs/clip-detection.md)), clip generation (candidate → background FFmpeg render → validated private MP4 with preview and download; see [docs/clip-generation.md](docs/clip-generation.md)), and short-form editing (ready clip → 9:16 center crop / blur background / fit with transcript captions burned in by libass → validated private short with preview and download; see [docs/short-form-editing.md](docs/short-form-editing.md)), and smart reframing (sampled frames → local YuNet face detection → tracking → smooth 9:16 crop path → moving FFmpeg crop, with centre and manual focal-point fallbacks; see [docs/smart-reframing.md](docs/smart-reframing.md)), with tests and CI.
 
-**No later milestone has been defined.** Do not start new features (face/subject tracking, AI reframing, word-level or animated captions, timeline editor, templates or brand kits, sound effects, music, publishing, Morocco Mode, payments) until explicitly instructed.
+**No later milestone has been defined.** Do not start new features (speaker diarization or active-speaker detection, generic object tracking, dynamic zoom, split screen, keyframe/timeline editor, word-level or animated captions, templates or brand kits, B-roll, transitions, sound effects, music, publishing, Morocco Mode, payments) until explicitly instructed.
 
 ## Stack (as built)
 
@@ -38,6 +38,7 @@ Long-term:
 - Tooling: pytest, Ruff, ESLint, GitHub Actions (backend job installs FFmpeg with libass and the Noto fonts)
 - Clip rendering: `app/services/clip_render/` (artifact storage, FFmpeg renderer, Celery pipeline); output profile `source_mp4_v1` = fast-start MP4, libx264 + aac, source geometry
 - Short-form editing: `app/services/clip_edit/` (edit config, 9:16 composition, transcript captions, ASS styles, edit artifacts, Celery pipeline); profile `vertical_1080x1920_v1`; libass + fontconfig fonts (Noto Sans), never committed font files
+- Smart reframing: `app/services/reframe/` (config snapshot, FFmpeg frame sampling, detector contract, YuNet face detector on onnxruntime, tracking, crop path, Celery pipeline); rendered by `clip_edit/smart_crop.py` as a time-varying FFmpeg crop. The model is installed by `scripts/fetch_reframe_model.py` (pinned sha256), never committed or auto-downloaded
 - Planned later: S3-compatible object storage
 
 ## Conventions
@@ -55,8 +56,9 @@ Long-term:
 - Short-form edits are derived artifacts: never modify the V0.5 clip file. Transcript text is untrusted — it reaches captions only through `escape_ass_text`, never a shell, filtergraph or path; edit options are allow-listed enums (no user ASS, fonts, filters or paths). Captions use persisted transcript timing only (phrase-level; no invented word timings).
 - Clip candidates: everything a model returns is untrusted until `validation.py` has snapped it to transcript lines and checked bounds; never clamp or invent values, never store a model's quotation as the transcript excerpt, keep scores on the documented 0–100 editorial scale and never present them as performance predictions.
 - Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
-- Tests: Celery eager mode, mocked speech models and a fake OpenAI client; CI sets `HF_HUB_OFFLINE=1` and never has an API key.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Smart reframing: positions are fractions of the display-oriented source (x right, y down). Detector output is untrusted until `normalize_detection`; "no face" (empty list) and "detector broken" (`DetectorUnavailable`/`DetectorFailure` → failed analysis) must stay distinct. Every tuning value is server configuration in the versioned snapshot. Persisted keyframes are re-validated before rendering and only module-formatted numbers reach the filtergraph. Never load a detector at import or startup, never download or commit model weights, and never describe the feature as speaker detection.
+- Tests: Celery eager mode, mocked speech models, a fake OpenAI client and a fake ONNX session; CI sets `HF_HUB_OFFLINE=1`, never has an API key and never downloads a model.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/smart-reframing.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 
