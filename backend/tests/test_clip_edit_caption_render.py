@@ -44,7 +44,7 @@ def style_fields(document: str) -> list[str]:
     raise AssertionError("no caption style line")
 
 
-# --- ASS document (no ffmpeg needed) -------------------------------------------------------------
+# --- ASS document (no ffmpeg needed) -----
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ def test_font_family_must_be_a_plain_name(font):
         doc([], font=font)
 
 
-# --- real renders ---------------------------------------------------------------------------------
+# --- real renders -----
 
 
 def plain_source(target: Path, seconds: float = 4.0, audio: bool = True) -> Path:

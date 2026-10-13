@@ -94,7 +94,7 @@ def test_non_finite_or_inverted_segments_are_ignored():
     assert words(cues) == ["good", "words"]
 
 
-# --- segmentation -----------------------------------------------------------------------------
+# --- segmentation -----
 
 
 def test_long_segments_become_short_readable_cues_in_order():
@@ -137,7 +137,7 @@ def test_overlapping_transcript_segments_do_not_stack():
     assert all(b.start >= a.end for a, b in zip(cues, cues[1:], strict=False))
 
 
-# --- text: Unicode, punctuation, words unchanged --------------------------------------------------
+# --- text: Unicode, punctuation, words unchanged -----
 
 
 @pytest.mark.parametrize(
@@ -165,7 +165,7 @@ def test_clean_text_keeps_joiners_and_marks_but_drops_bidi_overrides():
     assert clean_text("abc\u202edcba\u202c") == "abcdcba"  # right-to-left override removed
 
 
-# --- ASS escaping -------------------------------------------------------------------------------
+# --- ASS escaping -----
 
 
 @pytest.mark.parametrize(
