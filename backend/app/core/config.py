@@ -149,7 +149,8 @@ class Settings(BaseSettings):
     reframe_dead_zone: float = Field(default=0.10, ge=0, le=0.4)
     # Exponential smoothing time constant of the crop centre, in seconds.
     reframe_smoothing_seconds: float = Field(default=0.5, ge=0, le=5)
-    # Speed limit of the crop centre, in source widths per second.
+    # Speed limit of the crop centre, in fractions of the panned axis per second (source widths
+    # for landscape footage).
     reframe_max_pan_per_second: float = Field(default=0.35, gt=0, le=5)
     # A track missing for longer than this stops steering the crop (then fall back to centre).
     reframe_max_gap_seconds: float = Field(default=1.5, gt=0, le=10)
