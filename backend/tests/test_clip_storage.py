@@ -25,7 +25,8 @@ def store(tmp_path: Path) -> ClipArtifactStore:
 def test_keys_are_generated_from_the_clip_id_only():
     clip_id = uuid.uuid4()
     assert clip_storage_key(clip_id) == f"clips/{clip_id}/clip.mp4"
-    assert clip_temp_key(clip_id) == f"clips/{clip_id}/clip-tmp.mp4"
+    assert clip_temp_key(clip_id) == f"clips/{clip_id}/clip-tmp-1.mp4"
+    assert clip_temp_key(clip_id, 3) == f"clips/{clip_id}/clip-tmp-3.mp4"
     assert clip_storage_key(str(clip_id)) == clip_storage_key(clip_id)
 
 
@@ -163,3 +164,44 @@ def test_same_title_different_clips_get_different_names():
     assert safe_download_filename("Same", uuid.uuid4()) != safe_download_filename(
         "Same", uuid.uuid4()
     )
+
+
+@pytest.mark.parametrize("attempt", [0, -1, True, 1.5, "2"])
+def test_temp_keys_need_a_positive_integer_attempt(attempt):
+    with pytest.raises(ValueError):
+        clip_temp_key(uuid.uuid4(), attempt)
+
+
+def test_each_attempt_has_its_own_temp_file(store: ClipArtifactStore):
+    """A fenced-out attempt can neither overwrite nor clean up the new attempt's output."""
+    clip_id = uuid.uuid4()
+    old, new = store.temp_path(clip_id, 1), store.temp_path(clip_id, 2)
+    assert old != new
+    old.write_bytes(b"zombie")
+    new.write_bytes(b"fresh")
+
+    store.discard_temp(clip_id, 1)  # the zombie cleans up after itself...
+    assert not old.exists() and new.read_bytes() == b"fresh"  # ...without touching attempt 2
+
+    store.finalize(clip_id, 2)
+    assert store.final_path(clip_id).read_bytes() == b"fresh"
+
+
+def test_discard_removes_temp_files_of_every_attempt(store: ClipArtifactStore):
+    clip_id = uuid.uuid4()
+    for attempt in (1, 2, 3):
+        store.temp_path(clip_id, attempt).write_bytes(b"x")
+    store.discard(clip_id)
+    assert not store.final_path(clip_id).parent.exists()
+
+
+def test_symlinked_clip_directory_cannot_escape_the_root(tmp_path: Path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "clip.mp4").write_bytes(b"secret")
+    store = ClipArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    clip_id = uuid.uuid4()
+    (store.storage.root / "clips").mkdir(parents=True)
+    (store.storage.root / "clips" / str(clip_id)).symlink_to(outside, target_is_directory=True)
+    with pytest.raises(InvalidStorageKey):
+        store.final_path(clip_id)

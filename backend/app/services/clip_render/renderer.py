@@ -187,8 +187,10 @@ def render_clip(
 
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
+    # Logged stderr is for operators, but server paths still have no business in logs.
+    redactions = {str(source): "<source>", str(target): "<output>"}
     try:
-        _run_ffmpeg(command, options, heartbeat)
+        _run_ffmpeg(command, options, heartbeat, redactions)
         if not target.is_file() or target.stat().st_size == 0:
             raise RenderError("invalid_output", "Rendering produced no output")
         return _validate_output(target, duration, has_audio, options)
@@ -198,7 +200,10 @@ def render_clip(
 
 
 def _run_ffmpeg(
-    command: list[str], options: RenderOptions, heartbeat: Callable[[], None] | None
+    command: list[str],
+    options: RenderOptions,
+    heartbeat: Callable[[], None] | None,
+    redactions: dict[str, str] | None = None,
 ) -> None:
     # stderr goes to a temp file (never a pipe that could fill up and stall FFmpeg); only a
     # bounded tail is logged, and nothing from it is ever shown to users.
@@ -211,26 +216,33 @@ def _run_ffmpeg(
             raise RenderError("ffmpeg_missing", "ffmpeg is not installed on the server") from None
 
         deadline = time.monotonic() + options.timeout_seconds
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RenderError(
+                        "render_timeout",
+                        f"Rendering timed out after {options.timeout_seconds:g} seconds",
+                    )
+                try:
+                    process.wait(timeout=min(options.heartbeat_interval_seconds, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    if heartbeat is not None:
+                        heartbeat()  # may raise (e.g. the job was taken over)
+        except BaseException:
+            # Timeout, a failing heartbeat, a soft time limit: never leave ffmpeg running.
+            if process.poll() is None:
                 process.kill()
-                process.wait()
-                raise RenderError(
-                    "render_timeout",
-                    f"Rendering timed out after {options.timeout_seconds:g} seconds",
-                )
-            try:
-                process.wait(timeout=min(options.heartbeat_interval_seconds, remaining))
-                break
-            except subprocess.TimeoutExpired:
-                if heartbeat is not None:
-                    heartbeat()
+            process.wait()
+            raise
 
         if process.returncode != 0:
             stderr.seek(0, os.SEEK_END)
             stderr.seek(max(0, stderr.tell() - STDERR_TAIL_BYTES))
             tail = stderr.read().decode(errors="replace")
+            for value, placeholder in (redactions or {}).items():
+                tail = tail.replace(value, placeholder)
             logger.warning("ffmpeg failed (exit %s): %s", process.returncode, tail)
             raise RenderError(
                 "ffmpeg_failed", f"Rendering failed (ffmpeg exit code {process.returncode})"

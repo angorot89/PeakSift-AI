@@ -10,6 +10,7 @@ one must be restored first (the UI offers Restore). A clip that already exists i
 destroyed because the candidate's decision changes afterwards.
 """
 
+import logging
 import uuid
 from typing import Annotated
 
@@ -18,13 +19,14 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.clip_detection import OwnedCandidate
-from app.api.deps import DbSession
+from app.api.deps import DbSession, Storage
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.models import CandidateDecision, Clip, ClipCandidate, ClipStatus, Video, VideoStatus
 from app.schemas.clip import ClipPage, ClipRead
 from app.services.clip_render.pipeline import is_stale
 from app.services.clip_render.renderer import RenderError, validate_range
+from app.services.storage import InvalidStorageKey, LocalMediaStorage
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_render, new_task_id
 
 router = APIRouter(
@@ -34,6 +36,8 @@ router = APIRouter(
 video_clips_router = APIRouter(prefix="/projects/{project_id}/videos/{video_id}", tags=["clips"])
 
 MAX_PAGE_SIZE = 100
+
+logger = logging.getLogger(__name__)
 
 
 def _read(clip: Clip, title: str, run_id: uuid.UUID) -> ClipRead:
@@ -70,6 +74,25 @@ def _read_for(clip: Clip) -> ClipRead:
     return _read(clip, clip.candidate.title, clip.candidate.run_id)
 
 
+def _reconcile(db: DbSession, clip: Clip | None, storage: LocalMediaStorage) -> Clip | None:
+    """``ready`` must mean a file exists. If the artifact vanished (disk loss, manual
+    deletion), say so honestly and make the clip retryable instead of a dead end."""
+    if clip is None or clip.status != ClipStatus.READY:
+        return clip
+    try:
+        present = bool(clip.storage_key) and storage.path_for(clip.storage_key).is_file()
+    except InvalidStorageKey:
+        present = False
+    if not present:
+        logger.error("Clip %s was ready but its artifact is missing; marking failed", clip.id)
+        clip.status = ClipStatus.FAILED
+        clip.error_code = "artifact_missing"
+        clip.error_message = "The rendered file is missing; retry to render it again"
+        clip.storage_key = None
+        db.commit()
+    return clip
+
+
 def _existing_clip(db: DbSession, candidate: ClipCandidate) -> Clip | None:
     return db.scalar(select(Clip).where(Clip.candidate_id == candidate.id))
 
@@ -104,11 +127,15 @@ def _enqueue_or_503(db: DbSession, clip: Clip, *, created: bool) -> None:
 
 @router.post("/clip", response_model=ClipRead, status_code=status.HTTP_201_CREATED)
 def generate_clip(
-    candidate: OwnedCandidate, video: OwnedVideo, db: DbSession, response: Response
+    candidate: OwnedCandidate,
+    video: OwnedVideo,
+    db: DbSession,
+    storage: Storage,
+    response: Response,
 ) -> ClipRead:
     """Render this candidate. Idempotent: an existing queued/rendering/ready clip is returned
     (200) instead of duplicated; a failed one must be retried explicitly (409)."""
-    existing = _existing_clip(db, candidate)
+    existing = _reconcile(db, _existing_clip(db, candidate), storage)
     if existing is not None:
         if existing.status == ClipStatus.FAILED:
             raise HTTPException(
@@ -158,17 +185,19 @@ def generate_clip(
 
 
 @router.get("/clip", response_model=ClipRead)
-def get_clip(candidate: OwnedCandidate, db: DbSession) -> ClipRead:
-    clip = _existing_clip(db, candidate)
+def get_clip(candidate: OwnedCandidate, db: DbSession, storage: Storage) -> ClipRead:
+    clip = _reconcile(db, _existing_clip(db, candidate), storage)
     if clip is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No clip generated yet")
     return _read(clip, candidate.title, candidate.run_id)
 
 
 @router.post("/clip/retry", response_model=ClipRead)
-def retry_clip(candidate: OwnedCandidate, video: OwnedVideo, db: DbSession) -> ClipRead:
+def retry_clip(
+    candidate: OwnedCandidate, video: OwnedVideo, db: DbSession, storage: Storage
+) -> ClipRead:
     """Re-queue a failed or stalled render on the same clip row (same boundaries)."""
-    clip = _existing_clip(db, candidate)
+    clip = _reconcile(db, _existing_clip(db, candidate), storage)
     if clip is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No clip generated yet")
     settings = get_settings()
@@ -205,6 +234,7 @@ def retry_clip(candidate: OwnedCandidate, video: OwnedVideo, db: DbSession) -> C
 def list_clips(
     video: OwnedVideo,
     db: DbSession,
+    storage: Storage,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 20,
 ) -> ClipPage:
@@ -217,4 +247,5 @@ def list_clips(
         .offset(offset)
         .limit(limit)
     ).all()
+    clips = [_reconcile(db, clip, storage) for clip in clips]
     return ClipPage(total=total, offset=offset, limit=limit, clips=[_read_for(c) for c in clips])
