@@ -82,6 +82,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends ffmpeg
           ffprobe -version | head -1
+      - name: FFmpeg provides the encoders clip rendering uses (libx264, aac)
+        # Clips are rendered with libx264 + aac in production and development; CI must
+        # exercise the same encoders rather than silently falling back to another path.
+        run: |
+          set -euo pipefail
+          encoders="$(ffmpeg -hide_banner -encoders)"
+          grep -qE '^ V\S* libx264 ' <<<"$encoders" || { echo "libx264 encoder missing"; exit 1; }
+          grep -qE '^ A\S* aac ' <<<"$encoders" || { echo "aac encoder missing"; exit 1; }
+          echo "libx264 and aac available"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
