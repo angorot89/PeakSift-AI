@@ -29,6 +29,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.clip_detection import ClipCandidate
+    from app.models.clip_edit import ClipEdit
     from app.models.video import Video
 
 
@@ -112,6 +113,13 @@ class Clip(Base):
 
     candidate: Mapped["ClipCandidate"] = relationship(back_populates="clip")
     video: Mapped["Video"] = relationship(back_populates="clips")
+    # Short-form edits derived from this clip (Milestone 6); the clip itself is never modified.
+    edits: Mapped[list["ClipEdit"]] = relationship(
+        back_populates="clip",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ClipEdit.created_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return f"Clip(id={self.id!r}, candidate_id={self.candidate_id!r}, status={self.status!r})"
