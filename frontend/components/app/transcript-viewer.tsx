@@ -111,7 +111,7 @@ export function TranscriptViewer({ projectId, videoId, total, footnote }: Props)
             <li key={segment.sequence_index} className="flex gap-3 px-4 py-2.5 sm:gap-4">
               <time
                 dateTime={`PT${Math.floor(segment.start)}S`}
-                className="mt-0.5 shrink-0 rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-accent-soft"
+                className="mt-0.5 shrink-0 self-start rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[11px] text-accent-soft"
                 title={`${formatTimestamp(segment.start)} – ${formatTimestamp(segment.end)}`}
               >
                 {formatTimestamp(segment.start)}

@@ -86,3 +86,27 @@ export const clipContentUrl = (clipId: string) => `${API_URL}/clips/${clipId}/co
 
 /** Same bytes as an attachment with a safe server-chosen filename. */
 export const clipDownloadUrl = (clipId: string) => `${API_URL}/clips/${clipId}/download`;
+
+/** Creator-facing explanation of a failed clip render; infrastructure details stay server-side. */
+export function friendlyClipError(clip: Pick<GeneratedClip, "error_code">): string {
+  switch (clip.error_code) {
+    case "ffmpeg_missing":
+      return "The video renderer isn't available right now. Try again in a little while.";
+    case "source_missing":
+    case "source_unreadable":
+    case "video_not_ready":
+      return "The original video couldn't be read.";
+    case "invalid_range":
+      return "This moment falls outside the video. Run clip detection again.";
+    case "render_timeout":
+    case "time_limit":
+      return "Rendering took too long. Try again.";
+    case "storage_failure":
+    case "artifact_missing":
+      return "The finished clip couldn't be saved. Try again.";
+    case "queue_unavailable":
+      return "The rendering queue is busy or offline. Try again in a moment.";
+    default:
+      return "Something went wrong while rendering. Try again.";
+  }
+}

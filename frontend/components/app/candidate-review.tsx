@@ -1,6 +1,8 @@
 "use client";
 
+import { Bookmark, BookmarkCheck, ChevronDown, EyeOff, Film, Play, SearchX, Undo2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { MediaFrame } from "@/components/ui/media-frame";
 import { ClipRenderControls } from "@/components/app/clip-render-controls";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -72,7 +74,12 @@ function ClipPreview({
   }
 
   return (
-    <div className="space-y-2">
+    <MediaFrame
+      icon={Film}
+      label="Source preview"
+      meta={`${formatTimestamp(start)} – ${formatTimestamp(end)} of the original`}
+      className="animate-fade-in"
+    >
       {/* The media fragment makes the browser start at `start`; timeupdate stops at `end`. */}
       <video
         ref={ref}
@@ -86,14 +93,10 @@ function ClipPreview({
           }
         }}
         onTimeUpdate={clampToRange}
-        className="aspect-video w-full rounded-xl bg-black"
+        className="aspect-video w-full bg-black"
         aria-label={`Preview of “${title}” from ${formatTimestamp(start)} to ${formatTimestamp(end)}`}
       />
-      <p className="text-xs text-muted">
-        Previewing {formatTimestamp(start)} – {formatTimestamp(end)} of the original video. Nothing
-        has been exported.
-      </p>
-    </div>
+    </MediaFrame>
   );
 }
 
@@ -102,17 +105,35 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
     <li className="flex items-center gap-2 text-xs">
       <span className="w-24 shrink-0 text-muted">{label}</span>
       <span
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"
+        className="h-1 flex-1 overflow-hidden rounded-full bg-white/10"
         role="meter"
         aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={value}
       >
-        <span className="block h-full bg-accent/80" style={{ width: `${value}%` }} />
+        <span className="block h-full rounded-full bg-white/45" style={{ width: `${value}%` }} />
       </span>
-      <span className="w-7 text-right font-mono text-muted">{value}</span>
+      <span className="tabular w-7 text-right text-muted">{value}</span>
     </li>
+  );
+}
+
+/** The overall score is the one number that matters at a glance; the breakdown is secondary. */
+function ScoreBadge({ score }: { score: number }) {
+  return (
+    <div
+      className="flex shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-surface-2 px-3 py-2"
+      title="Overall editorial score, 0–100. A weighted judgement, not a prediction of views."
+    >
+      <span className="tabular text-2xl leading-none font-semibold text-foreground" aria-hidden="true">
+        {score}
+      </span>
+      <span className="mt-1 text-[10px] font-medium tracking-wide text-subtle uppercase" aria-hidden="true">
+        Score
+      </span>
+      <span className="sr-only">Overall score {score} out of 100</span>
+    </div>
   );
 }
 
@@ -133,100 +154,119 @@ function CandidateCard({
   onDecide: (action: "save" | "dismiss" | "reset") => void;
   clipControls: ReactNode;
 }) {
-  const [showExcerpt, setShowExcerpt] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const dismissed = candidate.decision === "dismissed";
   const saved = candidate.decision === "saved";
+  const top = candidate.rank === 1;
 
   return (
     <li
-      className={`rounded-2xl border bg-surface p-4 sm:p-5 ${
-        saved ? "border-emerald-500/40" : dismissed ? "border-border opacity-60" : "border-border"
-      }`}
+      className={`rounded-2xl border bg-surface-2/40 p-4 transition-[border-color,opacity] duration-200 sm:p-5 ${
+        saved ? "border-success/40" : "border-border"
+      } ${dismissed ? "opacity-60 hover:opacity-90" : ""}`}
       aria-label={`Candidate ${candidate.rank}: ${candidate.title}`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">
-            #{candidate.rank} · {CATEGORY_LABELS[candidate.category] ?? candidate.category}
-            {saved ? " · Saved" : dismissed ? " · Dismissed" : ""}
-          </p>
-          <h4 className="font-medium break-words text-foreground">{candidate.title}</h4>
-          <p className="font-mono text-xs text-accent-soft">
+      <div className="flex gap-3 sm:gap-4">
+        <span
+          aria-hidden="true"
+          className={`tabular flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold sm:size-10 ${
+            top ? "bg-accent/15 text-accent-soft" : "bg-surface-3 text-muted"
+          }`}
+        >
+          #{candidate.rank}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-muted">
+              {CATEGORY_LABELS[candidate.category] ?? candidate.category}
+            </span>
+            {saved ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-200">
+                <BookmarkCheck aria-hidden="true" className="size-3" />
+                Saved
+              </span>
+            ) : null}
+            {dismissed ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-subtle">
+                <EyeOff aria-hidden="true" className="size-3" />
+                Dismissed
+              </span>
+            ) : null}
+          </div>
+          <h4 className="mt-1.5 text-base leading-snug font-semibold text-balance break-words text-foreground sm:text-[17px]">
+            {candidate.title}
+          </h4>
+          <p className="tabular mt-1 text-xs text-muted">
             <time dateTime={`PT${Math.floor(candidate.start)}S`}>{formatTimestamp(candidate.start)}</time>
             {" – "}
             <time dateTime={`PT${Math.floor(candidate.end)}S`}>{formatTimestamp(candidate.end)}</time>
-            <span className="text-muted"> · {formatDuration(candidate.duration)}</span>
+            <span className="text-subtle"> · {formatDuration(candidate.duration)}</span>
           </p>
         </div>
-        <div
-          className="flex shrink-0 items-baseline gap-1 rounded-xl border border-border px-3 py-1.5"
-          title="Overall editorial score, 0–100. A weighted judgement, not a prediction."
-        >
-          <span className="text-2xl font-semibold text-foreground">{candidate.overall_score}</span>
-          <span className="text-xs text-muted">/ 100</span>
-        </div>
+        <ScoreBadge score={candidate.overall_score} />
       </div>
 
-      <p className="mt-3 text-sm text-foreground">
-        <span className="text-muted">Hook: </span>
+      <blockquote className="mt-4 border-l-2 border-accent/60 pl-3 text-[15px] leading-relaxed text-pretty text-foreground">
         {candidate.hook}
-      </p>
-      <p className="mt-1 text-sm leading-relaxed text-muted">{candidate.rationale}</p>
+      </blockquote>
 
-      <ul className="mt-3 grid gap-1 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
-        {DIMENSIONS.map(({ key, label }) => (
-          <ScoreBar key={key} label={label} value={candidate.scores[key]} />
-        ))}
-      </ul>
+      <div className="mt-3">
+        <p className="text-xs font-medium text-subtle">Why it was selected</p>
+        <p className={`mt-1 text-sm leading-relaxed text-pretty text-muted ${expanded ? "" : "line-clamp-2"}`}>
+          {candidate.rationale}
+        </p>
+      </div>
 
-      {candidate.transcript_excerpt ? (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => setShowExcerpt((v) => !v)}
-            aria-expanded={showExcerpt}
-            className="text-xs text-accent-soft underline-offset-2 hover:underline"
-          >
-            {showExcerpt ? "Hide transcript excerpt" : "Show transcript excerpt"}
-          </button>
-          {showExcerpt ? (
-            <blockquote className="mt-2 border-l-2 border-border pl-3 text-sm leading-relaxed break-words text-muted">
+      <details className="group mt-3" onToggle={(e) => setExpanded((e.target as HTMLDetailsElement).open)}>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-accent-soft select-none hover:underline [&::-webkit-details-marker]:hidden">
+          <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-open:rotate-180" />
+          <span className="group-open:hidden">More: score breakdown{candidate.transcript_excerpt ? " and transcript" : ""}</span>
+          <span className="hidden group-open:inline">Less</span>
+        </summary>
+        <div className="mt-3 space-y-3 animate-fade-in">
+          <ul className="grid gap-1.5 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
+            {DIMENSIONS.map(({ key, label }) => (
+              <ScoreBar key={key} label={label} value={candidate.scores[key]} />
+            ))}
+          </ul>
+          {candidate.transcript_excerpt ? (
+            <blockquote className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
               {candidate.transcript_excerpt}
             </blockquote>
           ) : null}
         </div>
-      ) : null}
+      </details>
 
       {previewing ? (
         <div className="mt-4">
-          <ClipPreview
-            videoId={videoId}
-            start={candidate.start}
-            end={candidate.end}
-            title={candidate.title}
-          />
+          <ClipPreview videoId={videoId} start={candidate.start} end={candidate.end} title={candidate.title} />
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={onPreview} aria-pressed={previewing}>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={onPreview} aria-pressed={previewing}>
+          {previewing ? <X aria-hidden="true" /> : <Play aria-hidden="true" />}
           {previewing ? "Close source preview" : "Preview source"}
         </Button>
         {saved ? (
-          <Button variant="secondary" onClick={() => onDecide("reset")} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={() => onDecide("reset")} disabled={busy} aria-pressed="true">
+            <BookmarkCheck aria-hidden="true" className="text-success" />
             Unsave
           </Button>
         ) : (
-          <Button onClick={() => onDecide("save")} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={() => onDecide("save")} disabled={busy} aria-pressed="false">
+            <Bookmark aria-hidden="true" />
             Save
           </Button>
         )}
         {dismissed ? (
-          <Button variant="secondary" onClick={() => onDecide("reset")} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={() => onDecide("reset")} disabled={busy}>
+            <Undo2 aria-hidden="true" />
             Restore
           </Button>
         ) : (
-          <Button variant="secondary" onClick={() => onDecide("dismiss")} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={() => onDecide("dismiss")} disabled={busy}>
+            <EyeOff aria-hidden="true" />
             Dismiss
           </Button>
         )}
@@ -323,7 +363,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Filter candidates" className="flex gap-1 rounded-full border border-border p-1">
+        <div role="tablist" aria-label="Filter candidates" className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
           {FILTERS.map((option) => (
             <button
               key={option.value}
@@ -334,9 +374,9 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
                 setFilter(option.value);
                 setPreviewId(null);
               }}
-              className={`rounded-full px-3 py-1 text-sm transition-colors ${
+              className={`inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
                 filter === option.value
-                  ? "bg-foreground text-background"
+                  ? "bg-surface-3 text-foreground shadow-sm"
                   : "text-muted hover:text-foreground"
               }`}
             >
@@ -344,7 +384,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
             </button>
           ))}
         </div>
-        <p className="text-sm text-muted">
+        <p className="tabular text-xs text-subtle">
           {loading && candidates.length === 0 ? "" : `${candidates.length} of ${total}`}
         </p>
       </div>
@@ -352,9 +392,11 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
       {(loading && candidates.length === 0) || clips === null ? (
         <LoadingState label="Loading candidates…" />
       ) : error && candidates.length === 0 ? (
-        <ErrorState message={error} onRetry={() => void load(0)} />
+        <ErrorState title="Candidates could not be loaded" message={error} onRetry={() => void load(0)} />
       ) : candidates.length === 0 ? (
         <EmptyState
+          compact
+          icon={SearchX}
           title={filter === "all" ? "No clip-worthy moments found" : `No ${filter} candidates`}
           description={
             filter === "all"
@@ -402,7 +444,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
 
       <FormError>{actionError}</FormError>
 
-      <p className="text-xs text-muted">
+      <p className="text-xs text-subtle">
         Scores are the model&apos;s editorial judgement on a 0–100 scale, normalised across
         providers. They are not predictions of views or engagement.
       </p>
