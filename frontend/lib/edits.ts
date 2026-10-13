@@ -49,15 +49,15 @@ export type ClipEdit = {
 export type ClipEditPage = { total: number; offset: number; limit: number; edits: ClipEdit[] };
 
 export const LAYOUT_OPTIONS: Array<{ value: Layout; label: string; hint: string }> = [
-  { value: "blur_background", label: "Blur background", hint: "Whole frame over a blurred fill" },
-  { value: "center_crop", label: "Center crop", hint: "Fill the frame, crop the sides" },
-  { value: "fit", label: "Fit", hint: "Whole frame on a dark background" },
+  { value: "center_crop", label: "Center crop", hint: "Fills the vertical screen, edges cropped" },
+  { value: "blur_background", label: "Blur background", hint: "Full original frame over a blurred fill" },
+  { value: "fit", label: "Fit", hint: "Full original frame on a dark background" },
 ];
 
 export const STYLE_OPTIONS: Array<{ value: CaptionStyle; label: string; hint: string }> = [
-  { value: "bold", label: "Bold", hint: "Large white text, heavy outline" },
-  { value: "clean", label: "Clean", hint: "Smaller white text, thin outline" },
-  { value: "creator", label: "Creator", hint: "Yellow text on a dark box" },
+  { value: "clean", label: "Clean", hint: "Regular white, thin outline" },
+  { value: "bold", label: "Bold", hint: "Large heavy white, thick outline" },
+  { value: "creator", label: "Creator", hint: "Bold yellow on a dark box" },
 ];
 
 export const POSITION_OPTIONS: Array<{ value: CaptionPosition; label: string }> = [
@@ -68,6 +68,8 @@ export const POSITION_OPTIONS: Array<{ value: CaptionPosition; label: string }> 
 
 export const layoutLabel = (layout: Layout) =>
   LAYOUT_OPTIONS.find((o) => o.value === layout)?.label ?? layout;
+export const positionLabel = (position: CaptionPosition) =>
+  POSITION_OPTIONS.find((o) => o.value === position)?.label ?? position;
 export const styleLabel = (style: CaptionStyle) =>
   STYLE_OPTIONS.find((o) => o.value === style)?.label ?? style;
 
@@ -98,6 +100,52 @@ export function describeEdit(edit: Pick<ClipEdit, "layout" | "captions_enabled" 
       : "No captions";
   return `${layoutLabel(edit.layout)} · ${captions}`;
 }
+
+/** Whether an existing edit was made with exactly these (normalized) settings. */
+export function sameSettings(edit: ClipEdit, request: EditRequest) {
+  return (
+    edit.layout === request.layout &&
+    edit.captions_enabled === request.captions_enabled &&
+    (!request.captions_enabled ||
+      (edit.caption_style === request.caption_style && edit.caption_position === request.caption_position))
+  );
+}
+
+/** "Bold captions · Bottom" or "No captions". */
+export function captionSummary(edit: Pick<ClipEdit, "captions_enabled" | "caption_style" | "caption_position">) {
+  return edit.captions_enabled && edit.caption_style && edit.caption_position
+    ? `${styleLabel(edit.caption_style)} captions · ${positionLabel(edit.caption_position)}`
+    : "No captions";
+}
+
+/** Creator-facing explanation of a failed render; infrastructure details stay server-side. */
+export function friendlyEditError(edit: Pick<ClipEdit, "error_code">): string {
+  switch (edit.error_code) {
+    case "ffmpeg_missing":
+    case "captions_unavailable":
+    case "caption_font_unavailable":
+      return "The video renderer isn't available right now. Try again in a little while.";
+    case "transcript_unavailable":
+      return "Captions need a completed transcript for this video.";
+    case "clip_missing":
+    case "clip_not_ready":
+    case "source_missing":
+    case "source_unreadable":
+      return "The source clip couldn't be read. Regenerate the clip, then try again.";
+    case "render_timeout":
+    case "time_limit":
+      return "Rendering took too long. Try again.";
+    case "storage_failure":
+    case "artifact_missing":
+      return "The finished short couldn't be saved. Try again.";
+    case "queue_unavailable":
+      return "The rendering queue is busy or offline. Try again in a moment.";
+    default:
+      return "Something went wrong while rendering. Try again.";
+  }
+}
+
+export const editorHref = (projectId: string, clipId: string) => `/projects/${projectId}/clips/${clipId}`;
 
 const base = (projectId: string, videoId: string, clipId: string) =>
   `/projects/${projectId}/videos/${videoId}/clips/${clipId}/edits`;

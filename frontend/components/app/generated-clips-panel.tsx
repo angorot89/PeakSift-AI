@@ -1,6 +1,7 @@
 "use client";
 
 import { Clapperboard, Download, Smartphone } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
 import { EmptyState, LoadingState } from "@/components/app/states";
@@ -8,7 +9,7 @@ import { buttonClasses } from "@/components/ui/button-styles";
 import { Panel } from "@/components/ui/panel";
 import { StatusPill } from "@/components/ui/status-pill";
 import { clipContentUrl, clipDownloadUrl, isClipActive, type GeneratedClip } from "@/lib/clips";
-import { isEditActive, listEdits } from "@/lib/edits";
+import { editorHref, isEditActive, listEdits } from "@/lib/edits";
 import { formatDuration, formatTimestamp } from "@/lib/format";
 
 type ShortCounts = { ready: number; active: number };
@@ -20,7 +21,7 @@ function ClipStatus({ clip }: { clip: GeneratedClip }) {
   return <StatusPill tone="processing">Rendering</StatusPill>;
 }
 
-function ClipRow({ clip, shorts }: { clip: GeneratedClip; shorts: ShortCounts | undefined }) {
+function ClipRow({ clip, shorts, projectId }: { clip: GeneratedClip; shorts: ShortCounts | undefined; projectId: string }) {
   const ready = clip.status === "ready";
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-border bg-surface-2/40 p-3 sm:flex-row sm:items-center">
@@ -70,6 +71,10 @@ function ClipRow({ clip, shorts }: { clip: GeneratedClip; shorts: ShortCounts | 
             <Download aria-hidden="true" />
             Download
           </a>
+          <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "sm")}>
+            <Smartphone aria-hidden="true" />
+            {shorts && shorts.ready > 0 ? "Open editor" : "Create short"}
+          </Link>
         </div>
       ) : null}
     </li>
@@ -164,7 +169,7 @@ export function GeneratedClipsPanel({
       ) : (
         <ul className="space-y-2">
           {ordered.map((clip) => (
-            <ClipRow key={clip.id} clip={clip} shorts={shorts.get(clip.id)} />
+            <ClipRow key={clip.id} clip={clip} shorts={shorts.get(clip.id)} projectId={projectId} />
           ))}
         </ul>
       )}
