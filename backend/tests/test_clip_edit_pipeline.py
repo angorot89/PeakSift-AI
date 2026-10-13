@@ -201,6 +201,7 @@ class SpyComposer:
         caption_font,
         heartbeat,
         crop_points=None,
+        focus=None,
     ):
         self.calls.append(
             {
@@ -211,6 +212,7 @@ class SpyComposer:
                 "captions": captions,
                 "caption_font": caption_font,
                 "crop_points": crop_points,
+                "focus": focus,
             }
         )
         self.captions_text = (workspace / "captions.ass").read_text() if captions else None

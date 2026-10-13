@@ -8,6 +8,7 @@ and therefore the same edit.
 
 import hashlib
 import json
+import math
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
@@ -30,6 +31,7 @@ class Layout(StrEnum):
     BLUR_BACKGROUND = "blur_background"  # whole frame over a blurred, filled copy
     FIT = "fit"  # whole frame on a plain dark background
     SMART_REFRAME = "smart_reframe"  # 9:16 crop following a completed face-tracking path
+    MANUAL_CROP = "manual_crop"  # fixed 9:16 crop around a focal point the user chose
 
 
 class CaptionStyle(StrEnum):
@@ -48,6 +50,18 @@ DEFAULT_CAPTION_STYLE = CaptionStyle.BOLD
 DEFAULT_CAPTION_POSITION = CaptionPosition.BOTTOM
 
 
+FOCUS_DECIMALS = 3  # 0.1 % of the frame: finer slider noise must not create a new render
+
+
+def _focus(value: float | None) -> float:
+    """A focal coordinate in [0, 1], rounded so near-identical choices share one render."""
+    if value is None or isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("Manual crop needs a focal point (x and y between 0 and 1)")
+    if not math.isfinite(value) or not 0 <= value <= 1:
+        raise ValueError("The focal point must lie inside the frame (0 to 1)")
+    return round(float(value), FOCUS_DECIMALS)
+
+
 @dataclass(frozen=True)
 class EditConfig:
     """A validated, normalized edit configuration."""
@@ -59,6 +73,9 @@ class EditConfig:
     caption_position: CaptionPosition | None
     # Smart reframe only: the completed ReframeAnalysis whose crop path the render follows.
     reframe_analysis_id: str | None = None
+    # Manual crop only: the focal point, as fractions of the display-oriented source frame.
+    focus_x: float | None = None
+    focus_y: float | None = None
 
     @classmethod
     def create(
@@ -70,6 +87,8 @@ class EditConfig:
         caption_style: str | None = None,
         caption_position: str | None = None,
         reframe_analysis_id: str | uuid.UUID | None = None,
+        focus_x: float | None = None,
+        focus_y: float | None = None,
     ) -> "EditConfig":
         """Validate against the allow-lists (ValueError otherwise) and normalize."""
         ratio = AspectRatio(aspect_ratio)
@@ -81,15 +100,18 @@ class EditConfig:
             if reframe_analysis_id is None:
                 raise ValueError("Smart reframe needs a completed framing analysis")
             analysis = str(uuid.UUID(str(reframe_analysis_id)))
+        focus = (None, None)
+        if chosen_layout == Layout.MANUAL_CROP:
+            focus = (_focus(focus_x), _focus(focus_y))
         if not captions_enabled:
             # Style and position are meaningless without captions: drop them so equivalent
             # requests share one fingerprint (and one render).
-            return cls(ratio, chosen_layout, False, None, None, analysis)
+            return cls(ratio, chosen_layout, False, None, None, analysis, *focus)
         style = CaptionStyle(caption_style) if caption_style else DEFAULT_CAPTION_STYLE
         position = (
             CaptionPosition(caption_position) if caption_position else DEFAULT_CAPTION_POSITION
         )
-        return cls(ratio, chosen_layout, True, style, position, analysis)
+        return cls(ratio, chosen_layout, True, style, position, analysis, *focus)
 
     @classmethod
     def from_snapshot(cls, snapshot: dict[str, Any]) -> "EditConfig":
@@ -103,6 +125,8 @@ class EditConfig:
             caption_style=captions.get("style"),
             caption_position=captions.get("position"),
             reframe_analysis_id=(snapshot.get("reframe") or {}).get("analysis_id"),
+            focus_x=(snapshot.get("focus") or {}).get("x"),
+            focus_y=(snapshot.get("focus") or {}).get("y"),
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -124,6 +148,8 @@ class EditConfig:
         }
         if self.layout == Layout.SMART_REFRAME:
             snapshot["reframe"] = {"analysis_id": self.reframe_analysis_id}
+        if self.layout == Layout.MANUAL_CROP:
+            snapshot["focus"] = {"x": self.focus_x, "y": self.focus_y}
         return snapshot
 
     def fingerprint(self) -> str:

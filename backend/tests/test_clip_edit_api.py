@@ -42,6 +42,8 @@ EDIT_KEYS = {
     "caption_style",
     "caption_position",
     "reframe_analysis_id",
+    "focus_x",
+    "focus_y",
     "output_width",
     "output_height",
     "render_profile",

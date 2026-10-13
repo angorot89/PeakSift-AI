@@ -62,8 +62,15 @@ class ClipEdit(Base):
         CheckConstraint("attempt >= 1", name="ck_clip_edits_attempt_positive"),
         CheckConstraint("output_width > 0 AND output_height > 0", name="ck_clip_edits_output"),
         CheckConstraint(
-            "layout IN ('center_crop', 'blur_background', 'fit', 'smart_reframe')",
+            "layout IN ('center_crop', 'blur_background', 'fit', 'smart_reframe', 'manual_crop')",
             name="ck_clip_edits_layout",
+        ),
+        CheckConstraint(
+            # A manual crop has exactly one focal point inside the frame; other layouts none.
+            "(layout = 'manual_crop' AND focus_x IS NOT NULL AND focus_y IS NOT NULL "
+            "AND focus_x >= 0 AND focus_x <= 1 AND focus_y >= 0 AND focus_y <= 1) "
+            "OR (layout <> 'manual_crop' AND focus_x IS NULL AND focus_y IS NULL)",
+            name="ck_clip_edits_focus",
         ),
         CheckConstraint(
             # A smart reframe follows exactly one analysis; other layouts never reference one.
@@ -106,6 +113,9 @@ class ClipEdit(Base):
     reframe_analysis_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("reframe_analyses.id", ondelete="CASCADE"), index=True
     )
+    # Manual crop only: the chosen focal point (fractions of the display-oriented source).
+    focus_x: Mapped[float | None] = mapped_column(Float)
+    focus_y: Mapped[float | None] = mapped_column(Float)
     output_width: Mapped[int] = mapped_column(Integer)
     output_height: Mapped[int] = mapped_column(Integer)
     render_profile: Mapped[str] = mapped_column(String(32))
