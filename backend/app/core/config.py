@@ -134,7 +134,10 @@ class Settings(BaseSettings):
     # --- Smart reframing (Milestone 7) -------------------------------------------------
     # Server configuration only: users never choose a detector, model file or tuning value.
     # Geometry is normalized to the display-oriented source frame (0..1 in x and y).
-    reframe_detector: str = Field(default="mediapipe_face", pattern=r"^[a-z0-9_]{1,32}$")
+    reframe_detector: str = Field(default="yunet_face", pattern=r"^[a-z0-9_]{1,32}$")
+    # Where the detector's model file lives. It is never committed and never downloaded
+    # automatically: run `python scripts/fetch_reframe_model.py` once (pinned URL + sha256).
+    reframe_model_path: str = "./models/face_detection_yunet_2023mar.onnx"
     # Frames analysed per second of clip, and the width they are downscaled to for detection.
     reframe_sample_fps: float = Field(default=2.0, gt=0, le=10)
     reframe_analysis_width: int = Field(default=640, ge=160, le=1920)
