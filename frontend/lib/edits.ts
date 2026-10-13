@@ -1,7 +1,7 @@
 import { API_URL, apiFetch, postJson } from "@/lib/api";
 
 export type EditStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
-export type Layout = "center_crop" | "blur_background" | "fit";
+export type Layout = "center_crop" | "blur_background" | "fit" | "smart_reframe" | "manual_crop";
 export type CaptionStyle = "clean" | "bold" | "creator";
 export type CaptionPosition = "top" | "center" | "bottom";
 
@@ -12,6 +12,11 @@ export type EditRequest = {
   captions_enabled: boolean;
   caption_style?: CaptionStyle;
   caption_position?: CaptionPosition;
+  /** smart_reframe only: a completed analysis of this clip. */
+  reframe_analysis_id?: string;
+  /** manual_crop only: the focal point, fractions of the frame (0..1). */
+  focus_x?: number;
+  focus_y?: number;
 };
 
 export type ClipEdit = {
@@ -28,6 +33,9 @@ export type ClipEdit = {
   captions_enabled: boolean;
   caption_style: CaptionStyle | null;
   caption_position: CaptionPosition | null;
+  reframe_analysis_id: string | null;
+  focus_x: number | null;
+  focus_y: number | null;
   output_width: number;
   output_height: number;
   render_profile: string;
@@ -48,11 +56,23 @@ export type ClipEdit = {
 
 export type ClipEditPage = { total: number; offset: number; limit: number; edits: ClipEdit[] };
 
-export const LAYOUT_OPTIONS: Array<{ value: Layout; label: string; hint: string }> = [
+/** What the layout picker offers; manual crop is chosen inside the Smart reframe panel. */
+export type PickableLayout = "center_crop" | "blur_background" | "fit" | "smart_reframe";
+
+export const LAYOUT_OPTIONS: Array<{ value: PickableLayout; label: string; hint: string }> = [
+  { value: "smart_reframe", label: "Smart reframe", hint: "Follows faces with a smooth vertical crop" },
   { value: "center_crop", label: "Center crop", hint: "Fills the vertical screen, edges cropped" },
   { value: "blur_background", label: "Blur background", hint: "Full original frame over a blurred fill" },
   { value: "fit", label: "Fit", hint: "Full original frame on a dark background" },
 ];
+
+const LAYOUT_LABELS: Record<Layout, string> = {
+  smart_reframe: "Smart reframe",
+  manual_crop: "Manual crop",
+  center_crop: "Center crop",
+  blur_background: "Blur background",
+  fit: "Fit",
+};
 
 export const STYLE_OPTIONS: Array<{ value: CaptionStyle; label: string; hint: string }> = [
   { value: "clean", label: "Clean", hint: "Regular white, thin outline" },
@@ -66,8 +86,7 @@ export const POSITION_OPTIONS: Array<{ value: CaptionPosition; label: string }> 
   { value: "bottom", label: "Bottom" },
 ];
 
-export const layoutLabel = (layout: Layout) =>
-  LAYOUT_OPTIONS.find((o) => o.value === layout)?.label ?? layout;
+export const layoutLabel = (layout: Layout) => LAYOUT_LABELS[layout] ?? layout;
 export const positionLabel = (position: CaptionPosition) =>
   POSITION_OPTIONS.find((o) => o.value === position)?.label ?? position;
 export const styleLabel = (style: CaptionStyle) =>
@@ -101,13 +120,19 @@ export function describeEdit(edit: Pick<ClipEdit, "layout" | "captions_enabled" 
   return `${layoutLabel(edit.layout)} · ${captions}`;
 }
 
-/** Whether an existing edit was made with exactly these (normalized) settings. */
+const round3 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 1000) / 1000);
+
+/** Whether an existing edit was made with exactly these settings, normalized like the
+ * server's fingerprint (focal points to 0.1 %). */
 export function sameSettings(edit: ClipEdit, request: EditRequest) {
   return (
     edit.layout === request.layout &&
     edit.captions_enabled === request.captions_enabled &&
     (!request.captions_enabled ||
-      (edit.caption_style === request.caption_style && edit.caption_position === request.caption_position))
+      (edit.caption_style === request.caption_style && edit.caption_position === request.caption_position)) &&
+    (request.layout !== "smart_reframe" || edit.reframe_analysis_id === request.reframe_analysis_id) &&
+    (request.layout !== "manual_crop" ||
+      (round3(edit.focus_x) === round3(request.focus_x) && round3(edit.focus_y) === round3(request.focus_y)))
   );
 }
 
@@ -138,6 +163,9 @@ export function friendlyEditError(edit: Pick<ClipEdit, "error_code">): string {
     case "storage_failure":
     case "artifact_missing":
       return "The finished short couldn't be saved. Try again.";
+    case "reframe_unavailable":
+    case "invalid_path":
+      return "The smart framing for this clip is no longer usable. Analyze the framing again, or set a focal point.";
     case "queue_unavailable":
       return "The rendering queue is busy or offline. Try again in a moment.";
     default:

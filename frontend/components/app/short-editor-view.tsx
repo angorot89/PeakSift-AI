@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, Plus, RotateCcw, Smartphone, Wand2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, Plus, RotateCcw, ScanFace, Smartphone, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { CaptionSwitch, LayoutPicker, PositionPicker, StylePicker } from "@/components/app/editor/controls";
-import { NineBySixteenFrame, PreviewStage } from "@/components/app/editor/preview-stage";
+import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from "@/components/app/editor/preview-stage";
+import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
 import { VersionList } from "@/components/app/editor/versions";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
@@ -36,10 +37,20 @@ import {
   type CaptionStyle,
   type ClipEdit,
   type EditRequest,
-  type Layout,
+  type PickableLayout,
 } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { getProject, isProjectId, type Project } from "@/lib/projects";
+import {
+  getAnalysis,
+  getCropPath,
+  getCurrentAnalysis,
+  isAnalysisActive,
+  retryAnalysis,
+  startAnalysis,
+  type CropPath,
+  type ReframeAnalysis,
+} from "@/lib/reframe";
 import { getTranscriptPage } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
 import { listProjectVideos } from "@/lib/videos";
@@ -63,7 +74,14 @@ async function sampleCaption(projectId: string, clip: GeneratedClip): Promise<st
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
   const id = useId();
-  const [layout, setLayout] = useState<Layout>("blur_background");
+  const [layout, setLayout] = useState<PickableLayout>("blur_background");
+  const [framingMode, setFramingMode] = useState<FramingMode>("auto");
+  const [focus, setFocus] = useState({ x: 0.5, y: 0.5 });
+  // undefined = still loading, null = never analyzed with the server's current configuration.
+  const [analysis, setAnalysis] = useState<ReframeAnalysis | null | undefined>(undefined);
+  const [cropPath, setCropPath] = useState<CropPath | null>(null);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [captions, setCaptions] = useState(true);
   const [style, setStyle] = useState<CaptionStyle>("bold");
   const [position, setPosition] = useState<CaptionPosition>("bottom");
@@ -126,16 +144,100 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     return () => window.clearInterval(timer);
   }, [anyActive, refresh]);
 
+  // ---- smart framing analysis -------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentAnalysis(project.id, clip.video_id, clip.id)
+      .then((current) => {
+        if (!cancelled) setAnalysis(current);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setAnalysis(null);
+        setAnalysisError(handleError(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, clip.video_id, clip.id, handleError]);
+
+  // Poll only while the analysis is really running.
+  const analysisId = analysis?.id ?? null;
+  const analysisRunning = !!analysis && isAnalysisActive(analysis.status) && !analysis.is_stale;
+  useEffect(() => {
+    if (!analysisRunning || !analysisId) return;
+    const timer = window.setInterval(() => {
+      getAnalysis(project.id, clip.video_id, clip.id, analysisId)
+        .then(setAnalysis)
+        .catch((err: unknown) => setAnalysisError(handleError(err)));
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [analysisRunning, analysisId, project.id, clip.video_id, clip.id, handleError]);
+
+  // The crop path drives the live preview once the analysis has completed.
+  const analysisDone = analysis?.status === "completed";
+  useEffect(() => {
+    if (!analysisDone || !analysisId) return;
+    let cancelled = false;
+    getCropPath(project.id, clip.video_id, clip.id, analysisId)
+      .then((path) => {
+        if (!cancelled) setCropPath(path);
+      })
+      .catch(() => {
+        if (!cancelled) setCropPath(null); // the preview stays centered; rendering is unaffected
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisDone, analysisId, project.id, clip.video_id, clip.id]);
+
+  async function analyze(retrying: boolean) {
+    if (analysisBusy) return;
+    setAnalysisBusy(true);
+    setAnalysisError(null);
+    try {
+      const next =
+        retrying && analysis
+          ? await retryAnalysis(project.id, clip.video_id, clip.id, analysis.id)
+          : await startAnalysis(project.id, clip.video_id, clip.id);
+      setCropPath(null);
+      setAnalysis(next);
+    } catch (err) {
+      setAnalysisError(handleError(err));
+    } finally {
+      setAnalysisBusy(false);
+    }
+  }
+
+  const smart = layout === "smart_reframe";
+  const manual = smart && framingMode === "manual";
+  const sourceWidth = clip.width ?? cropPath?.source_width ?? analysis?.source_width ?? null;
+  const sourceHeight = clip.height ?? cropPath?.source_height ?? analysis?.source_height ?? null;
+  const pathKeyframes = analysisDone && cropPath?.analysis_id === analysisId ? cropPath.keyframes : null;
+  const framing: Framing = useMemo(
+    () =>
+      manual
+        ? { kind: "focus", x: focus.x, y: focus.y }
+        : pathKeyframes
+          ? { kind: "path", keyframes: pathKeyframes }
+          : { kind: "center" },
+    [manual, focus, pathKeyframes],
+  );
+  // Automatic framing can render only from a completed analysis of this clip.
+  const awaitingAnalysis = smart && !manual && !analysisDone;
+
   const request: EditRequest = useMemo(
     () => ({
       aspect_ratio: "9:16",
-      layout,
+      layout: manual ? "manual_crop" : layout,
       captions_enabled: captions,
       ...(captions ? { caption_style: style, caption_position: position } : {}),
+      ...(smart && !manual && analysisDone && analysisId ? { reframe_analysis_id: analysisId } : {}),
+      ...(manual ? { focus_x: focus.x, focus_y: focus.y } : {}),
     }),
-    [layout, captions, style, position],
+    [layout, manual, smart, captions, style, position, analysisDone, analysisId, focus],
   );
-  const match = edits?.find((e) => sameSettings(e, request)) ?? null;
+  const match = awaitingAnalysis ? null : (edits?.find((e) => sameSettings(e, request)) ?? null);
   const matchActive = !!match && isEditActive(match.status) && !match.is_stale;
   const matchStuck = !!match && (match.status === "failed" || (isEditActive(match.status) && match.is_stale));
   const readyEdits = edits?.filter((e) => e.status === "ready") ?? [];
@@ -163,7 +265,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   }
 
   async function render() {
-    if (busy || matchActive) return; // no duplicate submissions (the API deduplicates too)
+    if (busy || matchActive || awaitingAnalysis) return; // no duplicate submissions (the API deduplicates too)
     if (match?.status === "ready") {
       showRendered(match);
       return;
@@ -194,7 +296,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 
   const backToProject = `/projects/${project.id}#generated`;
   const renderedName = selected ? `${layoutLabel(selected.layout)} · ${captionSummary(selected)}` : "";
-  const settingsSummary = `${layoutLabel(layout)} · ${
+  const settingsSummary = `${layoutLabel(request.layout)} · ${
     captions ? `${styleLabel(style)} captions · ${positionLabel(position)}` : "No captions"
   }`;
 
@@ -234,6 +336,20 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           <RotateCcw aria-hidden="true" />
           {retryingId === match.id ? "Retrying…" : "Retry render"}
         </Button>
+      </div>
+    );
+  } else if (awaitingAnalysis) {
+    action = (
+      <div className="space-y-2">
+        <Button size="lg" className="w-full" disabled>
+          <Wand2 aria-hidden="true" />
+          Render short
+        </Button>
+        <p className="text-center text-xs text-subtle">
+          {analysis && isAnalysisActive(analysis.status) && !analysis.is_stale
+            ? "Available when the framing analysis finishes."
+            : "Analyze the framing first, or set a focal point."}
+        </p>
       </div>
     );
   } else {
@@ -342,14 +458,35 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             ) : (
               <div className="space-y-3">
                 <div className="relative">
-                  <PreviewStage
-                    clipSrc={clipContentUrl(clip.id)}
-                    layout={layout}
-                    captions={captions}
-                    style={style}
-                    position={position}
-                    sampleText={sample}
-                  />
+                  {smart && sourceWidth && sourceHeight ? (
+                    <ReframedPreview
+                      clipSrc={clipContentUrl(clip.id)}
+                      sourceWidth={sourceWidth}
+                      sourceHeight={sourceHeight}
+                      framing={framing}
+                      captions={captions}
+                      style={style}
+                      position={position}
+                      sampleText={sample}
+                      badge={
+                        framing.kind === "center" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                            <ScanFace aria-hidden="true" className="size-3" />
+                            Centered until framing is analyzed
+                          </span>
+                        ) : null
+                      }
+                    />
+                  ) : (
+                    <PreviewStage
+                      clipSrc={clipContentUrl(clip.id)}
+                      layout={smart ? "center_crop" : layout}
+                      captions={captions}
+                      style={style}
+                      position={position}
+                      sampleText={sample}
+                    />
+                  )}
                 </div>
                 <p className="mx-auto max-w-sm text-center text-xs text-pretty text-subtle">
                   Preview only — layout and caption placement are approximate. The rendered MP4 is the final result.
@@ -370,7 +507,31 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             <p className="mt-0.5 text-sm text-muted">Choose how this clip becomes a vertical short.</p>
           </div>
           <div className="space-y-6 px-4 py-5 sm:px-5">
-            <LayoutPicker value={layout} onChange={setLayout} name={`${id}-layout`} />
+            <div className="space-y-3">
+              <LayoutPicker value={layout} onChange={setLayout} name={`${id}-layout`} />
+              {smart ? (
+                <div className="animate-fade-in space-y-2">
+                  <SmartReframePanel
+                    name={`${id}-framing`}
+                    mode={framingMode}
+                    onModeChange={setFramingMode}
+                    analysis={analysis}
+                    busy={analysisBusy}
+                    onAnalyze={() => void analyze(false)}
+                    onRetry={() => void analyze(true)}
+                    posterSrc={clipContentUrl(clip.id)}
+                    sourceWidth={sourceWidth ?? 16}
+                    sourceHeight={sourceHeight ?? 9}
+                    focusX={focus.x}
+                    focusY={focus.y}
+                    onFocusChange={(x, y) => setFocus({ x, y })}
+                  />
+                  {analysisError ? (
+                    <InlineAlert title="Smart framing is unavailable">{analysisError}</InlineAlert>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-4">
               <CaptionSwitch checked={captions} onChange={setCaptions} />
               <StylePicker value={style} onChange={setStyle} name={`${id}-style`} disabled={!captions} />
