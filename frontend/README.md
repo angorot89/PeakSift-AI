@@ -1,6 +1,6 @@
 # PeakSift AI — Frontend
 
-Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata, preview, transcription workflow and AI clip detection (provider choice, staged progress, ranked candidate cards with preview and save/dismiss) — all backed by the FastAPI API.
+Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata, preview, transcription workflow and AI clip detection (provider choice, staged progress, ranked candidate cards with preview and save/dismiss) and clip generation (Generate clip, real render states, rendered clip player, Download MP4) — all backed by the FastAPI API.
 
 ## Run locally
 
@@ -39,7 +39,7 @@ npm run start    # Serve the production build
 | `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
 | `/projects` | The signed-in user's projects                                       |
 | `/projects/new` | Create a project (name only)                                   |
-| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress), the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path; for a ready video, the **Transcription** panel: start, live status (polled every 4 s while queued/preparing/transcribing, real progress only), failure with retry, and the paginated timestamped transcript viewer with "Load more" and "Copy transcript"; once the transcript is complete, the **AI clip detection** panel: provider and model `<select>`s filled from `GET /clip-detection/providers` (unavailable providers are explained), "Find clip moments", staged status polled every 4 s while active, stalled/failed states with bounded retry or "Start a new detection", run history, and the candidate review — ranked cards with time range, duration, overall score and five score meters, hook, rationale, collapsible transcript excerpt, an in-page preview of just that range of the source video, Save / Dismiss / Restore with All / Saved / Dismissed filters and "Load more" |
+| `/projects/[id]` | Project details plus the source video: upload (MP4/MOV/WebM, drag-and-drop or file picker, real upload progress), the probed metadata — duration, resolution, frame rate, codecs, size — or a clear failure state with a retry path; for a ready video, the **Transcription** panel: start, live status (polled every 4 s while queued/preparing/transcribing, real progress only), failure with retry, and the paginated timestamped transcript viewer with "Load more" and "Copy transcript"; once the transcript is complete, the **AI clip detection** panel: provider and model `<select>`s filled from `GET /clip-detection/providers` (unavailable providers are explained), "Find clip moments", staged status polled every 4 s while active, stalled/failed states with bounded retry or "Start a new detection", run history, and the candidate review — ranked cards with time range, duration, overall score and five score meters, hook, rationale, collapsible transcript excerpt, an in-page preview of just that range of the source video, Save / Dismiss / Restore with All / Saved / Dismissed filters and "Load more"; on each card a **Generated clip** box: "Generate clip" (dismissed candidates must be restored first), the backend's real render states *Queued / Rendering… / Validating…* with stage progress, polled every 4 s only while active, "Render failed" with the safe message and "Retry render" (also for stalled renders), and once ready the **Rendered clip** player with duration, resolution and size plus **Download MP4**; a **Generated clips** list for the video |
 
 `/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
@@ -48,7 +48,7 @@ npm run start    # Serve the production build
 - The API sets an **HttpOnly** cookie on login/register; the frontend never sees or stores the token (nothing in `localStorage`/`sessionStorage`), and every API call uses `credentials: "include"`.
 - On page load `AuthProvider` calls `GET /auth/me` to find out who is signed in; the backend is the source of truth. The header shows **Log in / Get Started** or the user's email with **Log out**.
 - Logout calls `POST /auth/logout`, which clears the cookie.
-- The video preview is a plain `<video src="…/videos/{id}/content">`; the browser attaches the cookie because the frontend and API are same-site (`localhost` in development), and the API checks ownership on every byte-range request. Candidate previews reuse the same stream with a media fragment (`#t=start,end`) and stop at the end of the range — nothing is exported.
+- The video preview is a plain `<video src="…/videos/{id}/content">`; the browser attaches the cookie because the frontend and API are same-site (`localhost` in development), and the API checks ownership on every byte-range request. Candidate previews ("Preview source") reuse the same stream with a media fragment (`#t=start,end`) and stop at the end of the range. Rendered clips play from `<video src="…/clips/{id}/content">` with the same cookie mechanism, and **Download MP4** is a plain link to `…/clips/{id}/download` (an attachment), so nothing is buffered in JavaScript.
 
 ## Uploads
 
@@ -67,7 +67,8 @@ app/
   icon.svg         # Favicon
 components/
   app/             # App shell, route guard, dashboard/projects views, states, source video,
-                   # transcription panel + viewer, clip detection panel + candidate review
+                   # transcription panel + viewer, clip detection panel + candidate review,
+                   # clip render controls + rendered clip
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
   ui/              # Primitives: Button, ButtonLink, Field, FormError, SectionHeading
@@ -79,6 +80,7 @@ lib/
   videos.ts        # Video type, accepted formats, list + XHR upload with progress
   transcription.ts # Transcription/transcript types, start/status/retry, paginated transcript
   clip-detection.ts # Provider options, detection runs, candidates, decisions; stage labels
+  clips.ts         # Generated clips: generate/status/retry/list, content and download URLs
   use-api.ts       # Loading/error/reload hook for API data
   format.ts        # Date, bytes, duration and frame-rate formatting
 ```

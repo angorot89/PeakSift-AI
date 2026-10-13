@@ -21,9 +21,9 @@ Long-term:
 
 ## Current state
 
-**Milestones 1–4 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), and AI clip detection (transcript windows → Ollama / OpenAI structured output → validation → ranking → candidates with preview and save/dismiss; see [docs/clip-detection.md](docs/clip-detection.md)), with tests and CI.
+**Milestones 1–5 are complete** (see [docs/milestones.md](docs/milestones.md)): landing page, email/password auth, owner-scoped projects, dashboard, source-video upload with ffprobe metadata and preview, background transcription (Redis + Celery, normalized audio, chunking, faster-whisper / OpenAI providers, timestamped transcript API and viewer), and AI clip detection (transcript windows → Ollama / OpenAI structured output → validation → ranking → candidates with preview and save/dismiss; see [docs/clip-detection.md](docs/clip-detection.md)), and clip generation (candidate → background FFmpeg render → validated private MP4 with preview and download; see [docs/clip-generation.md](docs/clip-generation.md)), with tests and CI.
 
-**Next is Milestone 5 — Clip Generation.** Do not start it, or any later feature (cutting/exporting clips, captions, reframing, editor, Morocco Mode, payments), until explicitly instructed.
+**Next is Milestone 6 — Short-form Editing.** Do not start it, or any later feature (9:16 reframing, captions, caption styles, face tracking, templates, timeline editor, sound effects, music, publishing, Morocco Mode, payments), until explicitly instructed.
 
 ## Stack (as built)
 
@@ -36,7 +36,8 @@ Long-term:
 - Speech-to-text: provider contract in `app/services/transcription/`; `faster-whisper` (local, lazy) and the OpenAI SDK (`whisper-1` for timestamps); provider is server configuration
 - Clip detection: provider contract in `app/services/clip_detection/` (windowing, validation, ranking, pipeline); `ollama` (httpx against an operator-configured endpoint) and `openai` (structured outputs); users choose provider/model only from server allow-lists
 - Tooling: pytest, Ruff, ESLint, GitHub Actions (backend job installs FFmpeg)
-- Planned later: S3-compatible object storage, clip rendering
+- Clip rendering: `app/services/clip_render/` (artifact storage, FFmpeg renderer, Celery pipeline); output profile `source_mp4_v1` = fast-start MP4, libx264 + aac, source geometry
+- Planned later: S3-compatible object storage, vertical/caption render profiles
 
 ## Conventions
 
@@ -51,8 +52,9 @@ Long-term:
 - Transcript timestamps are never fabricated: a provider without segment timestamps is refused; segments are validated (and re-validated in the pipeline) and shifted to absolute time before persisting. Provider SDK objects never leave the provider module.
 - Celery tasks receive database ids only and must stay idempotent on database state; never load a speech model at import or API startup. Generate a job's task id before committing its row (fencing token), then enqueue with that id.
 - Clip candidates: everything a model returns is untrusted until `validation.py` has snapped it to transcript lines and checked bounds; never clamp or invent values, never store a model's quotation as the transcript excerpt, keep scores on the documented 0–100 editorial scale and never present them as performance predictions.
+- Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
 - Tests: Celery eager mode, mocked speech models and a fake OpenAI client; CI sets `HF_HUB_OFFLINE=1` and never has an API key.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

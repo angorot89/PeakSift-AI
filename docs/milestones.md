@@ -62,18 +62,31 @@ Delivered:
 
 Definition of done — a user can transcribe a video → choose a provider → start detection → watch queued/analyzing/ranking progress → receive ranked, explained candidates → preview each range → save or dismiss → log out and back in with the decisions kept → recover from a provider failure with retry.
 
-## Milestone 5 — Clip Generation V0.5 *(next — not started)*
+## Milestone 5 — Clip Generation V0.5 *(complete)*
 
-- Cut selected (saved) moments into short-form vertical clips with FFmpeg
-- Export files
+Delivered:
 
-## Milestone 6 — Creator Intelligence & Metadata
+- `clips` table: one rendered clip per candidate (unique), boundary snapshot, render status `queued → rendering → validating → ready | failed`, render profile `source_mp4_v1`, validated output metadata
+- Private clip storage under `MEDIA_ROOT/clips/<uuid>/` with per-attempt temp files and an atomic rename to `clip.mp4` after validation
+- FFmpeg renderer: re-encoded with input seeking (frame-accurate start, never stream copy) to fast-start MP4, H.264 (libx264, yuv420p) + AAC when the source has audio, original resolution, aspect ratio and orientation; ffprobe validation of codec, size, duration and audio
+- Background render pipeline on the existing Redis + Celery worker: idempotent on database state, pre-committed task id as fencing token checked on every commit, heartbeats and stale detection, honest stage progress, safe failure codes, bounded retry on the same clip
+- API: generate (from the persisted candidate only; dismissed candidates must be restored), status, retry, per-video listing; private Range-streamed preview and attachment download with sanitised filenames — all owner-scoped
+- Frontend: Generate clip on candidate cards, real render states, failure and stalled states with retry, rendered clip player, Download MP4, generated clips list
+- Hardening (zombie-worker fencing, ready-but-missing reconciliation, FFmpeg kill on abnormal exit, path redaction in logs), CI (libx264/aac gate, real end-to-end renders) and documentation ([clip-generation.md](clip-generation.md))
 
-- Titles, hooks, descriptions, and other metadata for generated clips
+Definition of done — a user can review a candidate → Generate clip → watch queued/rendering/validating → preview the rendered MP4 → download it → log out and back in with the clip still there → recover from a render failure with retry.
+
+## Milestone 6 — Short-form Editing *(next — not started)*
+
+- Vertical (9:16) layouts and reframing for generated clips
+- Captions and caption styles
+- Trimming and simple editing of generated clips
 
 ## Later
 
-- Clip editor (captions, hooks, sound effects)
+- Creator intelligence & metadata (titles, hooks, descriptions)
+- Publishing integrations
+- Sound effects and music
 - Global asset libraries
 - Morocco Mode (localization layer extending Global). Before any Moroccan accuracy claim, benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio — none of that has been tested yet.
 - Additional localization
