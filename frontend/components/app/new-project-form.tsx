@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { buttonClasses } from "@/components/ui/button-styles";
 import { Field } from "@/components/ui/field";
 import { FormError } from "@/components/ui/form-error";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -47,19 +48,15 @@ export function NewProjectForm() {
   return (
     <div className="mx-auto max-w-xl">
       <PageHeader
-        eyebrow={
-          <Link href="/projects" className="hover:text-foreground">
-            ← Projects
-          </Link>
-        }
+        back={{ href: "/projects", label: "Projects" }}
         title="New project"
         description="Name the recording you want to clip, then upload its source video on the next page."
       />
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6">
         <Field
           id="name"
           label="Project name"
-          placeholder="Kai Cenat Stream — September 28"
+          placeholder="Friday stream — September 28"
           autoComplete="off"
           autoFocus
           required
@@ -72,7 +69,7 @@ export function NewProjectForm() {
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Link
             href="/projects"
-            className="inline-flex h-9 items-center justify-center rounded-full px-4 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={buttonClasses("ghost")}
           >
             Cancel
           </Link>

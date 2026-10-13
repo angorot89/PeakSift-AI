@@ -14,9 +14,9 @@ export function ClosingCta() {
               Your next long-form video already has its best clips in it.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-pretty text-muted sm:text-lg">
-              PeakSift is in early development. You can create an account,
-              set up projects and upload source videos today; transcription
-              and AI clip detection are next on the roadmap.
+              Upload a recording, get a timestamped transcript, let AI rank
+              the moments worth clipping, then render them as vertical shorts
+              with captions — all in one workspace.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <ButtonLink href="/register" size="lg" className="w-full sm:w-auto">

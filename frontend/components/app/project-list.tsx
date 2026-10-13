@@ -1,22 +1,29 @@
+import { ArrowUpRight, Folder } from "lucide-react";
 import Link from "next/link";
-import { StatusBadge } from "@/components/app/status-badge";
 import { formatDate } from "@/lib/format";
 import type { Project } from "@/lib/projects";
 
+/** Projects as scannable cards: name first, creation date as quiet metadata. */
 export function ProjectList({ projects }: { projects: Project[] }) {
   return (
-    <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {projects.map((project) => (
         <li key={project.id}>
           <Link
             href={`/projects/${project.id}`}
-            className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.03] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            className="group flex h-full items-start gap-3 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <div className="min-w-0">
-              <p className="truncate font-medium text-foreground">{project.name}</p>
-              <p className="mt-0.5 text-xs text-muted">Created {formatDate(project.created_at)}</p>
-            </div>
-            <StatusBadge status={project.status} />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted transition-colors group-hover:text-accent-soft">
+              <Folder aria-hidden="true" className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="line-clamp-2 font-medium break-words text-foreground">{project.name}</span>
+              <span className="mt-1 block text-xs text-subtle">Created {formatDate(project.created_at)}</span>
+            </span>
+            <ArrowUpRight
+              aria-hidden="true"
+              className="size-4 shrink-0 text-subtle transition-colors group-hover:text-foreground"
+            />
           </Link>
         </li>
       ))}

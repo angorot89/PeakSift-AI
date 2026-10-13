@@ -1,21 +1,36 @@
 @import "tailwindcss";
 
 :root {
+  /* Surfaces, from the page outwards: page < panel < raised control/inset. */
   --background: #09090b;
-  --foreground: #fafafa;
   --surface: #111113;
+  --surface-2: #18181b;
+  --surface-3: #202024;
   --border: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.16);
+  /* Text: primary, secondary (≥ 7:1 on panels), tertiary metadata (≥ 4.5:1). */
+  --foreground: #fafafa;
   --muted: #a1a1aa;
-  --subtle: #82828b;
+  --subtle: #8b8b94;
+  /* One brand accent, used sparingly; status colours only for state. */
   --accent: #f97316;
   --accent-soft: #fdba74;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
@@ -24,6 +39,29 @@
   --font-mono: var(--font-geist-mono);
 
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 
   @keyframes fade-up {
     from {
@@ -45,6 +83,12 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Timestamps, durations and counters line up in columns. */
+time,
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 ::selection {
