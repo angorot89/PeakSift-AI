@@ -10,7 +10,9 @@ export function NineBySixteenFrame({ children, label }: { children: ReactNode; l
     <div
       role="group"
       aria-label={label}
-      className="relative mx-auto aspect-[9/16] h-[min(64vh,600px)] max-w-full overflow-hidden rounded-[22px] border border-white/12 bg-black shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-black"
+      // Sized by width with a locked 9:16 ratio, capped so the frame never exceeds
+      // min(64vh, 600px) in height: it stays exactly 9:16 at every screen width.
+      className="relative mx-auto aspect-[9/16] w-full max-w-[calc(min(64vh,600px)*0.5625)] overflow-hidden rounded-[22px] border border-white/12 bg-black shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-black"
       style={{ containerType: "size" }}
     >
       {children}
@@ -72,7 +74,7 @@ export function PreviewStage({ clipSrc, layout, captions, style, position, sampl
           playsInline
           preload="metadata"
           src={`${clipSrc}#t=0.1`}
-          className="absolute inset-0 size-full scale-110 object-cover blur-xl brightness-75"
+          className="absolute inset-0 size-full scale-110 object-cover blur-xl"
         />
       ) : null}
       {layout === "fit" ? <div aria-hidden="true" className="absolute inset-0 bg-[#111113]" /> : null}
