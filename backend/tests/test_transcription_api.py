@@ -34,13 +34,16 @@ STATUS_KEYS = {
 
 
 @pytest.fixture(autouse=True)
-def fake_queue(monkeypatch):
-    """Never run the real pipeline from the API tests; record what would be queued."""
+def fake_queue(monkeypatch, db_session):
+    """Never run the real pipeline; record what would be queued and prove the fencing token
+    was committed on the row before the job was handed to the broker."""
     queued: list[uuid.UUID] = []
 
-    def fake_enqueue(transcription_id):
+    def fake_enqueue(transcription_id, *, task_id):
+        row = db_session.get(Transcription, transcription_id)
+        assert row is not None and row.celery_task_id == task_id
         queued.append(transcription_id)
-        return f"task-{len(queued)}"
+        return task_id
 
     monkeypatch.setattr(api, "enqueue_transcription", fake_enqueue)
     return queued
@@ -150,7 +153,7 @@ def test_start_queues_a_job(client: TestClient, db_session: Session, fake_queue)
 
     transcription = db_session.get(Transcription, uuid.UUID(body["id"]))
     assert fake_queue == [transcription.id]
-    assert transcription.celery_task_id == "task-1"
+    assert uuid.UUID(transcription.celery_task_id)  # pre-chosen, committed before enqueue
 
 
 def test_start_is_idempotent_for_queued_running_and_completed(client, db_session, fake_queue):
@@ -199,7 +202,7 @@ def test_queue_outage_leaves_no_orphan_row(client, db_session, monkeypatch):
     sign_up(client)
     project_id, video_id = ready_video(client, db_session)
 
-    def down(transcription_id):
+    def down(transcription_id, *, task_id):
         raise JobQueueUnavailable("down")
 
     monkeypatch.setattr(api, "enqueue_transcription", down)
@@ -275,7 +278,7 @@ def test_retry_requeues_a_failed_job(client, db_session, fake_queue):
         and body["error_code"] is None
         and body["error_message"] is None
     )
-    assert len(fake_queue) == 2 and t.celery_task_id == "task-2"
+    assert len(fake_queue) == 2 and uuid.UUID(t.celery_task_id)
 
 
 @pytest.mark.parametrize("status", ["queued", "extracting_audio", "transcribing", "completed"])
@@ -410,7 +413,7 @@ def test_retry_resets_a_stale_job(client, db_session, fake_queue):
 
     assert response.status_code == 200
     assert response.json()["status"] == "queued" and response.json()["is_stale"] is False
-    assert len(fake_queue) == 2 and t.celery_task_id == "task-2"
+    assert len(fake_queue) == 2 and uuid.UUID(t.celery_task_id)
 
 
 def test_retry_refuses_a_live_job_with_fresh_heartbeat(client, db_session, fake_queue):
@@ -425,3 +428,37 @@ def test_retry_refuses_a_live_job_with_fresh_heartbeat(client, db_session, fake_
 
     assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 409
     assert len(fake_queue) == 1
+
+
+def test_retry_issues_a_new_token_committed_before_enqueue(client, db_session, fake_queue):
+    """The V0.3 flow stored the new task id *after* enqueueing, so a fast worker could start
+    while the row still held the previous attempt's token. Now the token comes first."""
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    created = client.post(f"{base(project_id, video_id)}/transcription").json()
+    row = db_session.get(Transcription, uuid.UUID(created["id"]))
+    first_token = row.celery_task_id
+    row.status = "failed"
+    db_session.commit()
+
+    assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 200
+
+    db_session.refresh(row)
+    assert row.celery_task_id != first_token and uuid.UUID(row.celery_task_id)
+    assert len(fake_queue) == 2  # fake_queue asserted the token was already on the row
+
+
+def test_retry_when_queue_is_down_marks_the_job_failed(client, db_session, monkeypatch):
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    created = client.post(f"{base(project_id, video_id)}/transcription").json()
+    db_session.get(Transcription, uuid.UUID(created["id"])).status = "failed"
+    db_session.commit()
+
+    def down(transcription_id, *, task_id):
+        raise JobQueueUnavailable("down")
+
+    monkeypatch.setattr(api, "enqueue_transcription", down)
+    assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 503
+    body = client.get(f"{base(project_id, video_id)}/transcription").json()
+    assert body["status"] == "failed" and body["error_code"] == "queue_unavailable"

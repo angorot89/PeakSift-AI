@@ -120,7 +120,7 @@ def run_clip_detection(
     except PipelineSuperseded:
         logger.info("Clip detection %s was taken over by a newer task; stopping", run.id)
     except (PipelineFailure, TranscriptError, ClipProviderError) as error:
-        _fail(run, db, error.code, error.message)
+        _fail(run, db, error.code, error.message, task_id=task_id)
     except SoftTimeLimitExceeded:
         # Celery's soft limit: record an honest, retryable-by-the-user failure instead of a
         # generic one, and leave the row consistent before the hard limit kills the process.
@@ -130,10 +130,11 @@ def run_clip_detection(
             "time_limit",
             "The detection ran longer than the worker allows; retry with a faster model "
             "or a smaller transcript",
+            task_id=task_id,
         )
     except Exception:
         logger.exception("Unexpected error detecting clips for run %s", run.id)
-        _fail(run, db, "internal_error", "Unexpected error during clip detection")
+        _fail(run, db, "internal_error", "Unexpected error during clip detection", task_id=task_id)
     return run
 
 
@@ -193,7 +194,7 @@ def _execute(
     run.windows_total = len(windows)
     run.progress_percent = PREPARED_PROGRESS
     run.status = ClipDetectionStatus.ANALYZING
-    _heartbeat(run, db)
+    _heartbeat(run, db, task_id)
 
     provider = provider_factory(run.provider, run.model, settings)
     video_duration = float(run.video.duration_seconds or 0.0)
@@ -223,12 +224,11 @@ def _execute(
             run.progress_percent,
             PREPARED_PROGRESS + int(ANALYZING_SPAN * position / len(windows)),
         )
-        _ensure_still_owner(run, db, task_id)
-        _heartbeat(run, db)  # one transaction per window
+        _heartbeat(run, db, task_id)  # one transaction per window (ownership checked)
 
     run.status = ClipDetectionStatus.VALIDATING
     run.progress_percent = VALIDATING_PROGRESS
-    _heartbeat(run, db)
+    _heartbeat(run, db, task_id)
     # The transcript must still be the snapshot this run was started from.
     if transcript_fingerprint(run.transcription_id, _load_transcript(run, db, config)) != (
         run.transcript_fingerprint
@@ -240,7 +240,7 @@ def _execute(
 
     run.status = ClipDetectionStatus.RANKING
     run.progress_percent = RANKING_PROGRESS
-    _heartbeat(run, db)
+    _heartbeat(run, db, task_id)
     ranked = rank_candidates(
         accepted, overlap_threshold=config.overlap_threshold, limit=config.target_candidates
     )
@@ -274,7 +274,7 @@ def _execute(
     run.status = ClipDetectionStatus.COMPLETED
     run.progress_percent = 100
     run.completed_at = _now()
-    _heartbeat(run, db)
+    _heartbeat(run, db, task_id)
     logger.info(
         "Clip detection %s completed: %s candidates kept from %s accepted (%s rejected) "
         "across %s windows",
@@ -358,13 +358,29 @@ def _ensure_still_owner(run: ClipDetectionRun, db: Session, task_id: str | None)
         raise PipelineSuperseded()
 
 
-def _heartbeat(run: ClipDetectionRun, db: Session) -> None:
+def _heartbeat(run: ClipDetectionRun, db: Session, task_id: str | None = None) -> None:
+    """Commit progress — but only while this task still owns the run."""
+    _ensure_still_owner(run, db, task_id)
     run.heartbeat_at = _now()
     db.commit()
 
 
-def _fail(run: ClipDetectionRun, db: Session, code: str, message: str) -> None:
+def _fail(
+    run: ClipDetectionRun, db: Session, code: str, message: str, *, task_id: str | None = None
+) -> None:
     db.rollback()  # discard anything uncommitted from the failed step
+    current = (
+        db.scalar(select(ClipDetectionRun.celery_task_id).where(ClipDetectionRun.id == run.id))
+        if task_id
+        else None
+    )
+    if current and current != task_id:
+        logger.info(
+            "Clip detection %s failed (%s) after being taken over; newer attempt untouched",
+            run.id,
+            code,
+        )
+        return
     run.status = ClipDetectionStatus.FAILED
     run.error_code = code[:64]
     run.error_message = message[:MAX_ERROR_LENGTH]

@@ -6,6 +6,12 @@ heartbeat) is never started twice, and a retry starts from a clean slate.
 
 Progress is real: 0 while queued, 5 once audio is ready, then 5 + 95 × chunks done /
 chunks total, 100 on completion. It never moves backwards during a run.
+
+Attempt ownership: the Celery task id committed on the row (before the job is enqueued) is
+the fencing token. Every commit and the failure path re-read it; a worker whose attempt was
+superseded by a retry stops without writing — it cannot overwrite progress, mark the newer
+attempt failed or completed, or delete its segments. Each attempt also works in its own
+``transcription/<id>/<attempt>/`` directory, so it never touches another attempt's files.
 """
 
 import logging
@@ -14,7 +20,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -28,7 +34,9 @@ from app.services.storage import LocalMediaStorage
 from app.services.transcription.chunking import (
     AudioChunk,
     ChunkingError,
+    attempt_workspace,
     cleanup_chunks,
+    cleanup_other_workspaces,
     shift_segments,
     split_audio,
 )
@@ -107,25 +115,29 @@ def run_transcription(
         return None
     if not _claim(transcription, db, settings, task_id):
         return transcription
+    workspace = attempt_workspace(transcription.id, task_id)
+    # Files of earlier attempts are derived data; a stalled worker still reading them only
+    # fails its own (fenced) run.
+    cleanup_other_workspaces(storage, transcription.id, keep=workspace)
 
-    superseded = False
+    def fail(code: str, message: str) -> None:
+        _fail(transcription, db, code, message, task_id=task_id)
+
     try:
-        _execute(transcription, db, settings, storage, provider_factory, sleep, task_id)
+        _execute(transcription, db, settings, storage, provider_factory, sleep, task_id, workspace)
     except PipelineSuperseded:
-        superseded = True
         logger.info("Transcription %s was taken over by a newer task; stopping", transcription.id)
     except PipelineFailure as failure:
-        _fail(transcription, db, failure.code, failure.message)
+        fail(failure.code, failure.message)
     except (AudioExtractionError, ChunkingError) as error:
-        _fail(transcription, db, error.code, error.message)
+        fail(error.code, error.message)
     except TranscriptionProviderError as error:
-        _fail(transcription, db, error.code, error.message)
+        fail(error.code, error.message)
     except Exception:
         logger.exception("Unexpected error transcribing %s", transcription.id)
-        _fail(transcription, db, "internal_error", "Unexpected error during transcription")
+        fail("internal_error", "Unexpected error during transcription")
     finally:
-        if not superseded:  # the newer task owns the chunk directory now
-            cleanup_chunks(storage, transcription.id)
+        cleanup_chunks(storage, workspace)  # always this attempt's own chunks only
     return transcription
 
 
@@ -179,6 +191,7 @@ def _execute(
     provider_factory: ProviderFactory,
     sleep: Callable[[float], None],
     task_id: str | None,
+    workspace: str,
 ) -> None:
     video = transcription.video
     if video.status != VideoStatus.READY:
@@ -190,7 +203,7 @@ def _execute(
     audio = extract_normalized_audio(
         source,
         storage,
-        normalized_audio_key(transcription.id),
+        normalized_audio_key(workspace),
         ffmpeg_path=settings.ffmpeg_path,
         ffprobe_path=settings.ffprobe_path,
         timeout_seconds=settings.audio_extraction_timeout_seconds,
@@ -200,12 +213,12 @@ def _execute(
     transcription.audio_storage_key = audio.storage_key
     transcription.audio_duration_seconds = audio.duration_seconds
     transcription.progress_percent = AUDIO_READY_PROGRESS
-    _heartbeat(transcription, db)
+    _heartbeat(transcription, db, task_id)
 
     chunks = split_audio(
         storage.path_for(audio.storage_key),
         storage,
-        transcription.id,
+        workspace,
         total_seconds=audio.duration_seconds,
         chunk_seconds=settings.transcription_chunk_seconds,
         ffmpeg_path=settings.ffmpeg_path,
@@ -213,7 +226,7 @@ def _execute(
         timeout_seconds=settings.audio_extraction_timeout_seconds,
     )
     transcription.status = TranscriptionStatus.TRANSCRIBING
-    _heartbeat(transcription, db)
+    _heartbeat(transcription, db, task_id)
 
     provider = provider_factory(settings)
     transcription.provider = provider.name
@@ -253,8 +266,7 @@ def _execute(
             transcription.progress_percent,
             AUDIO_READY_PROGRESS + int((100 - AUDIO_READY_PROGRESS) * position / len(chunks)),
         )
-        _ensure_still_owner(transcription, db, task_id)
-        _heartbeat(transcription, db)  # one transaction per chunk
+        _heartbeat(transcription, db, task_id)  # one transaction per chunk (ownership checked)
         if settings.transcription_prompt_tail_chars and result.text:
             previous_tail = result.text[-settings.transcription_prompt_tail_chars :]
 
@@ -264,7 +276,7 @@ def _execute(
     transcription.status = TranscriptionStatus.COMPLETED
     transcription.progress_percent = 100
     transcription.completed_at = _now()
-    _heartbeat(transcription, db)
+    _heartbeat(transcription, db, task_id)
     logger.info(
         "Transcription %s completed: %s segments, %s chunks",
         transcription.id,
@@ -317,24 +329,52 @@ def _transcribe_with_retry(
 # --- state helpers ----------------------------------------------------------------------
 
 
-def _ensure_still_owner(transcription: Transcription, db: Session, task_id: str | None) -> None:
-    """Re-read the fencing token; a newer task id means this run must stop writing."""
+def _still_owner(transcription: Transcription, db: Session, task_id: str | None) -> bool:
+    """Read the token straight from the database (not the identity map)."""
     if task_id is None:
-        return
-    db.refresh(transcription, attribute_names=["celery_task_id"])
-    if transcription.celery_task_id and transcription.celery_task_id != task_id:
+        return True
+    current = db.scalar(
+        select(Transcription.celery_task_id).where(Transcription.id == transcription.id)
+    )
+    return not current or current == task_id
+
+
+def _ensure_still_owner(transcription: Transcription, db: Session, task_id: str | None) -> None:
+    """A newer task id means this run must stop writing."""
+    if not _still_owner(transcription, db, task_id):
         db.rollback()
         raise PipelineSuperseded()
 
 
-def _heartbeat(transcription: Transcription, db: Session, *, commit: bool = True) -> None:
+def _heartbeat(
+    transcription: Transcription,
+    db: Session,
+    task_id: str | None = None,
+    *,
+    commit: bool = True,
+) -> None:
     transcription.heartbeat_at = _now()
     if commit:
+        _ensure_still_owner(transcription, db, task_id)  # never commit for a newer attempt
         db.commit()
 
 
-def _fail(transcription: Transcription, db: Session, code: str, message: str) -> None:
+def _fail(
+    transcription: Transcription,
+    db: Session,
+    code: str,
+    message: str,
+    *,
+    task_id: str | None = None,
+) -> None:
     db.rollback()  # discard anything uncommitted from the failed step
+    if not _still_owner(transcription, db, task_id):
+        logger.info(
+            "Transcription %s failed (%s) after being taken over; newer attempt untouched",
+            transcription.id,
+            code,
+        )
+        return
     transcription.status = TranscriptionStatus.FAILED
     transcription.error_code = code[:64]
     transcription.error_message = message[:MAX_ERROR_LENGTH]

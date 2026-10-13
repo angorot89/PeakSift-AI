@@ -12,7 +12,7 @@ from app.models import Project, Transcription, TranscriptSegment, User, Video
 from app.services.audio_extraction import AudioExtractionError, ExtractedAudio
 from app.services.storage import LocalMediaStorage
 from app.services.transcription import pipeline
-from app.services.transcription.chunking import AudioChunk, ChunkingError
+from app.services.transcription.chunking import AudioChunk, ChunkingError, attempt_workspace
 from app.services.transcription.contract import ProviderSegment, TranscriptionProviderError
 from app.services.transcription.pipeline import is_stale, run_transcription
 from app.workers.transcription_tasks import transcribe_video
@@ -67,6 +67,7 @@ class FakeMedia:
         self.storage, self.duration, self.chunk_durations = storage, duration, chunks
         self.extract_calls = 0
         self.cleanup_calls = 0
+        self.cleaned: list[str] = []
         monkeypatch.setattr(pipeline, "extract_normalized_audio", self.extract)
         monkeypatch.setattr(pipeline, "split_audio", self.split)
         monkeypatch.setattr(pipeline, "cleanup_chunks", self.cleanup)
@@ -92,6 +93,7 @@ class FakeMedia:
 
     def cleanup(self, storage, transcription_id):
         self.cleanup_calls += 1
+        self.cleaned.append(transcription_id)
 
 
 class SpyProvider(FakeProvider):
@@ -146,7 +148,8 @@ def test_full_pipeline_completes_with_absolute_timestamps(
     assert result.provider == "fake" and result.model == "fake-1"
     assert result.language == "en" and result.language_probability == 0.98
     assert result.started_at and result.completed_at and result.heartbeat_at
-    assert result.audio_storage_key == f"transcription/{transcription.id}/normalized.mp3"
+    # Each attempt works in its own directory (task id tag; "inline" without one).
+    assert result.audio_storage_key == f"transcription/{transcription.id}/inline/normalized.mp3"
     assert result.audio_duration_seconds == 1250.0
     assert result.error_code is None and result.error_message is None
 
@@ -618,7 +621,9 @@ def test_run_taken_over_mid_way_stops_without_writing(
     assert len(provider.requests) == 2  # stopped before the third chunk
     assert result.status == "transcribing" and result.error_code is None  # not marked failed
     assert len(segments_of(db_session, transcription)) == 2  # chunk 1 committed, chunk 2 discarded
-    assert media.cleanup_calls == 0  # the newer task owns the chunk directory
+    # The superseded worker cleans only its own attempt's chunks, never the newer attempt's.
+    assert media.cleaned == [attempt_workspace(transcription.id, "task-old")]
+    assert attempt_workspace(transcription.id, "task-new") not in media.cleaned
 
 
 def test_provider_segments_are_revalidated_in_the_pipeline(
@@ -651,3 +656,119 @@ def test_multilingual_unicode_transcript(monkeypatch, db_session, storage, trans
         "مرحبا بكم في بيك سيفت",
         "Ça va? Très bien — 🎬",
     ]
+
+
+# --- stale-worker ownership (attempt 1 stalls, attempt 2 takes over, attempt 1 resumes) -------
+
+
+def _attempt_two_takes_over(db_session, transcription, *, progress=40, segment=True):
+    """What a retry plus the new worker do while attempt 1 is stalled: a new token is
+    committed, and attempt 2 makes its own progress (and segments)."""
+    from sqlalchemy import update
+
+    db_session.execute(
+        update(Transcription)
+        .where(Transcription.id == transcription.id)
+        .values(
+            celery_task_id="task-2",
+            status="transcribing",
+            progress_percent=progress,
+            error_code=None,
+            error_message=None,
+        )
+    )
+    if segment:
+        db_session.add(
+            TranscriptSegment(
+                transcription_id=transcription.id,
+                sequence_index=999,
+                start_time=0.0,
+                end_time=1.0,
+                text="attempt two",
+            )
+        )
+    db_session.commit()
+
+
+def _state(db_session, transcription):
+    db_session.expire_all()
+    row = db_session.get(Transcription, transcription.id)
+    texts = [s.text for s in segments_of(db_session, row)]
+    return row, texts
+
+
+def test_stale_attempt_cannot_overwrite_the_new_attempts_progress(
+    monkeypatch, db_session, storage, transcription
+):
+    FakeMedia(monkeypatch, storage)
+    transcription.celery_task_id = "task-1"
+    db_session.commit()
+
+    class Resumes(FakeProvider):
+        def transcribe(self, request):
+            if not self.requests:
+                _attempt_two_takes_over(db_session, transcription)  # while attempt 1 stalls
+            return super().transcribe(request)  # attempt 1 resumes with a result
+
+    run(transcription, db_session, Resumes(), storage, task_id="task-1")
+
+    row, texts = _state(db_session, transcription)
+    assert row.celery_task_id == "task-2"
+    assert row.status == "transcribing" and row.progress_percent == 40  # attempt 2's values
+    assert texts == ["attempt two"]  # attempt 1's segments were never committed
+
+
+def test_stale_attempt_cannot_mark_the_new_attempt_failed(
+    monkeypatch, db_session, storage, transcription
+):
+    FakeMedia(monkeypatch, storage)
+    transcription.celery_task_id = "task-1"
+    db_session.commit()
+
+    class ResumesAndFails(FakeProvider):
+        def transcribe(self, request):
+            _attempt_two_takes_over(db_session, transcription)
+            raise TranscriptionProviderError("provider_output", "garbage", retryable=False)
+
+    run(transcription, db_session, ResumesAndFails(), storage, task_id="task-1")
+
+    row, texts = _state(db_session, transcription)
+    assert row.status == "transcribing" and row.error_code is None  # not marked failed
+    assert texts == ["attempt two"]  # attempt 2's segments were not deleted
+
+
+def test_stale_attempt_cannot_mark_the_new_attempt_completed(
+    monkeypatch, db_session, storage, transcription
+):
+    FakeMedia(monkeypatch, storage, duration=50.0, chunks=(50,))
+    transcription.celery_task_id = "task-1"
+    db_session.commit()
+
+    class FinishesLate(FakeProvider):
+        def transcribe(self, request):
+            result = super().transcribe(request)
+            _attempt_two_takes_over(db_session, transcription, segment=False)
+            return result  # attempt 1 would now complete the job
+
+    run(transcription, db_session, FinishesLate(), storage, task_id="task-1")
+
+    row, _ = _state(db_session, transcription)
+    assert row.status == "transcribing" and row.progress_percent == 40
+    assert row.full_text is None and row.completed_at is None
+
+
+def test_stale_attempt_only_cleans_its_own_workspace(
+    monkeypatch, db_session, storage, transcription
+):
+    media = FakeMedia(monkeypatch, storage)
+    transcription.celery_task_id = "task-1"
+    db_session.commit()
+
+    class ResumesAndFails(FakeProvider):
+        def transcribe(self, request):
+            _attempt_two_takes_over(db_session, transcription)
+            raise TranscriptionProviderError("provider_output", "garbage", retryable=False)
+
+    run(transcription, db_session, ResumesAndFails(), storage, task_id="task-1")
+
+    assert media.cleaned == [attempt_workspace(transcription.id, "task-1")]
