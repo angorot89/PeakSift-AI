@@ -1,17 +1,21 @@
-export type ButtonVariant = "primary" | "secondary";
-export type ButtonSize = "md" | "lg";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonSize = "sm" | "md" | "lg";
 
+// One shape for every button in the product: a softly rounded rectangle, never a pill.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&_svg]:size-4 [&_svg]:shrink-0";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-foreground text-background hover:bg-zinc-200",
+  primary: "bg-foreground text-background shadow-sm hover:bg-zinc-200",
   secondary:
-    "border border-border bg-white/[0.03] text-foreground hover:border-white/20 hover:bg-white/[0.06]",
+    "border border-border-strong bg-surface-2 text-foreground hover:border-white/25 hover:bg-surface-3",
+  ghost: "text-muted hover:bg-white/[0.06] hover:text-foreground",
+  danger: "border border-danger/40 bg-danger/10 text-rose-100 hover:bg-danger/20",
 };
 
 const sizes: Record<ButtonSize, string> = {
-  md: "h-9 px-4 text-sm",
+  sm: "h-8 px-3 text-[13px]",
+  md: "h-10 px-4 text-sm",
   lg: "h-12 px-6 text-[15px]",
 };
 

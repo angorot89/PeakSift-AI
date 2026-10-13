@@ -1,75 +1,97 @@
 "use client";
 
+import { FolderPlus, Plus } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { ProjectList } from "@/components/app/project-list";
-import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
-import { useAuth } from "@/components/auth/auth-provider";
+import { EmptyState, ErrorState } from "@/components/app/states";
+import { WORKFLOW_STEPS } from "@/components/app/workflow-steps";
 import { ButtonLink } from "@/components/ui/button-link";
+import { Skeleton } from "@/components/ui/skeleton";
 import { listProjects } from "@/lib/projects";
 import { useApi } from "@/lib/use-api";
 
-const RECENT_LIMIT = 5;
+const RECENT_LIMIT = 6;
 
-function StatCard({ label, value, note }: { label: string; value: number | string; note?: string }) {
+/** A compact orientation strip: what PeakSift does, in the order a creator does it. */
+function WorkflowGuide() {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6">
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-2 text-4xl font-semibold tracking-tight">{value}</p>
-      {note ? <p className="mt-2 text-xs text-subtle">{note}</p> : null}
-    </div>
+    <section aria-labelledby="workflow-heading">
+      <h2 id="workflow-heading" className="mb-3 text-sm font-medium text-muted">
+        How a project works
+      </h2>
+      <ol className="grid gap-2 sm:grid-cols-5">
+        {WORKFLOW_STEPS.map((step, index) => (
+          <li
+            key={step.key}
+            className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 sm:flex-col sm:items-start sm:gap-2 sm:px-3.5 sm:py-3"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-accent-soft">
+              <step.icon aria-hidden="true" className="size-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-foreground">
+                <span className="tabular text-subtle">{index + 1}. </span>
+                {step.label}
+              </span>
+              <span className="block text-xs text-subtle">{step.hint}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
 export function DashboardView() {
-  const { user } = useAuth();
   const { data: projects, error, loading, reload } = useApi(listProjects);
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={user ? `Signed in as ${user.email}` : undefined}
-        action={<ButtonLink href="/projects/new">Create Project</ButtonLink>}
+        description="Pick up a project or start a new one."
+        action={
+          <ButtonLink href="/projects/new">
+            <Plus aria-hidden="true" />
+            New project
+          </ButtonLink>
+        }
       />
 
-      <section aria-labelledby="overview-heading">
-        <h2 id="overview-heading" className="sr-only">
-          Overview
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="Projects" value={projects ? projects.length : "–"} />
-          <StatCard label="Videos" value="–" note="Upload a source video from a project page." />
-          <StatCard label="Clips Found" value={0} note="AI clip detection arrives in Milestone 4." />
-        </div>
-      </section>
-
-      <section aria-labelledby="recent-heading" className="mt-10">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="recent-heading" className="text-lg font-medium">
-            Recent Projects
+      <section aria-labelledby="recent-heading" className="mb-10">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 id="recent-heading" className="text-sm font-medium text-muted">
+            Recent projects
           </h2>
           {projects && projects.length > RECENT_LIMIT ? (
             <Link href="/projects" className="text-sm text-muted hover:text-foreground">
-              View all
+              View all {projects.length}
             </Link>
           ) : null}
         </div>
 
         {loading ? (
-          <LoadingState label="Loading projects…" />
+          <div role="status" aria-label="Loading projects" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-[76px] rounded-xl" />
+            ))}
+          </div>
         ) : error ? (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState title="Projects could not be loaded" message={error} onRetry={reload} />
         ) : projects && projects.length > 0 ? (
           <ProjectList projects={projects.slice(0, RECENT_LIMIT)} />
         ) : (
           <EmptyState
+            icon={FolderPlus}
             title="No projects yet"
-            description="A project holds one long-form recording and the clips you make from it. Create your first one to get started."
-            action={<ButtonLink href="/projects/new">Create Project</ButtonLink>}
+            description="A project holds one long recording and every clip you make from it."
+            action={<ButtonLink href="/projects/new">Create your first project</ButtonLink>}
           />
         )}
       </section>
+
+      <WorkflowGuide />
     </>
   );
 }

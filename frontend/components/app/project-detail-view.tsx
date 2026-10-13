@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
 import { PageHeader } from "@/components/app/page-header";
@@ -37,16 +36,12 @@ export function ProjectDetailView() {
   }, [id, validId]);
   const { data: project, error, loading, reload } = useApi(load);
 
-  const backLink = (
-    <Link href="/projects" className="hover:text-foreground">
-      ← Projects
-    </Link>
-  );
+  const back = { href: "/projects", label: "Projects" };
 
   if (loading) {
     return (
       <>
-        <PageHeader eyebrow={backLink} title="Project" />
+        <PageHeader back={back} title="Project" />
         <LoadingState label="Loading project…" />
       </>
     );
@@ -56,7 +51,7 @@ export function ProjectDetailView() {
     const notFound = !validId || error === "Project not found";
     return (
       <>
-        <PageHeader eyebrow={backLink} title="Project" />
+        <PageHeader back={back} title="Project" />
         {notFound ? <NotFound /> : <ErrorState message={error ?? "Project unavailable."} onRetry={reload} />}
       </>
     );
@@ -65,7 +60,7 @@ export function ProjectDetailView() {
   return (
     <>
       <PageHeader
-        eyebrow={backLink}
+        back={back}
         title={project.name}
         action={<StatusBadge status={project.status} />}
       />

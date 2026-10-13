@@ -1,38 +1,25 @@
-type Tone = "neutral" | "accent" | "success" | "danger";
+import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 
-const presentation: Record<string, { label: string; tone: Tone }> = {
-  // projects
-  created: { label: "Created", tone: "accent" },
+const presentation: Record<string, { label: string; tone: StatusTone }> = {
   // videos
   uploaded: { label: "Uploaded", tone: "neutral" },
-  processing_metadata: { label: "Processing", tone: "accent" },
+  processing_metadata: { label: "Processing", tone: "processing" },
   ready: { label: "Ready", tone: "success" },
   failed: { label: "Failed", tone: "danger" },
-  // transcriptions
+  // background jobs
   queued: { label: "Queued", tone: "neutral" },
-  extracting_audio: { label: "Preparing audio", tone: "accent" },
-  transcribing: { label: "Transcribing", tone: "accent" },
+  extracting_audio: { label: "Preparing audio", tone: "processing" },
+  transcribing: { label: "Transcribing", tone: "processing" },
   completed: { label: "Completed", tone: "success" },
-  // clip detection runs
-  preparing_transcript: { label: "Preparing transcript", tone: "accent" },
-  analyzing: { label: "Analyzing", tone: "accent" },
-  validating: { label: "Validating", tone: "accent" },
-  ranking: { label: "Ranking", tone: "accent" },
+  preparing_transcript: { label: "Preparing transcript", tone: "processing" },
+  analyzing: { label: "Analyzing", tone: "processing" },
+  validating: { label: "Validating", tone: "processing" },
+  ranking: { label: "Ranking", tone: "processing" },
+  rendering: { label: "Rendering", tone: "processing" },
 };
 
-const dot: Record<Tone, string> = {
-  neutral: "bg-zinc-400",
-  accent: "bg-accent",
-  success: "bg-emerald-400",
-  danger: "bg-rose-400",
-};
-
-export function StatusBadge({ status }: { status: string }) {
-  const { label, tone } = presentation[status] ?? { label: status, tone: "neutral" as Tone };
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white/[0.03] px-2.5 py-0.5 text-xs font-medium text-muted">
-      <span aria-hidden="true" className={`size-1.5 rounded-full ${dot[tone]}`} />
-      {label}
-    </span>
-  );
+export function StatusBadge({ status, stale = false }: { status: string; stale?: boolean }) {
+  if (stale) return <StatusPill tone="warning">Stalled</StatusPill>;
+  const { label, tone } = presentation[status] ?? { label: status, tone: "neutral" as StatusTone };
+  return <StatusPill tone={tone}>{label}</StatusPill>;
 }
