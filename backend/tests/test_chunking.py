@@ -40,7 +40,7 @@ def files(storage: LocalMediaStorage) -> list[str]:
     return sorted(str(p.relative_to(storage.root)) for p in storage.root.rglob("*") if p.is_file())
 
 
-# --- planning --------------------------------------------------------------------
+# --- planning -----
 
 
 def test_single_chunk_when_audio_is_shorter_than_chunk():
@@ -94,7 +94,7 @@ def test_invalid_chunk_size_is_rejected():
         plan_chunks(100, 0)
 
 
-# --- keys and commands ----------------------------------------------------------------
+# --- keys and commands -----
 
 
 def test_chunk_keys_are_internal_ordered_and_safe(storage: LocalMediaStorage):
@@ -116,7 +116,7 @@ def test_chunk_command_seeks_and_limits_duration(tmp_path: Path):
     assert command[-1] == str(tmp_path / "c.part")
 
 
-# --- splitting (mocked ffmpeg) ---------------------------------------------------------------
+# --- splitting (mocked ffmpeg) -----
 
 
 def fake_run_writing(payload: bytes = b"chunkdata"):
@@ -215,7 +215,7 @@ def test_cleanup_removes_chunks_but_keeps_normalized_audio(monkeypatch, storage,
     assert files(storage) == [f"transcription/{TID}/normalized.mp3"]
 
 
-# --- absolute timestamps ---------------------------------------------------------------------
+# --- absolute timestamps -----
 
 
 def test_shift_segments_into_absolute_time():
@@ -245,7 +245,7 @@ def test_shift_across_three_hours():
     assert (shifted[0].start, shifted[0].end) == (11405.5, 11409.25)
 
 
-# --- real ffmpeg -----------------------------------------------------------------------------
+# --- real ffmpeg -----
 
 
 @requires_ffmpeg

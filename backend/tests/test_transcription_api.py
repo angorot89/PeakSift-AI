@@ -96,7 +96,7 @@ def complete_with_segments(db_session: Session, video_id: str, count: int) -> Tr
     return transcription
 
 
-# --- authentication and ownership ------------------------------------------------
+# --- authentication and ownership -----
 
 
 def test_all_endpoints_require_authentication(client: TestClient):
@@ -130,7 +130,7 @@ def test_video_must_belong_to_project_in_url(client: TestClient, db_session: Ses
     assert client.get(f"{base(project_id, uuid.uuid4())}/transcription").status_code == 404
 
 
-# --- start ---------------------------------------------------------------------------
+# --- start -----
 
 
 def test_start_queues_a_job(client: TestClient, db_session: Session, fake_queue):
@@ -214,7 +214,7 @@ def test_queue_outage_leaves_no_orphan_row(client, db_session, monkeypatch):
     assert client.get(f"{base(project_id, video_id)}/transcription").status_code == 404
 
 
-# --- status ---------------------------------------------------------------------------
+# --- status -----
 
 
 def test_status_404_before_start(client, db_session):
@@ -257,7 +257,7 @@ def test_status_exposes_safe_failure_fields_only(client, db_session):
     assert "normalized.mp3" not in response.text and "task-" not in response.text
 
 
-# --- retry -----------------------------------------------------------------------------------
+# --- retry -----
 
 
 def test_retry_requeues_a_failed_job(client, db_session, fake_queue):
@@ -300,7 +300,7 @@ def test_retry_404_without_transcription(client, db_session):
     assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 404
 
 
-# --- transcript ----------------------------------------------------------------------------------
+# --- transcript -----
 
 
 def test_transcript_404_without_transcription(client, db_session):
@@ -376,7 +376,7 @@ def test_transcript_pagination_bounds(client, db_session, params):
     assert client.get(f"{base(project_id, video_id)}/transcript", params=params).status_code == 422
 
 
-# --- hardening: stale jobs ------------------------------------------------------------------
+# --- hardening: stale jobs -----
 
 
 def test_status_flags_a_stale_job(client, db_session):

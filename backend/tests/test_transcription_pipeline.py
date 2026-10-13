@@ -133,7 +133,7 @@ def segments_of(db: Session, row: Transcription) -> list[TranscriptSegment]:
     )
 
 
-# --- happy path ----------------------------------------------------------------------------
+# --- happy path -----
 
 
 def test_full_pipeline_completes_with_absolute_timestamps(
@@ -219,7 +219,7 @@ def test_silent_chunks_produce_a_completed_empty_transcript(
     assert segments_of(db_session, transcription) == []
 
 
-# --- failures ----------------------------------------------------------------------------
+# --- failures -----
 
 
 def test_audio_extraction_failure(monkeypatch, db_session, storage, transcription):
@@ -407,7 +407,7 @@ def test_unexpected_exception_is_contained(monkeypatch, db_session, storage, tra
     assert "/Users" not in result.error_message
 
 
-# --- idempotency / duplicate delivery -------------------------------------------------------
+# --- idempotency / duplicate delivery -----
 
 
 def test_completed_job_ignores_duplicate_delivery(monkeypatch, db_session, storage, transcription):
@@ -505,7 +505,7 @@ def test_is_stale_only_for_active_statuses():
     )
 
 
-# --- Celery wiring -----------------------------------------------------------------------------
+# --- Celery wiring -----
 
 
 def test_celery_task_runs_pipeline_in_eager_mode(monkeypatch, db_session, storage, transcription):
@@ -539,7 +539,7 @@ class _Reusable:
         return False
 
 
-# --- real ffmpeg end to end (fake provider) ------------------------------------------------------
+# --- real ffmpeg end to end (fake provider) -----
 
 
 @requires_ffmpeg
@@ -570,7 +570,7 @@ def test_real_media_pipeline_end_to_end(db_session, storage, tmp_path, transcrip
     assert len(segments_of(db_session, transcription)) == 2
 
 
-# --- hardening: fencing, validation, multilingual ------------------------------------------
+# --- hardening: fencing, validation, multilingual -----
 
 
 def test_claim_ignores_row_owned_by_a_newer_task(monkeypatch, db_session, storage, transcription):

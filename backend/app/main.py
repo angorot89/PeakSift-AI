@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api.clip_detection import providers_router as clip_providers_router
 from app.api.clip_detection import router as clip_detection_router
+from app.api.clip_edits import media_router as edit_media_router
+from app.api.clip_edits import router as clip_edits_router
 from app.api.clip_media import router as clip_media_router
 from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
@@ -40,3 +42,5 @@ app.include_router(clip_detection_router)
 app.include_router(clips_router)
 app.include_router(video_clips_router)
 app.include_router(clip_media_router)
+app.include_router(clip_edits_router)
+app.include_router(edit_media_router)

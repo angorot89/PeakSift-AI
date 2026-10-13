@@ -59,7 +59,7 @@ def clean_media_root():
             path.unlink()
 
 
-# --- authentication -------------------------------------------------------------
+# --- authentication -----
 
 
 def test_read_endpoints_require_authentication(client: TestClient):
@@ -69,7 +69,7 @@ def test_read_endpoints_require_authentication(client: TestClient):
     assert client.get(f"/projects/{project_id}/videos/{video_id}").status_code == 401
 
 
-# --- listing ------------------------------------------------------------------------
+# --- listing -----
 
 
 def test_list_is_empty_for_project_without_videos(client: TestClient):
@@ -113,7 +113,7 @@ def test_list_is_scoped_to_the_project(client: TestClient):
     assert client.get(f"/projects/{second}/videos").json() == []
 
 
-# --- detail ---------------------------------------------------------------------------
+# --- detail -----
 
 
 def test_detail_has_exactly_the_safe_fields(client: TestClient, db_session: Session):
@@ -168,7 +168,7 @@ def test_detail_exposes_probe_metadata_when_present(client: TestClient, db_sessi
     assert (body["video_codec"], body["audio_codec"]) == ("h264", "aac")
 
 
-# --- ownership and existence ---------------------------------------------------------------
+# --- ownership and existence -----
 
 
 def test_other_user_cannot_list_or_read_videos(client: TestClient):

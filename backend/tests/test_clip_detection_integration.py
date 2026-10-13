@@ -31,7 +31,7 @@ PASSWORD = "correct horse battery"
 MP4_BYTES = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 1024
 
 
-# --- API → eager task → pipeline → API -----------------------------------------------------
+# --- API → eager task → pipeline → API -----
 
 
 class _Reusable:

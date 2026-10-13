@@ -19,7 +19,7 @@ from app.services.transcription.contract import (
 )
 from tests.fakes import TEXT_ONLY_CAPABILITIES, FakeProvider
 
-# --- types -------------------------------------------------------------------------
+# --- types -----
 
 
 def test_result_types_are_immutable_and_provider_agnostic():
@@ -41,7 +41,7 @@ def test_request_carries_hints_without_persisting_anything():
     assert (request.language_hint, request.prompt) == ("fr", "context")
 
 
-# --- errors ------------------------------------------------------------------------
+# --- errors -----
 
 
 def test_error_hierarchy_and_retryable_flag():
@@ -61,7 +61,7 @@ def test_error_hierarchy_and_retryable_flag():
     assert ProviderOutputError("x").code == "provider_output"
 
 
-# --- capability enforcement ------------------------------------------------------------
+# --- capability enforcement -----
 
 
 def test_timestamp_capable_provider_is_accepted():
@@ -78,7 +78,7 @@ def test_text_only_provider_is_refused_with_a_clear_message():
     assert "never fabricated" in str(excinfo.value)
 
 
-# --- segment validation ---------------------------------------------------------------
+# --- segment validation -----
 
 
 def test_validate_segments_strips_text_and_drops_empty_segments():
@@ -134,7 +134,7 @@ def test_validate_segments_empty_input():
     assert join_segment_text(()) == ""
 
 
-# --- factory ----------------------------------------------------------------------------
+# --- factory -----
 
 
 def test_factory_rejects_unknown_provider(monkeypatch):

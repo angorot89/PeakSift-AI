@@ -27,7 +27,7 @@ def windows_for(items, **overrides):
     return build_windows(tuple(items), **options)
 
 
-# --- normalisation ----------------------------------------------------------------------------
+# --- normalisation -----
 
 
 def test_normalize_strips_control_characters_and_collapses_whitespace():
@@ -42,7 +42,7 @@ def test_normalize_caps_absurdly_long_lines():
     assert len(normalize_text("x" * (MAX_LINE_CHARS + 500))) == MAX_LINE_CHARS
 
 
-# --- prepare ---------------------------------------------------------------------------------
+# --- prepare -----
 
 
 def test_prepare_normalises_and_drops_empty_lines():
@@ -96,7 +96,7 @@ def test_prepare_rejects_an_empty_transcript():
         prepare_lines([], video_duration=10, tolerance_seconds=1)
 
 
-# --- fingerprint -------------------------------------------------------------------------------
+# --- fingerprint -----
 
 
 def test_fingerprint_is_deterministic_and_sensitive():
@@ -123,7 +123,7 @@ def test_fingerprint_is_deterministic_and_sensitive():
     )
 
 
-# --- windows ---------------------------------------------------------------------------------
+# --- windows -----
 
 
 def test_short_transcript_is_one_window():
@@ -211,7 +211,7 @@ def test_windows_are_deterministic():
     )
 
 
-# --- excerpt -------------------------------------------------------------------------------
+# --- excerpt -----
 
 
 def test_excerpt_takes_only_overlapping_lines():

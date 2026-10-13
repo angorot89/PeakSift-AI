@@ -54,7 +54,7 @@ def settings_with(**overrides) -> Settings:
     return Settings(**base)
 
 
-# --- types -----------------------------------------------------------------------------
+# --- types -----
 
 
 def test_window_measures_itself():
@@ -72,7 +72,7 @@ def test_documented_bounds_are_exposed():
     assert TEXT_LIMITS == {"title": 120, "hook": 300, "rationale": 1000}
 
 
-# --- structured output -------------------------------------------------------------------
+# --- structured output -----
 
 
 def test_json_schema_is_strict_and_lists_every_field():
@@ -192,7 +192,7 @@ def test_parse_output_does_not_judge_values_only_shape():
     assert candidate.start == 50 and candidate.end == 10 and candidate.hook_score == 500
 
 
-# --- errors ----------------------------------------------------------------------------
+# --- errors -----
 
 
 def test_error_retryability_is_explicit():
@@ -208,7 +208,7 @@ def test_error_retryability_is_explicit():
         assert isinstance(error, ClipProviderError)
 
 
-# --- prompt -----------------------------------------------------------------------------
+# --- prompt -----
 
 
 def test_render_window_uses_absolute_seconds_per_line():
@@ -344,7 +344,7 @@ def test_get_clip_provider_reports_a_missing_sdk_as_configuration(monkeypatch):
     assert "not available" in info.value.message
 
 
-# --- settings ---------------------------------------------------------------------------
+# --- settings -----
 
 
 def test_clip_bounds_must_be_ordered():
@@ -361,7 +361,7 @@ def test_default_clip_settings_are_sane():
     assert 0 <= s.clip_detection_overlap_threshold <= 1
 
 
-# --- fake provider -----------------------------------------------------------------------
+# --- fake provider -----
 
 
 def test_fake_provider_records_requests_and_supports_scripts():

@@ -19,7 +19,7 @@ def store(tmp_path: Path) -> ClipArtifactStore:
     return ClipArtifactStore(LocalMediaStorage(tmp_path / "media"))
 
 
-# --- keys ------------------------------------------------------------------------------------
+# --- keys -----
 
 
 def test_keys_are_generated_from_the_clip_id_only():
@@ -50,7 +50,7 @@ def test_storage_refuses_traversal_even_if_a_key_were_forged(store: ClipArtifact
         store.storage.path_for("clips/../../../etc/passwd")
 
 
-# --- temp → final ---------------------------------------------------------------------------
+# --- temp → final -----
 
 
 def test_temp_path_creates_the_directory_and_clears_stale_temp(store: ClipArtifactStore):
@@ -131,7 +131,7 @@ def test_two_clips_never_share_a_location(store: ClipArtifactStore):
     assert store.final_path(a).parent != store.final_path(b).parent
 
 
-# --- download filename -----------------------------------------------------------------------
+# --- download filename -----
 
 
 def test_download_filename_is_a_slug_plus_short_id():

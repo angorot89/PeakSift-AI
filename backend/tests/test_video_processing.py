@@ -52,7 +52,7 @@ def clean_media_root(storage: LocalMediaStorage):
             path.unlink()
 
 
-# --- state transitions (probe mocked) ----------------------------------------------
+# --- state transitions (probe mocked) -----
 
 
 def test_successful_probe_marks_video_ready(db_session: Session, storage, monkeypatch):

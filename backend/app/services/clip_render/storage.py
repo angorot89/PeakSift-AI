@@ -108,8 +108,11 @@ _SLUG_MAX = 60
 _NON_SLUG = re.compile(r"[^a-z0-9]+")
 
 
-def safe_download_filename(title: str | None, clip_id: uuid.UUID | str) -> str:
-    """``that-was-crazy-3f2c9a.mp4``: an ASCII slug of the title plus a short id.
+def safe_download_filename(
+    title: str | None, clip_id: uuid.UUID | str, *, variant: str | None = None
+) -> str:
+    """``that-was-crazy-3f2c9a.mp4``: an ASCII slug of the title plus a short id
+    (``that-was-crazy-vertical-3f2c9a.mp4`` with ``variant="vertical"``).
 
     The title only ever influences the *download* name shown to the browser; the storage
     path is always the generated key. Unicode is transliterated where possible and
@@ -117,4 +120,8 @@ def safe_download_filename(title: str | None, clip_id: uuid.UUID | str) -> str:
     """
     normalised = unicodedata.normalize("NFKD", title or "").encode("ascii", "ignore").decode()
     slug = _NON_SLUG.sub("-", normalised.lower()).strip("-")[:_SLUG_MAX].strip("-") or "clip"
+    if variant is not None:
+        tag = _NON_SLUG.sub("-", variant.lower()).strip("-")[:16]
+        if tag:
+            slug = f"{slug}-{tag}"
     return f"{slug}-{_clip_id(clip_id)[:8]}.mp4"

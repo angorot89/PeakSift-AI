@@ -89,7 +89,7 @@ def make_clip(db_session: Session, candidate: ClipCandidate | None = None, **ove
     return clip
 
 
-# --- defaults and state machine ---------------------------------------------------------------
+# --- defaults and state machine -----
 
 
 def test_clip_defaults_snapshot_the_candidate_boundaries(db_session: Session):
@@ -127,7 +127,7 @@ def test_snapshot_is_independent_of_later_candidate_changes(db_session: Session)
     assert (clip.start_time, clip.end_time, clip.duration_seconds) == (30.0, 60.0, 30.0)
 
 
-# --- relationships and ownership traversal -----------------------------------------------------
+# --- relationships and ownership traversal -----
 
 
 def test_candidate_has_at_most_one_clip(db_session: Session):
@@ -159,7 +159,7 @@ def test_storage_key_is_unique_across_clips(db_session: Session):
     db_session.rollback()
 
 
-# --- constraints ---------------------------------------------------------------------------------
+# --- constraints -----
 
 
 @pytest.mark.parametrize(
@@ -194,7 +194,7 @@ def test_ready_metadata_can_be_recorded(db_session: Session):
     assert clip.status == "ready" and clip.file_size == 123456 and clip.fps == 29.97
 
 
-# --- cascades --------------------------------------------------------------------------------
+# --- cascades -----
 
 
 def test_deleting_the_candidate_deletes_its_clip(db_session: Session):

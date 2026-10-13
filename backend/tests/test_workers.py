@@ -27,7 +27,7 @@ requires_redis = pytest.mark.skipif(
 )
 
 
-# --- configuration -------------------------------------------------------------
+# --- configuration -----
 
 
 def test_celery_uses_redis_and_json_only():
@@ -60,7 +60,7 @@ def test_tasks_are_registered():
     assert celery_app.tasks["peaksift.transcribe_video"].name == transcribe_video.name
 
 
-# --- eager execution -----------------------------------------------------------------
+# --- eager execution -----
 
 
 def test_ping_runs_inline_in_eager_mode():
@@ -109,7 +109,7 @@ def test_enqueue_returns_task_id_and_passes_only_the_id(monkeypatch):
     assert seen == {"args": [str(transcription_id)], "task_id": "task-123", "retry": False}
 
 
-# --- broker unavailable --------------------------------------------------------------------
+# --- broker unavailable -----
 
 
 def test_enqueue_when_broker_is_down_is_a_controlled_error(monkeypatch):

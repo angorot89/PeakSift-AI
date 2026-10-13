@@ -37,7 +37,7 @@ def leftovers(storage: LocalMediaStorage) -> list[Path]:
     return [p for p in storage.root.rglob("*") if p.is_file()]
 
 
-# --- command construction --------------------------------------------------------
+# --- command construction -----
 
 
 def test_command_is_an_argument_list_with_speech_settings(tmp_path: Path):
@@ -62,7 +62,7 @@ def test_normalized_audio_key_is_internal_and_safe(storage: LocalMediaStorage):
     assert storage.root in storage.path_for(key).parents
 
 
-# --- mocked ffmpeg ------------------------------------------------------------------
+# --- mocked ffmpeg -----
 
 
 def test_successful_extraction(monkeypatch, storage, source):
@@ -188,7 +188,7 @@ def test_unsafe_key_is_rejected_before_anything_happens(monkeypatch, storage, so
     assert not storage.root.exists()
 
 
-# --- real ffmpeg ----------------------------------------------------------------------
+# --- real ffmpeg -----
 
 
 @requires_ffmpeg

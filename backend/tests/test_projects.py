@@ -24,7 +24,7 @@ def create_project(client: TestClient, name: str) -> dict:
     return response.json()
 
 
-# --- authentication ---------------------------------------------------------
+# --- authentication -----
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_project_endpoints_require_authentication(client: TestClient, method: st
     assert response.status_code == 401
 
 
-# --- create -----------------------------------------------------------------
+# --- create -----
 
 
 def test_create_project(client: TestClient, db_session: Session):
@@ -84,7 +84,7 @@ def test_create_project_requires_name(client: TestClient):
     assert client.post("/projects", json={}).status_code == 422
 
 
-# --- list -------------------------------------------------------------------
+# --- list -----
 
 
 def test_list_projects_returns_own_projects_newest_first(client: TestClient, db_session: Session):
@@ -124,7 +124,7 @@ def test_list_projects_excludes_other_users_projects(client: TestClient):
     assert names == ["Bob's project"]
 
 
-# --- detail -----------------------------------------------------------------
+# --- detail -----
 
 
 def test_get_own_project(client: TestClient):

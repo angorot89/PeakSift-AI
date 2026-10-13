@@ -78,7 +78,7 @@ def provider() -> OpenAITranscriptionProvider:
     return OpenAITranscriptionProvider(get_settings())
 
 
-# --- configuration -----------------------------------------------------------------
+# --- configuration -----
 
 
 def test_missing_key_is_a_configuration_error(monkeypatch):
@@ -126,7 +126,7 @@ def test_constructing_the_provider_makes_no_request(fake_openai):
     assert fake_openai.instances[-1].audio.transcriptions.calls == []
 
 
-# --- requests -----------------------------------------------------------------------------
+# --- requests -----
 
 
 def test_request_uses_verbose_json_segments_and_passes_hints(fake_openai, audio):
@@ -171,7 +171,7 @@ def test_full_text_falls_back_to_segments(fake_openai, audio):
     )
 
 
-# --- output validation ---------------------------------------------------------------------
+# --- output validation -----
 
 
 def test_response_without_segments_is_rejected(fake_openai, audio):
@@ -204,7 +204,7 @@ def test_segments_with_wrong_shape_are_rejected(fake_openai, audio):
         p.transcribe(TranscriptionRequest(audio_path=audio))
 
 
-# --- size guard ---------------------------------------------------------------------------
+# --- size guard -----
 
 
 def test_oversized_chunk_is_refused_before_upload(fake_openai, audio, monkeypatch):
@@ -225,7 +225,7 @@ def test_missing_audio_file(fake_openai, tmp_path):
     assert excinfo.value.code == "audio_missing"
 
 
-# --- error mapping -------------------------------------------------------------------------
+# --- error mapping -----
 
 
 @pytest.mark.parametrize(
