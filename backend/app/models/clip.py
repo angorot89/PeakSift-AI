@@ -30,6 +30,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.clip_detection import ClipCandidate
     from app.models.clip_edit import ClipEdit
+    from app.models.reframe import ReframeAnalysis
     from app.models.video import Video
 
 
@@ -119,6 +120,12 @@ class Clip(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ClipEdit.created_at.desc()",
+    )
+    reframe_analyses: Mapped[list["ReframeAnalysis"]] = relationship(
+        back_populates="clip",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ReframeAnalysis.created_at.desc()",
     )
 
     def __repr__(self) -> str:
