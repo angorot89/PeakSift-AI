@@ -6,7 +6,7 @@ How PeakSift turns an AI clip candidate into a real, downloadable MP4. This page
 
 **Generate clip** on a candidate renders exactly that candidate's validated time range from the original upload into a private MP4, in a background worker, validates the result with ffprobe, and lets the owner preview and download it.
 
-V0.5 keeps the source's **aspect ratio, resolution and orientation**. It does **not** reframe to 9:16, crop, track faces, burn in captions, add music or sound effects, apply templates or watermarks, trim interactively, or publish anywhere. Those belong to later milestones.
+V0.5 keeps the source's **aspect ratio, resolution and orientation**. It does **not** reframe to 9:16, crop, track faces, burn in captions, add music or sound effects, apply templates or watermarks, trim interactively, or publish anywhere. Vertical 9:16 shorts with captions are built on top of these clips in V0.6 — see [short-form-editing.md](short-form-editing.md); the clip itself stays unchanged.
 
 ## Pipeline
 

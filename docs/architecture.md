@@ -1,8 +1,8 @@
 # Architecture
 
-Two sections: what is **built** (Milestones 1–5) and what is **planned**. Planned parts are decided milestone by milestone and may change.
+Two sections: what is **built** (Milestones 1–6) and what is **planned**. Planned parts are decided milestone by milestone and may change.
 
-## Built (Milestones 1–5)
+## Built (Milestones 1–6)
 
 ```
 ┌───────────────────┐   HTTP/JSON + HttpOnly cookie   ┌───────────────────┐        ┌──────────────────┐
@@ -26,7 +26,13 @@ Two sections: what is **built** (Milestones 1–5) and what is **planned**. Plan
                                                       ┌───────────────────┐        │    | OpenAI      │
                                                       │ Ollama (optional, │ ◀────▶ │  → validate      │
                                                       │ local inference)  │        │  → rank          │
-                                                      └───────────────────┘        └──────────────────┘
+                                                      └───────────────────┘        │ clip render:     │
+                                                                                   │  ffmpeg → clip   │
+                                                                                   │ short-form edit: │
+                                                                                   │  transcript→ASS  │
+                                                                                   │  → ffmpeg 9:16   │
+                                                                                   │    + libass      │
+                                                                                   └──────────────────┘
 ```
 
 ### Frontend (`frontend/`)
@@ -35,16 +41,16 @@ Two sections: what is **built** (Milestones 1–5) and what is **planned**. Plan
 - Pages: landing (`/`), `/login`, `/register`, and a signed-in area (`/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`) under one route group that wraps pages in a client-side guard and an app shell.
 - Auth state lives in a small React context (`AuthProvider`). On load it calls `GET /auth/me`; the backend is the authority. Tokens are never stored in JavaScript-accessible storage.
 - A single fetch wrapper (`lib/api.ts`) adds the API base URL (`NEXT_PUBLIC_API_URL`), sends cookies, and turns error bodies into messages. Uploads use a small `XMLHttpRequest` helper (`lib/videos.ts`) because `fetch` cannot report upload progress.
-- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos. For ready videos a **Transcription** panel starts the job, polls `GET …/transcription` every 4 s only while it is active, shows real progress, failure/stalled states with retry, and a paginated timestamped transcript viewer. Once the transcript is complete, an **AI clip detection** panel offers the server's provider/model allow-lists, starts a run, polls `GET …/clip-detection/{run_id}` every 4 s while active with staged progress, handles failed/stalled runs with bounded retry, lists previous runs, and renders the **candidate review** (ranked cards, score breakdown, transcript excerpt, in-page preview of the candidate range from the owner-only stream, save/dismiss with filters).
+- The project page's **Source video** section uploads a file, shows the metadata the API returns (only fields that exist), and renders a native `<video controls>` for ready videos. For ready videos a **Transcription** panel starts the job, polls `GET …/transcription` every 4 s only while it is active, shows real progress, failure/stalled states with retry, and a paginated timestamped transcript viewer. Once the transcript is complete, an **AI clip detection** panel offers the server's provider/model allow-lists, starts a run, polls `GET …/clip-detection/{run_id}` every 4 s while active with staged progress, handles failed/stalled runs with bounded retry, lists previous runs, and renders the **candidate review** (ranked cards, score breakdown, transcript excerpt, in-page preview of the candidate range from the owner-only stream, save/dismiss with filters). Each ready clip shows its **Rendered clip** player and, under it, **Make a vertical short**: an edit-settings form (layout, captions, caption style and position; a schematic labelled as a layout guide, not the result) and a **Rendered shorts** list where each variant polls only while active and then shows its 9:16 player and download (`components/app/short-form-editor.tsx`, `components/app/edited-shorts.tsx`, `lib/edits.ts`).
 
 ### Backend (`backend/`)
 
-- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript), `clip_detection` (providers, runs, candidates, decisions), `clips` (generate/status/retry/list) and `clip_media` (private clip preview and download, sharing `media_streaming.py` with source preview); request/response schemas (Pydantic) are separate from ORM models.
+- FastAPI with routers for `health`, `auth`, `projects`, `videos` (upload + metadata), `video_content` (streaming), `transcriptions` (start/status/retry/transcript), `clip_detection` (providers, runs, candidates, decisions), `clips` (generate/status/retry/list), `clip_media` (private clip preview and download, sharing `media_streaming.py` with source preview), `clip_edits` (create/list/status/retry of short-form edits) and `edit_media` (private short preview and download); request/response schemas (Pydantic) are separate from ORM models.
 - Settings from environment variables via pydantic-settings; `DATABASE_URL` and `SECRET_KEY` are required.
 - SQLAlchemy 2 with a **synchronous** engine and one session per request (`get_db`). Async was deliberately not introduced.
 - Alembic migrations are the only way the schema changes; `alembic check` runs in CI to catch model/migration drift.
-- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), the `transcription/` package (provider contract, factory, chunking, pipeline, providers) and the `clip_detection/` package (provider contract + shared schema and prompt, factory with allow-lists, Ollama and OpenAI providers, windowing, validation, ranking, config snapshot, pipeline).
-- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py`, `clip_render_tasks.py` and `dispatch.py` (enqueue helpers; detection and render task ids are chosen before the row is committed); only database ids cross the broker.
+- Services: `storage.py` (local media files), `video_upload.py` (validation + storage), `ffprobe.py` (metadata), `video_processing.py` (status transitions), `audio_extraction.py` (normalized audio), the `transcription/` package (provider contract, factory, chunking, pipeline, providers) and the `clip_detection/` package (provider contract + shared schema and prompt, factory with allow-lists, Ollama and OpenAI providers, windowing, validation, ranking, config snapshot, pipeline), `clip_render/` (clip artifacts, FFmpeg renderer, pipeline) and `clip_edit/` (edit config, 9:16 composition, captions, caption styles, edit artifacts, pipeline).
+- Workers: `app/workers/celery_app.py` (Celery on Redis), `transcription_tasks.py`, `clip_detection_tasks.py`, `clip_render_tasks.py`, `clip_edit_tasks.py` and `dispatch.py` (enqueue helpers; every job's task id is chosen and committed on its row before enqueueing and serves as the attempt token); only database ids cross the broker.
 
 ### Video pipeline (Milestone 2)
 
@@ -124,9 +130,34 @@ GET /clips/{id}/content | /download  →  owner check → path_for(storage_key) 
 
 Full reference: [clip-generation.md](clip-generation.md).
 
+### Short-form editing pipeline (Milestone 6)
+
+```
+POST …/clips/{id}/edits {layout, captions…}  →  allow-listed enums → normalized config snapshot + fingerprint
+                             →  same fingerprint exists? 200 (failed: 409, use retry)
+                             →  ClipEdit row (queued, render_profile vertical_1080x1920_v1, pre-chosen task id)
+                             →  enqueue peaksift.render_clip_edit  →  201
+Worker (app/services/clip_edit/):
+  claim (DB state + attempt token), discard leftovers                                   (5)
+  → captions   transcript segments → clip-local cues → escaped ASS in edits/<id>/work-<n>/  (15)
+  → rendering  ffmpeg (cwd = workspace): layout filtergraph [+ subtitles=captions.ass]
+               → libx264/yuv420p + aac, +faststart, 1080×1920, heartbeat                  (85)
+  → validating ffprobe: h264, 1080×1920, fps, duration vs clip, audio iff source         (90)
+  → atomic rename to edits/<id>/edited.mp4, then one commit: storage_key + metadata + ready (100)
+  | failed      safe error_code/message, all of the edit's files removed
+GET /edits/{id}/content | /download  →  owner check → path_for(storage_key) → Range stream
+```
+
+- **Derived, never destructive:** the V0.5 clip file is the read-only input; every edit is its own row and file.
+- **Untrusted text:** transcript text only reaches the ASS file through escaping (word joiner after backslashes, escaped braces); filtergraphs come from constants; the caption file is a fixed relative name, so no path enters a filtergraph.
+- **Ownership:** the same attempt-token fencing as clip rendering, plus per-attempt workspaces; a row deleted mid-render makes the worker stop without writing. Retry locks the row.
+- **Renderer checks:** libass presence (`subtitles` filter) and a probe caption that must draw text pixels (fonts) before a captioned render.
+
+Full reference: [short-form-editing.md](short-form-editing.md).
+
 ### Storage
 
-- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
+- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`, `edits/<edit-uuid>/work-<attempt>/{captions.ass,short.mp4}` → `edits/<edit-uuid>/edited.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
 - Nothing under `MEDIA_ROOT` is served statically. Object storage (S3/R2) is planned and will implement the same `save / exists / delete / path_for` surface.
 
 ### Authentication
@@ -150,26 +181,23 @@ Full reference: [clip-generation.md](clip-generation.md).
 | `clip_detection_runs` | `id` (uuid), `video_id` (FK → videos, cascade), `transcription_id` (FK → transcriptions, cascade), `transcript_fingerprint` (sha256), `provider`, `model`, `config` (JSONB snapshot), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `windows_total`, `windows_done`, `error_code`, `error_message`, `celery_task_id`, `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at`. Partial unique index on `video_id` where status is active (one running detection per video) |
 | `clip_candidates` | `id` (uuid), `run_id` (FK → clip_detection_runs, cascade), `video_id` (FK → videos, cascade), `start_time`, `end_time`, `duration_seconds` (checked = end − start), `title` (120), `hook` (300), `rationale` (1000), `category`, `transcript_excerpt`, `overall_score` + five dimension scores (each checked 0–100), `rank` (≥ 1, unique per run), `decision` (`undecided`/`saved`/`dismissed`), `decided_at`, `created_at`, `updated_at`; index on `(video_id, decision)` |
 | `clips` | `id` (uuid), `candidate_id` (FK → clip_candidates, cascade, **unique**), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `start_time`, `end_time`, `duration_seconds` (snapshot; checked start ≥ 0, end > start, duration = end − start), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
+| `clip_edits` | `id` (uuid), `clip_id` (FK → clips, cascade), `video_id` (FK → videos, cascade), `status`, `progress_percent` (0–100), `attempt` (≥ 1), `config` (JSONB, versioned snapshot), `config_fingerprint` (sha256; **unique with `clip_id`**), `aspect_ratio` (`9:16`), `layout` (`center_crop`/`blur_background`/`fit`), `captions_enabled`, `caption_style`, `caption_position` (both set iff captions are enabled — checked), `output_width`/`output_height` (1080 × 1920), `render_profile`, `storage_key` (unique, internal), `content_type`, `file_size`, `duration_seconds`, `width`, `height`, `fps`, `video_codec`, `audio_codec`, `caption_cue_count`, `error_code`, `error_message`, `celery_task_id` (internal), `created_at`, `updated_at`, `started_at`, `completed_at`, `heartbeat_at` |
 
-Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`). Clip detection `status` is a third state machine — `queued` → `preparing_transcript` → `analyzing` → `validating` → `ranking` → `completed` | `failed` — and candidate times are absolute seconds on transcript-line boundaries; scores are integers on one 0–100 editorial scale. Clip `status` is a fourth — `queued` → `rendering` → `validating` → `ready` | `failed` — describing the health of the rendered artifact.
+Timestamps are timezone-aware. Project `status` is currently always `created`. Video `status` is `uploaded` → `processing_metadata` → `ready` | `failed`; the metadata columns stay empty until probing fills them. A project may own several videos at the database level; the UI surfaces the latest. Transcription `status` is a separate state machine — `queued` → `extracting_audio` → `transcribing` → `completed` | `failed` — answering "what is happening to the speech-to-text job", while video status answers "is this media usable". Segment times are absolute seconds from the start of the video (floats, like the video's `duration_seconds`). Clip detection `status` is a third state machine — `queued` → `preparing_transcript` → `analyzing` → `validating` → `ranking` → `completed` | `failed` — and candidate times are absolute seconds on transcript-line boundaries; scores are integers on one 0–100 editorial scale. Clip `status` is a fourth — `queued` → `rendering` → `validating` → `ready` | `failed` — describing the health of the rendered artifact; each clip edit has the same lifecycle for its own short.
 
 ### Testing and CI
 
 - Backend: pytest against a dedicated PostgreSQL test database; migrations are applied at the start of the session and every test is rolled back. Media tests use a throwaway `MEDIA_ROOT`; fixtures are generated at test time with `ffmpeg` (none are committed). Celery runs in eager mode; speech models are mocked (an opt-in real `tiny`-model check exists for macOS); clip-analysis providers are tested with a mocked transport / fake SDK client plus an in-process fake Ollama HTTP server (an opt-in real check runs against a local Ollama with `PEAKSIFT_REAL_OLLAMA=1`). Integration tests skip locally without FFmpeg/Redis and are required in CI (`REQUIRE_FFMPEG=1`, `REQUIRE_REDIS=1`, `HF_HUB_OFFLINE=1`, `OLLAMA_BASE_URL` on a closed port).
 - Frontend: ESLint and a production build.
-- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, checks that FFmpeg provides the `libx264` and `aac` encoders, runs real clip renders end-to-end through the API, and finishes with a real worker smoke (`ping` round-trip and registration of the transcription, clip detection and clip rendering tasks).
+- GitHub Actions runs both on every push to `main` and every pull request; the backend job installs FFmpeg, runs PostgreSQL and Redis service containers, installs the Noto fonts, checks that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption draws text, runs real clip renders end-to-end through the API and real captioned 9:16 renders verified on frame pixels (`REQUIRE_LIBASS=1`), and finishes with a real worker smoke (`ping` round-trip and registration of the transcription, clip detection, clip rendering and short-form edit tasks).
 
 ## Planned (later milestones)
 
 ```
-Backend ──▶ Object storage (source videos, generated clips)
-        ──▶ Render profiles beyond source_mp4_v1 (vertical layouts, captions)
+Backend ──▶ Object storage (source videos, generated clips, edited shorts)
 ```
 
-1. **Short-form editing (Milestone 6)** — vertical layouts, captions and trimming on top of generated clips (new render profiles alongside `source_mp4_v1`).
-2. **Later** — creator intelligence and metadata, publishing, asset libraries.
-
-Object storage replaces `MEDIA_ROOT` when deployment requires it. None of this exists yet.
+No milestone after V0.6 has been defined. Possible later work — creator intelligence and metadata, publishing, asset libraries, object storage replacing `MEDIA_ROOT` when deployment requires it — is not committed scope, and none of it exists yet.
 
 ## Localization
 

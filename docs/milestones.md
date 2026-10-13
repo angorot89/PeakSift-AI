@@ -76,13 +76,33 @@ Delivered:
 
 Definition of done — a user can review a candidate → Generate clip → watch queued/rendering/validating → preview the rendered MP4 → download it → log out and back in with the clip still there → recover from a render failure with retry.
 
-## Milestone 6 — Short-form Editing *(next — not started)*
+## Milestone 6 — Short-form Editing V0.6 *(complete)*
 
-- Vertical (9:16) layouts and reframing for generated clips
-- Captions and caption styles
-- Trimming and simple editing of generated clips
+Delivered:
 
-## Later
+- Stale-worker ownership fix for transcription and clip detection: the attempt token is committed before enqueueing, every pipeline commit and the failure path re-check it, and each transcription attempt works in its own directory
+- `clip_edits` table: edit variants of a generated clip (versioned, normalized config snapshot; unique per clip + config fingerprint), render status `queued → rendering → validating → ready | failed`, render profile `vertical_1080x1920_v1`, validated output metadata and caption cue count
+- 9:16 composition at 1080 × 1920 with FFmpeg: **Center crop**, **Blur background**, **Fit** — aspect preserved, rotation applied, audio kept when present; filtergraphs from constants only
+- Captions from the persisted transcript: clip-local timing, readable cue segmentation (proportional word timing within segments, phrase-level), long-token splitting, ASS escaping of untrusted text, three presets (Bold, Clean, Creator) and three positions (top, center, bottom), burned in with libass using Noto Sans; caption font probe
+- Background edit pipeline on the existing worker (`peaksift.render_clip_edit`): attempt ownership, per-attempt workspaces, ffprobe validation, atomic finalize, stale detection, bounded retry, safe failure codes
+- API: create (allow-listed options, deduplicated), list, status, retry; private Range-streamed preview and attachment download (`…-vertical-<id>.mp4`) — all owner-scoped
+- Frontend: edit settings under each ready clip (labelled layout guide, accessible controls), rendered-short cards with live status, retry, 9:16 player and **Download short**
+- Hardening (deleted rows, missing FFmpeg vs missing libass, font probe, unbreakable caption lines, emoji, disk errors, retry locking), CI (libass, layout filters and fonts gate; `REQUIRE_LIBASS=1`) and documentation ([short-form-editing.md](short-form-editing.md))
+
+Definition of done — a user can open a generated clip → choose a layout → configure captions → Render short → watch queued/rendering/validating → preview the 9:16 MP4 → download it → render a second variant with other settings → log out and back in with every variant still there → recover from a render failure with retry, with the original clip unchanged.
+
+## Roadmap status
+
+- V0.1 Foundation — COMPLETE
+- V0.2 Video Upload — COMPLETE
+- V0.3 Transcription — COMPLETE
+- V0.4 AI Clip Detection — COMPLETE
+- V0.5 Clip Generation — COMPLETE
+- V0.6 Short-form Editing — COMPLETE
+
+No later milestone has been defined or started.
+
+## Later (opportunities, not committed scope)
 
 - Creator intelligence & metadata (titles, hooks, descriptions)
 - Publishing integrations
