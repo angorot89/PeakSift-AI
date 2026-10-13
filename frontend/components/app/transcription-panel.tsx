@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ErrorState, LoadingState } from "@/components/app/states";
+import { FileText } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
+import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TranscriptViewer } from "@/components/app/transcript-viewer";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { Panel } from "@/components/ui/panel";
+import { WorkingState } from "@/components/ui/progress";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
   getTranscription,
@@ -32,9 +37,7 @@ function statusCopy(transcription: Transcription): string {
     case "extracting_audio":
       return "Preparing audio";
     case "transcribing":
-      return transcription.progress_percent > 0
-        ? `Transcribing — ${transcription.progress_percent}%`
-        : "Transcribing";
+      return "Transcribing";
     case "completed":
       return "Transcript ready";
     case "failed":
@@ -117,101 +120,115 @@ export function TranscriptionPanel({ projectId, videoId, onTranscriptionChange }
     }
   }
 
-  return (
-    <section aria-labelledby="transcription-heading" className="mt-6 border-t border-border pt-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 id="transcription-heading" className="font-medium">
-          Transcription
-        </h3>
-        {transcription ? <StatusBadge status={transcription.status} /> : null}
-      </div>
+  const stepState: StepState = !loaded
+    ? "unknown"
+    : transcription === null
+      ? "todo"
+      : transcription.status === "completed"
+        ? "done"
+        : transcription.status === "failed" || transcription.is_stale
+          ? "failed"
+          : "active";
+  useWorkflowReport("transcribe", stepState);
 
-      {!loaded ? (
-        <LoadingState label="Checking transcription…" />
-      ) : loadError ? (
-        <ErrorState message={loadError} onRetry={() => void refresh()} />
-      ) : transcription === null ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted">
-            Turn the speech in this video into a timestamped transcript. It runs in the
-            background and can take a while for long recordings.
-          </p>
+  let body: ReactNode;
+  if (!loaded) {
+    body = <LoadingState label="Checking the transcript…" />;
+  } else if (loadError) {
+    body = <ErrorState title="Transcript status unavailable" message={loadError} onRetry={() => void refresh()} />;
+  } else if (transcription === null) {
+    body = (
+      <EmptyState
+        compact
+        icon={FileText}
+        title="No transcript yet"
+        description="Transcribe the source video before PeakSift can analyze moments. It runs in the background."
+        action={
           <Button onClick={() => run(() => startTranscription(projectId, videoId))} disabled={busy}>
+            <FileText aria-hidden="true" />
             {busy ? "Starting…" : "Transcribe video"}
           </Button>
-        </div>
-      ) : isActive(transcription.status) && transcription.is_stale ? (
-        <div className="space-y-4">
-          <div
-            role="alert"
-            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-sm text-amber-100"
-          >
-            <p className="font-medium">This transcription appears to have stalled</p>
-            <p className="mt-1">The worker stopped reporting progress. You can start it again.</p>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => run(() => retryTranscription(projectId, videoId))}
-            disabled={busy}
-          >
+        }
+      />
+    );
+  } else if (isActive(transcription.status) && transcription.is_stale) {
+    body = (
+      <InlineAlert
+        tone="warning"
+        title="Transcription stalled"
+        action={
+          <Button variant="secondary" size="sm" onClick={() => run(() => retryTranscription(projectId, videoId))} disabled={busy}>
             {busy ? "Restarting…" : "Retry transcription"}
           </Button>
-        </div>
-      ) : isActive(transcription.status) ? (
-        <div className="space-y-3">
-          <p className="flex items-center gap-3 text-sm text-muted" role="status" aria-live="polite">
-            <span
-              aria-hidden="true"
-              className="size-4 animate-spin rounded-full border-2 border-white/15 border-t-accent"
-            />
-            {statusCopy(transcription)}
-          </p>
-          {transcription.status === "transcribing" && transcription.progress_percent > 0 ? (
-            <div
-              role="progressbar"
-              aria-label="Transcription progress"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={transcription.progress_percent}
-              className="h-2 overflow-hidden rounded-full bg-white/10"
-            >
-              <div
-                className="h-full bg-accent transition-[width]"
-                style={{ width: `${transcription.progress_percent}%` }}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : transcription.status === "failed" ? (
-        <div className="space-y-4">
-          <div
-            role="alert"
-            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200"
-          >
-            <p className="font-medium">Transcription failed</p>
-            {transcription.error_message ? <p className="mt-1">{transcription.error_message}</p> : null}
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => run(() => retryTranscription(projectId, videoId))}
-            disabled={busy}
-          >
+        }
+      >
+        The worker stopped reporting progress. Start it again to continue.
+      </InlineAlert>
+    );
+  } else if (isActive(transcription.status)) {
+    body = (
+      <WorkingState
+        label={statusCopy(transcription)}
+        progress={transcription.status === "transcribing" ? transcription.progress_percent : null}
+        progressLabel="Transcription progress"
+        detail="Long recordings can take a while. You can leave this page; it keeps running."
+      />
+    );
+  } else if (transcription.status === "failed") {
+    body = (
+      <InlineAlert
+        title="Transcription failed"
+        action={
+          <Button variant="secondary" size="sm" onClick={() => run(() => retryTranscription(projectId, videoId))} disabled={busy}>
             {busy ? "Retrying…" : "Retry transcription"}
           </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-muted">
-            {transcription.segment_count} segments
-            {transcription.language ? ` · language: ${transcription.language}` : ""} · {transcription.provider}
-            {" / "}
-            {transcription.model}
-          </p>
-          <TranscriptViewer projectId={projectId} videoId={videoId} total={transcription.segment_count} />
-        </div>
-      )}
+        }
+      >
+        {transcription.error_message ?? "The speech could not be transcribed."}
+      </InlineAlert>
+    );
+  } else {
+    body = (
+      <TranscriptViewer
+        projectId={projectId}
+        videoId={videoId}
+        total={transcription.segment_count}
+        footnote={`Transcribed with ${transcription.provider} · ${transcription.model}`}
+      />
+    );
+  }
 
-      <FormError>{actionError}</FormError>
-    </section>
+  const description =
+    transcription?.status === "completed"
+      ? `${transcription.segment_count} segment${transcription.segment_count === 1 ? "" : "s"}${
+          transcription.language ? ` · ${languageName(transcription.language)}` : ""
+        }`
+      : "A timestamped transcript of everything said in the video.";
+
+  return (
+    <Panel
+      id="transcript"
+      step="2"
+      title="Transcript"
+      description={description}
+      status={transcription ? <StatusBadge status={transcription.status} stale={isActive(transcription.status) && transcription.is_stale} /> : undefined}
+    >
+      {body}
+      {actionError ? (
+        <div className="mt-3">
+          <FormError>{actionError}</FormError>
+        </div>
+      ) : null}
+    </Panel>
   );
+}
+
+const languageNames = typeof Intl !== "undefined" && "DisplayNames" in Intl ? new Intl.DisplayNames(["en"], { type: "language" }) : null;
+
+function languageName(code: string): string {
+  try {
+    return languageNames?.of(code) ?? code;
+  } catch {
+    return code;
+  }
 }
