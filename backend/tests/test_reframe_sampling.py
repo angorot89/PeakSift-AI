@@ -169,6 +169,23 @@ def test_audio_and_variable_frame_rate_do_not_matter(tmp_path: Path):
 
 
 @requires_ffmpeg
+def test_4k_high_frame_rate_source_is_sampled_small_and_on_time(tmp_path: Path):
+    # 3840x2160 at 60 fps: decoded once, scaled down in FFmpeg, sampled at the analysis rate.
+    source = tmp_path / "uhd.mp4"
+    subprocess.run(
+        [FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=3840x2160:r=60:d=2",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(source)],
+        check=True, capture_output=True, timeout=120,
+    )  # fmt: skip
+    geometry = probe_geometry(source, ffprobe_path=S.ffprobe_path)
+    assert (geometry.width, geometry.height) == (3840, 2160)
+    frames = run(source, fps=2.0, width=640)
+    assert [f.timestamp for f in frames] == [0.0, 0.5, 1.0, 1.5]
+    assert {(f.width, f.height) for f in frames} == {(640, 360)}
+    assert all(len(f.rgb) == 640 * 360 * 3 for f in frames)
+
+
+@requires_ffmpeg
 def test_short_clip_gives_at_least_one_frame(tmp_path: Path):
     frames = run(ramp_video(tmp_path / "s.mp4", seconds=0.3))
     assert len(frames) == 1 and frames[0].timestamp == 0

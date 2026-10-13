@@ -108,6 +108,8 @@ def test_dominant_face_leaving_hands_over_once():
     result = run(frames(16, host, guest))
     xs = primary_x(result)
     assert xs[0] == 0.4 and xs[-1] == 0.7 and result.switches == 1
+    # The guest was on screen with the host all along: a hand-over, not a shot change.
+    assert not any(s.cut for s in result.samples)
 
 
 def test_short_detection_glitch_never_steers():
@@ -154,3 +156,36 @@ def test_a_far_jump_starts_a_new_track_rather_than_teleporting():
     jumper = lambda t: face(t, 0.15 if t < 2.5 else 0.85)  # noqa: E731
     tracks = associate(frames(10, jumper), max_gap=GAP, sample_period=PERIOD)
     assert len(tracks) == 2
+
+
+# --- shot changes (hand-offs) -----
+
+
+def test_a_hard_cut_hands_the_frame_to_the_new_face_at_once():
+    # Shot 1: a face on the left until 3 s. Shot 2: a different face on the right from 3.5 s.
+    shot1 = lambda t: face(t, 0.2) if t < 3.5 else None  # noqa: E731
+    shot2 = lambda t: face(t, 0.8) if t >= 3.5 else None  # noqa: E731
+    result = run(frames(14, shot1, shot2))
+    xs = primary_x(result)
+    # No waiting on the old face's held box: the very first sample of shot 2 follows it.
+    assert xs[:7] == [0.2] * 7 and xs[7:] == [0.8] * 7
+    cuts = [s.timestamp for s in result.samples if s.cut]
+    assert cuts == [3.5] and result.switches == 1
+
+
+def test_a_brief_miss_of_the_subject_is_not_a_cut():
+    # The subject is missed for one sample while a second face (seen all along) is visible.
+    host = lambda t: None if t == 2.0 else face(t, 0.4, w=0.1)  # noqa: E731
+    guest = lambda t: face(t, 0.8, w=0.05)  # noqa: E731
+    result = run(frames(12, host, guest))
+    assert set(primary_x(result)) == {0.4} and result.switches == 0
+    assert not any(s.cut for s in result.samples)
+
+
+def test_a_face_returning_after_a_long_absence_is_followed_without_a_cut_flag():
+    # Gone for 3 s (longer than the gap limit): centre fallback in between, then a new track.
+    person = lambda t: None if 2.0 <= t < 5.0 else face(t, 0.7)  # noqa: E731
+    result = run(frames(16, person))
+    xs = primary_x(result)
+    assert xs[0] == 0.7 and xs[-1] == 0.7 and None in xs
+    assert len(result.tracks) == 2 and not any(s.cut for s in result.samples)

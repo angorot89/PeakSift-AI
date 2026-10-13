@@ -118,8 +118,14 @@ export function confidenceCopy(level: ConfidenceLevel | null): { label: string; 
 export function analysisErrorCopy(analysis: ReframeAnalysis): string {
   switch (analysis.error_code) {
     case "detector_unavailable":
+    case "ffmpeg_missing":
+    case "ffprobe_missing":
       return "Smart framing isn't available on this server right now.";
+    case "detector_failed":
+      // A broken detector is never reported as "no faces": the analysis failed.
+      return "The face detector stopped while analyzing this clip. Try again, or set a focal point.";
     case "clip_missing":
+    case "source_missing":
     case "clip_not_ready":
     case "source_unreadable":
     case "sampling_failed":

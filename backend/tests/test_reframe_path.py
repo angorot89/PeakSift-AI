@@ -263,3 +263,78 @@ def test_values_are_finite_and_within_the_database_constraints():
             )
         )
         assert 0 <= k.confidence <= 1 and 0 < k.crop_width <= 1 and k.timestamp >= 0
+
+
+# --- shot changes, fast movement, leaving and returning -----
+
+
+def cut_samples(left=0.2, right=0.8, at=5.0, duration=10.0):
+    """Shot 1 follows a face at ``left`` (track 0); a hard cut at ``at`` hands off to a face at
+    ``right`` (track 1) — what tracking reports for a cut."""
+    out = []
+    for i in range(int(duration / PERIOD) + 1):
+        t = i * PERIOD
+        if t < at:
+            out.append(SubjectSample(t, point(t, left, track=0), ()))
+        else:
+            out.append(SubjectSample(t, point(t, right, track=1), (), cut=t == at))
+    return out
+
+
+def test_a_shot_cut_cuts_the_camera_instead_of_panning_across_the_frame():
+    p = plan(cut_samples())
+    assert p.camera_cuts == 1
+    pairs = [
+        (a, b)
+        for a, b in zip(p.keyframes, p.keyframes[1:], strict=False)
+        if b.timestamp - a.timestamp < 0.01
+    ]
+    assert len(pairs) == 1
+    before, after = pairs[0]
+    # Halfway between the last sample of shot 1 (4.5 s) and the first of shot 2 (5.0 s).
+    assert after.timestamp == pytest.approx(4.75) and before.timestamp == pytest.approx(4.749)
+    assert face_inside(p, 4.7, 0.2) and face_inside(p, 4.8, 0.8)
+    # No drift toward the next shot before the cut, no slow pan after it.
+    assert all(face_inside(p, t / 10, 0.2) for t in range(0, 47))
+    assert all(face_inside(p, t / 10, 0.8) for t in range(48, 101))
+    # The diagnostics describe pans only; the cut is not reported as a 600 %/s pan.
+    assert p.max_pan_speed <= CONFIG.max_pan_per_second + 1e-6
+    assert p.subject_in_crop_fraction >= 0.95
+
+
+def test_a_hand_off_to_a_nearby_face_stays_smooth():
+    p = plan(cut_samples(left=0.45, right=0.5))
+    assert p.camera_cuts == 0
+    assert all(
+        b.timestamp - a.timestamp > 0.01 for a, b in zip(p.keyframes, p.keyframes[1:], strict=False)
+    )
+
+
+def test_cut_keyframes_satisfy_the_renderer_and_database_rules():
+    from app.services.clip_edit.smart_crop import crop_points_from, smart_crop_filter
+    from app.services.reframe.pipeline import validate_keyframes
+
+    p = plan(cut_samples(at=2.5, duration=6.0), duration=6.0)
+    validate_keyframes(p.keyframes, 6.0)
+    points = crop_points_from(p.keyframes)
+    assert all(b.timestamp > a.timestamp for a, b in zip(points, points[1:], strict=False))
+    assert "if(lt(t," in smart_crop_filter(points, W, H, 1080, 1920)
+
+
+def test_a_fast_moving_subject_stays_in_frame():
+    # Crossing 60 % of a landscape frame in 3 s (fast for an on-camera presenter).
+    p = plan(samples(6.0, lambda t: {"cx": 0.2 + 0.2 * min(t, 3.0)}), duration=6.0)
+    assert p.subject_in_crop_fraction >= 0.9
+    assert p.max_pan_speed <= CONFIG.max_pan_per_second + 1e-6
+
+
+def test_a_subject_leaving_and_returning_is_framed_again():
+    def person(t):
+        return None if 3.0 <= t < 6.0 else {"cx": 0.75}
+
+    p = plan(samples(10.0, person))
+    assert p.camera_cuts == 0
+    assert face_inside(p, 1.0, 0.75) and face_inside(p, 9.5, 0.75)
+    c, _ = crop_center_at(p.keyframes, 5.5)
+    assert c == pytest.approx(0.5, abs=0.05)  # centre fallback while nobody is visible
+    assert 0.2 < p.fallback_fraction < 0.4

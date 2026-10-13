@@ -24,6 +24,14 @@ are scored ``0.45·size + 0.30·persistence + 0.15·confidence + 0.10·centralit
 to the largest visible face, persistence = observed duration up to 3 s, centrality = closeness
 to the horizontal centre). The current subject stays until it disappears, or until another
 track has outscored it by ``SWITCH_MARGIN`` (25 %) continuously for ``SWITCH_HOLD_SECONDS``.
+
+**Hand-offs (shot changes).** When the followed face has ended (it is only being *held* past
+its last observation) and a face that first appeared *after* that last observation is
+visible, the new face takes over at once instead of waiting for the held box to expire: one
+face vanishing as another appears elsewhere is what a hard cut looks like. Such a change of
+subject is flagged ``cut`` so the crop path can cut with it instead of panning across the
+frame. Faces that were visible together never produce a hand-off; they use the hysteresis
+above.
 """
 
 import math
@@ -230,6 +238,7 @@ class SubjectSample:
     timestamp: float
     primary: TrackPoint | None
     others: tuple[TrackPoint, ...]
+    cut: bool = False  # the subject was handed off to a face that appeared after it vanished
 
 
 @dataclass(frozen=True)
@@ -289,6 +298,20 @@ def track_subjects(
             points, key=lambda p: (round(scores[p.track_id], 9), -p.center_x, -p.center_y)
         ).track_id
         visible = {p.track_id for p in points}
+        previous = current
+        if current in visible and timestamp > eligible[current].last_seen + 1e-9:
+            # The subject has ended and is only held: a face that appeared after it was last
+            # seen takes over now (a hand-off), rather than after the held box expires.
+            ended = eligible[current].last_seen
+            fresh = [p for p in points if eligible[p.track_id].first_seen > ended + 1e-9]
+            if fresh:
+                fresh_scores = {p.track_id: scores[p.track_id] for p in fresh}
+                current = max(
+                    fresh,
+                    key=lambda p: (round(fresh_scores[p.track_id], 9), -p.center_x, -p.center_y),
+                ).track_id
+                challenger = None
+                switches += 1
         if current not in visible:
             if current is not None and best != current:
                 switches += 1
@@ -303,5 +326,10 @@ def track_subjects(
             challenger = None
         primary = next(p for p in points if p.track_id == current)
         others = tuple(p for p in points if p.track_id != current)
-        samples.append(SubjectSample(timestamp, primary, others))
+        cut = (
+            previous is not None
+            and current != previous
+            and eligible[current].first_seen > eligible[previous].last_seen + 1e-9
+        )
+        samples.append(SubjectSample(timestamp, primary, others, cut))
     return TrackingResult(tracks=tracks, samples=samples, switches=switches)

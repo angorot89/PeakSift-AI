@@ -202,6 +202,23 @@ def test_missing_clip_file_is_reported(db_session, settings, storage):
     assert result.status == ReframeStatus.FAILED and result.error_code == "clip_missing"
 
 
+def test_symlinked_clip_directory_outside_the_root_is_never_read(
+    db_session, settings, storage, tmp_path: Path
+):
+    analysis = ready_analysis(db_session, storage, with_file=False)
+    key = analysis.clip.storage_key
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / Path(key).name).write_bytes(b"secret bytes outside the media root")
+    link = storage.root / Path(key).parent
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(outside, target_is_directory=True)
+    detector = ScriptedDetector()
+    result = run(analysis, db_session, settings, storage, detector)
+    assert result.status == ReframeStatus.FAILED and result.error_code == "clip_missing"
+    assert str(outside) not in (result.error_message or "") and detector.calls == []
+
+
 def test_unreadable_clip_is_reported(db_session, settings, storage):
     analysis = ready_analysis(db_session, storage, with_file=False)
     path = storage.path_for(analysis.clip.storage_key)
