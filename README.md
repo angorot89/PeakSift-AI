@@ -6,7 +6,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 ## Current status
 
-**Milestones 1–5 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5). What exists today:
+**Milestones 1–6 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6). What exists today:
 
 - A landing page.
 - Email/password accounts: register, log in, log out, with an HttpOnly session cookie.
@@ -17,18 +17,18 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 - **Background transcription**: one click turns a ready video into a timestamped transcript. Audio is normalized with FFmpeg, split into 10-minute chunks and transcribed by a Celery worker with faster-whisper (local, default) or OpenAI (`whisper-1`); the project page polls real progress, shows failures and stalled jobs with retry, and renders the transcript with `HH:MM:SS` timestamps, paging and copy.
 - **AI clip detection**: on a transcribed video, pick an AI provider and model (local Ollama or hosted OpenAI, from server allow-lists) and start a background run. The transcript is analysed in bounded windows, every proposal is validated against the transcript, deduplicated and ranked, and the project page shows candidate cards — title, time range, duration, a 0–100 editorial score with its breakdown, hook, rationale, transcript excerpt — with an in-page preview of that range of the original video and save/dismiss decisions. Details: [docs/clip-detection.md](docs/clip-detection.md).
 - **Clip generation**: **Generate clip** on a candidate renders exactly its validated time range from the original upload into a private MP4 (H.264 + AAC, fast-start, original aspect ratio and orientation) in the background worker with FFmpeg, validates it with ffprobe, then shows the rendered clip in the page with **Download MP4**. Real render states, failure messages and retry; clips persist across sessions. Details: [docs/clip-generation.md](docs/clip-generation.md).
-- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`) managed with Alembic migrations.
-- Automated tests (backend 765), linting and CI with PostgreSQL, Redis and FFmpeg (including real clip renders).
+- **Short-form editing**: under a ready clip, **Make a vertical short** renders it as a 9:16 short (1080 × 1920) in the background worker — **Center crop**, **Blur background** or **Fit** — with optional captions burned in from the transcript (Bold / Clean / Creator presets; top, center or bottom). Each settings combination is a separate variant with its own status, 9:16 player and **Download short**; the V0.5 clip is never modified. Details: [docs/short-form-editing.md](docs/short-form-editing.md).
+- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`) managed with Alembic migrations.
+- Automated tests (950 backend tests in CI), linting and CI with PostgreSQL, Redis and FFmpeg (including real clip and captioned short renders).
 
 **Not built yet** (see [docs/milestones.md](docs/milestones.md)):
 
 | Feature                                                              | Milestone |
 | -------------------------------------------------------------------- | --------- |
-| Short-form editing (vertical layouts, captions, trimming)            | 6 (next)  |
 | Creator intelligence & metadata, publishing                          | later     |
 | Asset libraries, Morocco Mode                                        | later     |
 
-The dashboard's Videos and Clips cards do not show counts yet. Generated clips keep the source's aspect ratio — vertical 9:16 layouts and captions are Milestone 6.
+The dashboard's Videos and Clips cards do not show counts yet. Shorts use centred framing and phrase-level captions — no subject tracking, word-level captions, timeline editor, music or publishing (see [Known limitations](#known-limitations)).
 
 ## Architecture (as built)
 
@@ -39,12 +39,13 @@ Browser ──▶ Next.js frontend (:3000) ──fetch, cookie──▶ FastAPI 
                                                               ├──▶ ffprobe (metadata)   │ status, segments, candidates
                                                               └──▶ Redis ──▶ Celery worker ──▶ transcription: ffmpeg → chunks → faster-whisper | OpenAI
                                                                                            ├─▶ clip detection: transcript windows → Ollama | OpenAI → validate → rank
-                                                                                           └─▶ clip rendering: ffmpeg (libx264/aac) → ffprobe → MEDIA_ROOT/clips/
+                                                                                           ├─▶ clip rendering: ffmpeg (libx264/aac) → ffprobe → MEDIA_ROOT/clips/
+                                                                                           └─▶ short-form edits: transcript → ASS captions → ffmpeg (9:16 layout + libass) → ffprobe → MEDIA_ROOT/edits/
 ```
 
 - **Frontend** — Next.js App Router, TypeScript, Tailwind CSS. Talks to the API with `credentials: "include"`; asks `GET /auth/me` to learn who is signed in. No tokens in browser storage.
 - **Backend** — FastAPI, SQLAlchemy 2 (sync), Alembic, psycopg 3. Argon2id password hashing; HS256 JWT delivered in an HttpOnly `SameSite=Lax` cookie; CORS limited to the frontend origin. Uploads are streamed to local storage and probed with ffprobe synchronously; transcription and clip detection run in a Celery worker over Redis, with the database as the source of truth for job state.
-- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates` tables, UUID keys, timezone-aware timestamps.
+- **Database** — PostgreSQL. `users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits` tables, UUID keys, timezone-aware timestamps.
 
 Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
 
@@ -55,7 +56,8 @@ Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backe
 - Node.js 20.9+
 - Python 3.11+
 - PostgreSQL 14+ — either Docker (`docker compose up -d`, which creates the `peaksift` and `peaksift_test` databases) or a local installation
-- FFmpeg (`ffprobe` for metadata, `ffmpeg` for audio): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads end in status `failed` and transcription cannot run.
+- FFmpeg (`ffprobe` for metadata, `ffmpeg` for audio and rendering): `apt install ffmpeg` on Ubuntu. On macOS use `brew install ffmpeg-full` and set `FFMPEG_PATH` / `FFPROBE_PATH` to `/opt/homebrew/opt/ffmpeg-full/bin/…` — Homebrew's default `ffmpeg` has no libass, so captioned shorts are refused with it. Without FFmpeg uploads end in status `failed` and transcription cannot run.
+- Caption fonts: Noto Sans (and Noto Sans Arabic) — `apt install fonts-noto-core` / `brew install --cask font-noto-sans font-noto-sans-arabic`.
 - Redis 7+ — Docker Compose (included) or `brew install redis && brew services start redis`. Broker for background jobs; the API starts without it, but starting a transcription or a clip detection answers `503` until it is reachable.
 - Ollama (optional, for local AI clip detection): `brew install ollama`, `ollama serve`, `ollama pull llama3.2:3b`. Without it the local provider is listed as unavailable; the hosted OpenAI provider needs `OPENAI_API_KEY` instead.
 
@@ -78,7 +80,7 @@ uvicorn app.main:app --reload        # http://localhost:8000 — docs at /docs
 
 Uploaded videos and derived audio are written under `backend/media/` (`MEDIA_ROOT`), which is git-ignored.
 
-### 3. Celery worker (transcription, clip detection, clip rendering)
+### 3. Celery worker (transcription, clip detection, clip rendering, short-form edits)
 
 In a second terminal, same virtualenv and directory:
 
@@ -89,7 +91,7 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 The default speech-to-text provider is faster-whisper on CPU (`FASTER_WHISPER_MODEL=small`, `int8`); the model (~460 MB) is downloaded on the first transcription, never at startup. On macOS, CPU mode is the supported path — there is no Apple-GPU acceleration in this stack. Set `FASTER_WHISPER_MODEL=tiny` to try the mechanics quickly, or `TRANSCRIPTION_PROVIDER=openai` with `OPENAI_API_KEY` for the hosted provider.
 
-The same worker runs clip detection and clip rendering (CPU `libx264`; your FFmpeg must include the `libx264` and `aac` encoders, as Homebrew's and Ubuntu's builds do). For the local AI provider, start Ollama (`ollama serve`) and pull a model from `OLLAMA_CLIP_MODELS` (default `llama3.2:3b`); the worker never pulls or loads a model itself.
+The same worker runs clip detection, clip rendering and short-form edits (CPU `libx264`; your FFmpeg must include the `libx264` and `aac` encoders, and libass for captions — Ubuntu's `ffmpeg` and Homebrew's `ffmpeg-full` do). For the local AI provider, start Ollama (`ollama serve`) and pull a model from `OLLAMA_CLIP_MODELS` (default `llama3.2:3b`); the worker never pulls or loads a model itself.
 
 ### 4. Frontend
 
@@ -162,10 +164,19 @@ Scores are the model's editorial judgement normalised to 0–100 — not predict
 
 Full reference: [docs/clip-generation.md](docs/clip-generation.md).
 
+## Short-form editing flow
+
+1. Under a ready clip, **Make a vertical short** offers the edit settings: layout (**Blur background**, **Center crop**, **Fit**), **Burn in captions from the transcript**, caption style (**Bold**, **Clean**, **Creator**) and position (**Top**, **Center**, **Bottom**). A small schematic is labelled as a layout guide, not the result. Click **Render short**; the API validates the options against allow-lists, deduplicates identical settings and queues the render at once.
+2. The worker builds captions from the persisted transcript (clip-local times, short cues, proportional word timing within each segment — phrase-level, not word-level), writes an escaped ASS file into the attempt's private workspace, composes the clip at 1080 × 1920 with FFmpeg (and libass for captions), validates the output with ffprobe, renames it atomically to `edits/<id>/edited.mp4` and only then marks the edit `ready`.
+3. Under **Rendered shorts**, each variant polls every 4 s while active, then shows a 9:16 player (owner-only Range stream) and **Download short**; failed or stalled renders show a safe message and **Retry render**.
+
+Full reference: [docs/short-form-editing.md](docs/short-form-editing.md).
+
 ## Security model (high level)
 
-- Every project, video, detection-run, candidate and clip endpoint is scoped to the signed-in owner; anything else is a `404`.
-- Rendered clips are private: preview and download go through owner-checked endpoints; candidate titles only influence the sanitised download name, never a storage path.
+- Every project, video, detection-run, candidate, clip and edit endpoint is scoped to the signed-in owner; anything else is a `404`.
+- Rendered clips and shorts are private: preview and download go through owner-checked endpoints; candidate titles only influence the sanitised download name, never a storage path.
+- Edit options are allow-listed enums; users never submit filters, fonts, paths or ASS syntax. Transcript text is untrusted: it is escaped for ASS (no override tags or line commands can form) and never reaches a shell, a filtergraph or a path.
 - Users choose an AI provider and model only from server allow-lists; the Ollama endpoint and the OpenAI key are server configuration and never appear in responses, errors or the frontend. Model output is validated and bounded before anything is stored.
 - Browser-supplied filenames are metadata only. Files are stored under application-generated UUID keys, and the single path-resolution function refuses anything outside `MEDIA_ROOT`.
 - Uploads are validated in layers (extension, MIME plausibility, size during streaming, then ffprobe proving the bytes are readable media). Oversized, empty or unreadable uploads leave no stray files.
@@ -185,17 +196,18 @@ Full reference: [docs/clip-generation.md](docs/clip-generation.md).
 - A job interrupted by a worker crash restarts from the beginning via the stale rule or retry (no chunk-level resume).
 - Transcription quality has only been sanity-checked on synthesised English speech; no Darija/Moroccan benchmarking has been done.
 - Clip detection analyses windows sequentially and cuts them on time/character budgets, not topics; snapping is line-granular; deduplication is temporal only; small local models yield fewer usable candidates. The hosted provider sends transcript text to OpenAI.
-- Clip generation keeps the original aspect ratio (no 9:16 reframing, captions, editor, trimming, music or sound effects), renders on the CPU with a fixed MP4/H.264/AAC profile, reports stage progress rather than frame progress, and has no clip deletion, retention or render cancellation. No publishing integrations.
+- Generated clips keep the original aspect ratio; vertical output comes from short-form edits. Rendering is CPU-only with fixed MP4/H.264/AAC profiles and stage (not frame) progress; there is no clip or edit deletion, retention or render cancellation, and no publishing integrations.
+- Short-form edits: centred crops only (no subject/face tracking, AI or dynamic reframing, manual crop position); phrase-level captions with approximate word timing (no word-by-word captions, highlighting or animation); three fixed caption presets and positions, one font family; emoji are left out of captions; Arabic shaping was verified visually on samples only. No timeline, trimming, music, sound effects, B-roll or publishing.
 
 ## Routes
 
 **Frontend:** `/`, `/login`, `/register`, `/dashboard`, `/projects`, `/projects/new`, `/projects/[id]`
 
-**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` · `GET /clip-detection/providers` · `POST /projects/{id}/videos/{video_id}/clip-detection` · `GET …/clip-detection` · `GET …/clip-detection/{run_id}` · `POST …/clip-detection/{run_id}/retry` · `GET …/clip-detection/{run_id}/candidates` · `GET …/candidates/{candidate_id}` · `POST …/candidates/{candidate_id}/save|dismiss|reset` · `POST …/candidates/{candidate_id}/clip` · `GET …/candidates/{candidate_id}/clip` · `POST …/candidates/{candidate_id}/clip/retry` · `GET /projects/{id}/videos/{video_id}/clips` · `GET /clips/{clip_id}/content` · `GET /clips/{clip_id}/download` — see [backend/README.md](backend/README.md#api).
+**API:** `GET /health` · `POST /auth/register` · `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` · `GET /projects` · `POST /projects` · `GET /projects/{id}` · `POST /projects/{id}/videos` · `GET /projects/{id}/videos` · `GET /projects/{id}/videos/{video_id}` · `GET /videos/{video_id}/content` · `POST /projects/{id}/videos/{video_id}/transcription` · `GET …/transcription` · `POST …/transcription/retry` · `GET …/transcript` · `GET /clip-detection/providers` · `POST /projects/{id}/videos/{video_id}/clip-detection` · `GET …/clip-detection` · `GET …/clip-detection/{run_id}` · `POST …/clip-detection/{run_id}/retry` · `GET …/clip-detection/{run_id}/candidates` · `GET …/candidates/{candidate_id}` · `POST …/candidates/{candidate_id}/save|dismiss|reset` · `POST …/candidates/{candidate_id}/clip` · `GET …/candidates/{candidate_id}/clip` · `POST …/candidates/{candidate_id}/clip/retry` · `GET /projects/{id}/videos/{video_id}/clips` · `GET /clips/{clip_id}/content` · `GET /clips/{clip_id}/download` · `POST /projects/{id}/videos/{video_id}/clips/{clip_id}/edits` · `GET …/edits` · `GET …/edits/{edit_id}` · `POST …/edits/{edit_id}/retry` · `GET /edits/{edit_id}/content` · `GET /edits/{edit_id}/download` — see [backend/README.md](backend/README.md#api).
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download — after checking that FFmpeg provides the `libx264` and `aac` encoders, and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection and clip rendering tasks are registered, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download, and real 9:16 short renders with burned-in captions checked against actual frame pixels — after installing the Noto fonts and checking that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption really draws text (`REQUIRE_LIBASS=1`: caption tests cannot skip), and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection, clip rendering and short-form edit tasks are registered, stop). Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
@@ -211,7 +223,7 @@ PeakSift will ship a **Global** experience available to everyone.
 PeakSift-AI/
 ├── frontend/             # Next.js app — see frontend/README.md
 ├── backend/              # FastAPI service — see backend/README.md
-├── docs/                 # Architecture, milestones, clip detection and clip generation references
+├── docs/                 # Architecture, milestones, clip detection, clip generation and short-form editing references
 ├── docker/               # PostgreSQL init script for Docker Compose
 ├── docker-compose.yml    # Local PostgreSQL
 └── .github/workflows/    # CI

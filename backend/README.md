@@ -1,12 +1,13 @@
 # PeakSift AI — Backend
 
-FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), background transcription with timestamped segments (faster-whisper locally or OpenAI), and AI clip detection — ranked, validated clip candidates derived from the transcript by a local Ollama model or OpenAI (see [docs/clip-detection.md](../docs/clip-detection.md)), and clip generation — a candidate rendered by FFmpeg into a validated private MP4 with Range-streamed preview and download (see [docs/clip-generation.md](../docs/clip-generation.md)).
+FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery worker on Redis. It provides a health check, email/password authentication, a per-user project API, source-video upload with ffprobe metadata extraction and owner-only streaming (local filesystem storage for development), background transcription with timestamped segments (faster-whisper locally or OpenAI), and AI clip detection — ranked, validated clip candidates derived from the transcript by a local Ollama model or OpenAI (see [docs/clip-detection.md](../docs/clip-detection.md)), clip generation — a candidate rendered by FFmpeg into a validated private MP4 with Range-streamed preview and download (see [docs/clip-generation.md](../docs/clip-generation.md)), and short-form editing — a generated clip composed as a 9:16 short with transcript captions burned in by libass (see [docs/short-form-editing.md](../docs/short-form-editing.md)).
 
 ## Prerequisites
 
 - Python 3.11+ (check with `python3 --version`)
 - PostgreSQL 14+ — either Docker (`docker compose up -d` from the repository root) or a local installation
-- FFmpeg (for `ffprobe`, which reads uploaded video metadata): `brew install ffmpeg` / `apt install ffmpeg`. Without it uploads still succeed but end in status `failed`.
+- FFmpeg with libass (`ffprobe` reads uploaded metadata; `ffmpeg` extracts audio and renders clips and shorts): `apt install ffmpeg` on Ubuntu; on macOS `brew install ffmpeg-full` and set `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`, `FFPROBE_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffprobe` in `.env` (Homebrew's default `ffmpeg` has no libass, so captioned shorts are refused). Without FFmpeg uploads still succeed but end in status `failed`.
+- Caption fonts: Noto Sans + Noto Sans Arabic (`apt install fonts-noto-core` / `brew install --cask font-noto-sans font-noto-sans-arabic`). No font files are committed.
 - Redis 7+ — either Docker Compose (included) or `brew install redis && brew services start redis`. It is the broker for background jobs; the API starts without it, but queuing a job fails with `503` until it is reachable.
 - Ollama (optional, local AI clip detection) — `brew install ollama`, `ollama serve`, `ollama pull llama3.2:3b`. Without it the local provider is reported unavailable; the hosted provider needs `OPENAI_API_KEY`.
 
@@ -122,6 +123,19 @@ Generated clips:
 
 A clip is `{id, candidate_id, run_id, video_id, title, status, progress_percent, attempt, is_stale, start_time, end_time, duration_seconds, render_profile, content_type, file_size, width, height, fps, video_codec, audio_codec, error_code, error_message, created_at, started_at, completed_at}`. Storage keys, paths and task ids are never returned.
 
+Short-form edits (9:16 variants of a ready clip):
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit", "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator", "caption_position": "top" \| "center" \| "bottom"}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
+| GET    | `…/clips/{clip_id}/edits` | yes | The clip's variants, newest first (`offset`, `limit` 1–50). |
+| GET    | `…/clips/{clip_id}/edits/{edit_id}` | yes | Edit state: `status`, stage `progress_percent`, `attempt`, `is_stale`, the configuration, output metadata and `caption_cue_count` once ready, safe `error_code`/`error_message`. A `ready` edit whose file is missing is reported as `failed`/`artifact_missing`. |
+| POST   | `…/edits/{edit_id}/retry` | yes | Re-queue a failed or stale edit on the same row (row-locked; `409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
+| GET    | `/edits/{edit_id}/content` | yes | The short inline for `<video>`, Range-capable (`206`/`416`), `private, no-store`; `404` unless yours and ready. |
+| GET    | `/edits/{edit_id}/download` | yes | Attachment named `<title-slug>-vertical-<short-id>.mp4`. |
+
+An edit is `{id, clip_id, video_id, status, progress_percent, attempt, is_stale, configuration, aspect_ratio, layout, captions_enabled, caption_style, caption_position, output_width, output_height, render_profile, caption_cue_count, duration_seconds, width, height, fps, file_size, video_codec, audio_codec, error_code, error_message, created_at, started_at, completed_at}` — never storage keys, paths, task ids, caption files or FFmpeg commands.
+
 A video is `{id, project_id, original_filename, content_type, file_size, duration_seconds, width, height, fps, video_codec, audio_codec, status, error_message, created_at, updated_at}`. The metadata fields are `null` until probing succeeds; `error_message` is set only when `status` is `failed`. Storage keys and filesystem paths are never returned.
 
 Auth request bodies are JSON: `{"email": "...", "password": "..."}`. Emails are trimmed and lower-cased; passwords must be 8–128 characters. Project names are trimmed and must be 1–200 characters. A project is `{id, name, status, created_at, updated_at}`.
@@ -192,9 +206,13 @@ Each chunk is checked against `OPENAI_MAX_UPLOAD_BYTES` (default 20 MB, a margin
 
 `app/services/clip_render/` turns a candidate into a validated MP4: `storage.py` (keys `clips/<uuid>/clip-tmp-<attempt>.mp4` → `clips/<uuid>/clip.mp4`, atomic finalize, discard, download-name sanitiser), `renderer.py` (FFmpeg argument list — `-ss` before `-i` and re-encoding, never stream copy; libx264/yuv420p + aac, `+faststart`, source geometry and orientation; stderr to a temp file with a bounded, path-redacted tail in logs; heartbeat callback; timeout kill; ffprobe validation of codec, size, duration and audio), `pipeline.py` (the Celery job: claim on database state, fencing on every commit, honest stage progress 10/80/90/100, file-first-then-row finalization, safe failure codes). The full design, configuration and limitations are in [docs/clip-generation.md](../docs/clip-generation.md).
 
+## Short-form editing
+
+`app/services/clip_edit/` turns a ready clip into a 9:16 short: `config.py` (allow-listed enums, normalized versioned snapshot, fingerprint), `composition.py` (constant filtergraphs for center crop / blur background / fit at 1080 × 1920, the FFmpeg command run inside the attempt workspace with `subtitles=captions.ass`, ffprobe validation, libass detection and the caption font probe), `captions.py` (transcript segments → clip-local cues: proportional word timing, segmentation, long-token splitting, emoji removal, ASS escaping), `caption_styles.py` (Bold/Clean/Creator presets, top/center/bottom positions, the ASS document), `storage.py` (`edits/<uuid>/work-<attempt>/` → `edits/<uuid>/edited.mp4`, atomic finalize) and `pipeline.py` (the Celery job `peaksift.render_clip_edit`: claim, attempt-token ownership on every commit, stage progress 5/15/85/90/100, file-first-then-row finalization, safe failure codes). The full design, configuration and limitations are in [docs/short-form-editing.md](../docs/short-form-editing.md).
+
 ## Media serving
 
-Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) and `GET /clips/{clip_id}/content` / `/download` (rendered clips); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
+Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
 
 ## Structure
 
@@ -202,11 +220,11 @@ Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch me
 app/
   main.py            # FastAPI app, CORS, routers
   api/               # Routers: health, auth, projects, videos, video_content, transcriptions, clip_detection,
-                     # clips, clip_media; media_streaming.py = shared Range streaming
+                     # clips, clip_media, clip_edits (+ edit media); media_streaming.py = shared Range streaming
   core/config.py     # Settings from environment variables
   core/database.py   # Engine, session factory, `get_db` dependency, declarative Base
   core/security.py   # Password hashing and access-token encode/decode
-  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip
+  models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip, ClipEdit
   schemas/           # Pydantic request/response schemas
   services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
@@ -215,12 +233,14 @@ app/
   services/audio_extraction.py # ffmpeg -> mono 16 kHz 64 kbps MP3 under transcription/<id>/
   services/transcription/      # Contract, factory, chunking, pipeline, faster_whisper + openai providers
   services/clip_render/        # Artifact storage, FFmpeg renderer, Celery render pipeline
+  services/clip_edit/          # Edit config, 9:16 composition, captions + styles, edit artifacts, pipeline
   services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
                                # validation, ranking, detection_config, pipeline
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
   workers/transcription_tasks.py # Background tasks (ids only cross the broker)
   workers/clip_detection_tasks.py # peaksift.detect_clips
   workers/clip_render_tasks.py # peaksift.render_clip
+  workers/clip_edit_tasks.py   # peaksift.render_clip_edit
   workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
 tests/               # pytest suite (conftest.py holds the DB fixtures)
@@ -242,7 +262,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
 | `FFPROBE_PATH`      | `ffprobe`                                      | ffprobe binary (name on `PATH` or absolute path) |
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
-| `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary used to extract normalized audio for transcription |
+| `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary for audio extraction, clip rendering and shorts (needs libass for captions) |
 | `AUDIO_EXTRACTION_TIMEOUT_SECONDS` | `3600`                          | Time limit for extracting one video's audio  |
 | `TRANSCRIPTION_CHUNK_SECONDS` | `600`                                | Fixed chunk length for long audio (min 30)   |
 | `TRANSCRIPTION_PROVIDER_MAX_ATTEMPTS` | `3`                           | Attempts per chunk for *transient* provider errors |
@@ -278,7 +298,9 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `CLIP_RENDER_TIMEOUT_SECONDS` | `1800`                              | Kill FFmpeg after this long                  |
 | `CLIP_RENDER_DURATION_TOLERANCE_SECONDS` / `CLIP_RENDER_SOURCE_TOLERANCE_SECONDS` | `1` / `1` | Accepted rendered-duration difference / overrun past the source end |
 | `CLIP_RENDER_HEARTBEAT_SECONDS` / `CLIP_RENDER_STALE_AFTER_SECONDS` | `15` / `900` | Render heartbeat interval / age after which a render counts as dead |
-| `CLIP_RENDER_MAX_ATTEMPTS` | `5`                                     | Retries per clip                             |
+| `CLIP_RENDER_MAX_ATTEMPTS` | `5`                                     | Retries per clip and per edit (the other `CLIP_RENDER_*` values apply to shorts too) |
+| `CAPTION_FONT_FAMILY` | `Noto Sans`                                  | Caption font family for shorts (plain name; resolved by fontconfig, with fallbacks) |
+| `CAPTION_MAX_WORDS` / `CAPTION_MAX_CHARS` | `7` / `32`               | Caption cue limits                           |
 | `REDIS_URL`         | `redis://localhost:6379/0`                     | Celery broker                                |
 | `CELERY_TASK_SOFT_TIME_LIMIT_SECONDS` | `21600` (6 h)                | Soft limit for one background job            |
 | `CELERY_TASK_TIME_LIMIT_SECONDS` | `22200`                           | Hard limit for one background job            |
