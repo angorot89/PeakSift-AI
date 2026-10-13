@@ -112,7 +112,7 @@ def close(actual, expected, tolerance=60) -> bool:
     return all(abs(a - e) <= tolerance for a, e in zip(actual, expected, strict=True))
 
 
-# --- filtergraphs and command (no ffmpeg needed) ---------------------------------------------
+# --- filtergraphs and command (no ffmpeg needed) -----
 
 
 def test_filtergraphs_come_only_from_constants():
@@ -148,7 +148,7 @@ def test_command_shape_with_and_without_captions():
     assert captioned[captioned.index("-map") + 1] == "[out]" and "0:a:0" not in captioned
 
 
-# --- real renders -----------------------------------------------------------------------------
+# --- real renders -----
 
 
 @requires_ffmpeg

@@ -115,7 +115,7 @@ def make_edit(
     return edit
 
 
-# --- configuration -----------------------------------------------------------------------------
+# --- configuration -----
 
 
 def test_config_snapshot_is_explicit_and_versioned():
@@ -193,7 +193,7 @@ def test_unknown_snapshot_versions_are_refused():
         EditConfig.from_snapshot({"version": 99, "layout": "fit"})
 
 
-# --- model -----------------------------------------------------------------------------------
+# --- model -----
 
 
 def test_edit_defaults(db_session: Session):

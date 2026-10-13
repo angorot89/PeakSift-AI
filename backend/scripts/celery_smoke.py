@@ -25,6 +25,7 @@ EXPECTED_TASKS = (
     "peaksift.transcribe_video",
     "peaksift.detect_clips",
     "peaksift.render_clip",
+    "peaksift.render_clip_edit",
 )
 
 
