@@ -117,9 +117,8 @@ def close(actual, expected, tolerance=60) -> bool:
 
 def test_filtergraphs_come_only_from_constants():
     crop = layout_filter(Layout.CENTER_CROP)
-    assert (
-        crop
-        == "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[framed]"
+    assert crop == (
+        "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[framed]"
     )
     blur = layout_filter(Layout.BLUR_BACKGROUND)
     assert "split=2" in blur and "gblur" in blur and "overlay=(W-w)/2:(H-h)/2" in blur
