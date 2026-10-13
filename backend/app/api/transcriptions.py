@@ -16,7 +16,7 @@ from app.models import (
 )
 from app.schemas.transcription import TranscriptionRead, TranscriptPage, TranscriptSegmentRead
 from app.services.transcription.pipeline import is_stale
-from app.workers.dispatch import JobQueueUnavailable, enqueue_transcription
+from app.workers.dispatch import JobQueueUnavailable, enqueue_transcription, new_task_id
 
 router = APIRouter(prefix="/projects/{project_id}/videos/{video_id}", tags=["transcription"])
 
@@ -72,17 +72,25 @@ def _read(db: DbSession, transcription: Transcription) -> TranscriptionRead:
 
 
 def _enqueue_or_503(db: DbSession, transcription: Transcription, *, created: bool) -> None:
+    """The task id is already committed on the row (fencing token); hand the job over.
+
+    Committing the token *before* enqueueing closes the V0.3 window in which a fast worker
+    could start while the row still carried the previous attempt's token.
+    """
     try:
-        transcription.celery_task_id = enqueue_transcription(transcription.id)
+        enqueue_transcription(transcription.id, task_id=transcription.celery_task_id)
     except JobQueueUnavailable:
         if created:
             db.delete(transcription)  # never leave a row that no worker will pick up
+        else:
+            transcription.status = TranscriptionStatus.FAILED
+            transcription.error_code = "queue_unavailable"
+            transcription.error_message = "The job queue was unavailable; retry in a moment"
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The transcription queue is unavailable. Try again in a moment.",
         ) from None
-    db.commit()
 
 
 @router.post("/transcription", response_model=TranscriptionRead)
@@ -108,6 +116,7 @@ def start_transcription(video: OwnedVideo, db: DbSession, response_status: None 
         video=video,
         provider=settings.transcription_provider,
         model=_configured_model(settings.transcription_provider),
+        celery_task_id=new_task_id(),
     )
     db.add(transcription)
     db.commit()
@@ -147,6 +156,7 @@ def retry_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
     transcription.started_at = None
     transcription.completed_at = None
     transcription.heartbeat_at = None
+    transcription.celery_task_id = new_task_id()  # fences out a stalled worker of the old attempt
     db.commit()
     _enqueue_or_503(db, transcription, created=False)
     return _read(db, transcription)

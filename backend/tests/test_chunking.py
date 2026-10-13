@@ -1,5 +1,6 @@
 import subprocess
 import types
+import uuid
 from pathlib import Path
 
 import pytest
@@ -321,3 +322,44 @@ def test_real_short_source_is_a_single_chunk(storage: LocalMediaStorage):
 
     assert len(chunks) == 1 and chunks[0].start_seconds == 0
     assert chunks[0].duration_seconds == pytest.approx(2.0, abs=0.15)
+
+
+# --- per-attempt workspaces ----------------------------------------------------------------
+
+
+def test_attempt_workspaces_are_distinct_and_safe():
+    from app.services.transcription.chunking import attempt_workspace
+
+    tid = uuid.UUID("12345678-1234-5678-1234-567812345678")
+    first = attempt_workspace(tid, "0f8e6c2a-1111-4222-8333-944455556666")
+    second = attempt_workspace(tid, "aa11bb22-1111-4222-8333-944455556666")
+    assert first != second and first.startswith(f"{tid}/")
+    assert attempt_workspace(tid, None) == f"{tid}/inline"
+    assert attempt_workspace(tid, "../../etc") == f"{tid}/etc"  # only alphanumerics survive
+    with pytest.raises(ValueError):
+        attempt_workspace("not-a-uuid", "x")
+
+
+def test_cleaning_one_workspace_never_touches_another(storage: LocalMediaStorage):
+    from app.services.transcription.chunking import (
+        attempt_workspace,
+        chunk_key,
+        cleanup_other_workspaces,
+    )
+
+    tid = uuid.uuid4()
+    old, new = attempt_workspace(tid, "taskone"), attempt_workspace(tid, "tasktwo")
+    for workspace in (old, new):
+        path = storage.path_for(chunk_key(workspace, 0))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+
+    cleanup_chunks(storage, old)  # the stale worker cleans up after itself
+    assert not storage.path_for(chunk_key(old, 0)).exists()
+    assert storage.path_for(chunk_key(new, 0)).exists()
+
+    legacy = storage.path_for(f"transcription/{tid}/normalized.mp3")  # pre-V0.6 flat layout
+    legacy.write_bytes(b"old")
+    cleanup_other_workspaces(storage, tid, keep=new)  # the current attempt clears the rest
+    assert storage.path_for(chunk_key(new, 0)).exists()
+    assert not storage.path_for(f"transcription/{old}").exists() and not legacy.exists()

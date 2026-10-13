@@ -189,6 +189,32 @@ def split_audio(
     return chunks
 
 
+def attempt_workspace(transcription_id: uuid.UUID | str, task_id: str | None) -> str:
+    """``<transcription-id>/<attempt-tag>``: where one attempt keeps its normalized audio and
+    chunks. Passed wherever a transcription id names a storage location, so a stalled worker
+    of an older attempt can only ever touch its own files."""
+    tag = "".join(ch for ch in (task_id or "inline") if ch.isalnum())[:16] or "inline"
+    return f"{uuid.UUID(str(transcription_id))}/{tag}"
+
+
+def cleanup_other_workspaces(
+    storage: LocalMediaStorage, transcription_id: uuid.UUID | str, keep: str
+) -> None:
+    """Remove derived files of earlier attempts (and the pre-V0.6 flat layout), keeping
+    ``keep`` (a workspace from ``attempt_workspace``)."""
+    root = storage.path_for(f"transcription/{uuid.UUID(str(transcription_id))}")
+    if not root.is_dir():
+        return
+    keep_name = keep.rsplit("/", 1)[-1]
+    for entry in root.iterdir():
+        if entry.name == keep_name:
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry, ignore_errors=True)
+        else:
+            entry.unlink(missing_ok=True)
+
+
 def cleanup_chunks(storage: LocalMediaStorage, transcription_id: uuid.UUID | str) -> None:
     """Delete the chunk directory; the normalized audio next to it is kept."""
     directory = storage.path_for(chunks_prefix(transcription_id))

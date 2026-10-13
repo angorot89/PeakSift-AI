@@ -99,18 +99,14 @@ def test_worker_processes_reset_the_database_pool():
 def test_enqueue_returns_task_id_and_passes_only_the_id(monkeypatch):
     seen: dict = {}
 
-    class FakeResult:
-        id = "task-123"
-
-    def fake_apply_async(*, args, retry):
-        seen.update(args=args, retry=retry)
-        return FakeResult()
+    def fake_apply_async(*, args, task_id, retry):
+        seen.update(args=args, task_id=task_id, retry=retry)
 
     monkeypatch.setattr(dispatch.transcribe_video, "apply_async", fake_apply_async)
     transcription_id = uuid.uuid4()
 
-    assert enqueue_transcription(transcription_id) == "task-123"
-    assert seen == {"args": [str(transcription_id)], "retry": False}
+    assert enqueue_transcription(transcription_id, task_id="task-123") == "task-123"
+    assert seen == {"args": [str(transcription_id)], "task_id": "task-123", "retry": False}
 
 
 # --- broker unavailable --------------------------------------------------------------------
@@ -123,7 +119,7 @@ def test_enqueue_when_broker_is_down_is_a_controlled_error(monkeypatch):
     monkeypatch.setattr(dispatch.transcribe_video, "apply_async", failing_apply_async)
 
     with pytest.raises(JobQueueUnavailable):
-        enqueue_transcription(uuid.uuid4())
+        enqueue_transcription(uuid.uuid4(), task_id="task-x")
 
 
 def test_real_broker_outage_fails_fast():

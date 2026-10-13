@@ -13,22 +13,23 @@ class JobQueueUnavailable(Exception):
     """Redis could not be reached; the caller should surface a temporary failure."""
 
 
-def enqueue_transcription(transcription_id: uuid.UUID) -> str:
-    """Queue `transcribe_video` and return the Celery task id.
+def enqueue_transcription(transcription_id: uuid.UUID, *, task_id: str) -> str:
+    """Queue `transcribe_video` under a pre-chosen task id (already committed on the row as
+    its fencing token) and return it.
 
     `retry=False` makes a broker outage fail fast instead of blocking the request while
     kombu retries; the API turns this into a 503.
     """
     try:
-        result = transcribe_video.apply_async(args=[str(transcription_id)], retry=False)
+        transcribe_video.apply_async(args=[str(transcription_id)], task_id=task_id, retry=False)
     except OperationalError as error:
         raise JobQueueUnavailable("The job queue is unavailable") from error
-    return result.id
+    return task_id
 
 
 def new_task_id() -> str:
     """A task id chosen *before* the job row is committed, so the fencing token is on the
-    row before any worker can see the job (the V0.3 transcription flow stored it after)."""
+    row before any worker can see the job. Every background job uses this."""
     return str(uuid.uuid4())
 
 
