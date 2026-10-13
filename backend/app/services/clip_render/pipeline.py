@@ -13,6 +13,11 @@ fails, the row is not ready and a retry discards the orphaned file first.
 
 Progress is honest stage progress: 0 queued, 10 render started, 80 render finished,
 90 validating/finalizing, 100 ready. Heartbeats are written while FFmpeg runs.
+
+Fencing: once claimed, every commit first re-reads the task id on the row. A worker that a
+retry has taken over (a stalled-but-alive "zombie") stops at its next heartbeat — FFmpeg is
+killed — and never writes the row or touches the new attempt's files; each attempt renders
+into its own temp file.
 """
 
 import logging
@@ -102,27 +107,29 @@ def run_clip_render(
         return None
     if not _claim(clip, db, settings, store, task_id):
         return clip
+    attempt = clip.attempt  # this run's temp file; fixed for the whole run
+
+    def fail(code: str, message: str) -> None:
+        _fail(clip, db, store, code, message, task_id=task_id, attempt=attempt)
 
     try:
-        _execute(clip, db, settings, store, renderer, task_id)
+        _execute(clip, db, settings, store, renderer, task_id, attempt)
     except PipelineSuperseded:
+        store.discard_temp(clip.id, attempt)
         logger.info("Clip %s was taken over by a newer task; stopping", clip.id)
     except (PipelineFailure, RenderError) as error:
-        _fail(clip, db, store, error.code, error.message)
+        fail(error.code, error.message)
     except StorageError:
         logger.exception("Storage failure while finalizing clip %s", clip.id)
-        _fail(clip, db, store, "storage_failure", "The rendered clip could not be stored")
+        fail("storage_failure", "The rendered clip could not be stored")
     except SoftTimeLimitExceeded:
-        _fail(
-            clip,
-            db,
-            store,
+        fail(
             "time_limit",
             "Rendering ran longer than the worker allows; retry or choose a shorter clip",
         )
     except Exception:
         logger.exception("Unexpected error rendering clip %s", clip.id)
-        _fail(clip, db, store, "internal_error", "Unexpected error while rendering the clip")
+        fail("internal_error", "Unexpected error while rendering the clip")
     return clip
 
 
@@ -174,6 +181,7 @@ def _execute(
     store: ClipArtifactStore,
     renderer: Renderer,
     task_id: str | None,
+    attempt: int,
 ) -> None:
     video = clip.video
     if video.status != VideoStatus.READY:
@@ -184,22 +192,22 @@ def _execute(
 
     rendered = renderer(
         source,
-        store.temp_path(clip.id),
+        store.temp_path(clip.id, attempt),
         start=clip.start_time,
         end=clip.end_time,
         options=render_options_from(settings),
-        heartbeat=lambda: _heartbeat(clip, db),
+        heartbeat=lambda: _heartbeat(clip, db, task_id),
     )
     clip.progress_percent = RENDER_DONE_PROGRESS
-    _heartbeat(clip, db)
+    _heartbeat(clip, db, task_id)
 
     clip.status = ClipStatus.VALIDATING
     clip.progress_percent = VALIDATING_PROGRESS
-    _heartbeat(clip, db)
+    _heartbeat(clip, db, task_id)
 
     _ensure_still_owner(clip, db, task_id)
     # File first, then the row: "ready" can only ever point at a finalized, validated file.
-    key = store.finalize(clip.id)
+    key = store.finalize(clip.id, attempt)
     clip.storage_key = key
     clip.file_size = rendered.size_bytes
     clip.width, clip.height = rendered.width, rendered.height
@@ -208,7 +216,7 @@ def _execute(
     clip.status = ClipStatus.READY
     clip.progress_percent = 100
     clip.completed_at = _now()
-    _heartbeat(clip, db)
+    _heartbeat(clip, db, task_id)
     logger.info(
         "Clip %s ready: %.2fs, %sx%s, %s bytes",
         clip.id,
@@ -222,22 +230,44 @@ def _execute(
 # --- state helpers ----------------------------------------------------------------------
 
 
-def _ensure_still_owner(clip: Clip, db: Session, task_id: str | None) -> None:
+def _still_owner(clip: Clip, db: Session, task_id: str | None) -> bool:
     if task_id is None:
-        return
+        return True
     current = db.scalar(select(Clip.celery_task_id).where(Clip.id == clip.id))
-    if current and current != task_id:
+    return not current or current == task_id
+
+
+def _ensure_still_owner(clip: Clip, db: Session, task_id: str | None) -> None:
+    if not _still_owner(clip, db, task_id):
         db.rollback()
         raise PipelineSuperseded()
 
 
-def _heartbeat(clip: Clip, db: Session) -> None:
+def _heartbeat(clip: Clip, db: Session, task_id: str | None = None) -> None:
+    """Commit progress/heartbeat — but only while this task still owns the row."""
+    _ensure_still_owner(clip, db, task_id)
     clip.heartbeat_at = _now()
     db.commit()
 
 
-def _fail(clip: Clip, db: Session, store: ClipArtifactStore, code: str, message: str) -> None:
+def _fail(
+    clip: Clip,
+    db: Session,
+    store: ClipArtifactStore,
+    code: str,
+    message: str,
+    *,
+    task_id: str | None = None,
+    attempt: int = 1,
+) -> None:
     db.rollback()
+    if not _still_owner(clip, db, task_id):
+        # A newer attempt owns the row and its files: clean up only our own temp output.
+        store.discard_temp(clip.id, attempt)
+        logger.info(
+            "Clip %s failed after being taken over (%s); newer attempt untouched", clip.id, code
+        )
+        return
     store.discard(clip.id)  # no partial or orphaned artifact survives a failure
     clip.status = ClipStatus.FAILED
     clip.error_code = code[:64]

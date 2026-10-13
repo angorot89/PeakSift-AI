@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +10,8 @@ from app.api import clip_detection as detection_api
 from app.api import clips as api
 from app.core.config import Settings, get_settings
 from app.models import Clip, ClipCandidate, ClipDetectionRun, TranscriptSegment, Video
+from app.services.clip_render.storage import ClipArtifactStore
+from app.services.storage import LocalMediaStorage
 from app.workers.dispatch import JobQueueUnavailable
 
 PASSWORD = "correct horse battery"
@@ -142,6 +145,15 @@ def clips_url(ctx: dict) -> str:
     return f"/projects/{ctx['project_id']}/videos/{ctx['video_id']}/clips"
 
 
+def mark_ready(db_session: Session, clip: Clip) -> None:
+    """A ready clip always has its file: write a small one at the final key."""
+    store = ClipArtifactStore(LocalMediaStorage(Path(get_settings().media_root)))
+    store.temp_path(clip.id).write_bytes(b"\x00" * 64)
+    clip.storage_key = store.finalize(clip.id)
+    clip.status, clip.progress_percent = "ready", 100
+    db_session.commit()
+
+
 # --- authentication and ownership ---------------------------------------------------------
 
 
@@ -230,12 +242,7 @@ def test_generate_on_a_ready_clip_returns_it_unchanged(client, db_session, setti
     ctx = candidate_setup(client, db_session)
     clip_id = client.post(clip_url(ctx)).json()["id"]
     clip = db_session.get(Clip, uuid.UUID(clip_id))
-    clip.status, clip.progress_percent, clip.storage_key, clip.file_size = (
-        "ready",
-        100,
-        f"clips/{clip.id}/clip.mp4",
-        4096,
-    )
+    clip.file_size = 4096
     clip.width, clip.height, clip.fps, clip.video_codec, clip.audio_codec = (
         640,
         360,
@@ -243,7 +250,7 @@ def test_generate_on_a_ready_clip_returns_it_unchanged(client, db_session, setti
         "h264",
         "aac",
     )
-    db_session.commit()
+    mark_ready(db_session, clip)
 
     response = client.post(clip_url(ctx))
     assert response.status_code == 200
@@ -433,8 +440,7 @@ def test_retry_refuses_live_ready_or_exhausted_clips(client, db_session, setting
     clip_id = client.post(clip_url(ctx)).json()["id"]
     assert client.post(f"{clip_url(ctx)}/retry").status_code == 409  # queued
     clip = db_session.get(Clip, uuid.UUID(clip_id))
-    clip.status = "ready"
-    db_session.commit()
+    mark_ready(db_session, clip)
     assert client.post(f"{clip_url(ctx)}/retry").status_code == 409
     clip.status, clip.attempt = "failed", settings.clip_render_max_attempts
     db_session.commit()
@@ -479,3 +485,35 @@ def test_list_clips_for_a_video_newest_first(client, db_session, settings):
     assert [c["id"] for c in page["clips"]] == [ids[0]]
     assert client.get(clips_url(ctx), params={"limit": 0}).status_code == 422
     assert client.get(clips_url(ctx), params={"limit": 101}).status_code == 422
+
+
+# --- hardening ----------------------------------------------------------------------------
+
+
+def test_ready_clip_with_missing_file_becomes_retryable(client, db_session, settings, fake_queues):
+    sign_up(client)
+    ctx = candidate_setup(client, db_session)
+    clip_id = client.post(clip_url(ctx)).json()["id"]
+    clip = db_session.get(Clip, uuid.UUID(clip_id))
+    clip.status, clip.storage_key, clip.file_size = "ready", f"clips/{clip.id}/clip.mp4", 10
+    db_session.commit()  # no file was ever written at that key
+
+    data = client.get(clip_url(ctx)).json()
+    assert data["status"] == "failed" and data["error_code"] == "artifact_missing"
+    assert "retry" in data["error_message"]
+    listed = client.get(clips_url(ctx)).json()["clips"][0]
+    assert listed["status"] == "failed"
+
+    retried = client.post(f"{clip_url(ctx)}/retry")
+    assert retried.status_code == 200 and retried.json()["status"] == "queued"
+
+
+def test_generate_on_a_ready_clip_with_missing_file_asks_for_retry(client, db_session, settings):
+    sign_up(client)
+    ctx = candidate_setup(client, db_session)
+    clip_id = client.post(clip_url(ctx)).json()["id"]
+    clip = db_session.get(Clip, uuid.UUID(clip_id))
+    clip.status, clip.storage_key = "ready", "../../etc/passwd"  # corrupted key: treated as missing
+    db_session.commit()
+    response = client.post(clip_url(ctx))
+    assert response.status_code == 409 and "retry" in response.json()["detail"]

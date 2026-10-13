@@ -190,7 +190,7 @@ def test_real_render_makes_the_clip_ready_with_validated_metadata(
     assert result.storage_key == clip_storage_key(clip.id)
     store = ClipArtifactStore(storage)
     assert store.exists(clip.id)
-    assert not storage.path_for(f"clips/{clip.id}/clip-tmp.mp4").exists()
+    assert not storage.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
     assert result.file_size == store.final_path(clip.id).stat().st_size > 0
     assert (result.width, result.height) == (64, 64)
     assert result.video_codec == "h264" and result.audio_codec == "aac"
@@ -207,8 +207,8 @@ def test_stages_and_progress_are_honest_and_monotonic(db_session, clip, settings
     seen: list[tuple[str, int]] = []
     original_heartbeat = pipeline._heartbeat
 
-    def spy_heartbeat(row, db):
-        original_heartbeat(row, db)
+    def spy_heartbeat(row, db, task_id=None):
+        original_heartbeat(row, db, task_id)
         seen.append((row.status, row.progress_percent))
 
     pipeline._heartbeat = spy_heartbeat
@@ -232,7 +232,7 @@ def test_renderer_receives_the_snapshot_boundaries_and_settings(
     (call,) = renderer.calls
     assert (call["start"], call["end"]) == (2.0, 4.0)
     assert call["source"] == storage.path_for(clip.video.storage_key)
-    assert call["target"].name == "clip-tmp.mp4" and str(clip.id) in str(call["target"])
+    assert call["target"].name == "clip-tmp-1.mp4" and str(clip.id) in str(call["target"])
     assert call["options"].preset == "ultrafast" and call["options"].timeout_seconds == 120
 
 
@@ -476,3 +476,137 @@ def test_enqueue_when_broker_is_down_is_a_controlled_error(monkeypatch):
     monkeypatch.setattr(dispatch.render_clip_task, "apply_async", failing)
     with pytest.raises(JobQueueUnavailable):
         enqueue_clip_render(uuid.uuid4(), task_id=new_task_id())
+
+
+# --- hardening ----------------------------------------------------------------------------
+
+
+def _take_over(clip, db_session, *, new_task: str = "task-2", attempt: int = 2) -> None:
+    """What the retry endpoint does to a stalled clip while the old worker is still alive."""
+    clip.celery_task_id = new_task
+    clip.attempt = attempt
+    clip.status = ClipStatus.QUEUED
+    db_session.commit()
+
+
+def test_zombie_that_fails_after_takeover_leaves_the_new_attempt_alone(
+    db_session, clip, settings, storage
+):
+    store = ClipArtifactStore(storage)
+
+    def zombie(source, target, *, start, end, options, heartbeat=None):
+        target.write_bytes(b"zombie partial")
+        # Meanwhile a retry hands the row to task-2, whose render is already in progress.
+        _take_over(clip, db_session)
+        store.temp_path(clip.id, 2).write_bytes(b"attempt 2 output")
+        raise RenderError("ffmpeg_failed", "Rendering failed (ffmpeg exit code 1)")
+
+    result = execute(clip, db_session, settings, storage, zombie, task_id="task-1")
+
+    db_session.refresh(result)
+    assert result.status == ClipStatus.QUEUED  # not overwritten with the zombie's failure
+    assert result.error_code is None and result.celery_task_id == "task-2"
+    assert (
+        store.storage.path_for(f"clips/{clip.id}/clip-tmp-2.mp4").read_bytes()
+        == b"attempt 2 output"
+    )
+    assert not store.storage.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
+
+
+def test_zombie_stops_at_its_next_heartbeat_without_writing(db_session, clip, settings, storage):
+    progress_seen: list[int] = []
+
+    def zombie(source, target, *, start, end, options, heartbeat=None):
+        heartbeat()  # still the owner: fine
+        _take_over(clip, db_session)
+        clip.progress_percent = 55  # would be committed by a naive heartbeat
+        progress_seen.append(clip.progress_percent)
+        heartbeat()  # must raise: the row belongs to task-2 now
+        raise AssertionError("heartbeat should have stopped the zombie")
+
+    result = execute(clip, db_session, settings, storage, zombie, task_id="task-1")
+
+    db_session.expire_all()
+    row = db_session.get(Clip, clip.id)
+    assert row.status == ClipStatus.QUEUED and row.progress_percent != 55
+    assert row.celery_task_id == "task-2" and row.error_code is None
+    assert result is not None and progress_seen == [55]
+
+
+def test_db_failure_after_finalize_leaves_no_ready_row_and_no_file(
+    monkeypatch, db_session, clip, settings, storage
+):
+    """File renamed into place, then the commit that would mark it ready fails."""
+    real_heartbeat = pipeline._heartbeat
+
+    def failing_ready_commit(row, db, task_id=None):
+        if row.status == ClipStatus.READY:
+            raise RuntimeError("database went away")
+        real_heartbeat(row, db, task_id)
+
+    monkeypatch.setattr(pipeline, "_heartbeat", failing_ready_commit)
+    result = execute(clip, db_session, settings, storage, SpyRenderer(db_session, clip))
+
+    db_session.refresh(result)
+    assert result.status == ClipStatus.FAILED and result.error_code == "internal_error"
+    assert result.storage_key is None
+    assert not ClipArtifactStore(storage).exists(clip.id)  # no orphaned "ready-looking" file
+
+
+@requires_ffmpeg
+def test_heartbeat_failure_kills_ffmpeg(tmp_path):
+    """If the heartbeat raises (takeover, DB down), the ffmpeg child must not keep running."""
+    import os
+    import stat
+
+    from app.services.clip_render.renderer import RenderOptions, render_clip
+
+    source = generate_video(tmp_path / "src.mp4", seconds=2.0)
+    pid_file = tmp_path / "pid"
+    fake = tmp_path / "fake-ffmpeg"
+    fake.write_text(f"#!/bin/sh\necho $$ > '{pid_file}'\nexec sleep 30\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+
+    class Boom(Exception):
+        pass
+
+    def heartbeat():
+        if pid_file.exists():  # only once the child is really running (macOS may scan it first)
+            raise Boom()
+
+    with pytest.raises(Boom):
+        render_clip(
+            source,
+            tmp_path / "out.mp4",
+            start=0,
+            end=1,
+            options=RenderOptions(
+                ffmpeg_path=str(fake), timeout_seconds=30, heartbeat_interval_seconds=0.2
+            ),
+            heartbeat=heartbeat,
+        )
+    pid = int(pid_file.read_text())
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)  # the child is gone
+
+
+@requires_ffmpeg
+def test_logged_ffmpeg_errors_do_not_contain_media_paths(tmp_path, caplog):
+    import logging
+    import stat
+
+    from app.services.clip_render.renderer import RenderOptions, render_clip
+
+    source = generate_video(tmp_path / "src.mp4", seconds=2.0)
+    target = tmp_path / "out" / "clip-tmp-1.mp4"
+    fake = tmp_path / "fake-ffmpeg"
+    fake.write_text(f"#!/bin/sh\necho 'cannot open {source} or {target}' >&2\nexit 3\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+
+    with (
+        caplog.at_level(logging.WARNING, logger="app.services.clip_render.renderer"),
+        pytest.raises(RenderError),
+    ):
+        render_clip(source, target, start=0, end=1, options=RenderOptions(ffmpeg_path=str(fake)))
+    assert "cannot open <source> or <output>" in caplog.text
+    assert str(tmp_path) not in caplog.text
