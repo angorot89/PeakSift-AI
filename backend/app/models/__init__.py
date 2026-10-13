@@ -17,6 +17,14 @@ from app.models.clip_detection import (
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
 from app.models.project import Project, ProjectStatus
+from app.models.reframe import (
+    ACTIVE_REFRAME_STATUSES,
+    KeyframeMode,
+    ReframeAnalysis,
+    ReframeConfidence,
+    ReframeKeyframe,
+    ReframeStatus,
+)
 from app.models.transcription import (
     ACTIVE_TRANSCRIPTION_STATUSES,
     Transcription,
@@ -30,6 +38,7 @@ __all__ = [
     "ACTIVE_CLIP_DETECTION_STATUSES",
     "ACTIVE_CLIP_EDIT_STATUSES",
     "ACTIVE_CLIP_STATUSES",
+    "ACTIVE_REFRAME_STATUSES",
     "ACTIVE_TRANSCRIPTION_STATUSES",
     "CANDIDATE_CATEGORIES",
     "CLIP_CONTENT_TYPE",
@@ -42,8 +51,13 @@ __all__ = [
     "ClipEdit",
     "ClipEditStatus",
     "ClipStatus",
+    "KeyframeMode",
     "Project",
     "ProjectStatus",
+    "ReframeAnalysis",
+    "ReframeConfidence",
+    "ReframeKeyframe",
+    "ReframeStatus",
     "Transcription",
     "TranscriptionStatus",
     "TranscriptSegment",

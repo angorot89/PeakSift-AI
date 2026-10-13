@@ -131,6 +131,30 @@ class Settings(BaseSettings):
     caption_max_words: int = Field(default=7, ge=1, le=20)
     caption_max_chars: int = Field(default=32, ge=8, le=80)
 
+    # --- Smart reframing (Milestone 7) -------------------------------------------------
+    # Server configuration only: users never choose a detector, model file or tuning value.
+    # Geometry is normalized to the display-oriented source frame (0..1 in x and y).
+    reframe_detector: str = Field(default="mediapipe_face", pattern=r"^[a-z0-9_]{1,32}$")
+    # Frames analysed per second of clip, and the width they are downscaled to for detection.
+    reframe_sample_fps: float = Field(default=2.0, gt=0, le=10)
+    reframe_analysis_width: int = Field(default=640, ge=160, le=1920)
+    reframe_min_detection_confidence: float = Field(default=0.5, ge=0.05, le=0.99)
+    # Keep at least this fraction of the crop width between a framed face and the crop edge.
+    reframe_face_margin: float = Field(default=0.12, ge=0, le=0.4)
+    # The subject may drift this fraction of the crop width from the crop centre before the
+    # crop starts to follow (prevents constant micro-panning).
+    reframe_dead_zone: float = Field(default=0.10, ge=0, le=0.4)
+    # Exponential smoothing time constant of the crop centre, in seconds.
+    reframe_smoothing_seconds: float = Field(default=0.5, ge=0, le=5)
+    # Speed limit of the crop centre, in source widths per second.
+    reframe_max_pan_per_second: float = Field(default=0.35, gt=0, le=5)
+    # A track missing for longer than this stops steering the crop (then fall back to centre).
+    reframe_max_gap_seconds: float = Field(default=1.0, gt=0, le=10)
+    reframe_sampling_timeout_seconds: float = Field(default=600, gt=0)
+    reframe_heartbeat_seconds: float = Field(default=15, gt=0)
+    reframe_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    reframe_max_attempts: int = Field(default=5, ge=1)
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
