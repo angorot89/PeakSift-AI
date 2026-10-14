@@ -115,6 +115,9 @@ function textCss(look: TextLook, spec: CaptionStyles): CSSProperties {
   return css;
 }
 
+// libass pads a box by the outline; box styles sit that much further in so the box stays inside.
+const boxInset = (look: TextLook, alignment: number) => (look.box && alignment !== 5 ? Math.round(look.outline) : 0);
+
 function placementCss(alignment: number, marginV: number, marginH: number, spec: CaptionStyles): CSSProperties {
   const css: CSSProperties = {
     left: cw(marginH, spec.output_width),
@@ -187,7 +190,7 @@ export function CaptionLayer({
 
       {cue && look ? (
         // Outer box places (it may translate); the inner box animates (scale + fade).
-        <div className="absolute text-center" style={placementCss(place.alignment, place.margin_v, place.margin_h, spec)}>
+        <div className="absolute text-center" style={placementCss(place.alignment, place.margin_v + boxInset(look, place.alignment), place.margin_h, spec)}>
           <div
             key={shown!.cue}
             className="caption-in"
@@ -217,7 +220,7 @@ export function CaptionLayer({
       ) : null}
 
       {hook && hookOn && hookLook && hookPlace && hook.text ? (
-        <div className="absolute flex justify-center text-center" style={placementCss(hookPlace.alignment, hookPlace.margin_v, hookPlace.margin_h, spec)}>
+        <div className="absolute flex justify-center text-center" style={placementCss(hookPlace.alignment, hookPlace.margin_v + boxInset(hookLook, hookPlace.alignment), hookPlace.margin_h, spec)}>
           <div
             className="caption-in text-balance"
             style={{ maxWidth: cw(Math.min(hookLook.max_line_width, spec.output_width - 2 * hookPlace.margin_h - 2 * hookLook.outline), spec.output_width) }}

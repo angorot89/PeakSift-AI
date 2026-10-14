@@ -17,6 +17,7 @@ from app.services.clip_edit.caption_v2 import (
 )
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, CaptionPosition
 from app.services.clip_edit.dynamic_cues import SourceWord, build_word_cues
+from app.services.clip_edit.hook import HookConfig, HookStyle, hook_ass
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SAFE_AREA_VERSION, caption_placement
 from tests.media_fixtures import requires_ffmpeg, requires_libass
 
@@ -78,10 +79,40 @@ def test_rendered_two_line_captions_stay_inside_the_safe_area(preset, position, 
     )
     rows, cols = text_rows_and_cols(ass, cue.end - 0.05, tmp_path)
     px = GENERAL_SOCIAL.px()
-    slack = 24  # outline/shadow/box padding may reach a little past the text box
+    # Vertically the whole drawing stays inside, box padding included (anti-aliasing aside);
+    # sideways an outline or box may reach a little past the measured line width.
+    slack, side_slack = 6, 24
     assert rows.min() >= px["top"] - slack, (preset, position, rows.min())
     assert rows.max() <= OUTPUT_HEIGHT - px["bottom"] + slack, (preset, position, rows.max())
-    assert cols.min() >= px["left"] - slack and cols.max() <= OUTPUT_WIDTH - px["right"] + slack
+    assert cols.min() >= px["left"] - side_slack
+    assert cols.max() <= OUTPUT_WIDTH - px["right"] + side_slack
+
+
+@requires_ffmpeg
+@requires_libass
+@pytest.mark.parametrize("style", list(HookStyle))
+def test_a_top_hook_stays_inside_the_safe_area_box_included(style, tmp_path):
+    hook = HookConfig.create(
+        text="What nobody tells you about seeing Earth from space",
+        style=style.value,
+        position="top",
+        duration=2,
+    )
+    hook_style, hook_event = hook_ass(hook, font_family=get_settings().caption_font_family)
+    ass = build_dynamic_ass(
+        [],
+        preset=DynamicPreset.FOCUS,
+        alignment=2,
+        margin_v=422,
+        margin_h=97,
+        font_family=get_settings().caption_font_family,
+        extra_styles=[hook_style],
+        extra_events=[hook_event],
+    )
+    rows, cols = text_rows_and_cols(ass, 1.0, tmp_path)
+    px = GENERAL_SOCIAL.px()
+    assert rows.min() >= px["top"] - 6, (style, rows.min())
+    assert cols.min() >= px["left"] - 24 and cols.max() <= OUTPUT_WIDTH - px["right"] + 24
 
 
 def test_the_editor_gets_the_renderers_exact_numbers(client):
