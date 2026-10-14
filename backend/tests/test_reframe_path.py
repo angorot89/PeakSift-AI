@@ -137,9 +137,15 @@ def test_dead_zone_tolerates_slow_drift_then_follows():
 def test_large_detector_jump_is_never_a_teleport():
     p = plan(samples(10, lambda t: {"cx": 0.2 if t < 5 else 0.8}))
     assert p.max_pan_speed <= CONFIG.max_pan_per_second + 1e-9
-    before, _ = crop_center_at(p.keyframes, 4.0)
-    soon, _ = crop_center_at(p.keyframes, 5.2)
-    assert abs(soon - before) < 0.6 * 0.5  # can't have travelled the whole way
+    # Every stretch of the path respects the pan limit, and when the jump is first seen the
+    # camera is still on its way (no teleport).
+    for t0 in [x / 10 for x in range(0, 95)]:
+        a, _ = crop_center_at(p.keyframes, t0)
+        z, _ = crop_center_at(p.keyframes, t0 + 0.5)
+        assert abs(z - a) <= CONFIG.max_pan_per_second * 0.5 + 1e-6
+    final, _ = crop_center_at(p.keyframes, 9.9)
+    at_jump, _ = crop_center_at(p.keyframes, 5.0)
+    assert final - at_jump > 0.1
 
 
 def test_lost_subject_eases_to_centre_fallback():
@@ -338,3 +344,17 @@ def test_a_subject_leaving_and_returning_is_framed_again():
     c, _ = crop_center_at(p.keyframes, 5.5)
     assert c == pytest.approx(0.5, abs=0.05)  # centre fallback while nobody is visible
     assert 0.2 < p.fallback_fraction < 0.4
+
+
+def test_steady_motion_gives_steady_camera_speed_not_sample_rate_pulses():
+    # A face crossing the frame at constant speed, sampled at 2 fps: between samples the target
+    # is interpolated, so once the camera has caught up it pans at an even speed.
+    p = plan(samples(12.0, lambda t: {"cx": 0.2 + 0.05 * t}), duration=12.0)
+    speeds = []
+    for i in range(30, 100):  # 3.0 s → 10.0 s, in 0.1 s steps
+        a, _ = crop_center_at(p.keyframes, i / 10)
+        b, _ = crop_center_at(p.keyframes, (i + 1) / 10)
+        speeds.append((b - a) / 0.1)
+    assert min(speeds) > 0  # always moving with the subject, never stopping and restarting
+    assert max(speeds) - min(speeds) < 0.01  # even speed (the subject moves at 0.05/s)
+    assert all(face_inside(p, i / 10, 0.2 + 0.05 * i / 10) for i in range(0, 120))
