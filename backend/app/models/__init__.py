@@ -1,5 +1,11 @@
 """ORM models. Importing this package registers every table on `Base.metadata`."""
 
+from app.models.caption_track import (
+    ACTIVE_CAPTION_TRACK_STATUSES,
+    CaptionTrack,
+    CaptionTrackStatus,
+    CaptionWord,
+)
 from app.models.clip import (
     ACTIVE_CLIP_STATUSES,
     CLIP_CONTENT_TYPE,
@@ -35,6 +41,7 @@ from app.models.user import User
 from app.models.video import Video, VideoStatus
 
 __all__ = [
+    "ACTIVE_CAPTION_TRACK_STATUSES",
     "ACTIVE_CLIP_DETECTION_STATUSES",
     "ACTIVE_CLIP_EDIT_STATUSES",
     "ACTIVE_CLIP_STATUSES",
@@ -44,6 +51,9 @@ __all__ = [
     "CLIP_CONTENT_TYPE",
     "RENDER_PROFILE_SOURCE_MP4_V1",
     "CandidateDecision",
+    "CaptionTrack",
+    "CaptionTrackStatus",
+    "CaptionWord",
     "Clip",
     "ClipCandidate",
     "ClipDetectionRun",

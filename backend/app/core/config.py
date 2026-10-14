@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -158,6 +159,16 @@ class Settings(BaseSettings):
     reframe_heartbeat_seconds: float = Field(default=15, gt=0)
     reframe_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     reframe_max_attempts: int = Field(default=5, ge=1)
+
+    # --- Word-timed captions (Milestone 8) ------------------------------------------------
+    # The speech-timing provider is server configuration (allow-listed). It reuses the
+    # FASTER_WHISPER_* model settings, so captions and transcripts share one loaded model.
+    caption_timing_provider: Literal["faster_whisper"] = "faster_whisper"
+    # A word may end this far past the decoded clip audio (encoder padding) before the
+    # provider output is refused; within it the end is clamped to the audio duration.
+    caption_timing_tolerance_seconds: float = Field(default=0.25, ge=0, le=2)
+    caption_timing_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    caption_timing_max_attempts: int = Field(default=5, ge=1)
 
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
