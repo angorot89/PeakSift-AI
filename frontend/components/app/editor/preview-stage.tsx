@@ -2,8 +2,8 @@
 
 import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { CaptionOverlay } from "@/components/app/editor/caption-sample";
-import type { CaptionPosition, CaptionStyle, Layout } from "@/lib/edits";
+import { VideoClockContext } from "@/components/app/editor/caption-layer";
+import type { Layout } from "@/lib/edits";
 import { clampedCenter, cropCenterAt, cropGeometry, type CropKeyframe } from "@/lib/reframe";
 
 /** The 9:16 device-like frame both the live preview and the rendered short sit in. */
@@ -25,10 +25,8 @@ export function NineBySixteenFrame({ children, label }: { children: ReactNode; l
 type PreviewProps = {
   clipSrc: string;
   layout: Layout;
-  captions: boolean;
-  style: CaptionStyle;
-  position: CaptionPosition;
-  sampleText: string;
+  /** Text layers (captions, hook, safe-area guide) in output-frame coordinates. */
+  overlay?: ReactNode;
 };
 
 /**
@@ -36,7 +34,7 @@ type PreviewProps = {
  * It shows layout and caption placement; it is labelled as a preview because the server's
  * FFmpeg render (blur strength, exact glyph shapes) is the authoritative result.
  */
-export function PreviewStage({ clipSrc, layout, captions, style, position, sampleText }: PreviewProps) {
+export function PreviewStage({ clipSrc, layout, overlay }: PreviewProps) {
   const front = useRef<HTMLVideoElement>(null);
   const back = useRef<HTMLVideoElement>(null);
 
@@ -89,7 +87,7 @@ export function PreviewStage({ clipSrc, layout, captions, style, position, sampl
         aria-label="Preview playback"
         className={`absolute inset-0 size-full ${layout === "center_crop" ? "object-cover" : "object-contain"}`}
       />
-      {captions ? <CaptionOverlay text={sampleText} style={style} position={position} /> : null}
+      <VideoClockContext.Provider value={front}>{overlay}</VideoClockContext.Provider>
     </NineBySixteenFrame>
   );
 }
@@ -120,20 +118,15 @@ export function ReframedPreview({
   sourceWidth,
   sourceHeight,
   framing,
-  captions,
-  style,
-  position,
-  sampleText,
+  overlay,
   badge,
 }: {
   clipSrc: string;
   sourceWidth: number;
   sourceHeight: number;
   framing: Framing;
-  captions: boolean;
-  style: CaptionStyle;
-  position: CaptionPosition;
-  sampleText: string;
+  /** Text layers in output-frame coordinates: they never move with the crop. */
+  overlay?: ReactNode;
   badge?: ReactNode;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -214,7 +207,7 @@ export function ReframedPreview({
               : { left: 0, top: "50%", width: "100%", aspectRatio: `${sourceWidth} / ${sourceHeight}` }
           }
         />
-        {captions ? <CaptionOverlay text={sampleText} style={style} position={position} /> : null}
+        <VideoClockContext.Provider value={video}>{overlay}</VideoClockContext.Provider>
         {badge ? <div className="absolute top-2.5 left-2.5 max-w-[calc(100%-1.25rem)]">{badge}</div> : null}
       </NineBySixteenFrame>
       <div className="mx-auto flex max-w-[calc(min(64vh,600px)*0.5625)] items-center gap-2.5">

@@ -59,3 +59,25 @@ class CaptionTimingOptions(BaseModel):
     track: CaptionTrackRead | None
     # phrase_fallback: segment-level transcript timing (the V0.6 behaviour); never per word.
     phrase_timing_available: bool
+
+
+class CaptionPreviewWord(BaseModel):
+    text: str  # as the burned-in caption shows it (emoji left out where the server cannot draw)
+    start: float  # active from (clip-local seconds)
+    end: float  # active until
+    attached: bool  # a later piece of a split token: no space before it
+
+
+class CaptionPreviewCue(BaseModel):
+    start: float
+    end: float
+    timed: bool  # word-synced: emphasise the active word; phrase-timed: never
+    lines: list[list[CaptionPreviewWord]]
+
+
+class CaptionPreviewRead(BaseModel):
+    """The dynamic caption text exactly as the renderer lays it out (same cues, lines, timing)."""
+
+    timing: Literal["aligned_word", "phrase_fallback"]
+    emoji: Literal["monochrome", "omitted"]
+    cues: list[CaptionPreviewCue]

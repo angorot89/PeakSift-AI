@@ -139,6 +139,9 @@ export function listRuns(projectId: string, videoId: string, limit = 10, offset 
   return apiFetch<DetectionRunPage>(`${base(projectId, videoId)}?${params}`);
 }
 
+export const getCandidate = (projectId: string, videoId: string, runId: string, candidateId: string) =>
+  apiFetch<ClipCandidate>(`/projects/${projectId}/videos/${videoId}/clip-detection/${runId}/candidates/${candidateId}`);
+
 export const getRun = (projectId: string, videoId: string, runId: string) =>
   apiFetch<DetectionRun>(`${base(projectId, videoId)}/${runId}`);
 

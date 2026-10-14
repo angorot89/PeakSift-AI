@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
@@ -11,6 +11,14 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// The face libass renders captions with: the editor preview uses it so lines wrap the same way.
+const captionSans = Noto_Sans({
+  variable: "--font-caption",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "700"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -27,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${captionSans.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
         <AuthProvider>{children}</AuthProvider>

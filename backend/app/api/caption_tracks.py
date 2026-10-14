@@ -28,6 +28,9 @@ from app.models import (
     TranscriptionStatus,
 )
 from app.schemas.caption_track import (
+    CaptionPreviewCue,
+    CaptionPreviewRead,
+    CaptionPreviewWord,
     CaptionTimingOptions,
     CaptionTrackPage,
     CaptionTrackRead,
@@ -36,6 +39,9 @@ from app.schemas.caption_track import (
 )
 from app.services.caption_timing.config import CaptionTimingConfig
 from app.services.caption_timing.pipeline import is_stale
+from app.services.clip_edit.config import CaptionPosition, CaptionTiming, DynamicPreset
+from app.services.clip_edit.dynamic_text import DynamicCaptionError, dynamic_cues
+from app.services.clip_edit.emoji import emoji_font, split_emoji
 from app.services.storage import InvalidStorageKey, LocalMediaStorage
 from app.workers.dispatch import JobQueueUnavailable, enqueue_caption_track, new_task_id
 
@@ -308,3 +314,45 @@ def retry_track(
     db.commit()
     _enqueue_or_503(db, track, created=False)
     return _read(track)
+
+
+@router.get("/caption-preview", response_model=CaptionPreviewRead)
+def caption_preview(
+    clip: OwnedClip,
+    db: DbSession,
+    style: DynamicPreset,
+    position: CaptionPosition = CaptionPosition.BOTTOM,
+    timing: CaptionTiming = CaptionTiming.ALIGNED_WORD,
+    track_id: uuid.UUID | None = None,
+) -> CaptionPreviewRead:
+    """The dynamic captions of this clip as the renderer will lay them out, for the editor's
+    live preview: the same cue builder, line fitting, word timing and emoji policy."""
+    settings = get_settings()
+    try:
+        cues = dynamic_cues(
+            clip, db, settings, preset=style, position=position, timing=timing, track_id=track_id
+        )
+    except DynamicCaptionError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error.message) from None
+    family = emoji_font(settings.ffmpeg_path)
+
+    def shown(text: str) -> str:
+        if family:
+            return text
+        return " ".join("".join(p for p, emoji in split_emoji(text) if not emoji).split())
+
+    out: list[CaptionPreviewCue] = []
+    for cue in cues:
+        lines = []
+        for line in cue.line_words():
+            words = [
+                CaptionPreviewWord(
+                    text=shown(w.text), start=w.start, end=w.end, attached=w.attached
+                )
+                for w in line
+            ]
+            lines.append([w for w in words if w.text])
+        out.append(CaptionPreviewCue(start=cue.start, end=cue.end, timed=cue.timed, lines=lines))
+    return CaptionPreviewRead(
+        timing=timing.value, emoji="monochrome" if family else "omitted", cues=out
+    )

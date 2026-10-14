@@ -9,7 +9,12 @@ import numpy as np
 import pytest
 
 from app.core.config import get_settings
-from app.services.clip_edit.caption_metrics import text_width
+from app.services.clip_edit.caption_metrics import (
+    ADVANCE_BOLD,
+    ADVANCE_REGULAR,
+    EM_PER_SIZE,
+    text_width,
+)
 from app.services.clip_edit.caption_v2 import (
     PRESETS_V2,
     DynamicPreset,
@@ -232,6 +237,17 @@ def test_long_lines_render_inside_the_side_margins(tmp_path):
             cols.min(),
             cols.max(),
         )
+
+
+def test_preview_em_ratio_agrees_with_the_libass_measurements():
+    # Noto Sans advances in font units (per 1000 em): the preview sizes text with EM_PER_SIZE,
+    # so it must reproduce what libass measured, or preview lines come out wider than renders.
+    for table, units in (
+        (ADVANCE_REGULAR, {"0": 572, "H": 741}),
+        (ADVANCE_BOLD, {"0": 572, "H": 765}),
+    ):
+        for char, advance in units.items():
+            assert table[char] == pytest.approx(advance / 1000 * EM_PER_SIZE, abs=0.004)
 
 
 def test_cues_built_for_rendering_are_word_cues():

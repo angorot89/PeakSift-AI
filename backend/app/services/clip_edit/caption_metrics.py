@@ -8,8 +8,10 @@ cancel out). Other characters use conservative classes: an accented Latin letter
 its base letter; Arabic letters, CJK ideographs and emoji use measured class widths with a
 margin. Line fitting therefore errs on the side of shorter lines, never on overflow.
 
-Note how libass sizes fonts: the font size is the line height (ascent + descent), so one em
-is about 0.73 × the size for Noto Sans — the browser preview accounts for the same ratio.
+Note how libass sizes fonts: the font size is the line height from the OS/2 Windows metrics
+(usWinAscent + usWinDescent = 1124 + 395 units in Noto Sans 2.x), so one em is about 0.66 × the
+size; the measured tables agree (a digit is 572/1000 em = 0.375 of the size). The browser
+preview uses the same ratio.
 """
 
 import unicodedata
@@ -213,7 +215,7 @@ ADVANCE_BOLD: dict[str, float] = {
 # libass treats the font size as the line height (ascent + descent). For Noto Sans
 # (ascent 1069 + descent 293 per 1000 em) one em is 1000 / 1362 of the size; the browser
 # preview sets its CSS font size with the same ratio.
-EM_PER_SIZE = round(1000 / 1362, 4)
+EM_PER_SIZE = round(1000 / (1124 + 395), 4)
 
 # Measured class averages (regular / bold) with a safety margin; see the module docstring.
 ARABIC = 0.38
