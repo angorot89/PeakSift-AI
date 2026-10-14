@@ -2,6 +2,8 @@
 
 This page explains how PeakSift turns a generated clip into a 9:16 vertical short, with captions burned in from the transcript. It is the reference for operators and contributors. The end-user walkthrough is at the end.
 
+> **V0.8:** word-synced dynamic captions — the Focus, Punch, Minimal and Boxed presets with the spoken word emphasised, the social safe area and the opening hook (renderer `caption_v2`) — are documented in [dynamic-captions.md](dynamic-captions.md). This page describes the V0.6 phrase renderer (`caption_v1`) used by the Clean, Bold and Creator styles; existing edits keep their original behaviour.
+
 ## What it does, and does not do
 
 When a clip is ready, its owner picks a **layout** and **caption** options and clicks **Render short**. A background worker composes the clip at 1080 × 1920 with FFmpeg. If captions are on, it burns in captions built from the persisted transcript. The worker validates the result with ffprobe and stores it as a private MP4, which the owner can preview and download.
@@ -257,9 +259,9 @@ All tests use tiny sources generated with FFmpeg at test time, and nothing is co
 ## Known limitations (V0.6)
 
 - **Framing.** In V0.6 crops were always centred; V0.7 adds face-following and manual focal-point crops ([smart-reframing.md](smart-reframing.md)). Only 9:16 at 1080 × 1920 is offered.
-- **Captions.** Captions are phrase-level, built from segment timestamps with proportional word timing. There are no word-by-word captions, highlighting or animation.
+- **Captions.** Captions are phrase-level, built from segment timestamps with proportional word timing. There are no word-by-word captions, highlighting or animation in `caption_v1`; V0.8 adds word-synced captions ([dynamic-captions.md](dynamic-captions.md)).
 - **Fixed options.** There are three fixed presets, three positions and one font family. Custom fonts, brand kits and watermarks are not supported.
-- **Scripts.** Emoji are not shown in captions. Other scripts depend on installed fallback fonts. Arabic shaping was verified visually on samples only.
+- **Scripts.** Emoji are not shown in `caption_v1` captions (V0.8 dynamic captions draw them in monochrome when a font is installed). Other scripts depend on installed fallback fonts. Arabic shaping was verified visually on samples only.
 - **Editing scope.** There is no timeline, trim, music, sound effects, B-roll, transitions or publishing.
 - **Platform.** Rendering is CPU-only on local filesystem storage. Edit deletion, retention and render cancellation are not supported.
 - **Progress.** Progress is stage-based, so very short renders can finish between two polls.

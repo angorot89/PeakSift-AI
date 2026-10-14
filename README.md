@@ -6,7 +6,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 ## Current status
 
-**Milestones 1–7 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7). What exists today:
+**Milestones 1–8 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7, Dynamic Captions & Creator Polish V0.8). What exists today:
 
 - A landing page.
 - Email/password accounts: register, log in, log out, with an HttpOnly session cookie.
@@ -19,9 +19,10 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 - **Clip generation**: **Generate clip** on a candidate renders exactly its validated time range from the original upload into a private MP4 (H.264 + AAC, fast-start, original aspect ratio and orientation) in the background worker with FFmpeg, validates it with ffprobe, then shows the rendered clip in the page with **Download MP4**. Real render states, failure messages and retry; clips persist across sessions. Details: [docs/clip-generation.md](docs/clip-generation.md).
 - **Short-form editing**: from a ready clip, the **short-form editor** renders it as a 9:16 short (1080 × 1920) in the background worker — **Center crop**, **Blur background** or **Fit** — with optional captions burned in from the transcript (Bold / Clean / Creator presets; top, center or bottom). Each settings combination is a separate version with its own status, 9:16 player and **Download short**; the V0.5 clip is never modified.
 - **Smart reframing**: PeakSift detects and tracks visible faces to generate a smooth vertical crop path, with centre and manual fallbacks. In the editor, **Smart reframe** → **Analyze framing** runs a background analysis (frames sampled with FFmpeg → a local face detector → tracking → a crop path with a dead zone, smoothing and a pan-speed limit), shows real progress and a plain-language confidence summary, previews the moving crop in the 9:16 stage, and renders it with captions fixed on screen. When no face is clear the crop stays centred, and **Focal point** pins a fixed crop where you choose. Details: [docs/smart-reframing.md](docs/smart-reframing.md).
+- **Dynamic captions**: word-synced captions generated from local speech timing. **Generate word sync** times every word of the clip's audio with faster-whisper word timestamps in the background; captions group words into short, readable cues and emphasise the spoken word in one of four creator presets (**Focus**, **Punch**, **Minimal**, **Boxed**), placed inside a general social-platform safe area, with an optional **opening hook** (1–60 characters, 0.5–5 s). The editor previews the renderer's own cues over the playing video; **Phrase timed** captions remain as a fallback and are never labelled word-synced. French, Arabic (right to left) and mixed scripts are supported; emoji are drawn in monochrome when a font for them is installed. Details: [docs/dynamic-captions.md](docs/dynamic-captions.md).
 - **Product design**: a shared design system (surface and status tokens, one button shape, panels, status pills, alerts, empty states, skeletons, progress), a project page organised as a workflow stepper plus numbered sections (Source video, Transcript, Clip moments, Generated clips), ranked candidate cards that lead with rank, title, score and hook, and context-specific empty, working and error states. Details: [docs/short-form-editing.md](docs/short-form-editing.md).
-- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`, `reframe_analyses`, `reframe_keyframes`) managed with Alembic migrations.
-- Automated tests (1178 backend tests in CI), linting, type checks and CI with PostgreSQL, Redis and FFmpeg (including real clip, captioned short and moving-crop renders).
+- PostgreSQL schema (`users`, `projects`, `videos`, `transcriptions`, `transcript_segments`, `clip_detection_runs`, `clip_candidates`, `clips`, `clip_edits`, `reframe_analyses`, `reframe_keyframes`, `caption_tracks`, `caption_words`) managed with Alembic migrations.
+- Automated tests (1417 backend and 15 frontend unit tests in CI), linting, type checks and CI with PostgreSQL, Redis and FFmpeg (including real clip, captioned short, word-synced caption and moving-crop renders).
 
 **Not built yet** (see [docs/milestones.md](docs/milestones.md)):
 
@@ -30,7 +31,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 | Creator intelligence & metadata, publishing                          | later     |
 | Asset libraries, Morocco Mode                                        | later     |
 
-The dashboard's Videos and Clips cards do not show counts yet. Smart reframing follows visible faces only — no speaker identification, object tracking, zoom or split screen — and captions are phrase-level; there is no timeline editor, music or publishing (see [Known limitations](#known-limitations)).
+The dashboard's Videos and Clips cards do not show counts yet. Smart reframing follows visible faces only — no speaker identification, object tracking, zoom or split screen — and word timing is as accurate as the speech recognizer's word timestamps (no manual timing editor); there is no timeline editor, custom fonts, music or publishing (see [Known limitations](#known-limitations)).
 
 ## Architecture (as built)
 
@@ -42,8 +43,9 @@ Browser ──▶ Next.js frontend (:3000) ──fetch, cookie──▶ FastAPI 
                                                               └──▶ Redis ──▶ Celery worker ──▶ transcription: ffmpeg → chunks → faster-whisper | OpenAI
                                                                                            ├─▶ clip detection: transcript windows → Ollama | OpenAI → validate → rank
                                                                                            ├─▶ clip rendering: ffmpeg (libx264/aac) → ffprobe → MEDIA_ROOT/clips/
-                                                                                           ├─▶ short-form edits: transcript → ASS captions → ffmpeg (9:16 layout | moving crop + libass) → ffprobe → MEDIA_ROOT/edits/
-                                                                                           └─▶ smart reframe: ffmpeg frames → YuNet faces → tracks → crop path → reframe_keyframes
+                                                                                           ├─▶ short-form edits: transcript or word timing → ASS captions → ffmpeg (9:16 layout | moving crop + libass) → ffprobe → MEDIA_ROOT/edits/
+                                                                                           ├─▶ smart reframe: ffmpeg frames → YuNet faces → tracks → crop path → reframe_keyframes
+                                                                                           └─▶ word timing: ffmpeg PCM → faster-whisper word timestamps → validate → caption_words
 ```
 
 - **Frontend** — Next.js App Router, TypeScript, Tailwind CSS. Talks to the API with `credentials: "include"`; asks `GET /auth/me` to learn who is signed in. No tokens in browser storage.
@@ -83,7 +85,7 @@ uvicorn app.main:app --reload        # http://localhost:8000 — docs at /docs
 
 Uploaded videos and derived audio are written under `backend/media/` (`MEDIA_ROOT`), which is git-ignored.
 
-### 3. Celery worker (transcription, clip detection, clip rendering, short-form edits)
+### 3. Celery worker (transcription, clip detection, clip rendering, short-form edits, smart reframing, word timing)
 
 In a second terminal, same virtualenv and directory:
 
@@ -192,6 +194,14 @@ Full reference: [docs/short-form-editing.md](docs/short-form-editing.md).
 
 A detector that is missing or crashes fails the analysis with a clear message; it is never reported as "no faces". Full reference: [docs/smart-reframing.md](docs/smart-reframing.md).
 
+## Dynamic captions flow
+
+1. In the editor, turn on **Captions**, keep **Word synced** and click **Generate word sync**. The API records a caption track for the clip and the server's timing configuration (repeat clicks return the same one) and queues it.
+2. The worker decodes the clip's audio, runs faster-whisper with word timestamps (the same lazily loaded model as transcription), validates every word (refusing impossible timing, dropping empty or tiny words, trimming overlaps) and stores the clip-local words and `completed` in one transaction. The panel shows the stage and progress, then "Word synced · N words timed from the clip's audio".
+3. Pick a caption style and position, and optionally an opening hook. The preview draws the renderer's own cues and active word over the playing video, with an optional safe-area guide. **Render short** renders word-synced captions with libass (`caption_v2`); old edits keep the V0.6 renderer (`caption_v1`).
+
+If word timing fails, the panel explains why and offers **Retry** or **Use phrase timing instead**. Full reference: [docs/dynamic-captions.md](docs/dynamic-captions.md).
+
 ## Security model (high level)
 
 - Every project, video, detection-run, candidate, clip and edit endpoint is scoped to the signed-in owner; anything else is a `404`.
@@ -212,13 +222,13 @@ A detector that is missing or crashes fails the analysis with a clear message; i
 - The frontend does not know the size limit in advance; an oversized file is rejected by the API with a `413` message.
 - Deleting is not implemented; replacing a video keeps the previous file and record (and its transcription).
 - Chunk boundaries are plain time cuts, not silence-aware: a word spoken across a boundary can be split between two segments. Chunks are transcribed sequentially (no parallelism, no GPU workers, no provider fallback chains).
-- No speaker diarization, word-level timestamps, translation, transcript editing or live transcription. The `speaker` column is reserved and always null.
+- Transcripts: no speaker diarization, word-level timestamps (word timing exists per clip, for captions), translation, transcript editing or live transcription. The `speaker` column is reserved and always null.
 - A job interrupted by a worker crash restarts from the beginning via the stale rule or retry (no chunk-level resume).
 - Transcription quality has only been sanity-checked on synthesised English speech; no Darija/Moroccan benchmarking has been done.
 - Clip detection analyses windows sequentially and cuts them on time/character budgets, not topics; snapping is line-granular; deduplication is temporal only; small local models yield fewer usable candidates. The hosted provider sends transcript text to OpenAI.
 - Generated clips keep the original aspect ratio; vertical output comes from short-form edits. Rendering is CPU-only with fixed MP4/H.264/AAC profiles and stage (not frame) progress; there is no clip or edit deletion, retention or render cancellation, and no publishing integrations.
 - Smart reframing is face-first: no speaker identification or active-speaker/audio mapping, no face recognition, no tracking of bodies, pets or objects, no dynamic zoom, no split screen and no keyframe timeline. Shot changes are inferred from one face vanishing as another appears, not from scene analysis; very small, occluded or profile faces may be missed (centre fallback). Analysis is CPU-only.
-- Short-form edits: phrase-level captions with approximate word timing (no word-by-word captions, highlighting or animation); three fixed caption presets and positions, one font family; emoji are left out of captions; Arabic shaping was verified visually on samples only. No timeline, trimming, music, sound effects, B-roll or publishing.
+- Short-form edits: word-synced captions depend on the speech recognizer's word timestamps (word-timed, not phoneme aligned) and can lead or lag slightly on fast or noisy speech; there is no manual word-timing editor, per-word positioning, custom font, brand kit or arbitrary animation. Phrase-timed and V0.6 captions use approximate word timing within transcript segments. Emoji are monochrome in dynamic captions (skin tones are not drawn) and left out of V0.6 captions; Arabic typography has had limited QA. Word timing runs locally on the CPU. No timeline, trimming, music, sound effects, B-roll or publishing.
 
 ## Routes
 
@@ -228,7 +238,7 @@ A detector that is missing or crashes fails the analysis with a clear message; i
 
 ## Continuous integration
 
-Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint, a type check and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download, real 9:16 short renders with burned-in captions checked against actual frame pixels, the whole smart-reframing stack (sampling with real FFmpeg, tracking, path planning, the analysis job and API, and a moving-crop render verified frame by frame against a synthetic moving marker) — after installing the Noto fonts and checking that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption really draws text (`REQUIRE_LIBASS=1`: caption tests cannot skip), a render of the deepest allowed smart-crop path on the runner's FFmpeg (`scripts/smart_crop_probe.py`), a guard against tracked model weights or media, and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection, clip rendering, short-form edit and smart-reframe tasks are registered, stop). The face detector is tested against a fake ONNX session, so CI never downloads a model. Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
+Every push to `main` and every pull request runs [GitHub Actions](.github/workflows/ci.yml): the frontend job runs `npm ci`, lint, unit tests (`npm test`), a type check and build; the backend job installs FFmpeg, runs Ruff, applies and checks the Alembic migrations against a PostgreSQL service container, runs the test suite — including the real-ffmpeg/ffprobe media tests (fixtures generated at test time), audio extraction, chunking and timestamp shifting with synthetic clips, Celery in eager mode, and a live-Redis connection check against a Redis service container — clip detection end-to-end with a fake provider and the real Ollama provider against an in-process fake server, real FFmpeg clip renders end-to-end through the API with Range delivery and download, real 9:16 short renders with burned-in captions checked against actual frame pixels, the whole smart-reframing stack (sampling with real FFmpeg, tracking, path planning, the analysis job and API, and a moving-crop render verified frame by frame against a synthetic moving marker) — after installing the Noto fonts and checking that FFmpeg provides `libx264`, `aac`, libass and the layout filters, that fontconfig resolves the caption fonts and that a probe caption really draws text (`REQUIRE_LIBASS=1`: caption tests cannot skip), font probes proving the caption, Arabic and emoji families resolve and really draw (`scripts/caption_font_probe.py`), an end-to-end word-synced caption render with a hook checked on decoded frames (`scripts/dynamic_caption_probe.py`), a render of the deepest allowed smart-crop path on the runner's FFmpeg (`scripts/smart_crop_probe.py`), a guard against tracked model weights or media, and finally a tiny real worker smoke (`scripts/celery_smoke.py`: start a worker, round-trip `ping`, verify the transcription, clip detection, clip rendering, short-form edit, smart-reframe and caption-timing tasks are registered, stop). The face detector is tested against a fake ONNX session, so CI never downloads a model. Speech-model inference is mocked and `HF_HUB_OFFLINE=1` guarantees CI never downloads a model; `OLLAMA_BASE_URL` points at a closed port so no real inference can happen; there is no OpenAI key in CI. CI validates only — nothing is deployed.
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
