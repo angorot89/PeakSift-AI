@@ -1,0 +1,310 @@
+"""The dynamic caption renderer (``caption_v2``): word-aware cues → an ASS document for libass.
+
+``caption_v1`` (``caption_styles.py``) stays unchanged for every edit created before V0.8.
+
+**Active-word emphasis.** Each cue is written as back-to-back ``Dialogue`` events, one per
+interval in which a different word is active; every event carries the whole cue, with only
+the active word's colour overridden. The layout of all events of a cue is identical, so the
+text never moves — only the emphasis does. (ASS karaoke tags such as ``\\k`` fill words
+progressively and keep earlier words highlighted, which is not "the word being spoken".)
+Phrase-timed cues are one event with no emphasis.
+
+**Entrance.** The first event of a cue fades in and grows from a slightly smaller scale over a
+fraction of a second; later events of the same cue have no animation. No bouncing, flashing
+or per-word scaling (which would shift the surrounding words).
+
+**Lines.** Line breaks come from the cue builder (``\\N``); libass wrapping is disabled
+(``WrapStyle: 2``), so the browser preview and the render break lines identically.
+
+**Text safety.** Everything goes through ``escape_ass_text_v2``: control characters become
+spaces, bidi override/isolate controls are dropped, a backslash is followed by a WORD JOINER
+(so no ``\\N``/override can form) and braces are escaped. Emoji are kept (glyph availability
+is a font question; see ``fonts.py``). Users choose a preset name only — never colours, fonts,
+sizes or ASS syntax.
+"""
+
+import math
+import re
+import unicodedata
+from collections.abc import Iterable
+from dataclasses import dataclass
+from enum import StrEnum
+
+from app.services.clip_edit.caption_metrics import text_width
+from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH
+from app.services.clip_edit.dynamic_cues import CueRules, WordCue
+
+CAPTION_RENDERER_V2 = "caption_v2"
+WORD_JOINER = "⁠"
+_FONT_NAME = re.compile(r"^[A-Za-z0-9 _-]{1,64}$")
+_BIDI_CONTROLS = frozenset("‪‫‬‭‮⁦⁧⁨⁩")
+_WHITESPACE = re.compile(r"\s+")
+
+
+class DynamicPreset(StrEnum):
+    FOCUS = "focus"
+    PUNCH = "punch"
+    MINIMAL = "minimal"
+    BOXED = "boxed"
+
+
+@dataclass(frozen=True)
+class V2Style:
+    """A dynamic preset. Colours are ``#RRGGBB``; ``size`` is the libass font size on the
+    1080 × 1920 canvas. ``max_line_width`` caps a line in pixels for readability; the safe
+    width (frame minus side margins and outline) caps it for layout — the smaller one wins."""
+
+    label: str
+    size: int
+    bold: bool
+    uppercase: bool
+    text: str
+    active: str
+    outline_colour: str
+    outline: float
+    shadow: float
+    box: bool  # an opaque box behind each line (BorderStyle 3) instead of an outline
+    box_alpha: int  # 0 opaque … 255 transparent (box only)
+    max_line_width: int
+    fade_ms: int
+    grow_from: int  # entrance scale in percent (100 = no scale animation)
+    grow_ms: int
+
+
+PRESETS_V2: dict[DynamicPreset, V2Style] = {
+    # Large clean white text with a solid outline; the spoken word turns warm yellow.
+    DynamicPreset.FOCUS: V2Style(
+        label="Focus",
+        size=112,
+        bold=True,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFD43B",
+        outline_colour="#000000",
+        outline=7,
+        shadow=2,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=90,
+        grow_from=94,
+        grow_ms=140,
+    ),
+    # Heavier creator style: uppercase, thick outline, the spoken word in vivid green.
+    DynamicPreset.PUNCH: V2Style(
+        label="Punch",
+        size=120,
+        bold=True,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#7CFC5A",
+        outline_colour="#000000",
+        outline=10,
+        shadow=3,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=80,
+        grow_from=90,
+        grow_ms=120,
+    ),
+    # Smaller and restrained: dimmed words, the spoken word in pure white, thin outline.
+    DynamicPreset.MINIMAL: V2Style(
+        label="Minimal",
+        size=78,
+        bold=False,
+        uppercase=False,
+        text="#9DA5B0",
+        active="#FFFFFF",
+        outline_colour="#000000",
+        outline=3,
+        shadow=2,
+        box=False,
+        box_alpha=0,
+        max_line_width=760,
+        fade_ms=120,
+        grow_from=100,
+        grow_ms=0,
+    ),
+    # High contrast: white on a dark box, the spoken word in yellow.
+    DynamicPreset.BOXED: V2Style(
+        label="Boxed",
+        size=100,
+        bold=True,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFD43B",
+        outline_colour="#101014",
+        outline=20,
+        shadow=0,
+        box=True,
+        box_alpha=40,
+        max_line_width=820,
+        fade_ms=90,
+        grow_from=96,
+        grow_ms=120,
+    ),
+}
+
+
+def ass_colour(rgb: str, alpha: int = 0) -> str:
+    """``#RRGGBB`` → ``&HAABBGGRR``."""
+    r, g, b = rgb[1:3], rgb[3:5], rgb[5:7]
+    return f"&H{alpha:02X}{b}{g}{r}".upper()
+
+
+def line_capacity(preset: DynamicPreset, margin_h: int) -> float:
+    """Pixels one line may use: the readability cap, or the space between the side margins
+    (minus the outline or box padding on both sides) — whichever is smaller."""
+    style = PRESETS_V2[preset]
+    return min(style.max_line_width, OUTPUT_WIDTH - 2 * margin_h - 2 * style.outline)
+
+
+def rules_for(preset: DynamicPreset, margin_h: int) -> CueRules:
+    """Cue rules that fit lines by the real rendered width of this preset's text."""
+    style = PRESETS_V2[preset]
+
+    def measure(text: str) -> float:
+        return text_width(
+            text.upper() if style.uppercase else text, bold=style.bold, size=style.size
+        )
+
+    return CueRules(line_units=line_capacity(preset, margin_h), measure=measure, space=measure(" "))
+
+
+def escape_ass_text_v2(text: str, *, uppercase: bool = False) -> str:
+    out = []
+    for ch in text:
+        if ch in _BIDI_CONTROLS:
+            continue
+        category = unicodedata.category(ch)
+        if category == "Cc":
+            out.append(" ")
+        elif category in ("Cs", "Co", "Cn"):
+            continue
+        else:
+            out.append(ch)
+    cleaned = _WHITESPACE.sub(" ", "".join(out)).strip()
+    if uppercase:
+        cleaned = cleaned.upper()
+    cleaned = cleaned.replace("\\", "\\" + WORD_JOINER)
+    return cleaned.replace("{", "\\{").replace("}", "\\}")
+
+
+def ass_time(seconds: float) -> str:
+    centis = max(0, int(round(seconds * 100)))
+    hours, rest = divmod(centis, 360_000)
+    minutes, rest = divmod(rest, 6_000)
+    secs, cs = divmod(rest, 100)
+    return f"{hours}:{minutes:02d}:{secs:02d}.{cs:02d}"
+
+
+STYLE_FORMAT = (
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
+    "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
+    "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding"
+)
+EVENT_FORMAT = "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+
+
+def _cue_text(cue: WordCue, active: int | None, style: V2Style) -> str:
+    parts: list[str] = []
+    base = ass_colour(style.text)
+    highlight = ass_colour(style.active)
+    for line_index, line in enumerate(cue.line_words()):
+        if line_index:
+            parts.append("\\N")
+        offset = cue.lines[line_index]
+        for k, word in enumerate(line):
+            index = offset + k
+            if k and not word.attached:
+                parts.append(" ")
+            text = escape_ass_text_v2(word.text, uppercase=style.uppercase)
+            if active is not None and index == active:
+                parts.append(f"{{\\1c{highlight}}}{text}{{\\1c{base}}}")
+            else:
+                parts.append(text)
+    return "".join(parts)
+
+
+def _segments(cue: WordCue) -> list[tuple[float, float, int | None]]:
+    """Back-to-back (start, end, active word) intervals covering the whole cue."""
+    if not cue.timed:
+        return [(cue.start, cue.end, None)]
+    bounds = sorted(
+        {cue.start, cue.end, *(w.start for w in cue.words), *(w.end for w in cue.words)}
+    )
+    bounds = [b for b in bounds if cue.start <= b <= cue.end]
+    out: list[tuple[float, float, int | None]] = []
+    for a, b in zip(bounds, bounds[1:], strict=False):
+        if b - a <= 0:
+            continue
+        active = cue.active_index((a + b) / 2)
+        if out and out[-1][2] == active:
+            out[-1] = (out[-1][0], b, active)
+        else:
+            out.append((a, b, active))
+    return out
+
+
+def build_dynamic_ass(
+    cues: Iterable[WordCue],
+    *,
+    preset: DynamicPreset,
+    alignment: int,
+    margin_v: int,
+    margin_h: int,
+    font_family: str,
+    extra_styles: Iterable[str] = (),
+    extra_events: Iterable[str] = (),
+) -> str:
+    if not _FONT_NAME.fullmatch(font_family):
+        raise ValueError("Unsupported caption font family name")
+    style = PRESETS_V2[preset]
+    border = 3 if style.box else 1
+    back = ass_colour(style.outline_colour, style.box_alpha) if style.box else "&H80000000"
+    outline_colour = back if style.box else ass_colour(style.outline_colour)
+    text = ass_colour(style.text)
+    style_line = (
+        f"Style: Dynamic,{font_family},{style.size},{text},{text},"
+        f"{outline_colour},{back},{-1 if style.bold else 0},0,0,0,100,100,0,0,{border},"
+        f"{style.outline:g},{style.shadow:g},{alignment},{margin_h},{margin_h},{margin_v},1"
+    )
+    lines = [
+        "[Script Info]",
+        "; Generated by PeakSift (caption_v2). Text is escaped; no user markup.",
+        "ScriptType: v4.00+",
+        f"PlayResX: {OUTPUT_WIDTH}",
+        f"PlayResY: {OUTPUT_HEIGHT}",
+        "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes",
+        "YCbCr Matrix: TV.709",
+        "",
+        "[V4+ Styles]",
+        STYLE_FORMAT,
+        style_line,
+        *extra_styles,
+        "",
+        "[Events]",
+        EVENT_FORMAT,
+    ]
+    for cue in cues:
+        if not (math.isfinite(cue.start) and math.isfinite(cue.end)) or cue.end <= cue.start:
+            continue
+        for index, (a, b, active) in enumerate(_segments(cue)):
+            start, end = ass_time(a), ass_time(b)
+            if end <= start:
+                continue
+            entrance = ""
+            if index == 0:
+                grow = (
+                    f"\\fscx{style.grow_from}\\fscy{style.grow_from}"
+                    f"\\t(0,{style.grow_ms},\\fscx100\\fscy100)"
+                    if style.grow_from != 100
+                    else ""
+                )
+                entrance = f"{{\\fad({style.fade_ms},0){grow}}}"
+            body = _cue_text(cue, active, style)
+            lines.append(f"Dialogue: 0,{start},{end},Dynamic,,0,0,0,,{entrance}{body}")
+    lines.extend(extra_events)
+    return "\n".join(lines) + "\n"
