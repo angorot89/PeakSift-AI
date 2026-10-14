@@ -1,4 +1,5 @@
 import { API_URL, ApiError, apiFetch, postJson } from "@/lib/api";
+import { stageRanks } from "@/lib/status-sync";
 
 export type ClipStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
 
@@ -35,6 +36,8 @@ export type ClipPage = { total: number; offset: number; limit: number; clips: Ge
 
 export const ACTIVE_CLIP_STATUSES: ClipStatus[] = ["queued", "rendering", "validating"];
 export const isClipActive = (status: ClipStatus) => ACTIVE_CLIP_STATUSES.includes(status);
+/** Status order within one render attempt (see lib/status-sync.ts). */
+export const CLIP_STAGES = stageRanks(ACTIVE_CLIP_STATUSES, ["ready", "failed"]);
 
 /** Honest stage copy; the percentage is the backend's stage progress, never animated. */
 export function clipStageLabel(clip: GeneratedClip): string {

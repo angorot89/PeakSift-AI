@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Clapperboard, Download, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -12,6 +12,7 @@ import { WorkingState } from "@/components/ui/progress";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
+  CLIP_STAGES,
   clipContentUrl,
   clipDownloadUrl,
   clipStageLabel,
@@ -25,8 +26,8 @@ import {
 import type { ClipCandidate } from "@/lib/clip-detection";
 import { editorHref } from "@/lib/edits";
 import { formatBytes, formatDuration } from "@/lib/format";
-
-const POLL_INTERVAL_MS = 4000;
+import { newer } from "@/lib/status-sync";
+import { usePolling } from "@/lib/use-polling";
 
 type Props = {
   projectId: string;
@@ -40,7 +41,9 @@ type Props = {
 
 /**
  * Generate / status / retry for one candidate's rendered clip. Polls only while the
- * render is active, one timer per clip, cleared on unmount or when it finishes.
+ * render is active (first check after about a second: fast renders finish that quickly),
+ * one timer per clip, cleared on unmount or when it finishes. Responses older than the state
+ * on screen (e.g. a poll that started before Retry) are ignored.
  */
 export function ClipRenderControls({ projectId, videoId, runId, candidate, initialClip, onChange }: Props) {
   const { setUser } = useAuth();
@@ -57,8 +60,12 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
     [setUser],
   );
 
+  // The clip on screen, read by `update` to drop out-of-order responses.
+  const clipRef = useRef(clip);
   const update = useCallback(
     (next: GeneratedClip) => {
+      if (newer(clipRef.current, next, CLIP_STAGES) !== next) return; // a stale response
+      clipRef.current = next;
       setClip(next);
       onChange?.(next);
     },
@@ -72,7 +79,7 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
     getClip(projectId, videoId, runId, candidate.id)
       .then((current) => {
         if (cancelled) return;
-        setClip(current);
+        if (current) update(current);
         setKnown(true);
       })
       .catch((err: unknown) => {
@@ -83,21 +90,22 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
     return () => {
       cancelled = true;
     };
-  }, [known, projectId, videoId, runId, candidate.id, handleError]);
+  }, [known, projectId, videoId, runId, candidate.id, handleError, update]);
 
   const active = clip !== null && isClipActive(clip.status) && !clip.is_stale;
   const clipId = clip?.id ?? null;
-  useEffect(() => {
-    if (!active || clipId === null) return;
-    const timer = window.setInterval(() => {
-      getClip(projectId, videoId, runId, candidate.id)
-        .then((current) => {
-          if (current) update(current);
-        })
-        .catch((err: unknown) => setError(handleError(err)));
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [active, clipId, projectId, videoId, runId, candidate.id, update, handleError]);
+  usePolling(
+    active && clipId !== null,
+    async () => {
+      try {
+        const current = await getClip(projectId, videoId, runId, candidate.id);
+        if (current) update(current);
+      } catch (err) {
+        setError(handleError(err));
+      }
+    },
+    clipId,
+  );
 
   async function act(action: () => Promise<GeneratedClip>) {
     if (busy) return; // a second click while the first request is in flight does nothing

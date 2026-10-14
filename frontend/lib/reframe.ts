@@ -1,4 +1,5 @@
 import { ApiError, apiFetch, postJson } from "@/lib/api";
+import { stageRanks } from "@/lib/status-sync";
 
 export type ReframeStatus = "queued" | "sampling" | "detecting" | "tracking" | "planning" | "completed" | "failed";
 export type ConfidenceLevel = "high" | "mixed" | "fallback";
@@ -52,6 +53,8 @@ export type CropPath = {
 
 const ACTIVE: ReframeStatus[] = ["queued", "sampling", "detecting", "tracking", "planning"];
 export const isAnalysisActive = (status: ReframeStatus) => ACTIVE.includes(status);
+/** Status order within one analysis attempt (see lib/status-sync.ts). */
+export const ANALYSIS_STAGES = stageRanks(ACTIVE, ["completed", "failed"]);
 
 const base = (projectId: string, videoId: string, clipId: string) =>
   `/projects/${projectId}/videos/${videoId}/clips/${clipId}/reframe`;
