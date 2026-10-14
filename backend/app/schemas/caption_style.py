@@ -1,5 +1,7 @@
 """The caption style specification served to the editor (one source of truth for the preview)."""
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -44,6 +46,9 @@ class FontRead(BaseModel):
 
 class CaptionStylesRead(BaseModel):
     renderer: str
+    # How emoji appear in burned-in text on this server: drawn with a monochrome emoji font,
+    # or left out (libass cannot draw colour emoji). Never colour.
+    emoji: Literal["monochrome", "omitted"]
     output_width: int
     output_height: int
     font: FontRead

@@ -98,10 +98,11 @@ jobs:
       - name: Install FFmpeg and caption fonts
         # ffprobe for metadata, ffmpeg for rendering and generated fixtures; Noto Sans (OFL,
         # installed from the distribution, never committed) is the caption font, with Noto
-        # Sans Arabic and the rest of fonts-noto-core as fontconfig fallbacks.
+        # Sans Arabic and the rest of fonts-noto-core as fontconfig fallbacks; Symbola is the
+        # monochrome emoji font dynamic captions use (libass cannot draw colour emoji).
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends ffmpeg fontconfig fonts-noto-core
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg fontconfig fonts-noto-core fonts-symbola
           ffprobe -version | head -1
       - name: FFmpeg provides the encoders and filters rendering uses
         # Clips and shorts are rendered with libx264 + aac, and shorts use the filters below
@@ -124,7 +125,8 @@ jobs:
           family="$(fc-match -f '%{family[0]}' 'Noto Sans')"
           [ "$family" = "Noto Sans" ] || { echo "Noto Sans not installed (got: $family)"; exit 1; }
           fc-list ':lang=ar' family | grep -q 'Noto Sans Arabic' || { echo "no Arabic fallback font"; exit 1; }
-          echo "Noto Sans + Noto Sans Arabic available"
+          fc-list ':charset=1f600' family | grep -q 'Symbola' || { echo "no monochrome emoji font"; exit 1; }
+          echo "Noto Sans + Noto Sans Arabic + Symbola (monochrome emoji) available"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -44,6 +44,7 @@ from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
 from app.services.clip_edit.config import CaptionPosition, CaptionStyle, EditConfig, Layout
+from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.hook import hook_ass
 from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
@@ -213,7 +214,15 @@ def _execute(
         )
         edit.caption_cue_count = len(cues)
     # The hook overlay shares the subtitle file (output-frame coordinates, safe area).
-    hook = hook_ass(config.hook, font_family=settings.caption_font_family) if config.hook else None
+    hook = (
+        hook_ass(
+            config.hook,
+            font_family=settings.caption_font_family,
+            emoji_family=emoji_font(settings.ffmpeg_path),
+        )
+        if config.hook
+        else None
+    )
     # No speech in this range and no hook: render without a text layer, honestly.
     captions = bool(cues) or hook is not None
     if captions:
