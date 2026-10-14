@@ -22,6 +22,7 @@ from app.services.clip_edit.caption_metrics import text_width
 from app.services.clip_edit.caption_v2 import ass_colour, ass_time, escape_ass_text_v2
 from app.services.clip_edit.config import OUTPUT_WIDTH
 from app.services.clip_edit.dynamic_cues import CueRules, CueWord, layout_lines
+from app.services.clip_edit.emoji import apply_emoji_policy
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SafeArea
 
 MAX_HOOK_CHARS = 60  # one punchy line of intent; fits three lines in every style
@@ -158,7 +159,11 @@ def hook_lines(config: HookConfig, area: SafeArea = GENERAL_SOCIAL) -> list[str]
 
 
 def hook_ass(
-    config: HookConfig, *, font_family: str, area: SafeArea = GENERAL_SOCIAL
+    config: HookConfig,
+    *,
+    font_family: str,
+    emoji_family: str | None = None,
+    area: SafeArea = GENERAL_SOCIAL,
 ) -> tuple[str, str]:
     """(Style line, Dialogue line) for the hook, to add to a short's ASS document."""
     look = HOOK_STYLES[config.style]
@@ -175,9 +180,10 @@ def hook_ass(
     style = (
         f"Style: Hook,{font_family},{look.size},{text},{text},{outline},{back},"
         f"{-1 if look.bold else 0},0,0,0,100,100,0,0,{border},{look.outline:g},{look.shadow:g},"
-        f"{alignment},{margin_h},{margin_h},{margin_v},1"
+        f"{alignment},{margin_h},{margin_h},{margin_v},-1"
     )
-    body = "\\N".join(escape_ass_text_v2(line) for line in lines)
+    drawn = (apply_emoji_policy(escape_ass_text_v2(line), emoji_family) for line in lines)
+    body = "\\N".join(line for line in drawn if line)
     event = (
         f"Dialogue: 1,{ass_time(0)},{ass_time(config.duration)},Hook,,0,0,0,,"
         f"{{\\fad({FADE_IN_MS},{FADE_OUT_MS})}}{body}"

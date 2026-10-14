@@ -15,6 +15,7 @@ from app.schemas.caption_style import (
 from app.services.clip_edit.caption_metrics import EM_PER_SIZE
 from app.services.clip_edit.caption_v2 import CAPTION_RENDERER_V2, PRESETS_V2
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, CaptionPosition
+from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SAFE_AREA_VERSION, caption_placement
 
 router = APIRouter(tags=["captions"])
@@ -22,11 +23,13 @@ router = APIRouter(tags=["captions"])
 
 @router.get("/caption-styles", response_model=CaptionStylesRead)
 def caption_styles(_user: CurrentUser) -> CaptionStylesRead:
+    settings = get_settings()
     return CaptionStylesRead(
         renderer=CAPTION_RENDERER_V2,
+        emoji="monochrome" if emoji_font(settings.ffmpeg_path) else "omitted",
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
-        font=FontRead(family=get_settings().caption_font_family, em_per_size=EM_PER_SIZE),
+        font=FontRead(family=settings.caption_font_family, em_per_size=EM_PER_SIZE),
         safe_area=SafeAreaRead(
             version=SAFE_AREA_VERSION,
             top=GENERAL_SOCIAL.top,

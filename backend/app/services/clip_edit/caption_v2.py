@@ -33,6 +33,7 @@ from enum import StrEnum
 from app.services.clip_edit.caption_metrics import text_width
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH
 from app.services.clip_edit.dynamic_cues import CueRules, WordCue
+from app.services.clip_edit.emoji import apply_emoji_policy
 
 CAPTION_RENDERER_V2 = "caption_v2"
 WORD_JOINER = "⁠"
@@ -207,7 +208,7 @@ STYLE_FORMAT = (
 EVENT_FORMAT = "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
 
 
-def _cue_text(cue: WordCue, active: int | None, style: V2Style) -> str:
+def _cue_text(cue: WordCue, active: int | None, style: V2Style, emoji_family: str | None) -> str:
     parts: list[str] = []
     base = ass_colour(style.text)
     highlight = ass_colour(style.active)
@@ -215,15 +216,21 @@ def _cue_text(cue: WordCue, active: int | None, style: V2Style) -> str:
         if line_index:
             parts.append("\\N")
         offset = cue.lines[line_index]
+        drawn = False
         for k, word in enumerate(line):
             index = offset + k
-            if k and not word.attached:
+            text = apply_emoji_policy(
+                escape_ass_text_v2(word.text, uppercase=style.uppercase), emoji_family
+            )
+            if not text:
+                continue  # an emoji-only word on a server that cannot draw emoji
+            if drawn and not word.attached:
                 parts.append(" ")
-            text = escape_ass_text_v2(word.text, uppercase=style.uppercase)
             if active is not None and index == active:
                 parts.append(f"{{\\1c{highlight}}}{text}{{\\1c{base}}}")
             else:
                 parts.append(text)
+            drawn = True
     return "".join(parts)
 
 
@@ -257,7 +264,10 @@ def build_dynamic_ass(
     font_family: str,
     extra_styles: Iterable[str] = (),
     extra_events: Iterable[str] = (),
+    emoji_family: str | None = None,
 ) -> str:
+    """The short's ASS document. ``emoji_family`` is the monochrome emoji font libass can
+    draw (see ``emoji.py``); None leaves emoji out of the burned-in text."""
     if not _FONT_NAME.fullmatch(font_family):
         raise ValueError("Unsupported caption font family name")
     style = PRESETS_V2[preset]
@@ -268,7 +278,7 @@ def build_dynamic_ass(
     style_line = (
         f"Style: Dynamic,{font_family},{style.size},{text},{text},"
         f"{outline_colour},{back},{-1 if style.bold else 0},0,0,0,100,100,0,0,{border},"
-        f"{style.outline:g},{style.shadow:g},{alignment},{margin_h},{margin_h},{margin_v},1"
+        f"{style.outline:g},{style.shadow:g},{alignment},{margin_h},{margin_h},{margin_v},-1"
     )
     lines = [
         "[Script Info]",
@@ -304,7 +314,7 @@ def build_dynamic_ass(
                     else ""
                 )
                 entrance = f"{{\\fad({style.fade_ms},0){grow}}}"
-            body = _cue_text(cue, active, style)
+            body = _cue_text(cue, active, style, emoji_family)
             lines.append(f"Dialogue: 0,{start},{end},Dynamic,,0,0,0,,{entrance}{body}")
     lines.extend(extra_events)
     return "\n".join(lines) + "\n"
