@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.model_name import PublicModelName
+
 
 class CaptionTrackRead(BaseModel):
     id: uuid.UUID
@@ -17,7 +19,7 @@ class CaptionTrackRead(BaseModel):
     # A track is always real provider word timing; phrase timing is never stored as a track.
     timing_mode: Literal["aligned_word"] = "aligned_word"
     provider: str
-    model: str
+    model: PublicModelName
     language: str | None
     word_count: int | None
     rejected_word_count: int | None

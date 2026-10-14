@@ -168,14 +168,14 @@ def test_every_line_fits_the_preset_width(preset):
 # --- real libass renders, checked on frames -----
 
 
-def render_frames(ass: str, times: list[float], tmp_path: Path) -> list[np.ndarray]:
+def render_frames(ass: str, times: list[float], tmp_path: Path, rate: int = 25) -> list[np.ndarray]:
     (tmp_path / "c.ass").write_text(ass, encoding="utf-8")
     frames = []
     for t in times:
         raw = subprocess.run(
             [
                 get_settings().ffmpeg_path, "-v", "error", "-f", "lavfi",
-                "-i", f"color=c=0x2B3A55:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:d=3:r=25",
+                "-i", f"color=c=0x2B3A55:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:d=3:r={rate}",
                 "-vf", "subtitles=c.ass", "-ss", f"{t:.2f}", "-frames:v", "1",
                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
             ],
@@ -219,6 +219,31 @@ def test_the_active_word_really_moves_on_rendered_frames(preset, tmp_path):
         abs(extents[0].min() - extents[1].min()) <= 3
         and abs(extents[0].max() - extents[1].max()) <= 3
     )
+
+
+@requires_ffmpeg
+@requires_libass
+def test_the_entrance_continues_across_a_short_first_word(tmp_path):
+    # The first word is shorter than the entrance (Punch grows over 120 ms): the next event must
+    # carry on growing, not pop to full size when the emphasis moves on.
+    words = [SourceWord("GO", 0.5, 0.56), *ONE_TWO_THREE[1:]]
+    preset = DynamicPreset.PUNCH
+    cues = build_word_cues(words, clip_duration=3, rules=rules_for(preset, MARGIN_H))
+    ass = document(cues, preset, alignment=5, margin_v=0)
+    background = np.array([0x2B, 0x3A, 0x55])
+    mid, settled = render_frames(ass, [0.58, 1.3], tmp_path, rate=50)
+    widths = [
+        np.ptp(np.nonzero(np.abs(f - background).max(axis=2) > 60)[1]) for f in (mid, settled)
+    ]
+    # 80 ms into a 90% → 100% grow the cue is ~96.7% wide; a pop would make it 100%.
+    assert 0.94 < widths[0] / widths[1] < 0.985, widths
+
+
+def test_a_cue_whose_first_segment_rounds_away_still_fades_in():
+    words = [SourceWord("A", 0.5, 0.502), SourceWord("BEE", 0.502, 1.0)]
+    cues = build_word_cues(words, clip_duration=3, rules=rules_for(DynamicPreset.FOCUS, MARGIN_H))
+    first = dialogue_lines(document(cues))[0]
+    assert "\\fad(" in first or "\\fade(" in first, first
 
 
 @requires_ffmpeg

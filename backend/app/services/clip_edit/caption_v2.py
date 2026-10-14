@@ -187,8 +187,12 @@ def escape_ass_text_v2(text: str, *, uppercase: bool = False) -> str:
     return cleaned.replace("{", "\\{").replace("}", "\\}")
 
 
+def _centis(seconds: float) -> int:
+    return max(0, int(round(seconds * 100)))
+
+
 def ass_time(seconds: float) -> str:
-    centis = max(0, int(round(seconds * 100)))
+    centis = _centis(seconds)
     hours, rest = divmod(centis, 360_000)
     minutes, rest = divmod(rest, 6_000)
     secs, cs = divmod(rest, 100)
@@ -249,6 +253,26 @@ def _segments(cue: WordCue) -> list[tuple[float, float, int | None]]:
     return out
 
 
+def _entrance(style: V2Style, offset_ms: int) -> str:
+    """The cue's entrance (fade in, grow to full size) as seen by an event that starts
+    ``offset_ms`` into the cue. Every word event continues it, so a first word shorter than
+    the entrance does not cut it off with a pop to full size."""
+    tags: list[str] = []
+    if offset_ms < style.fade_ms:
+        if offset_ms == 0:
+            tags.append(f"\\fad({style.fade_ms},0)")
+        else:
+            left = style.fade_ms - offset_ms
+            alpha = round(255 * left / style.fade_ms)
+            tags.append(f"\\fade({alpha},0,0,0,{left},{left},{left})")
+    if style.grow_from != 100 and offset_ms < style.grow_ms:
+        scale = round(style.grow_from + (100 - style.grow_from) * offset_ms / style.grow_ms, 2)
+        tags.append(
+            f"\\fscx{scale:g}\\fscy{scale:g}\\t(0,{style.grow_ms - offset_ms},\\fscx100\\fscy100)"
+        )
+    return "{" + "".join(tags) + "}" if tags else ""
+
+
 def build_dynamic_ass(
     cues: Iterable[WordCue],
     *,
@@ -296,19 +320,14 @@ def build_dynamic_ass(
     for cue in cues:
         if not (math.isfinite(cue.start) and math.isfinite(cue.end)) or cue.end <= cue.start:
             continue
-        for index, (a, b, active) in enumerate(_segments(cue)):
+        first: int | None = None  # the cue's first drawn event, in centiseconds
+        for a, b, active in _segments(cue):
             start, end = ass_time(a), ass_time(b)
             if end <= start:
-                continue
-            entrance = ""
-            if index == 0:
-                grow = (
-                    f"\\fscx{style.grow_from}\\fscy{style.grow_from}"
-                    f"\\t(0,{style.grow_ms},\\fscx100\\fscy100)"
-                    if style.grow_from != 100
-                    else ""
-                )
-                entrance = f"{{\\fad({style.fade_ms},0){grow}}}"
+                continue  # shorter than the subtitle clock: the next event covers it
+            if first is None:
+                first = _centis(a)
+            entrance = _entrance(style, (_centis(a) - first) * 10)
             body = _cue_text(cue, active, style, emoji_family)
             lines.append(f"Dialogue: 0,{start},{end},Dynamic,,0,0,0,,{entrance}{body}")
     lines.extend(extra_events)

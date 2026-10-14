@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.model_name import PublicModelName
+
 
 class TranscriptionRead(BaseModel):
     """Job status. Polling-friendly: no transcript text, no internals (task ids, paths)."""
@@ -13,7 +15,7 @@ class TranscriptionRead(BaseModel):
     video_id: uuid.UUID
     status: str
     provider: str
-    model: str
+    model: PublicModelName
     language: str | None
     language_probability: float | None
     progress_percent: int

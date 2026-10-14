@@ -117,13 +117,25 @@ export function CaptionTimingPanel({
     );
   } else if (track === undefined) {
     status = <WorkingState label="Checking word timing" />;
+  } else if (ready && track.word_count === 0) {
+    status = (
+      <p className="flex items-start gap-2 text-xs text-muted" role="status">
+        <Type aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          <span className="font-medium text-foreground">No spoken words found</span> in this clip&apos;s audio, so
+          there is nothing to caption.
+        </span>
+      </p>
+    );
   } else if (ready) {
     status = (
       <p className="flex items-center gap-2 text-xs text-muted" role="status">
         <CheckCircle2 aria-hidden="true" className="size-3.5 shrink-0 text-success" />
         <span>
           <span className="font-medium text-foreground">Word synced</span>
-          {track.word_count != null ? ` · ${track.word_count} words timed from the clip's audio` : null}
+          {track.word_count != null
+            ? ` · ${track.word_count} ${track.word_count === 1 ? "word" : "words"} timed from the clip's audio`
+            : null}
         </span>
       </p>
     );
