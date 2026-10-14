@@ -157,6 +157,7 @@ def make_edit(
         captions_enabled=config.captions_enabled,
         caption_style=config.caption_style.value if config.caption_style else None,
         caption_position=config.caption_position.value if config.caption_position else None,
+        caption_renderer=config.caption_renderer,
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
         render_profile=RENDER_PROFILE_VERTICAL_V1,

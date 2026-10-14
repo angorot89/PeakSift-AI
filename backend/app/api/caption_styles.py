@@ -13,8 +13,13 @@ from app.schemas.caption_style import (
     SafeAreaRead,
 )
 from app.services.clip_edit.caption_metrics import EM_PER_SIZE
-from app.services.clip_edit.caption_v2 import CAPTION_RENDERER_V2, PRESETS_V2
-from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, CaptionPosition
+from app.services.clip_edit.caption_v2 import PRESETS_V2
+from app.services.clip_edit.config import (
+    CAPTION_RENDERER_V2,
+    OUTPUT_HEIGHT,
+    OUTPUT_WIDTH,
+    CaptionPosition,
+)
 from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SAFE_AREA_VERSION, caption_placement
 

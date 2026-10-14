@@ -4,7 +4,14 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
-from app.services.clip_edit.config import AspectRatio, CaptionPosition, CaptionStyle, Layout
+from app.services.clip_edit.config import (
+    AspectRatio,
+    CaptionPosition,
+    CaptionStyle,
+    CaptionTiming,
+    DynamicPreset,
+    Layout,
+)
 from app.services.clip_edit.hook import HookPosition, HookStyle
 
 
@@ -17,8 +24,14 @@ class EditRequest(BaseModel):
     aspect_ratio: AspectRatio = AspectRatio.VERTICAL
     layout: Layout
     captions_enabled: StrictBool = False  # "yes"/1 are refused, not coerced
-    caption_style: CaptionStyle | None = None
+    # Clean / Bold / Creator render with the V0.6 phrase renderer (caption_v1); Focus / Punch /
+    # Minimal / Boxed with the dynamic word-aware renderer (caption_v2).
+    caption_style: CaptionStyle | DynamicPreset | None = None
     caption_position: CaptionPosition | None = None
+    # Dynamic captions only: "aligned_word" needs caption_track_id (a completed word timing
+    # of this clip); "phrase_fallback" uses the transcript's phrase timing, never per word.
+    caption_timing: CaptionTiming | None = None
+    caption_track_id: uuid.UUID | None = None
     # Required for layout "smart_reframe": a completed analysis of this clip (never a path).
     reframe_analysis_id: uuid.UUID | None = None
     # Required for layout "manual_crop": the focal point, fractions of the frame (0..1).
@@ -48,6 +61,9 @@ class ClipEditRead(BaseModel):
     captions_enabled: bool
     caption_style: str | None
     caption_position: str | None
+    caption_renderer: str | None
+    caption_timing: str | None
+    caption_track_id: uuid.UUID | None
     reframe_analysis_id: uuid.UUID | None
     focus_x: float | None
     focus_y: float | None

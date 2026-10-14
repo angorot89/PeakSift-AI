@@ -81,9 +81,11 @@ class ClipEdit(Base):
         CheckConstraint(
             # A hook has text, an allowed style and position and a bounded duration; no hook
             # has none of them.
+            # Every term is NOT NULL-safe: a CHECK that evaluates to NULL would accept the row.
             "(hook_enabled AND hook_text IS NOT NULL AND length(hook_text) BETWEEN 1 AND 60 "
-            "AND hook_style IN ('headline', 'boxed', 'minimal') "
-            "AND hook_position IN ('top', 'center') "
+            "AND hook_style IS NOT NULL AND hook_style IN ('headline', 'boxed', 'minimal') "
+            "AND hook_position IS NOT NULL AND hook_position IN ('top', 'center') "
+            "AND hook_duration_seconds IS NOT NULL "
             "AND hook_duration_seconds >= 0.5 AND hook_duration_seconds <= 5) "
             "OR (NOT hook_enabled AND hook_text IS NULL AND hook_style IS NULL "
             "AND hook_position IS NULL AND hook_duration_seconds IS NULL)",
@@ -92,10 +94,23 @@ class ClipEdit(Base):
         CheckConstraint(
             # IS NOT NULL is explicit: "NULL IN (...)" is NULL, which a CHECK would accept.
             "(captions_enabled AND caption_style IS NOT NULL AND caption_position IS NOT NULL "
-            "AND caption_style IN ('clean', 'bold', 'creator') "
-            "AND caption_position IN ('top', 'center', 'bottom')) "
-            "OR (NOT captions_enabled AND caption_style IS NULL AND caption_position IS NULL)",
+            "AND caption_position IN ('top', 'center', 'bottom') AND caption_renderer IS NOT NULL "
+            "AND ((caption_renderer = 'caption_v1' "
+            "AND caption_style IN ('clean', 'bold', 'creator')) "
+            "OR (caption_renderer = 'caption_v2' "
+            "AND caption_style IN ('focus', 'punch', 'minimal', 'boxed')))) "
+            "OR (NOT captions_enabled AND caption_style IS NULL AND caption_position IS NULL "
+            "AND caption_renderer IS NULL)",
             name="ck_clip_edits_captions",
+        ),
+        CheckConstraint(
+            # Dynamic captions say how words are timed; word-synced ones name their track.
+            "(caption_renderer = 'caption_v2' AND caption_timing IS NOT NULL "
+            "AND caption_timing IN ('aligned_word', 'phrase_fallback') "
+            "AND (caption_timing = 'aligned_word') = (caption_track_id IS NOT NULL)) "
+            "OR (caption_renderer IS DISTINCT FROM 'caption_v2' "
+            "AND caption_timing IS NULL AND caption_track_id IS NULL)",
+            name="ck_clip_edits_caption_timing",
         ),
     )
 
@@ -120,6 +135,13 @@ class ClipEdit(Base):
     captions_enabled: Mapped[bool] = mapped_column(Boolean)
     caption_style: Mapped[str | None] = mapped_column(String(32))
     caption_position: Mapped[str | None] = mapped_column(String(16))
+    # caption_v1 (V0.6 phrase captions) or caption_v2 (V0.8 dynamic); None without captions.
+    caption_renderer: Mapped[str | None] = mapped_column(String(16))
+    caption_timing: Mapped[str | None] = mapped_column(String(16))
+    # The exact word timing a word-synced edit was rendered from (never re-pointed later).
+    caption_track_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("caption_tracks.id", ondelete="CASCADE"), index=True
+    )
     # Smart reframe only: the completed analysis whose crop path this render follows.
     reframe_analysis_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("reframe_analyses.id", ondelete="CASCADE"), index=True
