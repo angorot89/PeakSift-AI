@@ -135,13 +135,15 @@ def test_long_tokens_are_split_without_inventing_time_or_breaking_graphemes():
     # Every piece shares the word's one interval (from its real start); no sub-word times.
     assert len({(w.start, w.end) for w in cue.words}) == 1 and cue.words[0].start == 1.0
     assert "".join(w.text for w in cue.words) == url and len(cue.line_words()) >= 2
-    assert split_token("é" * 20, 18)[1][0] != "́"  # a combining accent stays with its base
-    family = "👨‍👩‍👧"
-    assert all(not p.startswith("‍") for p in split_token(family * 6, 4))
+    assert (
+        split_token("e\u0301" * 20, 18)[1][0] != "\u0301"
+    )  # a combining accent stays with its base
+    family = "👨\u200d👩\u200d👧"
+    assert all(not p.startswith("\u200d") for p in split_token(family * 6, 4))
 
 
 def test_arabic_and_wide_text_are_measured_sensibly():
-    assert text_units("مرحبا") == 5 and text_units("日本語") == 6 and text_units("é") == 1
+    assert text_units("مرحبا") == 5 and text_units("日本語") == 6 and text_units("e\u0301") == 1
 
 
 # --- active word timing -----

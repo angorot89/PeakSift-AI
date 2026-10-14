@@ -31,16 +31,30 @@ highlighted individually. Text is never changed: words appear exactly as recogni
 import math
 import re
 import unicodedata
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 
 SENTENCE_END = re.compile(r"[.!?…。؟]['\")\]»”’]*$")
 CLAUSE_END = re.compile(r"[,;:،—–]['\")\]»”’]*$")
 
 
+def char_units(ch: str) -> int:
+    if unicodedata.category(ch)[0] in ("M", "C"):
+        return 0  # combining marks, joiners and format characters take no space of their own
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+
+def text_units(text: str) -> int:
+    return sum(char_units(ch) for ch in text)
+
+
 @dataclass(frozen=True)
 class CueRules:
-    line_units: int = 18  # how many character units fit one line at the preset's size
+    # The width budget of one line, in the units of ``measure``: character units by default;
+    # the dynamic presets measure real glyph advances in pixels (see ``caption_metrics.py``).
+    line_units: float = 18
+    measure: Callable[[str], float] = text_units
+    space: float = 1  # the width of the space between two words, in the same units
     max_lines: int = 2
     max_words: int = 7
     min_words: int = 2  # a clause end closes a cue only once it has this many words
@@ -93,28 +107,20 @@ class WordCue:
         return None
 
 
-def char_units(ch: str) -> int:
-    if unicodedata.category(ch)[0] in ("M", "C"):
-        return 0  # combining marks, joiners and format characters take no space of their own
-    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
-
-
-def text_units(text: str) -> int:
-    return sum(char_units(ch) for ch in text)
-
-
-def split_token(text: str, max_units: int) -> list[str]:
+def split_token(
+    text: str, max_units: float, measure: Callable[[str], float] = text_units
+) -> list[str]:
     """Split one token wider than a line into balanced pieces, never separating a combining
     mark or joiner from the character before it (grapheme-safe for accents and emoji ZWJ)."""
-    total = text_units(text)
+    total = measure(text)
     if total <= max_units:
         return [text]
     count = math.ceil(total / max_units)
     pieces: list[str] = []
-    current, width, consumed = "", 0, 0
+    current, width, consumed = "", 0.0, 0.0
     for ch in text:
-        w = char_units(ch)
-        attached = w == 0 or ch == "‍" or (current and current[-1] == "‍")
+        w = measure(ch)
+        attached = w == 0 or ch == "\u200d" or (current and current[-1] == "\u200d")
         boundary = total * (len(pieces) + 1) / count
         if current and not attached and (width + w > max_units or consumed + w > boundary):
             pieces.append(current)
@@ -127,10 +133,10 @@ def split_token(text: str, max_units: int) -> list[str]:
     return pieces
 
 
-def _line_width(words: Sequence[CueWord]) -> int:
-    width = 0
+def _line_width(words: Sequence[CueWord], rules: CueRules) -> float:
+    width = 0.0
     for index, word in enumerate(words):
-        width += text_units(word.text) + (1 if index and not word.attached else 0)
+        width += rules.measure(word.text) + (rules.space if index and not word.attached else 0)
     return width
 
 
@@ -139,10 +145,10 @@ def _greedy_lines(words: Sequence[CueWord], rules: CueRules) -> tuple[int, ...]:
     may need more than two lines rather than losing text."""
     starts, width = [0], 0
     for index, word in enumerate(words):
-        w = text_units(word.text) + (1 if index and not word.attached else 0)
+        w = rules.measure(word.text) + (rules.space if index and not word.attached else 0)
         if index and width + w > rules.line_units:
             starts.append(index)
-            width = text_units(word.text)
+            width = rules.measure(word.text)
         else:
             width += w
     return tuple(starts)
@@ -150,14 +156,14 @@ def _greedy_lines(words: Sequence[CueWord], rules: CueRules) -> tuple[int, ...]:
 
 def layout_lines(words: Sequence[CueWord], rules: CueRules) -> tuple[int, ...] | None:
     """Line starts for ``words`` within ``rules.max_lines`` lines, or None if they cannot fit."""
-    if _line_width(words) <= rules.line_units:
+    if _line_width(words, rules) <= rules.line_units:
         return (0,)
     if rules.max_lines < 2:
         return None
     best: tuple[float, int] | None = None
     for cut in range(1, len(words)):
         first, second = words[:cut], words[cut:]
-        a, b = _line_width(first), _line_width(second)
+        a, b = _line_width(first, rules), _line_width(second, rules)
         if a > rules.line_units or b > rules.line_units:
             continue
         score = abs(a - b)
@@ -178,7 +184,7 @@ def _pieces(words: Iterable[SourceWord], rules: CueRules) -> list[CueWord]:
         text = " ".join(word.text.split())
         if not text:
             continue
-        for index, piece in enumerate(split_token(text, rules.line_units)):
+        for index, piece in enumerate(split_token(text, rules.line_units, rules.measure)):
             # Pieces share the word's real interval: no sub-word time is invented.
             out.append(CueWord(piece, word.start, word.end, attached=index > 0))
     return out
