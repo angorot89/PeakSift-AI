@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - name: Unit tests (status synchronisation)
+      - name: Unit tests (status synchronisation, caption timing)
         run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
@@ -146,6 +146,15 @@ jobs:
         run: >-
           python -c "from app.services.clip_edit.composition import require_caption_rendering;
           require_caption_rendering('ffmpeg', 'Noto Sans'); print('caption probe: text drawn')"
+      - name: Caption font families draw through libass (Latin, Arabic, emoji)
+        # Each family the app expects must resolve by name and draw real glyphs (not
+        # missing-glyph boxes): Noto Sans, Noto Sans Arabic, and a monochrome emoji font.
+        run: python scripts/caption_font_probe.py
+      - name: Dynamic captions render end to end (word sync, hook, safe area)
+        # Known words ONE / TWO / THREE + a hook through the real compose_short: checks the
+        # MP4 (1080x1920, H.264, AAC, duration) and frames (active word moves, hook shown then
+        # gone, text inside the safe area).
+        run: python scripts/dynamic_caption_probe.py
       - name: Smart reframe renders the deepest allowed crop path on this FFmpeg
         # The moving crop is an FFmpeg expression tree; expression limits differ by build.
         run: python scripts/smart_crop_probe.py
