@@ -146,7 +146,7 @@ The crop has a fixed size; there is no zoom in V0.7.
 
 `plan_crop_path()` simulates a virtual camera every 0.1 s:
 
-1. **Target and dead zone.** The target keeps the subject's centre within `REFRAME_DEAD_ZONE` (0.10 crop widths) of the current crop centre. A face drifting inside that zone moves nothing; a face leaving it is followed by the minimum movement.
+1. **Target and dead zone.** The target keeps the subject's centre within `REFRAME_DEAD_ZONE` (0.10 crop widths) of the current crop centre. A face drifting inside that zone moves nothing; a face leaving it is followed by the minimum movement. Between two samples the subject's position is interpolated linearly when both samples follow the same face in the same mode (never across a fallback, a mode change or a cut), so a face moving steadily gives a steady pan rather than speed pulses at the 2 fps sampling rate.
 2. **Face margin.** The whole face box keeps `REFRAME_FACE_MARGIN` (0.12 crop widths) from both crop edges. A face larger than the usable area is simply centred.
 3. **Group framing.** A second face at least 60 % of the primary's size, which fits inside the crop together with the primary (margins included), is framed with it, centred on the pair. Entering or leaving group framing needs 1 s of stable evidence. Faces too far apart keep the primary; there is no split screen.
 4. **Look-ahead.** The path is computed offline, so the target is read `REFRAME_SMOOTHING_SECONDS` (0.5 s) ahead, which cancels the smoothing lag.

@@ -16,6 +16,9 @@ From subject to camera, at a fixed internal step of ``STEP`` seconds:
    movement. The face box must also keep ``face_margin·crop`` from both crop edges. Two faces
    that fit together (with margins) are framed as a group (their union's centre). Without a
    subject the target is the centre (fallback).
+   Between two samples the target is interpolated linearly when both follow the same subject
+   in the same mode (never across a fallback, a mode change or a cut), so a smoothly moving
+   face gives smooth camera motion instead of speed pulses at the sampling rate.
 2. **Look-ahead.** The path is computed offline, so the target is read ``smoothing_seconds``
    ahead — this cancels the lag the smoothing would otherwise add to a moving subject.
 3. **Smoothing.** Exponential smoothing with time constant ``smoothing_seconds`` (never
@@ -125,6 +128,8 @@ class _Target:
     center: float
     confidence: float
     mode: KeyframeMode
+    subject: int | None = None  # followed track (the primary of a group)
+    cut: bool = False  # this sample hands the frame to a new subject (shot change)
 
 
 def _extent(point: TrackPoint, axis: str) -> tuple[float, float, float]:
@@ -174,18 +179,27 @@ def _targets(
             low, high = min(low, p_low), max(high, p_high)
             center = (low + high) / 2
             confidence = min(confidence, partner.confidence)
-            targets.append(
-                _Target(sample.timestamp, low, high, center, confidence, KeyframeMode.GROUP)
-            )
+            mode = KeyframeMode.GROUP
         else:
-            targets.append(
-                _Target(sample.timestamp, low, high, center, confidence, KeyframeMode.TRACKED)
+            mode = KeyframeMode.TRACKED
+        targets.append(
+            _Target(
+                sample.timestamp,
+                low,
+                high,
+                center,
+                confidence,
+                mode,
+                sample.primary.track_id,
+                sample.cut,
             )
+        )
     return targets
 
 
 def _target_at(targets: Sequence[_Target], t: float) -> _Target:
-    """The target in force at time t (the latest sample at or before t)."""
+    """The target at time t: the latest sample at or before t, interpolated toward the next
+    one when both follow the same subject in the same mode (not across fallbacks or cuts)."""
     lo, hi = 0, len(targets) - 1
     if t <= targets[0].timestamp:
         return targets[0]
@@ -195,7 +209,32 @@ def _target_at(targets: Sequence[_Target], t: float) -> _Target:
             lo = mid
         else:
             hi = mid - 1
-    return targets[lo]
+    a = targets[lo]
+    if lo + 1 >= len(targets):
+        return a
+    b = targets[lo + 1]
+    if (
+        a.mode == KeyframeMode.FALLBACK
+        or b.mode != a.mode
+        or b.subject != a.subject
+        or b.cut
+        or b.timestamp <= a.timestamp
+    ):
+        return a
+    f = min(1.0, max(0.0, (t - a.timestamp) / (b.timestamp - a.timestamp)))
+
+    def mix(x: float, y: float) -> float:
+        return x + (y - x) * f
+
+    return _Target(
+        t,
+        mix(a.low, b.low),
+        mix(a.high, b.high),
+        mix(a.center, b.center),
+        mix(a.confidence, b.confidence),
+        a.mode,
+        a.subject,
+    )
 
 
 def _desired(
