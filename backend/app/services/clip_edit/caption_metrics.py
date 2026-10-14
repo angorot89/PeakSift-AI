@@ -210,6 +210,11 @@ ADVANCE_BOLD: dict[str, float] = {
     "~": 0.375,
 }
 
+# libass treats the font size as the line height (ascent + descent). For Noto Sans
+# (ascent 1069 + descent 293 per 1000 em) one em is 1000 / 1362 of the size; the browser
+# preview sets its CSS font size with the same ratio.
+EM_PER_SIZE = round(1000 / 1362, 4)
+
 # Measured class averages (regular / bold) with a safety margin; see the module docstring.
 ARABIC = 0.38
 WIDE = 0.76  # CJK ideographs, kana, fullwidth forms

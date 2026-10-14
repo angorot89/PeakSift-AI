@@ -1,0 +1,52 @@
+"""The caption style specification served to the editor (one source of truth for the preview)."""
+
+from pydantic import BaseModel
+
+
+class SafeAreaRead(BaseModel):
+    version: str
+    # Normalized margins of the 1080 × 1920 output frame.
+    top: float
+    bottom: float
+    left: float
+    right: float
+
+
+class PlacementRead(BaseModel):
+    alignment: int  # ASS numpad: 8 top, 5 middle, 2 bottom (all horizontally centred)
+    margin_v: int  # output pixels
+    margin_h: int
+
+
+class DynamicPresetRead(BaseModel):
+    name: str
+    label: str
+    size: int  # libass font size on the 1080 × 1920 canvas (see font.em_per_size)
+    bold: bool
+    uppercase: bool
+    text: str  # #RRGGBB
+    active: str
+    outline_colour: str
+    outline: float
+    shadow: float
+    box: bool
+    box_alpha: int
+    fade_ms: int
+    grow_from: int
+    grow_ms: int
+
+
+class FontRead(BaseModel):
+    family: str
+    # libass treats the font size as the line height: one em is this fraction of the size.
+    em_per_size: float
+
+
+class CaptionStylesRead(BaseModel):
+    renderer: str
+    output_width: int
+    output_height: int
+    font: FontRead
+    safe_area: SafeAreaRead
+    positions: dict[str, PlacementRead]
+    presets: list[DynamicPresetRead]
