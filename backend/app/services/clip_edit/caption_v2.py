@@ -290,6 +290,8 @@ def build_dynamic_ass(
     if not _FONT_NAME.fullmatch(font_family):
         raise ValueError("Unsupported caption font family name")
     style = PRESETS_V2[preset]
+    if style.box and alignment != 5:  # libass pads the box by the outline: keep it inside too
+        margin_v += round(style.outline)
     border = 3 if style.box else 1
     back = ass_colour(style.outline_colour, style.box_alpha) if style.box else "&H80000000"
     outline_colour = back if style.box else ass_colour(style.outline_colour)

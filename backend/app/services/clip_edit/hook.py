@@ -173,6 +173,8 @@ def hook_ass(
     px = area.px()
     margin_h = max(px["left"], px["right"])
     alignment, margin_v = (8, px["top"]) if config.position == HookPosition.TOP else (5, 0)
+    if look.box and alignment != 5:  # libass pads the box by the outline: keep it inside too
+        margin_v += round(look.outline)
     border = 3 if look.box else 1
     outline = ass_colour(look.outline_colour, look.box_alpha)
     back = outline if look.box else "&H80000000"
