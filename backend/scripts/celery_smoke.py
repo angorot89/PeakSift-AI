@@ -1,5 +1,5 @@
 """Tiny real-broker smoke test: start a worker, round-trip `peaksift.ping`, check that the
-transcription and clip detection tasks are registered, stop the worker.
+background job tasks are registered, stop the worker.
 
 Used by CI (against the Redis service) and by the acceptance checklist. It proves that the
 broker, the worker process and task registration work together; it transcribes nothing.
@@ -27,6 +27,7 @@ EXPECTED_TASKS = (
     "peaksift.render_clip",
     "peaksift.render_clip_edit",
     "peaksift.analyze_reframe",
+    "peaksift.generate_caption_track",
 )
 
 
