@@ -79,6 +79,17 @@ class ClipEdit(Base):
         ),
         CheckConstraint("aspect_ratio IN ('9:16')", name="ck_clip_edits_aspect_ratio"),
         CheckConstraint(
+            # A hook has text, an allowed style and position and a bounded duration; no hook
+            # has none of them.
+            "(hook_enabled AND hook_text IS NOT NULL AND length(hook_text) BETWEEN 1 AND 60 "
+            "AND hook_style IN ('headline', 'boxed', 'minimal') "
+            "AND hook_position IN ('top', 'center') "
+            "AND hook_duration_seconds >= 0.5 AND hook_duration_seconds <= 5) "
+            "OR (NOT hook_enabled AND hook_text IS NULL AND hook_style IS NULL "
+            "AND hook_position IS NULL AND hook_duration_seconds IS NULL)",
+            name="ck_clip_edits_hook",
+        ),
+        CheckConstraint(
             # IS NOT NULL is explicit: "NULL IN (...)" is NULL, which a CHECK would accept.
             "(captions_enabled AND caption_style IS NOT NULL AND caption_position IS NOT NULL "
             "AND caption_style IN ('clean', 'bold', 'creator') "
@@ -116,6 +127,12 @@ class ClipEdit(Base):
     # Manual crop only: the chosen focal point (fractions of the display-oriented source).
     focus_x: Mapped[float | None] = mapped_column(Float)
     focus_y: Mapped[float | None] = mapped_column(Float)
+    # The optional opening hook overlay (V0.8).
+    hook_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    hook_text: Mapped[str | None] = mapped_column(String(60))
+    hook_style: Mapped[str | None] = mapped_column(String(16))
+    hook_position: Mapped[str | None] = mapped_column(String(16))
+    hook_duration_seconds: Mapped[float | None] = mapped_column(Float)
     output_width: Mapped[int] = mapped_column(Integer)
     output_height: Mapped[int] = mapped_column(Integer)
     render_profile: Mapped[str] = mapped_column(String(32))
