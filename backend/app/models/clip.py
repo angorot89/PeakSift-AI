@@ -28,6 +28,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.caption_track import CaptionTrack
     from app.models.clip_detection import ClipCandidate
     from app.models.clip_edit import ClipEdit
     from app.models.reframe import ReframeAnalysis
@@ -126,6 +127,12 @@ class Clip(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ReframeAnalysis.created_at.desc()",
+    )
+    caption_tracks: Mapped[list["CaptionTrack"]] = relationship(
+        back_populates="clip",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="CaptionTrack.created_at.desc()",
     )
 
     def __repr__(self) -> str:
