@@ -127,7 +127,7 @@ Short-form edits (9:16 variants of a ready clip):
 
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
-| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator", "caption_position": "top" \| "center" \| "bottom"}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
+| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator" \| "focus" \| "punch" \| "minimal" \| "boxed", "caption_position": "top" \| "center" \| "bottom", "caption_timing": "aligned_word" \| "phrase_fallback" (dynamic styles only; default aligned_word), "caption_track_id": uuid (aligned_word only; a completed track of this clip), "hook_enabled": bool, "hook_text": 1–60 characters, "hook_style": "headline" \| "boxed" \| "minimal", "hook_position": "top" \| "center", "hook_duration_seconds": 0.5–5}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
 | GET    | `…/clips/{clip_id}/edits` | yes | The clip's variants, newest first (`offset`, `limit` 1–50). |
 | GET    | `…/clips/{clip_id}/edits/{edit_id}` | yes | Edit state: `status`, stage `progress_percent`, `attempt`, `is_stale`, the configuration, output metadata and `caption_cue_count` once ready, safe `error_code`/`error_message`. A `ready` edit whose file is missing is reported as `failed`/`artifact_missing`. |
 | POST   | `…/edits/{edit_id}/retry` | yes | Re-queue a failed or stale edit on the same row (row-locked; `409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
@@ -146,6 +146,13 @@ Smart reframing (face-tracking crop paths for a ready clip; see [docs/smart-refr
 | GET    | `…/clips/{clip_id}/reframe/{analysis_id}` | yes | Status (`queued`/`sampling`/`detecting`/`tracking`/`planning`/`completed`/`failed`), `progress_percent`, `is_stale`, `confidence_level` (`high`/`mixed`/`fallback`), statistics, safe `error_code`/`error_message`. |
 | GET    | `…/clips/{clip_id}/reframe/{analysis_id}/path` | yes | Ordered keyframes `{timestamp, center_x, center_y, crop_width, crop_height, confidence, mode}` (fractions of the display-oriented source) and the source size; `409` until completed. |
 | POST   | `…/clips/{clip_id}/reframe/{analysis_id}/retry` | yes | Re-queue a failed or stale analysis (row-locked; `409` otherwise or after `REFRAME_MAX_ATTEMPTS`). |
+| POST   | `…/clips/{clip_id}/caption-tracks` | yes | Time every word of the clip's audio with the server's configuration. `201` new track; `200` with the existing one for the same configuration; `409` if the clip is not ready, word timing is not installed, or the last track failed (use retry); `503` if the queue is unreachable. |
+| GET    | `…/clips/{clip_id}/caption-tracks` / `…/current` / `…/{track_id}` | yes | Tracks newest first / the current configuration's track / status (`queued`/`preparing_audio`/`aligning`/`validating`/`completed`/`failed`), `progress_percent`, `is_stale`, `word_count`, `rejected_word_count`, `average_confidence`, safe `error_code`/`error_message`. A configured model directory is shown as `custom`. |
+| GET    | `…/clips/{clip_id}/caption-tracks/{track_id}/words` | yes | Words of a completed track in order: `{i, start, end, text, confidence}` (clip-local seconds); `409` until completed. |
+| POST   | `…/clips/{clip_id}/caption-tracks/{track_id}/retry` | yes | Re-queue a failed or stale track (row-locked; `409` otherwise or after `CAPTION_TIMING_MAX_ATTEMPTS`). |
+| GET    | `…/clips/{clip_id}/caption-timing` | yes | `{word_timing: none\|running\|completed\|failed, track, phrase_timing_available}` for the editor. |
+| GET    | `…/clips/{clip_id}/caption-preview?style=&position=&timing=&track_id=` | yes | The renderer's own cues `{start, end, timed, lines: [[{text, start, end, attached}]]}` for the live preview; `409` when they cannot be built yet. |
+| GET    | `/caption-styles` | yes | The dynamic renderer's presets, placements, safe area, hook limits, font ratio and emoji policy (`monochrome`/`omitted`). |
 
 No task ids, model paths, storage keys or FFmpeg details are returned.
 
@@ -237,6 +244,18 @@ PEAKSIFT_REAL_DETECTOR=1 REFRAME_TEST_FACE_IMAGE=/path/to/face.png pytest tests/
 
 The full design, configuration and limitations are in [docs/smart-reframing.md](../docs/smart-reframing.md).
 
+## Dynamic captions
+
+`app/services/caption_timing/` times the words of a ready clip: `config.py` (versioned `caption_alignment_v1` snapshot + fingerprint), `contract.py` (provider contract, `validate_words`), `faster_whisper.py` (word timestamps from the shared, lazily loaded faster-whisper model) and `pipeline.py` (the Celery job `peaksift.generate_caption_track`: claim, attempt-token ownership, progress 5/10/20/85/100, one-transaction finalize). `app/services/clip_edit/` renders them: `dynamic_cues.py` (cue grouping, line layout, active word), `caption_v2.py` (presets and the ASS document), `caption_metrics.py` (libass-measured Noto Sans widths), `safe_area.py`, `hook.py`, `emoji.py` and `dynamic_text.py` (cues shared by the render and the preview).
+
+```bash
+python scripts/caption_font_probe.py      # caption, Arabic and emoji fonts resolve and draw through libass
+python scripts/dynamic_caption_probe.py   # end-to-end word-synced render with a hook, checked on frames
+PEAKSIFT_REAL_WHISPER=1 pytest tests/test_caption_timing_provider.py -k real   # macOS, tiny model
+```
+
+The full design and limitations are in [docs/dynamic-captions.md](../docs/dynamic-captions.md).
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -262,6 +281,7 @@ app/
   services/clip_render/        # Artifact storage, FFmpeg renderer, Celery render pipeline
   services/clip_edit/          # Edit config, 9:16 composition, smart/manual crops, captions + styles, edit artifacts, pipeline
   services/reframe/            # Smart reframing: config, sampling, detector contract + YuNet, tracking, crop path, pipeline
+  services/caption_timing/     # Word timing: config, provider contract + validation, faster-whisper words, pipeline
   services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
                                # validation, ranking, detection_config, pipeline
   workers/celery_app.py        # Celery app (Redis broker) and long-job semantics
@@ -270,9 +290,10 @@ app/
   workers/clip_render_tasks.py # peaksift.render_clip
   workers/clip_edit_tasks.py   # peaksift.render_clip_edit
   workers/reframe_tasks.py     # peaksift.analyze_reframe
+  workers/caption_tasks.py     # peaksift.generate_caption_track
   workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
-scripts/             # celery_smoke.py, fetch_reframe_model.py, smart_crop_probe.py
+scripts/             # celery_smoke.py, fetch_reframe_model.py, smart_crop_probe.py, caption_font_probe.py, dynamic_caption_probe.py
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
 
@@ -331,6 +352,9 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `CLIP_RENDER_MAX_ATTEMPTS` | `5`                                     | Retries per clip and per edit (the other `CLIP_RENDER_*` values apply to shorts too) |
 | `CAPTION_FONT_FAMILY` | `Noto Sans`                                  | Caption font family for shorts (plain name; resolved by fontconfig, with fallbacks) |
 | `CAPTION_MAX_WORDS` / `CAPTION_MAX_CHARS` | `7` / `32`               | Caption cue limits                           |
+| `CAPTION_TIMING_PROVIDER` | `faster_whisper`                         | Word-timing provider (allow-listed; reuses the `FASTER_WHISPER_*` model settings) |
+| `CAPTION_TIMING_TOLERANCE_SECONDS` | `0.25`                          | How far past the clip audio a word may end before the result is refused |
+| `CAPTION_TIMING_STALE_AFTER_SECONDS` / `CAPTION_TIMING_MAX_ATTEMPTS` | `900` / `5` | Stale threshold and retries for word timing |
 | `REFRAME_DETECTOR` / `REFRAME_MODEL_PATH` | `yunet_face` / `./models/face_detection_yunet_2023mar.onnx` | Face detector and its pinned model file (install with `scripts/fetch_reframe_model.py`) |
 | `REFRAME_SAMPLE_FPS` / `REFRAME_ANALYSIS_WIDTH` / `REFRAME_MIN_DETECTION_CONFIDENCE` | `2` / `640` / `0.5` | Frames analysed per second, detection width, score threshold |
 | `REFRAME_FACE_MARGIN` / `REFRAME_DEAD_ZONE` | `0.12` / `0.10`          | Face-to-edge margin and tolerated drift, in crop widths |

@@ -111,6 +111,26 @@ Delivered:
 
 Definition of done — a user can open a generated clip → select Smart reframe → analyze framing → watch real progress → see a confidence summary → preview the moving crop → render a 9:16 short with captions that follows the visible face → download it → fall back to a manual focal point when tracking is weak → recover from a failed analysis with retry.
 
+## Milestone 8 — Dynamic Captions & Creator Polish V0.8 *(complete)*
+
+PeakSift renders word-synced creator captions — the spoken word emphasised as it is said — from local speech timing, with creator presets, social safe areas and an opening hook.
+
+Delivered:
+
+- Polling robustness: a shared status-sync module (newer attempt > later stage > more progress) so render, edit and analysis status never moves backwards; first poll after 1 s, then every 4 s; frontend unit tests in CI (`npm test`)
+- `caption_tracks` / `caption_words` tables: one track per clip and timing configuration (versioned `caption_alignment_v1` snapshot + fingerprint), status `queued → preparing_audio → aligning → validating → completed | failed`, clip-local words as recognized, rejected-word count and confidence; tracks are always real word timing (never proportional or generated)
+- Word-timing provider contract and faster-whisper word timestamps (shared, lazily loaded model; never at import or startup); strict validation (refuse impossible timing, drop empty/tiny words, trim overlaps), repeated before every render
+- Background word timing (`peaksift.generate_caption_track`): ids only, attempt-token fencing, heartbeats and stale detection, one-transaction finalize, safe failure codes, bounded retry; zero-word clips complete honestly
+- API: start (idempotent), list, current, status, words, retry, timing options and caption preview — owner-scoped
+- Word-aware cue builder (no LLM, no paraphrase): punctuation, pause, width, word and duration limits, readable minimum duration, no orphan words, balanced two-line layout from libass-measured glyph widths, grapheme-safe token splitting, active-word timing
+- Renderer `caption_v2`: back-to-back word events with the active word recoloured and a continuous entrance; presets Focus, Punch, Minimal, Boxed; `caption_v1` kept for V0.6 styles and existing edits (fingerprints unchanged)
+- General Social Safe Area v1 and Top / Center / Bottom placement inside it; opening hook (1–60 characters, 1–3 balanced lines, 0.5–5 s, Headline / Boxed / Minimal, Top / Center)
+- Multilingual and emoji: bidi-correct Arabic and mixed RTL/LTR (`Encoding -1`), French and accents, monochrome emoji through a probed emoji font or left out — never tofu
+- Editor: word-timing panel with text status, Generate / Retry and phrase fallback; preset cards; hook panel; safe-area guide; live preview of the renderer's own cues following the video clock, matching rendered frames in line breaks, size and position; reviewed at 1440, 1024, 768 and 375 px; reduced-motion aware
+- Hardening (entrance continuity, cue churn in fast speech, model-path masking, injection fuzzing), CI (caption font probes for Latin / Arabic / emoji, end-to-end dynamic caption render probe) and documentation ([dynamic-captions.md](dynamic-captions.md))
+
+Definition of done — a user can open a generated clip → generate word sync and watch its real progress → pick a caption preset, position and opening hook → preview the active word over the playing clip → render a 9:16 short with word-synced captions (with any layout or Smart reframe) → download it → fall back to phrase timing or retry when word timing fails.
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -120,6 +140,7 @@ Definition of done — a user can open a generated clip → select Smart reframe
 - V0.5 Clip Generation — COMPLETE
 - V0.6 Short-form Editing — COMPLETE
 - V0.7 Smart Reframing — COMPLETE
+- V0.8 Dynamic Captions & Creator Polish — COMPLETE
 
 No later milestone has been defined or started.
 
@@ -128,6 +149,7 @@ No later milestone has been defined or started.
 - Creator intelligence & metadata (titles, hooks, descriptions)
 - Publishing integrations
 - Sound effects and music
+- Brand kits, custom fonts and a caption timing editor
 - Global asset libraries
 - Morocco Mode (localization layer extending Global). Before any Moroccan accuracy claim, benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio — none of that has been tested yet.
 - Additional localization
