@@ -79,12 +79,13 @@ def _is_emoji(ch: str) -> bool:
 _BIDI_CONTROLS = frozenset("\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 
 
-def clean_text(text: str) -> str:
+def clean_text(text: str, *, keep_emoji: bool = False) -> str:
     """Words exactly as transcribed: control characters become spaces, whitespace collapses.
-    Unicode letters, accents, Arabic and joiners are kept; emoji are dropped (no glyphs)."""
+    Unicode letters, accents, Arabic and joiners are kept; emoji are dropped (no glyphs in the
+    V0.6 renderer) unless ``keep_emoji`` (the dynamic renderer has its own emoji policy)."""
     out = []
     for ch in text:
-        if ch in _BIDI_CONTROLS or _is_emoji(ch):
+        if ch in _BIDI_CONTROLS or (_is_emoji(ch) and not keep_emoji):
             continue
         category = unicodedata.category(ch)
         out.append(" " if category == "Cc" else "" if category in ("Cs", "Co", "Cn") else ch)
@@ -133,10 +134,10 @@ class _Word(NamedTuple):
     continues: bool = False  # a later piece of a split token (no space before it)
 
 
-def _words_with_times(segment: SourceSegment) -> list[_Word]:
+def _words_with_times(segment: SourceSegment, *, keep_emoji: bool = False) -> list[_Word]:
     """Spread the segment's duration over its words proportionally to their length."""
     pieces: list[tuple[str, bool]] = []
-    for word in clean_text(segment.text).split(" "):
+    for word in clean_text(segment.text, keep_emoji=keep_emoji).split(" "):
         if word and _visible(word):
             parts = split_long_token(word)
             pieces += [(part, index > 0) for index, part in enumerate(parts)]
@@ -188,6 +189,7 @@ def build_cues(
     max_words: int = DEFAULT_MAX_WORDS,
     max_chars: int = DEFAULT_MAX_CHARS,
     min_words: int = DEFAULT_MIN_WORDS,
+    keep_emoji: bool = False,
 ) -> list[Cue]:
     """Cues for ``[clip_start, clip_end]`` in clip-local seconds, ordered, non-overlapping."""
     if not (math.isfinite(clip_start) and math.isfinite(clip_end)) or clip_end <= clip_start:
@@ -201,7 +203,9 @@ def build_cues(
             continue  # entirely outside the clip, or not a real interval
         # Keep only the words (approximately) spoken inside the clip.
         inside = [
-            w for w in _words_with_times(segment) if clip_start <= (w.start + w.end) / 2 < clip_end
+            w
+            for w in _words_with_times(segment, keep_emoji=keep_emoji)
+            if clip_start <= (w.start + w.end) / 2 < clip_end
         ]
         for group in _group(inside, max_words, max_chars, min_words):
             start = max(group[0].start, clip_start) - clip_start

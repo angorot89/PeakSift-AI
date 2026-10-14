@@ -31,6 +31,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.models import (
+    CaptionTrack,
+    CaptionTrackStatus,
+    CaptionWord,
     ClipEdit,
     ClipEditStatus,
     ClipStatus,
@@ -40,12 +43,23 @@ from app.models import (
     TranscriptionStatus,
     TranscriptSegment,
 )
+from app.services.caption_timing.contract import TimedWord, TimingOutputError, validate_words
 from app.services.clip_edit.caption_styles import build_ass_document
+from app.services.clip_edit.caption_v2 import build_dynamic_ass, rules_for
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
-from app.services.clip_edit.config import CaptionPosition, CaptionStyle, EditConfig, Layout
+from app.services.clip_edit.config import (
+    CAPTION_RENDERER_V2,
+    CaptionPosition,
+    CaptionStyle,
+    CaptionTiming,
+    EditConfig,
+    Layout,
+)
+from app.services.clip_edit.dynamic_cues import SourceWord, build_word_cues, phrase_cues
 from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.hook import hook_ass
+from app.services.clip_edit.safe_area import caption_placement
 from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
@@ -203,8 +217,12 @@ def _execute(
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
 
     workspace = store.workspace(edit.id, attempt)
-    cues = []
-    if config.captions_enabled:
+    dynamic = config.caption_renderer == CAPTION_RENDERER_V2
+    cues: list = []
+    if config.captions_enabled and dynamic:
+        cues = _dynamic_cues(edit, db, settings, config)
+        edit.caption_cue_count = len(cues)
+    elif config.captions_enabled:
         cues = build_cues(
             _transcript_segments(edit, db),
             clip_start=clip.start_time,
@@ -213,19 +231,32 @@ def _execute(
             max_chars=settings.caption_max_chars,
         )
         edit.caption_cue_count = len(cues)
+    emoji_family = emoji_font(settings.ffmpeg_path) if dynamic or config.hook else None
     # The hook overlay shares the subtitle file (output-frame coordinates, safe area).
     hook = (
-        hook_ass(
-            config.hook,
-            font_family=settings.caption_font_family,
-            emoji_family=emoji_font(settings.ffmpeg_path),
-        )
+        hook_ass(config.hook, font_family=settings.caption_font_family, emoji_family=emoji_family)
         if config.hook
         else None
     )
     # No speech in this range and no hook: render without a text layer, honestly.
     captions = bool(cues) or hook is not None
-    if captions:
+    if captions and dynamic:
+        placement = caption_placement(config.caption_position)
+        store.captions_path(edit.id, attempt).write_text(
+            build_dynamic_ass(
+                cues,
+                preset=config.caption_style,
+                alignment=placement.alignment,
+                margin_v=placement.margin_v,
+                margin_h=placement.margin_h,
+                font_family=settings.caption_font_family,
+                extra_styles=[hook[0]] if hook else (),
+                extra_events=[hook[1]] if hook else (),
+                emoji_family=emoji_family,
+            ),
+            encoding="utf-8",
+        )
+    elif captions:
         store.captions_path(edit.id, attempt).write_text(
             build_ass_document(
                 cues,
@@ -305,6 +336,54 @@ def _crop_path(edit: ClipEdit, db: Session, config: EditConfig) -> list[CropPoin
         return crop_points_from(keyframes)
     except ValueError:
         raise PipelineFailure("invalid_path", "The framing path is not valid") from None
+
+
+def _dynamic_cues(edit: ClipEdit, db: Session, settings: Settings, config: EditConfig) -> list:
+    """Word-aware cues for the dynamic renderer: from the edit's own CaptionTrack (aligned
+    word timing) or from the transcript's phrases (phrase timing, never highlighted)."""
+    clip = edit.clip
+    duration = float(clip.duration_seconds)
+    rules = rules_for(config.caption_style, caption_placement(config.caption_position).margin_h)
+    if config.caption_timing != CaptionTiming.ALIGNED_WORD:
+        phrases = build_cues(
+            _transcript_segments(edit, db),
+            clip_start=clip.start_time,
+            clip_end=clip.end_time,
+            max_words=settings.caption_max_words,
+            max_chars=settings.caption_max_chars,
+            keep_emoji=True,
+        )
+        return phrase_cues(
+            [(c.start, c.end, c.text) for c in phrases], clip_duration=duration, rules=rules
+        )
+    track = db.get(CaptionTrack, uuid.UUID(str(config.caption_track_id)))
+    if (
+        track is None
+        or track.clip_id != edit.clip_id
+        or track.status != CaptionTrackStatus.COMPLETED
+    ):
+        raise PipelineFailure(
+            "caption_track_unavailable",
+            "The word timing for these captions is not available; generate it again",
+        )
+    rows = db.scalars(
+        select(CaptionWord)
+        .where(CaptionWord.caption_track_id == track.id)
+        .order_by(CaptionWord.sequence_index)
+    ).all()
+    try:  # persisted words are re-validated before they reach FFmpeg
+        words, _ = validate_words(
+            [TimedWord(r.start_time, r.end_time, r.text, r.confidence) for r in rows],
+            audio_duration=duration,
+            tolerance=settings.caption_timing_tolerance_seconds,
+        )
+    except TimingOutputError:
+        raise PipelineFailure(
+            "caption_track_invalid", "The word timing for these captions is not valid"
+        ) from None
+    return build_word_cues(
+        [SourceWord(w.text, w.start, w.end) for w in words], clip_duration=duration, rules=rules
+    )
 
 
 def _transcript_segments(edit: ClipEdit, db: Session) -> list[SourceSegment]:

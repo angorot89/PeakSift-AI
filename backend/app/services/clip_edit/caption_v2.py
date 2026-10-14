@@ -28,25 +28,20 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import StrEnum
 
 from app.services.clip_edit.caption_metrics import text_width
-from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH
+from app.services.clip_edit.config import (
+    OUTPUT_HEIGHT,
+    OUTPUT_WIDTH,
+    DynamicPreset,
+)
 from app.services.clip_edit.dynamic_cues import CueRules, WordCue
 from app.services.clip_edit.emoji import apply_emoji_policy
 
-CAPTION_RENDERER_V2 = "caption_v2"
 WORD_JOINER = "⁠"
 _FONT_NAME = re.compile(r"^[A-Za-z0-9 _-]{1,64}$")
 _BIDI_CONTROLS = frozenset("‪‫‬‭‮⁦⁧⁨⁩")
 _WHITESPACE = re.compile(r"\s+")
-
-
-class DynamicPreset(StrEnum):
-    FOCUS = "focus"
-    PUNCH = "punch"
-    MINIMAL = "minimal"
-    BOXED = "boxed"
 
 
 @dataclass(frozen=True)

@@ -43,6 +43,24 @@ class CaptionStyle(StrEnum):
     CREATOR = "creator"
 
 
+class DynamicPreset(StrEnum):
+    """Word-aware caption presets of the dynamic renderer (``caption_v2``)."""
+
+    FOCUS = "focus"
+    PUNCH = "punch"
+    MINIMAL = "minimal"
+    BOXED = "boxed"
+
+
+class CaptionTiming(StrEnum):
+    ALIGNED_WORD = "aligned_word"  # real word timestamps from a completed CaptionTrack
+    PHRASE_FALLBACK = "phrase_fallback"  # transcript segment timing; never per-word emphasis
+
+
+CAPTION_RENDERER_V1 = "caption_v1"  # V0.6 phrase captions (Clean / Bold / Creator)
+CAPTION_RENDERER_V2 = "caption_v2"  # V0.8 dynamic word-aware captions
+
+
 class CaptionPosition(StrEnum):
     TOP = "top"
     CENTER = "center"
@@ -81,6 +99,19 @@ class EditConfig:
     focus_y: float | None = None
     # The optional opening hook overlay (see hook.py); None = no hook.
     hook: "HookConfig | None" = None
+    # Dynamic captions only: how words are timed, and the exact CaptionTrack used (aligned).
+    caption_timing: CaptionTiming | None = None
+    caption_track_id: str | None = None
+
+    @property
+    def caption_renderer(self) -> str | None:
+        if not self.captions_enabled:
+            return None
+        return (
+            CAPTION_RENDERER_V2
+            if isinstance(self.caption_style, DynamicPreset)
+            else CAPTION_RENDERER_V1
+        )
 
     @classmethod
     def create(
@@ -99,6 +130,8 @@ class EditConfig:
         hook_style: str | None = None,
         hook_position: str | None = None,
         hook_duration: float | None = None,
+        caption_timing: str | None = None,
+        caption_track_id: str | uuid.UUID | None = None,
     ) -> "EditConfig":
         """Validate against the allow-lists (ValueError otherwise) and normalize."""
         from app.services.clip_edit.hook import HookConfig
@@ -128,13 +161,28 @@ class EditConfig:
             # Style and position are meaningless without captions: drop them so equivalent
             # requests share one fingerprint (and one render).
             return cls(ratio, chosen_layout, False, None, None, analysis, *focus, hook)
-        style = CaptionStyle(caption_style) if caption_style else DEFAULT_CAPTION_STYLE
+        style: CaptionStyle | DynamicPreset
+        if not caption_style:
+            style = DEFAULT_CAPTION_STYLE
+        elif caption_style in DynamicPreset.__members__.values():
+            style = DynamicPreset(caption_style)
+        else:
+            style = CaptionStyle(caption_style)
         position = (
             CaptionPosition(caption_position) if caption_position else DEFAULT_CAPTION_POSITION
         )
         if hook is not None and hook.position.value == position.value:
             raise ValueError("The hook and the captions cannot share the same position")
-        return cls(ratio, chosen_layout, True, style, position, analysis, *focus, hook)
+        timing, track = None, None
+        if isinstance(style, DynamicPreset):  # caption_v2: timing (and its track) are explicit
+            timing = CaptionTiming(caption_timing) if caption_timing else CaptionTiming.ALIGNED_WORD
+            if timing == CaptionTiming.ALIGNED_WORD:
+                if caption_track_id is None:
+                    raise ValueError("Word-synced captions need a completed word timing track")
+                track = str(uuid.UUID(str(caption_track_id)))
+        return cls(
+            ratio, chosen_layout, True, style, position, analysis, *focus, hook, timing, track
+        )
 
     @classmethod
     def from_snapshot(cls, snapshot: dict[str, Any]) -> "EditConfig":
@@ -156,14 +204,16 @@ class EditConfig:
             hook_style=(hook or {}).get("style"),
             hook_position=(hook or {}).get("position"),
             hook_duration=(hook or {}).get("duration"),
+            caption_timing=captions.get("timing"),
+            caption_track_id=captions.get("track_id"),
         )
 
     def snapshot(self) -> dict[str, Any]:
         """The exact parameters a render uses, stored on the edit (never future defaults).
 
-        The ``reframe``, ``focus`` and ``hook`` keys exist only when used, so every earlier
-        configuration keeps exactly its previous snapshot and fingerprint (repeat requests
-        still deduplicate).
+        The ``reframe``, ``focus`` and ``hook`` keys — and the dynamic-caption keys (renderer,
+        timing, track, safe area) — exist only when used, so every earlier configuration keeps
+        exactly its previous snapshot and fingerprint (repeat requests still deduplicate).
         """
         snapshot: dict[str, Any] = {
             "version": CONFIG_VERSION,
@@ -182,6 +232,15 @@ class EditConfig:
             snapshot["focus"] = {"x": self.focus_x, "y": self.focus_y}
         if self.hook is not None:
             snapshot["hook"] = self.hook.snapshot()
+        if self.caption_renderer == CAPTION_RENDERER_V2:
+            from app.services.clip_edit.safe_area import SAFE_AREA_VERSION
+
+            captions = snapshot["captions"]
+            captions["renderer"] = CAPTION_RENDERER_V2
+            captions["timing"] = self.caption_timing.value
+            captions["safe_area"] = SAFE_AREA_VERSION
+            if self.caption_track_id is not None:
+                captions["track_id"] = self.caption_track_id
         return snapshot
 
     def fingerprint(self) -> str:

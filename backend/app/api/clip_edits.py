@@ -21,6 +21,8 @@ from app.api.media_streaming import stream_file
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.models import (
+    CaptionTrack,
+    CaptionTrackStatus,
     Clip,
     ClipEdit,
     ClipEditStatus,
@@ -37,6 +39,7 @@ from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
     RENDER_PROFILE_VERTICAL_V1,
+    CaptionTiming,
     EditConfig,
     Layout,
 )
@@ -90,6 +93,9 @@ def _read(edit: ClipEdit) -> ClipEditRead:
         captions_enabled=edit.captions_enabled,
         caption_style=edit.caption_style,
         caption_position=edit.caption_position,
+        caption_renderer=edit.caption_renderer,
+        caption_timing=edit.caption_timing,
+        caption_track_id=edit.caption_track_id,
         reframe_analysis_id=edit.reframe_analysis_id,
         focus_x=edit.focus_x,
         focus_y=edit.focus_y,
@@ -165,7 +171,19 @@ def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditCon
             status_code=status.HTTP_409_CONFLICT,
             detail="Text overlays are not available on this server",
         )
-    if config.captions_enabled:
+    if config.captions_enabled and config.caption_timing == CaptionTiming.ALIGNED_WORD:
+        track = db.get(CaptionTrack, uuid.UUID(str(config.caption_track_id)))
+        # Another clip's track is indistinguishable from a missing one (no existence leak).
+        if (
+            track is None
+            or track.clip_id != clip.id
+            or track.status != CaptionTrackStatus.COMPLETED
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Generate word timing for this clip first, or choose phrase timing",
+            )
+    elif config.captions_enabled:  # phrase captions (V0.6 or dynamic) come from the transcript
         transcription = video.transcription
         if transcription is None or transcription.status != TranscriptionStatus.COMPLETED:
             raise HTTPException(
@@ -226,6 +244,8 @@ def create_edit(
             hook_style=body.hook_style,
             hook_position=body.hook_position,
             hook_duration=body.hook_duration_seconds,
+            caption_timing=body.caption_timing,
+            caption_track_id=body.caption_track_id,
         )
     except ValueError as error:
         raise HTTPException(
@@ -254,6 +274,9 @@ def create_edit(
         captions_enabled=config.captions_enabled,
         caption_style=config.caption_style.value if config.caption_style else None,
         caption_position=config.caption_position.value if config.caption_position else None,
+        caption_renderer=config.caption_renderer,
+        caption_timing=config.caption_timing.value if config.caption_timing else None,
+        caption_track_id=uuid.UUID(config.caption_track_id) if config.caption_track_id else None,
         reframe_analysis_id=(
             uuid.UUID(config.reframe_analysis_id) if config.reframe_analysis_id else None
         ),
