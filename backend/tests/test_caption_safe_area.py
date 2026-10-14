@@ -108,6 +108,10 @@ def test_the_editor_gets_the_renderers_exact_numbers(client):
     for position in CaptionPosition:
         assert data["positions"][position.value] == vars(caption_placement(position))
     assert [p["name"] for p in data["presets"]] == [p.value for p in DynamicPreset]
+    hook = data["hook"]
+    assert (hook["max_chars"], hook["max_lines"], hook["default_seconds"]) == (60, 3, 2.0)
+    assert [h["name"] for h in hook["styles"]] == ["headline", "boxed", "minimal"]
+    assert hook["positions"]["top"] == {"alignment": 8, "margin_v": 192, "margin_h": 97}
     for served in data["presets"]:
         style = PRESETS_V2[DynamicPreset(served["name"])]
         assert served["size"] == style.size and served["active"] == style.active

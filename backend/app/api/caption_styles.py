@@ -9,9 +9,12 @@ from app.schemas.caption_style import (
     CaptionStylesRead,
     DynamicPresetRead,
     FontRead,
+    HookSpecRead,
+    HookStyleRead,
     PlacementRead,
     SafeAreaRead,
 )
+from app.services.clip_edit import hook
 from app.services.clip_edit.caption_metrics import EM_PER_SIZE
 from app.services.clip_edit.caption_v2 import PRESETS_V2
 from app.services.clip_edit.config import (
@@ -29,6 +32,7 @@ router = APIRouter(tags=["captions"])
 @router.get("/caption-styles", response_model=CaptionStylesRead)
 def caption_styles(_user: CurrentUser) -> CaptionStylesRead:
     settings = get_settings()
+    margin_h = max(GENERAL_SOCIAL.px()["left"], GENERAL_SOCIAL.px()["right"])
     return CaptionStylesRead(
         renderer=CAPTION_RENDERER_V2,
         emoji="monochrome" if emoji_font(settings.ffmpeg_path) else "omitted",
@@ -66,4 +70,23 @@ def caption_styles(_user: CurrentUser) -> CaptionStylesRead:
             )
             for preset, style in PRESETS_V2.items()
         ],
+        hook=HookSpecRead(
+            max_chars=hook.MAX_HOOK_CHARS,
+            max_lines=hook.MAX_HOOK_LINES,
+            min_seconds=hook.MIN_HOOK_SECONDS,
+            max_seconds=hook.MAX_HOOK_SECONDS,
+            default_seconds=hook.DEFAULT_HOOK_SECONDS,
+            fade_in_ms=hook.FADE_IN_MS,
+            fade_out_ms=hook.FADE_OUT_MS,
+            styles=[
+                HookStyleRead(name=name.value, **vars(look))
+                for name, look in hook.HOOK_STYLES.items()
+            ],
+            positions={
+                "top": PlacementRead(
+                    alignment=8, margin_v=GENERAL_SOCIAL.px()["top"], margin_h=margin_h
+                ),
+                "center": PlacementRead(alignment=5, margin_v=0, margin_h=margin_h),
+            },
+        ),
     )

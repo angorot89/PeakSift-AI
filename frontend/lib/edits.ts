@@ -1,9 +1,12 @@
 import { API_URL, apiFetch, postJson } from "@/lib/api";
+import type { CaptionTiming, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
 import { stageRanks } from "@/lib/status-sync";
 
 export type EditStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
 export type Layout = "center_crop" | "blur_background" | "fit" | "smart_reframe" | "manual_crop";
-export type CaptionStyle = "clean" | "bold" | "creator";
+/** Clean / Bold / Creator: V0.6 phrase captions (caption_v1, still rendered for existing
+ * versions); Focus / Punch / Minimal / Boxed: dynamic word-aware captions (caption_v2). */
+export type CaptionStyle = "clean" | "bold" | "creator" | DynamicPreset;
 export type CaptionPosition = "top" | "center" | "bottom";
 
 /** The only options the API accepts (it rejects anything else). */
@@ -18,6 +21,15 @@ export type EditRequest = {
   /** manual_crop only: the focal point, fractions of the frame (0..1). */
   focus_x?: number;
   focus_y?: number;
+  /** Dynamic captions: word-synced (needs a completed word timing track) or phrase timed. */
+  caption_timing?: CaptionTiming;
+  caption_track_id?: string;
+  /** The optional opening hook (plain text, escaped by the server). */
+  hook_enabled?: boolean;
+  hook_text?: string;
+  hook_style?: HookStyle;
+  hook_position?: HookPosition;
+  hook_duration_seconds?: number;
 };
 
 export type ClipEdit = {
@@ -34,6 +46,14 @@ export type ClipEdit = {
   captions_enabled: boolean;
   caption_style: CaptionStyle | null;
   caption_position: CaptionPosition | null;
+  caption_renderer: "caption_v1" | "caption_v2" | null;
+  caption_timing: CaptionTiming | null;
+  caption_track_id: string | null;
+  hook_enabled: boolean;
+  hook_text: string | null;
+  hook_style: HookStyle | null;
+  hook_position: HookPosition | null;
+  hook_duration_seconds: number | null;
   reframe_analysis_id: string | null;
   focus_x: number | null;
   focus_y: number | null;
@@ -81,6 +101,13 @@ export const STYLE_OPTIONS: Array<{ value: CaptionStyle; label: string; hint: st
   { value: "creator", label: "Creator", hint: "Bold yellow on a dark box" },
 ];
 
+const DYNAMIC_LABELS: Record<DynamicPreset, string> = {
+  focus: "Focus",
+  punch: "Punch",
+  minimal: "Minimal",
+  boxed: "Boxed",
+};
+
 export const POSITION_OPTIONS: Array<{ value: CaptionPosition; label: string }> = [
   { value: "top", label: "Top" },
   { value: "center", label: "Center" },
@@ -91,7 +118,7 @@ export const layoutLabel = (layout: Layout) => LAYOUT_LABELS[layout] ?? layout;
 export const positionLabel = (position: CaptionPosition) =>
   POSITION_OPTIONS.find((o) => o.value === position)?.label ?? position;
 export const styleLabel = (style: CaptionStyle) =>
-  STYLE_OPTIONS.find((o) => o.value === style)?.label ?? style;
+  DYNAMIC_LABELS[style as DynamicPreset] ?? STYLE_OPTIONS.find((o) => o.value === style)?.label ?? style;
 
 export const ACTIVE_EDIT_STATUSES: EditStatus[] = ["queued", "rendering", "validating"];
 export const isEditActive = (status: EditStatus) => ACTIVE_EDIT_STATUSES.includes(status);
@@ -114,16 +141,20 @@ export function editStageLabel(edit: ClipEdit): string {
   }
 }
 
-/** "Blur background · Bold captions, bottom" — enough to tell variants apart. */
-export function describeEdit(edit: Pick<ClipEdit, "layout" | "captions_enabled" | "caption_style" | "caption_position">) {
-  const captions =
-    edit.captions_enabled && edit.caption_style && edit.caption_position
-      ? `${styleLabel(edit.caption_style)} captions, ${edit.caption_position}`
-      : "No captions";
-  return `${layoutLabel(edit.layout)} · ${captions}`;
+type Described = Pick<
+  ClipEdit,
+  "layout" | "captions_enabled" | "caption_style" | "caption_position" | "caption_timing" | "hook_enabled"
+>;
+
+/** "Smart reframe · Focus captions · Bottom · Hook" — enough to tell variants apart. */
+export function describeEdit(edit: Described) {
+  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}`;
 }
 
 const round3 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 1000) / 1000);
+const round1 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 10) / 10);
+/** The server's hook text normalization: whitespace (and line breaks) collapse. */
+export const normalizeHookText = (text: string) => text.split(/\s+/).filter(Boolean).join(" ");
 
 /** Whether an existing edit was made with exactly these settings, normalized like the
  * server's fingerprint (focal points to 0.1 %). */
@@ -135,15 +166,30 @@ export function sameSettings(edit: ClipEdit, request: EditRequest) {
       (edit.caption_style === request.caption_style && edit.caption_position === request.caption_position)) &&
     (request.layout !== "smart_reframe" || edit.reframe_analysis_id === request.reframe_analysis_id) &&
     (request.layout !== "manual_crop" ||
-      (round3(edit.focus_x) === round3(request.focus_x) && round3(edit.focus_y) === round3(request.focus_y)))
+      (round3(edit.focus_x) === round3(request.focus_x) && round3(edit.focus_y) === round3(request.focus_y))) &&
+    (!request.captions_enabled ||
+      ((edit.caption_timing ?? undefined) === request.caption_timing &&
+        (edit.caption_track_id ?? undefined) === request.caption_track_id)) &&
+    edit.hook_enabled === !!request.hook_enabled &&
+    (!request.hook_enabled ||
+      (edit.hook_text === normalizeHookText(request.hook_text ?? "") &&
+        edit.hook_style === request.hook_style &&
+        edit.hook_position === request.hook_position &&
+        round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds)))
   );
 }
 
-/** "Bold captions · Bottom" or "No captions". */
-export function captionSummary(edit: Pick<ClipEdit, "captions_enabled" | "caption_style" | "caption_position">) {
-  return edit.captions_enabled && edit.caption_style && edit.caption_position
-    ? `${styleLabel(edit.caption_style)} captions · ${positionLabel(edit.caption_position)}`
-    : "No captions";
+/** "Focus captions · Bottom · Hook", "Punch captions (phrase timed) · Top" or "No captions".
+ * Phrase-timed dynamic captions say so: they are never presented as word-synced. */
+export function captionSummary(
+  edit: Pick<ClipEdit, "captions_enabled" | "caption_style" | "caption_position"> &
+    Partial<Pick<ClipEdit, "caption_timing" | "hook_enabled">>,
+) {
+  const captions =
+    edit.captions_enabled && edit.caption_style && edit.caption_position
+      ? `${styleLabel(edit.caption_style)} captions${edit.caption_timing === "phrase_fallback" ? " (phrase timed)" : ""} · ${positionLabel(edit.caption_position)}`
+      : "No captions";
+  return edit.hook_enabled ? `${captions} · Hook` : captions;
 }
 
 /** Creator-facing explanation of a failed render; infrastructure details stay server-side. */
@@ -166,6 +212,9 @@ export function friendlyEditError(edit: Pick<ClipEdit, "error_code">): string {
     case "storage_failure":
     case "artifact_missing":
       return "The finished short couldn't be saved. Try again.";
+    case "caption_track_unavailable":
+    case "caption_track_invalid":
+      return "The word timing for these captions is no longer usable. Generate word sync again, or use phrase timing.";
     case "reframe_unavailable":
     case "invalid_path":
       return "The smart framing for this clip is no longer usable. Analyze the framing again, or set a focal point.";

@@ -38,6 +38,32 @@ class DynamicPresetRead(BaseModel):
     grow_ms: int
 
 
+class HookStyleRead(BaseModel):
+    name: str
+    label: str
+    size: int
+    bold: bool
+    text: str
+    outline_colour: str
+    outline: float
+    shadow: float
+    box: bool
+    box_alpha: int
+    max_line_width: int
+
+
+class HookSpecRead(BaseModel):
+    max_chars: int
+    max_lines: int
+    min_seconds: float
+    max_seconds: float
+    default_seconds: float
+    fade_in_ms: int
+    fade_out_ms: int
+    styles: list[HookStyleRead]
+    positions: dict[str, PlacementRead]
+
+
 class FontRead(BaseModel):
     family: str
     # libass treats the font size as the line height: one em is this fraction of the size.
@@ -55,3 +81,4 @@ class CaptionStylesRead(BaseModel):
     safe_area: SafeAreaRead
     positions: dict[str, PlacementRead]
     presets: list[DynamicPresetRead]
+    hook: HookSpecRead

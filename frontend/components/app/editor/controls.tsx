@@ -2,13 +2,10 @@
 
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
-import { captionTextStyle } from "@/components/app/editor/caption-sample";
 import {
   LAYOUT_OPTIONS,
   POSITION_OPTIONS,
-  STYLE_OPTIONS,
   type CaptionPosition,
-  type CaptionStyle,
   type PickableLayout,
 } from "@/lib/edits";
 
@@ -36,7 +33,7 @@ export function ControlGroup({
 }
 
 /** A radio rendered as a selectable card. Real input → arrow keys, focus and labels work. */
-function OptionCard({
+export function OptionCard({
   name,
   value,
   checked,
@@ -45,6 +42,7 @@ function OptionCard({
   label,
   className = "",
   badge = true,
+  disabled = false,
 }: {
   name: string;
   value: string;
@@ -55,16 +53,26 @@ function OptionCard({
   className?: string;
   /** Corner check mark; cards with text near the corner show an inline check instead. */
   badge?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label
-      className={`group relative flex cursor-pointer flex-col rounded-xl border bg-surface-2 transition-[border-color,background-color,box-shadow] duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+      className={`group relative flex flex-col rounded-xl border bg-surface-2 ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"} transition-[border-color,background-color,box-shadow] duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
         checked
           ? "border-accent/70 bg-accent/[0.06] shadow-[0_0_0_1px_rgb(249_115_22/0.35)]"
           : "border-border hover:border-border-strong hover:bg-surface-3"
       } ${className}`}
     >
-      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" aria-label={label} />
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        className="sr-only"
+        aria-label={label}
+      />
       {/* A check mark keeps the selection visible without relying on colour. */}
       {badge ? (
       <span
@@ -153,7 +161,7 @@ export function CaptionSwitch({ checked, onChange }: { checked: boolean; onChang
           Captions
         </p>
         <p id="captions-switch-hint" className="text-xs text-subtle">
-          Burned in from your transcript, phrase by phrase
+          Burned in, with the spoken word emphasised
         </p>
       </div>
       <button
@@ -179,62 +187,12 @@ export function CaptionSwitch({ checked, onChange }: { checked: boolean; onChang
   );
 }
 
-function InlineCheck({ on }: { on: boolean }) {
+export function InlineCheck({ on }: { on: boolean }) {
   return on ? (
     <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent text-background">
       <Check className="size-2.5" strokeWidth={3.5} />
     </span>
   ) : null;
-}
-
-const SAMPLE = "This is the caption";
-
-export function StylePicker({
-  value,
-  onChange,
-  name,
-  disabled,
-}: {
-  value: CaptionStyle;
-  onChange: (v: CaptionStyle) => void;
-  name: string;
-  disabled: boolean;
-}) {
-  return (
-    <ControlGroup legend="Caption style" disabled={disabled}>
-      <div className="grid grid-cols-3 gap-2">
-        {STYLE_OPTIONS.map((option) => (
-          <OptionCard
-            key={option.value}
-            name={name}
-            value={option.value}
-            label={`${option.label}: ${option.hint}`}
-            checked={value === option.value}
-            onChange={() => onChange(option.value)}
-            className="overflow-hidden"
-            badge={false}
-          >
-            {/* Typographic sample of the preset's intent (size ratio, weight, colour, outline/box). */}
-            <span
-              aria-hidden="true"
-              className="flex h-16 items-center justify-center bg-[linear-gradient(135deg,#3f3f46,#27272a)] px-1.5 text-center"
-            >
-              <span style={captionTextStyle(option.value, (f) => `${(f * 340).toFixed(2)}px`)} className="leading-tight">
-                {SAMPLE}
-              </span>
-            </span>
-            <span className="px-2.5 py-2">
-              <span className="flex items-center justify-between gap-1.5 text-[13px] font-medium text-foreground">
-                {option.label}
-                <InlineCheck on={value === option.value} />
-              </span>
-              <span className="hidden text-[11px] leading-snug text-subtle sm:block">{option.hint}</span>
-            </span>
-          </OptionCard>
-        ))}
-      </div>
-    </ControlGroup>
-  );
 }
 
 function PositionGlyph({ position }: { position: CaptionPosition }) {
@@ -251,14 +209,17 @@ export function PositionPicker({
   onChange,
   name,
   disabled,
+  taken,
 }: {
   value: CaptionPosition;
   onChange: (v: CaptionPosition) => void;
   name: string;
   disabled: boolean;
+  /** A position the hook already uses (captions and hook never overlap). */
+  taken?: CaptionPosition | null;
 }) {
   return (
-    <ControlGroup legend="Caption position" disabled={disabled}>
+    <ControlGroup legend="Caption position" hint={taken ? `${taken === "top" ? "Top" : "Center"} is used by the hook` : undefined} disabled={disabled}>
       <div className="grid grid-cols-3 gap-2">
         {POSITION_OPTIONS.map((option) => (
           <OptionCard
@@ -268,6 +229,7 @@ export function PositionPicker({
             label={option.label}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
+            disabled={taken === option.value}
             className={`flex-row items-center justify-center gap-2 px-2 py-2.5 ${value === option.value ? "text-accent-soft" : "text-muted"}`}
             badge={false}
           >

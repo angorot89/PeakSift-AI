@@ -4,7 +4,9 @@ import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, Plus, RotateCcw, 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { CaptionSwitch, LayoutPicker, PositionPicker, StylePicker } from "@/components/app/editor/controls";
+import { CaptionTimingPanel, HookPanel, PresetCards, SafeAreaToggle } from "@/components/app/editor/caption-controls";
+import { CaptionLayer, type HookPreview } from "@/components/app/editor/caption-layer";
+import { CaptionSwitch, LayoutPicker, PositionPicker } from "@/components/app/editor/controls";
 import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from "@/components/app/editor/preview-stage";
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
 import { VersionList } from "@/components/app/editor/versions";
@@ -18,6 +20,24 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, errorMessage } from "@/lib/api";
+import {
+  TRACK_STAGES,
+  getCaptionPreview,
+  getCaptionStyles,
+  getTimingOptions,
+  getTrack,
+  isTrackActive,
+  retryWordTiming,
+  startWordTiming,
+  type CaptionStyles,
+  type CaptionTiming,
+  type CaptionTrack,
+  type DynamicPreset,
+  type HookPosition,
+  type HookStyle,
+  type PreviewCue,
+} from "@/lib/captions";
+import { getCandidate } from "@/lib/clip-detection";
 import { clipContentUrl, listVideoClips, type GeneratedClip } from "@/lib/clips";
 import {
   EDIT_STAGES,
@@ -30,12 +50,10 @@ import {
   isEditActive,
   layoutLabel,
   listEdits,
-  positionLabel,
+  normalizeHookText,
   retryEdit,
   sameSettings,
-  styleLabel,
   type CaptionPosition,
-  type CaptionStyle,
   type ClipEdit,
   type EditRequest,
   type PickableLayout,
@@ -54,25 +72,9 @@ import {
   type ReframeAnalysis,
 } from "@/lib/reframe";
 import { mergeJobs, newer } from "@/lib/status-sync";
-import { getTranscriptPage } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 import { listProjectVideos } from "@/lib/videos";
-
-const FALLBACK_CAPTION = "Your captions appear here";
-
-/** Real words from the transcript at the start of the clip, trimmed like a caption cue. */
-async function sampleCaption(projectId: string, clip: GeneratedClip): Promise<string> {
-  const page = await getTranscriptPage(projectId, clip.video_id, 0, 500);
-  const segment = page.segments.find((s) => s.end > clip.start_time && s.start < clip.end_time);
-  if (!segment) return FALLBACK_CAPTION;
-  const words: string[] = [];
-  for (const word of segment.text.split(/\s+/).filter(Boolean)) {
-    if (words.length >= 7 || [...words, word].join(" ").length > 32) break;
-    words.push(word);
-  }
-  return words.length ? words.join(" ") : FALLBACK_CAPTION;
-}
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
@@ -86,8 +88,22 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [captions, setCaptions] = useState(true);
-  const [style, setStyle] = useState<CaptionStyle>("bold");
+  const [preset, setPreset] = useState<DynamicPreset>("focus");
   const [position, setPosition] = useState<CaptionPosition>("bottom");
+  const [timing, setTiming] = useState<CaptionTiming>("aligned_word");
+  const [spec, setSpec] = useState<CaptionStyles | null>(null);
+  // undefined = still loading, null = never generated with the server's current configuration.
+  const [track, setTrack] = useState<CaptionTrack | null | undefined>(undefined);
+  const [phraseAvailable, setPhraseAvailable] = useState(false);
+  const [trackBusy, setTrackBusy] = useState(false);
+  const [trackError, setTrackError] = useState<string | null>(null);
+  const [cues, setCues] = useState<PreviewCue[] | null>(null);
+  const [hookOn, setHookOn] = useState(false);
+  const [hookText, setHookText] = useState("");
+  const [hookStyle, setHookStyle] = useState<HookStyle>("headline");
+  const [hookPosition, setHookPosition] = useState<HookPosition>("top");
+  const [hookDuration, setHookDuration] = useState(2);
+  const [showSafeArea, setShowSafeArea] = useState(false);
   const [edits, setEdits] = useState<ClipEdit[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<"preview" | "rendered">("preview");
@@ -97,7 +113,6 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [busy, setBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [sample, setSample] = useState(FALLBACK_CAPTION);
 
   const handleError = useCallback(
     (err: unknown) => {
@@ -135,10 +150,105 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 
   useEffect(() => {
     void refresh();
-    sampleCaption(project.id, clip)
-      .then(setSample)
-      .catch(() => setSample(FALLBACK_CAPTION));
-  }, [refresh, project.id, clip]);
+  }, [refresh]);
+
+  // ---- dynamic captions: the renderer's spec, word timing, the hook suggestion -------------
+  useEffect(() => {
+    let cancelled = false;
+    getCaptionStyles()
+      .then((styles) => {
+        if (!cancelled) setSpec(styles);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setActionError(handleError(err));
+      });
+    getTimingOptions(project.id, clip.video_id, clip.id)
+      .then((options) => {
+        if (cancelled) return;
+        setTrack(options.track);
+        setPhraseAvailable(options.phrase_timing_available);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setTrack(null);
+        setTrackError(handleError(err));
+      });
+    // Suggest the candidate's own hook (or title) when it fits; never call another model.
+    getCandidate(project.id, clip.video_id, clip.run_id, clip.candidate_id)
+      .then((candidate) => {
+        if (cancelled) return;
+        const suggestion = [candidate.hook, candidate.title, clip.title]
+          .map((t) => normalizeHookText(t ?? ""))
+          .find((t) => t && [...t].length <= 60);
+        if (suggestion) setHookText((current) => current || suggestion);
+      })
+      .catch(() => {
+        if (!cancelled && [...clip.title].length <= 60) setHookText((current) => current || clip.title);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, clip.video_id, clip.id, clip.run_id, clip.candidate_id, clip.title, handleError]);
+
+  const trackId = track?.id ?? null;
+  const trackReady = track?.status === "completed";
+  const trackRunning = !!track && isTrackActive(track.status) && !track.is_stale;
+  const acceptTrack = useCallback(
+    (next: CaptionTrack) => setTrack((current) => newer(current, next, TRACK_STAGES)),
+    [],
+  );
+  usePolling(
+    trackRunning && trackId !== null,
+    async () => {
+      if (!trackId) return;
+      try {
+        acceptTrack(await getTrack(project.id, clip.video_id, clip.id, trackId));
+      } catch (err) {
+        setTrackError(handleError(err));
+      }
+    },
+    trackId,
+  );
+
+  async function generateWordSync(retrying: boolean) {
+    if (trackBusy) return;
+    setTrackBusy(true);
+    setTrackError(null);
+    try {
+      const next =
+        retrying && track
+          ? await retryWordTiming(project.id, clip.video_id, clip.id, track.id)
+          : await startWordTiming(project.id, clip.video_id, clip.id);
+      acceptTrack(next);
+      setTiming("aligned_word");
+    } catch (err) {
+      setTrackError(handleError(err));
+    } finally {
+      setTrackBusy(false);
+    }
+  }
+
+  // The preview shows the renderer's own cues (lines, word timing) for these settings.
+  const previewReady = captions && (timing === "phrase_fallback" ? phraseAvailable : trackReady);
+  useEffect(() => {
+    if (!previewReady) return;
+    let cancelled = false;
+    getCaptionPreview(project.id, clip.video_id, clip.id, {
+      style: preset,
+      position,
+      timing,
+      trackId: timing === "aligned_word" ? trackId : null,
+    })
+      .then((preview) => {
+        if (!cancelled) setCues(preview?.cues ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCues(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewReady, project.id, clip.video_id, clip.id, preset, position, timing, trackId]);
 
   // Poll only while some version is really rendering; stop when all are settled.
   const anyActive = !!edits?.some((e) => isEditActive(e.status) && !e.is_stale);
@@ -238,13 +348,48 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       aspect_ratio: "9:16",
       layout: manual ? "manual_crop" : layout,
       captions_enabled: captions,
-      ...(captions ? { caption_style: style, caption_position: position } : {}),
+      ...(captions
+        ? {
+            caption_style: preset,
+            caption_position: position,
+            caption_timing: timing,
+            ...(timing === "aligned_word" && trackReady && trackId ? { caption_track_id: trackId } : {}),
+          }
+        : {}),
       ...(smart && !manual && analysisDone && analysisId ? { reframe_analysis_id: analysisId } : {}),
       ...(manual ? { focus_x: focus.x, focus_y: focus.y } : {}),
+      ...(hookOn
+        ? {
+            hook_enabled: true,
+            hook_text: normalizeHookText(hookText),
+            hook_style: hookStyle,
+            hook_position: hookPosition,
+            hook_duration_seconds: hookDuration,
+          }
+        : {}),
     }),
-    [layout, manual, smart, captions, style, position, analysisDone, analysisId, focus],
+    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration],
   );
-  const match = awaitingAnalysis ? null : (edits?.find((e) => sameSettings(e, request)) ?? null);
+  // Word-synced captions render only from a completed word timing (never silently phrase).
+  const awaitingWords = captions && timing === "aligned_word" && !trackReady;
+  const hookLength = [...normalizeHookText(hookText)].length;
+  const hookInvalid = hookOn && (hookLength === 0 || hookLength > (spec?.hook.max_chars ?? 60));
+  const blocked = awaitingAnalysis || awaitingWords || hookInvalid;
+  const hookPreview: HookPreview | null =
+    hookOn && !hookInvalid
+      ? { text: normalizeHookText(hookText), style: hookStyle, position: hookPosition, duration: hookDuration }
+      : null;
+  const overlay = spec ? (
+    <CaptionLayer
+      spec={spec}
+      preset={captions ? preset : null}
+      position={position}
+      cues={captions && previewReady ? cues : null}
+      hook={hookPreview}
+      showSafeArea={showSafeArea}
+    />
+  ) : null;
+  const match = blocked ? null : (edits?.find((e) => sameSettings(e, request)) ?? null);
   const matchActive = !!match && isEditActive(match.status) && !match.is_stale;
   const matchStuck = !!match && (match.status === "failed" || (isEditActive(match.status) && match.is_stale));
   const readyEdits = edits?.filter((e) => e.status === "ready") ?? [];
@@ -269,7 +414,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   }
 
   async function render() {
-    if (busy || matchActive || awaitingAnalysis) return; // no duplicate submissions (the API deduplicates too)
+    if (busy || matchActive || blocked) return; // no duplicate submissions (the API deduplicates too)
     if (match?.status === "ready") {
       showRendered(match);
       return;
@@ -300,9 +445,13 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 
   const backToProject = `/projects/${project.id}#generated`;
   const renderedName = selected ? `${layoutLabel(selected.layout)} · ${captionSummary(selected)}` : "";
-  const settingsSummary = `${layoutLabel(request.layout)} · ${
-    captions ? `${styleLabel(style)} captions · ${positionLabel(position)}` : "No captions"
-  }`;
+  const settingsSummary = `${layoutLabel(request.layout)} · ${captionSummary({
+    captions_enabled: captions,
+    caption_style: preset,
+    caption_position: position,
+    caption_timing: timing,
+    hook_enabled: hookOn,
+  })}`;
 
   // ---- primary action area -------------------------------------------------------------
   let action;
@@ -353,6 +502,35 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           {analysis && isAnalysisActive(analysis.status) && !analysis.is_stale
             ? "Available when the framing analysis finishes."
             : "Analyze the framing first, or set a focal point."}
+        </p>
+      </div>
+    );
+  } else if (awaitingWords) {
+    action = (
+      <div className="space-y-2">
+        <Button size="lg" className="w-full" disabled>
+          <Wand2 aria-hidden="true" />
+          Render short
+        </Button>
+        <p className="text-center text-xs text-subtle">
+          {trackRunning ? "Available when word sync finishes." : "Generate word sync first, or use phrase timing."}
+        </p>
+        {phraseAvailable ? (
+          <Button variant="ghost" className="w-full" onClick={() => setTiming("phrase_fallback")}>
+            Use phrase timing instead
+          </Button>
+        ) : null}
+      </div>
+    );
+  } else if (hookInvalid) {
+    action = (
+      <div className="space-y-2">
+        <Button size="lg" className="w-full" disabled>
+          <Wand2 aria-hidden="true" />
+          Render short
+        </Button>
+        <p className="text-center text-xs text-subtle">
+          {hookLength === 0 ? "Add hook text, or turn the hook off." : "Shorten the hook text to render."}
         </p>
       </div>
     );
@@ -411,7 +589,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   Rendered short
                 </button>
               </div>
-              <span className="tabular text-xs text-subtle">9:16 · 1080 × 1920</span>
+              <div className="flex items-center gap-3">
+                {mode === "preview" && spec ? <SafeAreaToggle checked={showSafeArea} onChange={setShowSafeArea} /> : null}
+                <span className="tabular hidden text-xs text-subtle sm:inline">9:16 · 1080 × 1920</span>
+              </div>
             </div>
 
             {mode === "rendered" && selected ? (
@@ -468,10 +649,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                       sourceWidth={sourceWidth}
                       sourceHeight={sourceHeight}
                       framing={framing}
-                      captions={captions}
-                      style={style}
-                      position={position}
-                      sampleText={sample}
+                      overlay={overlay}
                       badge={
                         framing.kind === "center" ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
@@ -485,16 +663,13 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     <PreviewStage
                       clipSrc={clipContentUrl(clip.id)}
                       layout={smart ? "center_crop" : layout}
-                      captions={captions}
-                      style={style}
-                      position={position}
-                      sampleText={sample}
+                      overlay={overlay}
                     />
                   )}
                 </div>
                 <p className="mx-auto max-w-sm text-center text-xs text-pretty text-subtle">
-                  Preview only — layout and caption placement are approximate. The rendered MP4 is the final result.
-                  {captions ? " The caption shows real words from your transcript." : ""}
+                  Preview — captions use the renderer&apos;s own lines and timing; sizes are close, not pixel-exact. The rendered
+                  MP4 is the final result.
                 </p>
               </div>
             )}
@@ -538,9 +713,52 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             </div>
             <div className="space-y-4">
               <CaptionSwitch checked={captions} onChange={setCaptions} />
-              <StylePicker value={style} onChange={setStyle} name={`${id}-style`} disabled={!captions} />
-              <PositionPicker value={position} onChange={setPosition} name={`${id}-position`} disabled={!captions} />
+              {captions ? (
+                <div className="animate-fade-in space-y-4">
+                  <CaptionTimingPanel
+                    timing={timing}
+                    onTimingChange={setTiming}
+                    track={track}
+                    phraseAvailable={phraseAvailable}
+                    busy={trackBusy}
+                    error={trackError}
+                    onGenerate={() => void generateWordSync(false)}
+                    onRetry={() => void generateWordSync(true)}
+                  />
+                  {spec ? (
+                    <PresetCards spec={spec} value={preset} onChange={setPreset} name={`${id}-preset`} disabled={!captions} />
+                  ) : null}
+                  <PositionPicker
+                    value={position}
+                    onChange={setPosition}
+                    name={`${id}-position`}
+                    disabled={!captions}
+                    taken={hookOn ? hookPosition : null}
+                  />
+                </div>
+              ) : null}
             </div>
+            {spec ? (
+              <HookPanel
+                spec={spec}
+                enabled={hookOn}
+                onEnabled={(on) => {
+                  // The hook never shares the captions' position: start it somewhere free.
+                  if (on && captions && hookPosition === position) setHookPosition(position === "top" ? "center" : "top");
+                  setHookOn(on);
+                }}
+                text={hookText}
+                onText={setHookText}
+                style={hookStyle}
+                onStyle={setHookStyle}
+                position={hookPosition}
+                onPosition={setHookPosition}
+                duration={hookDuration}
+                onDuration={setHookDuration}
+                captionPosition={captions ? position : null}
+                emojiOmitted={spec.emoji === "omitted"}
+              />
+            ) : null}
           </div>
           <div className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
             <p className="text-xs text-muted">

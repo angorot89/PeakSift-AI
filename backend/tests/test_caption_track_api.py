@@ -380,3 +380,60 @@ def test_timing_availability_checks_the_installed_package_without_importing_it()
     before = "faster_whisper" in sys.modules
     assert real_timing_available(Settings(**get_settings().model_dump())) is True
     assert ("faster_whisper" in sys.modules) == before
+
+
+# --- caption preview (the renderer's own layout, for the editor) -----
+
+
+def test_caption_preview_returns_the_renderers_cues_lines_and_word_timing(
+    client, db_session, storage, monkeypatch
+):
+    sign_up(client)
+    ctx = clip_with_file(db_session, storage)
+    track_id = client.post(ctx["base"]).json()["id"]
+    complete(db_session, track_id, words=("Nobody", "tells", "you."))
+    url = f"{ctx['clip_base']}/caption-preview"
+    data = client.get(url, params={"style": "focus", "track_id": track_id}).json()
+    assert data["timing"] == "aligned_word" and data["emoji"] in ("monochrome", "omitted")
+    (cue,) = data["cues"]
+    assert cue["timed"] is True and [w["text"] for line in cue["lines"] for w in line] == [
+        "Nobody",
+        "tells",
+        "you.",
+    ]
+    first = cue["lines"][0][0]
+    assert (
+        first["start"] == 0.0 and first["end"] == 0.5 and first["attached"] is False
+    )  # active until "tells"
+    phrase = client.get(url, params={"style": "punch", "timing": "phrase_fallback"}).json()
+    assert phrase["timing"] == "phrase_fallback" and all(not c["timed"] for c in phrase["cues"])
+
+
+def test_caption_preview_refuses_unusable_timing_and_respects_ownership(
+    client, db_session, storage
+):
+    sign_up(client)
+    ctx = clip_with_file(db_session, storage)
+    url = f"{ctx['clip_base']}/caption-preview"
+    response = client.get(url, params={"style": "focus", "track_id": str(uuid.uuid4())})
+    assert response.status_code == 409 and "word timing" in response.json()["detail"]
+    assert client.get(url, params={"style": "neon"}).status_code == 422
+    client.post("/auth/logout")
+    assert client.get(url, params={"style": "focus"}).status_code == 401
+    sign_up(client, "intruder@example.com")
+    assert (
+        client.get(url, params={"style": "focus", "timing": "phrase_fallback"}).status_code == 404
+    )
+
+
+def test_caption_preview_mirrors_the_emoji_policy(client, db_session, storage, monkeypatch):
+    sign_up(client)
+    ctx = clip_with_file(db_session, storage)
+    track_id = client.post(ctx["base"]).json()["id"]
+    complete(db_session, track_id, words=("So", "🔥", "good"))
+    monkeypatch.setattr(api, "emoji_font", lambda path: None)
+    data = client.get(
+        f"{ctx['clip_base']}/caption-preview", params={"style": "focus", "track_id": track_id}
+    ).json()
+    assert data["emoji"] == "omitted"
+    assert [w["text"] for line in data["cues"][0]["lines"] for w in line] == ["So", "good"]
