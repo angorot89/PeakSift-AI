@@ -12,6 +12,7 @@ from app.api import caption_tracks as api
 from app.api.caption_tracks import timing_available as real_timing_available
 from app.core.config import Settings, get_settings
 from app.models import CaptionTrack, CaptionTrackStatus, CaptionWord
+from app.schemas.model_name import public_model_name
 from app.services.storage import LocalMediaStorage
 from app.workers.dispatch import JobQueueUnavailable
 from tests.test_clip_edit_api import ready_clip, sign_up
@@ -437,3 +438,32 @@ def test_caption_preview_mirrors_the_emoji_policy(client, db_session, storage, m
     ).json()
     assert data["emoji"] == "omitted"
     assert [w["text"] for line in data["cues"][0]["lines"] for w in line] == ["So", "good"]
+
+
+def test_a_local_model_directory_is_never_shown(client, db_session, storage, fake_queue):
+    sign_up(client)
+    ctx = clip_with_file(db_session, storage)
+    track_id = client.post(ctx["base"]).json()["id"]
+    row = db_session.get(CaptionTrack, uuid.UUID(track_id))
+    row.model = "/srv/models/faster-whisper-small"
+    db_session.commit()
+    response = client.get(f"{ctx['base']}/{track_id}")
+    assert response.json()["model"] == "custom" and "/srv" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("configured", "shown"),
+    [
+        ("small", "small"),
+        ("large-v3", "large-v3"),
+        ("tiny.en", "tiny.en"),
+        ("whisper-1", "whisper-1"),
+        ("/srv/models/small", "custom"),
+        ("models/small", "custom"),
+        ("C:\\models\\small", "custom"),
+        ("~/whisper", "custom"),
+        ("..", "custom"),
+    ],
+)
+def test_public_model_names(configured, shown):
+    assert public_model_name(configured) == shown

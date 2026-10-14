@@ -214,8 +214,12 @@ def _group(pieces: list[CueWord], rules: CueRules) -> list[list[CueWord]]:
             if pause or too_long or not _fits([*current, piece], rules):
                 close()
         current.append(piece)
-        if SENTENCE_END.search(piece.text) or (
-            CLAUSE_END.search(piece.text) and len(current) >= rules.min_words
+        # Punctuation closes a cue only once it has been on screen long enough to read; in
+        # fast speech the following words join it (the width and duration limits still apply).
+        readable = piece.end - current[0].start >= rules.min_duration
+        if readable and (
+            SENTENCE_END.search(piece.text)
+            or (CLAUSE_END.search(piece.text) and len(current) >= rules.min_words)
         ):
             close()
     close()

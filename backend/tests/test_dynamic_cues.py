@@ -56,6 +56,20 @@ def test_a_clause_end_needs_at_least_two_words():
     assert " ".join(texts(cues[0])).startswith("Well, nobody")
 
 
+def test_fast_punctuated_speech_does_not_flash_cues():
+    # Very fast speech with punctuation every word or two: punctuation alone must not close a
+    # cue that would be on screen for a fraction of a second (rapid cue churn).
+    cues = build_word_cues(
+        seq("Go. Up. Now, then. We fly, fast, far. Done.", step=0.09, gap=0.02), clip_duration=30
+    )
+    assert all(c.end - c.start >= RULES.min_duration for c in cues), [
+        (" ".join(texts(c)), round(c.end - c.start, 2)) for c in cues
+    ]
+    assert [
+        w for c in cues for w in texts(c)
+    ] == "Go. Up. Now, then. We fly, fast, far. Done.".split()
+
+
 def test_natural_pauses_split_cues():
     ws = words(
         ("first", 0.0, 0.3), ("thought", 0.35, 0.7), ("second", 1.4, 1.7), ("thought", 1.75, 2.1)
