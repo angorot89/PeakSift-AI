@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, errorMessage } from "@/lib/api";
 import { clipContentUrl, listVideoClips, type GeneratedClip } from "@/lib/clips";
 import {
+  EDIT_STAGES,
   captionSummary,
   createEdit,
   editContentUrl,
@@ -42,6 +43,7 @@ import {
 import { formatDuration } from "@/lib/format";
 import { getProject, isProjectId, type Project } from "@/lib/projects";
 import {
+  ANALYSIS_STAGES,
   getAnalysis,
   getCropPath,
   getCurrentAnalysis,
@@ -51,11 +53,12 @@ import {
   type CropPath,
   type ReframeAnalysis,
 } from "@/lib/reframe";
+import { mergeJobs, newer } from "@/lib/status-sync";
 import { getTranscriptPage } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
+import { usePolling } from "@/lib/use-polling";
 import { listProjectVideos } from "@/lib/videos";
 
-const POLL_INTERVAL_MS = 4000;
 const FALLBACK_CAPTION = "Your captions appear here";
 
 /** Real words from the transcript at the start of the clip, trimmed like a caption cue. */
@@ -113,7 +116,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     () =>
       listEdits(project.id, clip.video_id, clip.id)
         .then((page) => {
-          setEdits(page.edits);
+          // Merge, never replace: a list fetched before a new render started must not drop it.
+          setEdits((current) => mergeJobs(current, page.edits, EDIT_STAGES));
           setLoadError(null);
           // When the version just started becomes ready, put the real output on the stage.
           const finished = page.edits.find((e) => e.id === pendingRef.current && e.status === "ready");
@@ -138,11 +142,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 
   // Poll only while some version is really rendering; stop when all are settled.
   const anyActive = !!edits?.some((e) => isEditActive(e.status) && !e.is_stale);
-  useEffect(() => {
-    if (!anyActive) return;
-    const timer = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [anyActive, refresh]);
+  usePolling(anyActive, refresh);
 
   // ---- smart framing analysis -------------------------------------------------------------
   useEffect(() => {
@@ -164,15 +164,22 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   // Poll only while the analysis is really running.
   const analysisId = analysis?.id ?? null;
   const analysisRunning = !!analysis && isAnalysisActive(analysis.status) && !analysis.is_stale;
-  useEffect(() => {
-    if (!analysisRunning || !analysisId) return;
-    const timer = window.setInterval(() => {
-      getAnalysis(project.id, clip.video_id, clip.id, analysisId)
-        .then(setAnalysis)
-        .catch((err: unknown) => setAnalysisError(handleError(err)));
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [analysisRunning, analysisId, project.id, clip.video_id, clip.id, handleError]);
+  const acceptAnalysis = useCallback(
+    (next: ReframeAnalysis) => setAnalysis((current) => newer(current, next, ANALYSIS_STAGES)),
+    [],
+  );
+  usePolling(
+    analysisRunning && analysisId !== null,
+    async () => {
+      if (!analysisId) return;
+      try {
+        acceptAnalysis(await getAnalysis(project.id, clip.video_id, clip.id, analysisId));
+      } catch (err) {
+        setAnalysisError(handleError(err));
+      }
+    },
+    analysisId,
+  );
 
   // The crop path drives the live preview once the analysis has completed.
   const analysisDone = analysis?.status === "completed";
@@ -201,7 +208,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           ? await retryAnalysis(project.id, clip.video_id, clip.id, analysis.id)
           : await startAnalysis(project.id, clip.video_id, clip.id);
       setCropPath(null);
-      setAnalysis(next);
+      acceptAnalysis(next);
     } catch (err) {
       setAnalysisError(handleError(err));
     } finally {
@@ -244,10 +251,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const selected = edits?.find((e) => e.id === selectedId && e.status === "ready") ?? null;
 
   function upsert(edit: ClipEdit) {
-    setEdits((current) => {
-      const list = current ?? [];
-      return list.some((e) => e.id === edit.id) ? list.map((e) => (e.id === edit.id ? edit : e)) : [edit, ...list];
-    });
+    setEdits((current) => mergeJobs(current, [edit], EDIT_STAGES));
   }
 
   async function retry(edit: ClipEdit) {

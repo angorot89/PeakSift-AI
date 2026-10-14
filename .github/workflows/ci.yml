@@ -25,6 +25,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - name: Unit tests (status synchronisation)
+        run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
         run: |

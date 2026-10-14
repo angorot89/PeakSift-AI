@@ -1,4 +1,5 @@
 import { API_URL, apiFetch, postJson } from "@/lib/api";
+import { stageRanks } from "@/lib/status-sync";
 
 export type EditStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
 export type Layout = "center_crop" | "blur_background" | "fit" | "smart_reframe" | "manual_crop";
@@ -94,6 +95,8 @@ export const styleLabel = (style: CaptionStyle) =>
 
 export const ACTIVE_EDIT_STATUSES: EditStatus[] = ["queued", "rendering", "validating"];
 export const isEditActive = (status: EditStatus) => ACTIVE_EDIT_STATUSES.includes(status);
+/** Status order within one render attempt (see lib/status-sync.ts). */
+export const EDIT_STAGES = stageRanks(ACTIVE_EDIT_STATUSES, ["ready", "failed"]);
 
 /** Honest stage copy; the percentage is the backend's stage progress, never animated. */
 export function editStageLabel(edit: ClipEdit): string {
