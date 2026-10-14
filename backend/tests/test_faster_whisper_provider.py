@@ -194,6 +194,24 @@ def test_model_load_failure_is_a_configuration_error(monkeypatch, tmp_path):
     assert "nope" in excinfo.value.message and "/Users" not in excinfo.value.message
 
 
+def test_a_model_directory_never_appears_in_the_load_error(monkeypatch, tmp_path):
+    class Exploding:
+        def __init__(self, *a, **k):
+            raise OSError("no model.bin")
+
+    module = types.ModuleType("faster_whisper")
+    module.WhisperModel = Exploding
+    monkeypatch.setitem(sys.modules, "faster_whisper", module)
+    monkeypatch.setattr(provider_module, "_MODEL_CACHE", {})
+    monkeypatch.setattr(get_settings(), "faster_whisper_model", "/srv/models/whisper-small")
+
+    with pytest.raises(ProviderConfigurationError) as excinfo:
+        FasterWhisperProvider(get_settings()).transcribe(request(tmp_path))
+
+    assert excinfo.value.code == "model_load_failed"
+    assert "'custom'" in excinfo.value.message and "/srv" not in excinfo.value.message
+
+
 def test_missing_dependency_is_a_configuration_error(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "faster_whisper", None)  # import raises ImportError
     monkeypatch.setattr(provider_module, "_MODEL_CACHE", {})

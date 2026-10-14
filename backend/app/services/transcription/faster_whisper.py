@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from app.core.config import Settings
+from app.schemas.model_name import public_model_name
 from app.services.transcription.contract import (
     ProviderCapabilities,
     ProviderConfigurationError,
@@ -59,9 +60,10 @@ def _load_model(model: str, device: str, compute_type: str) -> Any:
         try:
             _MODEL_CACHE[key] = WhisperModel(model, device=device, compute_type=compute_type)
         except Exception as error:
-            # The exception text can contain cache paths; keep only its type.
+            # The exception text can contain cache paths; keep only its type. A model given as a
+            # local directory is shown as "custom", never as its path.
             raise ProviderConfigurationError(
-                f"faster-whisper model '{model}' could not be loaded "
+                f"faster-whisper model '{public_model_name(model)}' could not be loaded "
                 f"({type(error).__name__}); check FASTER_WHISPER_* settings",
                 code="model_load_failed",
             ) from error
