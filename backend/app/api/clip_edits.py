@@ -93,6 +93,11 @@ def _read(edit: ClipEdit) -> ClipEditRead:
         reframe_analysis_id=edit.reframe_analysis_id,
         focus_x=edit.focus_x,
         focus_y=edit.focus_y,
+        hook_enabled=edit.hook_enabled,
+        hook_text=edit.hook_text,
+        hook_style=edit.hook_style,
+        hook_position=edit.hook_position,
+        hook_duration_seconds=edit.hook_duration_seconds,
         output_width=edit.output_width,
         output_height=edit.output_height,
         render_profile=edit.render_profile,
@@ -155,6 +160,11 @@ def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditCon
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Analyze the framing of this clip before rendering a smart reframe",
             )
+    if config.hook is not None and not supports_captions(get_settings().ffmpeg_path):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Text overlays are not available on this server",
+        )
     if config.captions_enabled:
         transcription = video.transcription
         if transcription is None or transcription.status != TranscriptionStatus.COMPLETED:
@@ -211,6 +221,11 @@ def create_edit(
             reframe_analysis_id=body.reframe_analysis_id,
             focus_x=body.focus_x,
             focus_y=body.focus_y,
+            hook_enabled=body.hook_enabled,
+            hook_text=body.hook_text,
+            hook_style=body.hook_style,
+            hook_position=body.hook_position,
+            hook_duration=body.hook_duration_seconds,
         )
     except ValueError as error:
         raise HTTPException(
@@ -244,6 +259,11 @@ def create_edit(
         ),
         focus_x=config.focus_x,
         focus_y=config.focus_y,
+        hook_enabled=config.hook is not None,
+        hook_text=config.hook.text if config.hook else None,
+        hook_style=config.hook.style.value if config.hook else None,
+        hook_position=config.hook.position.value if config.hook else None,
+        hook_duration_seconds=config.hook.duration if config.hook else None,
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
         render_profile=RENDER_PROFILE_VERTICAL_V1,

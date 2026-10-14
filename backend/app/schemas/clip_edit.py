@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.services.clip_edit.config import AspectRatio, CaptionPosition, CaptionStyle, Layout
+from app.services.clip_edit.hook import HookPosition, HookStyle
 
 
 class EditRequest(BaseModel):
@@ -23,6 +24,12 @@ class EditRequest(BaseModel):
     # Required for layout "manual_crop": the focal point, fractions of the frame (0..1).
     focus_x: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)] | None = None
     focus_y: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)] | None = None
+    # The optional opening hook: plain text (escaped, never markup) and allow-listed options.
+    hook_enabled: StrictBool = False
+    hook_text: Annotated[str, Field(max_length=400)] | None = None
+    hook_style: HookStyle | None = None
+    hook_position: HookPosition | None = None
+    hook_duration_seconds: Annotated[float, Field(allow_inf_nan=False)] | None = None
 
 
 class ClipEditRead(BaseModel):
@@ -44,6 +51,11 @@ class ClipEditRead(BaseModel):
     reframe_analysis_id: uuid.UUID | None
     focus_x: float | None
     focus_y: float | None
+    hook_enabled: bool
+    hook_text: str | None
+    hook_style: str | None
+    hook_position: str | None
+    hook_duration_seconds: float | None
     output_width: int
     output_height: int
     render_profile: str

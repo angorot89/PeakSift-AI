@@ -103,6 +103,8 @@ def build_ass_document(
     style: CaptionStyle,
     position: CaptionPosition,
     font_family: str,
+    extra_styles: Iterable[str] = (),
+    extra_events: Iterable[str] = (),
 ) -> str:
     if not _FONT_NAME.fullmatch(font_family):
         raise ValueError("Unsupported caption font family name")
@@ -127,6 +129,7 @@ def build_ass_document(
         "[V4+ Styles]",
         STYLE_FORMAT,
         style_line,
+        *extra_styles,
         "",
         "[Events]",
         EVENT_FORMAT,
@@ -138,4 +141,5 @@ def build_ass_document(
         if end <= start:  # rounding to centiseconds must not produce an empty cue
             end = ass_time(cue.start + 0.01)
         lines.append(f"Dialogue: 0,{start},{end},Caption,,0,0,0,,{escape_ass_text(cue.text)}")
+    lines.extend(extra_events)
     return "\n".join(lines) + "\n"

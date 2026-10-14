@@ -43,7 +43,8 @@ from app.models import (
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
-from app.services.clip_edit.config import EditConfig, Layout
+from app.services.clip_edit.config import CaptionPosition, CaptionStyle, EditConfig, Layout
+from app.services.clip_edit.hook import hook_ass
 from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
@@ -201,7 +202,7 @@ def _execute(
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
 
     workspace = store.workspace(edit.id, attempt)
-    captions = False
+    cues = []
     if config.captions_enabled:
         cues = build_cues(
             _transcript_segments(edit, db),
@@ -211,17 +212,22 @@ def _execute(
             max_chars=settings.caption_max_chars,
         )
         edit.caption_cue_count = len(cues)
-        if cues:  # no speech in this range: render without a caption layer, honestly
-            store.captions_path(edit.id, attempt).write_text(
-                build_ass_document(
-                    cues,
-                    style=config.caption_style,
-                    position=config.caption_position,
-                    font_family=settings.caption_font_family,
-                ),
-                encoding="utf-8",
-            )
-            captions = True
+    # The hook overlay shares the subtitle file (output-frame coordinates, safe area).
+    hook = hook_ass(config.hook, font_family=settings.caption_font_family) if config.hook else None
+    # No speech in this range and no hook: render without a text layer, honestly.
+    captions = bool(cues) or hook is not None
+    if captions:
+        store.captions_path(edit.id, attempt).write_text(
+            build_ass_document(
+                cues,
+                style=config.caption_style or CaptionStyle.BOLD,
+                position=config.caption_position or CaptionPosition.BOTTOM,
+                font_family=settings.caption_font_family,
+                extra_styles=[hook[0]] if hook else (),
+                extra_events=[hook[1]] if hook else (),
+            ),
+            encoding="utf-8",
+        )
     edit.progress_percent = CAPTIONS_READY_PROGRESS
     _heartbeat(edit, db, task_id)
 
@@ -258,11 +264,12 @@ def _execute(
     edit.completed_at = _now()
     _heartbeat(edit, db, task_id)
     logger.info(
-        "Clip edit %s ready: %s, captions %s (%s cues), %.2fs, %s bytes",
+        "Clip edit %s ready: %s, captions %s (%s cues), hook %s, %.2fs, %s bytes",
         edit.id,
         config.layout.value,
         "on" if config.captions_enabled else "off",
         edit.caption_cue_count,
+        "on" if config.hook else "off",
         composed.duration_seconds,
         composed.size_bytes,
     )
