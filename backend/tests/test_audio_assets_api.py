@@ -16,6 +16,7 @@ from app.services.audio_assets import (
     WAVEFORM_MIN_BUCKETS,
     compute_waveform,
     validate_audio_upload,
+    waveform_bucket_count,
 )
 from app.services.video_upload import UploadValidationError
 from tests.media_fixtures import generate_video, requires_ffmpeg
@@ -121,10 +122,10 @@ def test_waveform_bucket_count_is_bounded_by_duration(client, project, tmp_path)
     wave = client.get(f"/projects/{project}/audio-assets/{long['id']}/waveform").json()
     assert wave["buckets"] == WAVEFORM_MAX_BUCKETS
     mid = upload(client, project, make_audio(tmp_path / "mid.mp3", seconds=20, freq=500)).json()
-    assert (
-        client.get(f"/projects/{project}/audio-assets/{mid['id']}/waveform").json()["buckets"]
-        == 400
-    )
+    # 20 buckets per second of the probed duration (MP3 padding varies between encoders).
+    mid_wave = client.get(f"/projects/{project}/audio-assets/{mid['id']}/waveform").json()
+    assert mid_wave["buckets"] == waveform_bucket_count(mid["duration_seconds"])
+    assert 395 <= mid_wave["buckets"] <= 405
 
 
 def test_waveform_follows_loudness_over_time(tmp_path):
