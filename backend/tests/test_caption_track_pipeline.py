@@ -22,7 +22,7 @@ from app.services.caption_timing.contract import (
 )
 from app.services.caption_timing.pipeline import clip_local_words, is_stale, run_caption_track
 from app.services.clip_render.storage import clip_storage_key
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers import dispatch
 from app.workers.celery_app import celery_app
 from app.workers.dispatch import JobQueueUnavailable, enqueue_caption_track, new_task_id
@@ -66,12 +66,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file() or path.is_symlink():
@@ -81,7 +81,7 @@ def clean_media_root(storage: LocalMediaStorage):
 
 
 def ready_track(
-    db: Session, storage: LocalMediaStorage, *, with_file=True, audio=True
+    db: Session, storage: LocalStorageProvider, *, with_file=True, audio=True
 ) -> CaptionTrack:
     clip = make_clip(db)
     clip.storage_key = clip_storage_key(clip.id)

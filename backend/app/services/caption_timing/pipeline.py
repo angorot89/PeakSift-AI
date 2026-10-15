@@ -44,7 +44,7 @@ from app.services.caption_timing.contract import (
     validate_words,
 )
 from app.services.caption_timing.factory import get_timing_provider
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import InvalidStorageKey, LocalStorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +100,13 @@ def run_caption_track(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalMediaStorage | None = None,
+    storage: LocalStorageProvider | None = None,
     provider: CaptionTimingProvider | None = None,
     task_id: str | None = None,
 ) -> CaptionTrack | None:
     """Time the words of one ``CaptionTrack`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    storage = storage or LocalMediaStorage(settings.media_root)
+    storage = storage or LocalStorageProvider(settings.media_root)
     track = db.get(CaptionTrack, track_id)
     if track is None:
         logger.warning("Caption track %s no longer exists; nothing to do", track_id)
@@ -174,7 +174,7 @@ def _execute(
     track: CaptionTrack,
     db: Session,
     settings: Settings,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     provider: CaptionTimingProvider | None,
     task_id: str | None,
 ) -> None:

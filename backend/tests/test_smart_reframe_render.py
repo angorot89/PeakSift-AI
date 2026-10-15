@@ -363,9 +363,9 @@ def smart_edit(db: Session, storage, analysis_id) -> ClipEdit:
 
 @pytest.fixture
 def storage():
-    from app.services.storage import LocalMediaStorage
+    from app.services.storage import LocalStorageProvider
 
-    yield LocalMediaStorage(Path(S.media_root))
+    yield LocalStorageProvider(Path(S.media_root))
     root = Path(S.media_root)
     for path in sorted(root.rglob("*"), reverse=True):
         path.unlink() if path.is_file() else path.rmdir()

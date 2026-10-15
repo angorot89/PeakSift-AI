@@ -7,14 +7,14 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import Video, VideoStatus
 from app.services.ffprobe import ProbeError, probe
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 
 logger = logging.getLogger(__name__)
 
 MAX_ERROR_LENGTH = 500
 
 
-def process_video_metadata(db: Session, storage: LocalMediaStorage, video: Video) -> Video:
+def process_video_metadata(db: Session, storage: LocalStorageProvider, video: Video) -> Video:
     """uploaded → processing_metadata → ready, or → failed with a safe error message.
 
     Runs synchronously for Milestone 2. Never raises for a bad file: a broken upload

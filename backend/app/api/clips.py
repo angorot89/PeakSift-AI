@@ -20,13 +20,14 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.clip_detection import OwnedCandidate
 from app.api.deps import DbSession, Storage
+from app.api.media_streaming import object_present
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.models import CandidateDecision, Clip, ClipCandidate, ClipStatus, Video, VideoStatus
 from app.schemas.clip import ClipPage, ClipRead
 from app.services.clip_render.pipeline import is_stale
 from app.services.clip_render.renderer import RenderError, validate_range
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import StorageProvider
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_render, new_task_id
 
 router = APIRouter(
@@ -74,15 +75,12 @@ def _read_for(clip: Clip) -> ClipRead:
     return _read(clip, clip.candidate.title, clip.candidate.run_id)
 
 
-def _reconcile(db: DbSession, clip: Clip | None, storage: LocalMediaStorage) -> Clip | None:
+def _reconcile(db: DbSession, clip: Clip | None, storage: StorageProvider) -> Clip | None:
     """``ready`` must mean a file exists. If the artifact vanished (disk loss, manual
     deletion), say so honestly and make the clip retryable instead of a dead end."""
     if clip is None or clip.status != ClipStatus.READY:
         return clip
-    try:
-        present = bool(clip.storage_key) and storage.path_for(clip.storage_key).is_file()
-    except InvalidStorageKey:
-        present = False
+    present = object_present(storage, clip.storage_key)
     if not present:
         logger.error("Clip %s was ready but its artifact is missing; marking failed", clip.id)
         clip.status = ClipStatus.FAILED

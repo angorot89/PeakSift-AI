@@ -239,7 +239,7 @@ requests `401`.
 ## Security
 
 - Uploads are validated by content; names are display metadata; storage keys are generated
-  and resolved only through `LocalMediaStorage.path_for` (symlinks that leave the media root
+  and resolved only through `LocalStorageProvider.path_for` (symlinks that leave the media root
   are refused).
 - No user string reaches FFmpeg: only allow-listed presets and validated numbers, with files
   as inputs; commands are argument lists with timeouts. FFmpeg errors are logged with every

@@ -273,7 +273,7 @@ The full design and limitations are in [docs/audio-sound-design.md](../docs/audi
 
 ## Media serving
 
-Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
+Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
 
 ## Structure
 
@@ -287,7 +287,7 @@ app/
   core/security.py   # Password hashing and access-token encode/decode
   models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip, ClipEdit, ReframeAnalysis(+Keyframe)
   schemas/           # Pydantic request/response schemas
-  services/storage.py # Local media storage: safe keys, chunked saves, no path escapes
+  services/storage.py # Storage contract: local directory or private S3 bucket; safe keys, ranged reads
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
@@ -327,6 +327,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `SECRET_KEY`        | *(required, ≥ 32 chars)*                       | Signs auth tokens. Generate: `openssl rand -hex 32` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
 | `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
+| `STORAGE_BACKEND`   | `local`                                        | `local` (`MEDIA_ROOT`) or `s3` (private bucket; `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PATH_STYLE`, `S3_SECURE`). `s3` is refused until the media pipelines use the contract |
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
 | `AUDIO_UPLOAD_MAX_BYTES` | `104857600` (100 MiB)                   | Largest accepted music or sound-effect file  |
 | `AUDIO_UPLOAD_MAX_DURATION_SECONDS` / `AUDIO_SFX_MAX_DURATION_SECONDS` | `1200` / `30` | Longest music track / sound effect |

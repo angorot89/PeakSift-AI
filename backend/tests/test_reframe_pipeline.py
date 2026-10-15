@@ -22,7 +22,7 @@ from app.services.reframe.detection import (
     SubjectDetection,
 )
 from app.services.reframe.pipeline import is_stale, run_reframe_analysis
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers import dispatch
 from app.workers.celery_app import celery_app
 from app.workers.dispatch import JobQueueUnavailable, enqueue_reframe_analysis, new_task_id
@@ -40,12 +40,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file() or path.is_symlink():
@@ -54,7 +54,9 @@ def clean_media_root(storage: LocalMediaStorage):
             path.rmdir()
 
 
-def ready_analysis(db: Session, storage: LocalMediaStorage, *, with_file=True) -> ReframeAnalysis:
+def ready_analysis(
+    db: Session, storage: LocalStorageProvider, *, with_file=True
+) -> ReframeAnalysis:
     clip = make_clip(db)
     clip.storage_key = clip_storage_key(clip.id)
     db.commit()

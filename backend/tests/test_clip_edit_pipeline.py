@@ -39,7 +39,7 @@ from app.services.clip_edit.storage import (
 )
 from app.services.clip_render.renderer import RenderError
 from app.services.clip_render.storage import clip_storage_key
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import InvalidStorageKey, LocalStorageProvider
 from app.workers import dispatch
 from app.workers.celery_app import celery_app
 from app.workers.clip_edit_tasks import render_clip_edit_task
@@ -55,12 +55,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file() or path.is_symlink():
@@ -71,7 +71,7 @@ def clean_media_root(storage: LocalMediaStorage):
 
 def make_edit(
     db_session: Session,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     *,
     captions=True,
     layout="blur_background",
@@ -252,7 +252,7 @@ def test_storage_keys_are_generated_and_attempt_scoped():
 
 
 def test_workspaces_are_isolated_and_finalize_is_atomic(tmp_path: Path):
-    store = EditArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    store = EditArtifactStore(LocalStorageProvider(tmp_path / "media"))
     edit_id = uuid.uuid4()
     store.workspace(edit_id, 1)
     store.workspace(edit_id, 2)
@@ -276,7 +276,7 @@ def test_workspaces_are_isolated_and_finalize_is_atomic(tmp_path: Path):
 
 
 def test_workspace_creation_clears_crash_leftovers(tmp_path: Path):
-    store = EditArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    store = EditArtifactStore(LocalStorageProvider(tmp_path / "media"))
     edit_id = uuid.uuid4()
     store.workspace(edit_id, 1)
     store.captions_path(edit_id, 1).write_text("stale")
@@ -286,7 +286,7 @@ def test_workspace_creation_clears_crash_leftovers(tmp_path: Path):
 
 
 def test_symlinked_edit_directory_cannot_escape(tmp_path: Path):
-    store = EditArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    store = EditArtifactStore(LocalStorageProvider(tmp_path / "media"))
     outside = tmp_path / "outside"
     outside.mkdir()
     edit_id = uuid.uuid4()
@@ -521,7 +521,7 @@ def _take_over(db_session, edit):
         .values(celery_task_id="task-2", attempt=2, status="rendering", progress_percent=15)
     )
     db_session.commit()
-    store = EditArtifactStore(LocalMediaStorage(Path(get_settings().media_root)))
+    store = EditArtifactStore(LocalStorageProvider(Path(get_settings().media_root)))
     store.workspace(edit.id, 2)
     store.render_path(edit.id, 2).write_bytes(b"attempt 2 output")
 

@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.clip_edits import OwnedClip
 from app.api.deps import DbSession, Storage
+from app.api.media_streaming import object_present
 from app.core.config import get_settings
 from app.models import (
     Clip,
@@ -34,7 +35,7 @@ from app.schemas.reframe import (
 from app.services.reframe.config import ReframeConfig
 from app.services.reframe.detection import detector_available
 from app.services.reframe.pipeline import is_stale
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import StorageProvider
 from app.workers.dispatch import JobQueueUnavailable, enqueue_reframe_analysis, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -89,15 +90,12 @@ def _read(analysis: ReframeAnalysis) -> ReframeAnalysisRead:
     )
 
 
-def _require_analysable(clip: Clip, storage: LocalMediaStorage) -> None:
+def _require_analysable(clip: Clip, storage: StorageProvider) -> None:
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Generate the clip before framing it"
         )
-    try:
-        present = storage.path_for(clip.storage_key).is_file()
-    except InvalidStorageKey:
-        present = False
+    present = object_present(storage, clip.storage_key)
     if not present:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

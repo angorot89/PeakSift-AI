@@ -19,7 +19,7 @@ from app.services.clip_edit import pipeline as pipeline_module
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
 from app.services.ffprobe import AudioInfo
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from tests.audio_fixtures import RATE, decode, tone
 from tests.media_fixtures import requires_ffmpeg
 from tests.test_audio_assets_api import make_audio, upload
@@ -35,12 +35,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file() or path.is_symlink():
