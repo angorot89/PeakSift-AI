@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
+from app.services.audio_mix.config import MAX_SFX_CUES, DuckingStrength
 from app.services.clip_edit.config import (
     AspectRatio,
     CaptionPosition,
@@ -13,6 +14,42 @@ from app.services.clip_edit.config import (
     Layout,
 )
 from app.services.clip_edit.hook import HookPosition, HookStyle
+
+Seconds = Annotated[float, Field(allow_inf_nan=False)]
+Decibels = Annotated[float, Field(allow_inf_nan=False)]
+
+
+class MusicRequest(BaseModel):
+    """Background music from the project's audio. Bounds are checked by ``AudioMix``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID
+    gain_db: Decibels = -16.0
+    source_start_seconds: Seconds = 0.0
+    loop: StrictBool = True
+    fade_in_seconds: Seconds = 0.5
+    fade_out_seconds: Seconds = 1.0
+    ducking: DuckingStrength = DuckingStrength.MEDIUM
+
+
+class SfxCueRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID
+    at_seconds: Seconds  # in the edited short (clip-local time)
+    gain_db: Decibels = -6.0
+
+
+class AudioRequest(BaseModel):
+    """Audio finishing: levels in dB, music, timed sound effects, final normalization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_gain_db: Decibels = 0.0
+    normalize: StrictBool = True
+    music: MusicRequest | None = None
+    sfx: Annotated[list[SfxCueRequest], Field(max_length=MAX_SFX_CUES)] = []
 
 
 class EditRequest(BaseModel):
@@ -43,6 +80,9 @@ class EditRequest(BaseModel):
     hook_style: HookStyle | None = None
     hook_position: HookPosition | None = None
     hook_duration_seconds: Annotated[float, Field(allow_inf_nan=False)] | None = None
+    # Optional audio finishing; omitted (or a section that changes nothing) keeps the clip's
+    # own audio exactly as before.
+    audio: AudioRequest | None = None
 
 
 class ClipEditRead(BaseModel):

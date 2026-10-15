@@ -21,6 +21,8 @@ from app.api.media_streaming import stream_file
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.models import (
+    AudioAsset,
+    AudioAssetKind,
     CaptionTrack,
     CaptionTrackStatus,
     Clip,
@@ -197,6 +199,53 @@ def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditCon
             )
 
 
+def _require_audio(db: DbSession, clip: Clip, video: Video, config: EditConfig) -> None:
+    """Referenced audio must be this project's, of the right kind, and fit the clip."""
+    mix = config.audio
+    if mix is None:
+        return
+    ids = {uuid.UUID(asset_id) for asset_id in mix.asset_ids}
+    assets = {
+        asset.id: asset
+        for asset in db.scalars(
+            select(AudioAsset).where(
+                AudioAsset.id.in_(ids), AudioAsset.project_id == video.project_id
+            )
+        )
+    }
+    # Another project's asset is indistinguishable from a missing one (no existence leak).
+    if mix.music is not None:
+        music = assets.get(uuid.UUID(mix.music.asset_id))
+        if music is None or music.kind != AudioAssetKind.MUSIC:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Choose background music from this project's audio",
+            )
+        if mix.music.source_start_seconds >= music.duration_seconds:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The music start is after the end of the track",
+            )
+    for cue in mix.sfx:
+        effect = assets.get(uuid.UUID(cue.asset_id))
+        if effect is None or effect.kind != AudioAssetKind.SFX:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Choose sound effects from this project's audio",
+            )
+        if cue.at_seconds > float(clip.duration_seconds):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A sound effect starts after the end of the clip",
+            )
+    # The audio configuration is stored and fingerprinted, but shorts are not mixed yet:
+    # refuse clearly instead of rendering without the requested audio.
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Audio mixing is not available on this server yet",
+    )
+
+
 def _enqueue_or_503(db: DbSession, edit: ClipEdit, *, created: bool) -> None:
     """The attempt token is already committed on the row; hand the job to the broker."""
     try:
@@ -246,6 +295,7 @@ def create_edit(
             hook_duration=body.hook_duration_seconds,
             caption_timing=body.caption_timing,
             caption_track_id=body.caption_track_id,
+            audio=body.audio.model_dump(mode="json") if body.audio else None,
         )
     except ValueError as error:
         raise HTTPException(
@@ -264,6 +314,7 @@ def create_edit(
         return _read(existing)
 
     _require_renderable(db, clip, video, config)
+    _require_audio(db, clip, video, config)
     edit = ClipEdit(
         clip_id=clip.id,
         video_id=video.id,

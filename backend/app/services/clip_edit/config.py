@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from app.services.audio_mix.config import AudioMix
+
 if TYPE_CHECKING:
     from app.services.clip_edit.hook import HookConfig
 
@@ -102,6 +104,9 @@ class EditConfig:
     # Dynamic captions only: how words are timed, and the exact CaptionTrack used (aligned).
     caption_timing: CaptionTiming | None = None
     caption_track_id: str | None = None
+    # The optional audio finishing (music, sound effects, levels, normalization); None keeps
+    # the clip's own audio exactly as earlier versions rendered it.
+    audio: AudioMix | None = None
 
     @property
     def caption_renderer(self) -> str | None:
@@ -132,6 +137,7 @@ class EditConfig:
         hook_duration: float | None = None,
         caption_timing: str | None = None,
         caption_track_id: str | uuid.UUID | None = None,
+        audio: dict[str, Any] | AudioMix | None = None,
     ) -> "EditConfig":
         """Validate against the allow-lists (ValueError otherwise) and normalize."""
         from app.services.clip_edit.hook import HookConfig
@@ -145,6 +151,7 @@ class EditConfig:
             if hook_enabled
             else None
         )
+        mix = audio if isinstance(audio, AudioMix) else AudioMix.create(audio)
         ratio = AspectRatio(aspect_ratio)
         chosen_layout = Layout(layout)
         if not isinstance(captions_enabled, bool):
@@ -160,7 +167,7 @@ class EditConfig:
         if not captions_enabled:
             # Style and position are meaningless without captions: drop them so equivalent
             # requests share one fingerprint (and one render).
-            return cls(ratio, chosen_layout, False, None, None, analysis, *focus, hook)
+            return cls(ratio, chosen_layout, False, None, None, analysis, *focus, hook, audio=mix)
         style: CaptionStyle | DynamicPreset
         if not caption_style:
             style = DEFAULT_CAPTION_STYLE
@@ -181,8 +188,9 @@ class EditConfig:
                     raise ValueError("Word-synced captions need a completed word timing track")
                 track = str(uuid.UUID(str(caption_track_id)))
         return cls(
-            ratio, chosen_layout, True, style, position, analysis, *focus, hook, timing, track
-        )
+            ratio, chosen_layout, True, style, position, analysis, *focus, hook, timing, track,
+            audio=mix,
+        )  # fmt: skip
 
     @classmethod
     def from_snapshot(cls, snapshot: dict[str, Any]) -> "EditConfig":
@@ -206,14 +214,16 @@ class EditConfig:
             hook_duration=(hook or {}).get("duration"),
             caption_timing=captions.get("timing"),
             caption_track_id=captions.get("track_id"),
+            audio=AudioMix.from_snapshot(snapshot.get("audio")),
         )
 
     def snapshot(self) -> dict[str, Any]:
         """The exact parameters a render uses, stored on the edit (never future defaults).
 
-        The ``reframe``, ``focus`` and ``hook`` keys — and the dynamic-caption keys (renderer,
-        timing, track, safe area) — exist only when used, so every earlier configuration keeps
-        exactly its previous snapshot and fingerprint (repeat requests still deduplicate).
+        The ``reframe``, ``focus``, ``hook`` and ``audio`` keys — and the dynamic-caption keys
+        (renderer, timing, track, safe area) — exist only when used, so every earlier
+        configuration keeps exactly its previous snapshot and fingerprint (repeat requests
+        still deduplicate).
         """
         snapshot: dict[str, Any] = {
             "version": CONFIG_VERSION,
@@ -241,6 +251,8 @@ class EditConfig:
             captions["safe_area"] = SAFE_AREA_VERSION
             if self.caption_track_id is not None:
                 captions["track_id"] = self.caption_track_id
+        if self.audio is not None:
+            snapshot["audio"] = self.audio.snapshot()
         return snapshot
 
     def fingerprint(self) -> str:
