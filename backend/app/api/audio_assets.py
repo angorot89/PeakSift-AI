@@ -1,5 +1,5 @@
-"""Private, project-scoped audio assets (music and sound effects): upload, list, metadata and
-waveform peaks.
+"""Private, project-scoped audio assets (music and sound effects): upload, list, metadata,
+waveform peaks and an owner-only preview stream (HTTP Range, for the editor's players).
 
 Ownership chain: User → Project → AudioAsset; anything else is a 404 (401 without a session).
 Uploads are validated by content (ffprobe), not by name, and stored under generated keys.
@@ -21,14 +21,17 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, Storage
+from app.api.media_streaming import stream_file
 from app.api.videos import OwnedProject
 from app.core.config import get_settings
 from app.models import AudioAsset, AudioAssetKind
 from app.schemas.audio_asset import AudioAssetRead, AudioUploadLimits, AudioWaveformRead
 from app.services.audio_assets import ACCEPTED_EXTENSIONS, store_audio_upload
+from app.services.storage import InvalidStorageKey
 from app.services.video_upload import UploadValidationError, check_declared_size
 
 router = APIRouter(prefix="/projects/{project_id}/audio-assets", tags=["audio"])
@@ -114,3 +117,18 @@ def get_waveform(asset: OwnedAudioAsset) -> AudioWaveformRead:
     return AudioWaveformRead(
         asset_id=asset.id, duration_seconds=asset.duration_seconds, buckets=len(peaks), peaks=peaks
     )
+
+
+@router.get("/{asset_id}/content")
+def audio_content(asset: OwnedAudioAsset, request: Request, storage: Storage) -> StreamingResponse:
+    """The uploaded file, for in-editor preview. Owner only; supports a single Range.
+
+    Served inline with private, no-store caching; there is no public URL.
+    """
+    try:
+        path = storage.path_for(asset.storage_key)
+    except InvalidStorageKey:
+        path = None
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing")
+    return stream_file(path, request, media_type=asset.content_type, filename=asset.display_name)
