@@ -45,6 +45,7 @@ from app.models import (
 )
 from app.services.audio_mix.loudness import measure_loudness
 from app.services.audio_mix.mixer import prepare_track
+from app.services.audio_mix.plan import SAMPLE_RATE as MIX_SAMPLE_RATE
 from app.services.audio_mix.plan import mix_request
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.caption_v2 import build_dynamic_ass
@@ -65,7 +66,7 @@ from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
-from app.services.ffprobe import ProbeError, probe
+from app.services.ffprobe import ProbeError, probe, probe_audio
 from app.services.storage import InvalidStorageKey, LocalMediaStorage, StorageError
 
 logger = logging.getLogger(__name__)
@@ -404,7 +405,27 @@ def _prepare_audio(
 
 
 def _check_final_audio(edit: ClipEdit, rendered: Path, settings: Settings) -> None:
-    """Measure the encoded short's audio; record it, and refuse an obviously clipped result."""
+    """Validate and measure the encoded short's mixed audio.
+
+    The audio stream must be the mix's format (stereo, 48 kHz) and as long as the video;
+    the loudness and true peak are recorded, and an obviously clipped result is refused.
+    """
+    try:
+        info = probe_audio(rendered, ffprobe_path=settings.ffprobe_path)
+        video = probe(rendered, ffprobe_path=settings.ffprobe_path)
+    except ProbeError:
+        raise RenderError(
+            "invalid_output", "The rendered short's audio could not be read"
+        ) from None
+    tolerance = render_options_from(settings).duration_tolerance_seconds
+    if (
+        info.channels != 2
+        or info.sample_rate != MIX_SAMPLE_RATE
+        or not info.duration_seconds
+        or not video.duration_seconds
+        or abs(info.duration_seconds - video.duration_seconds) > tolerance
+    ):
+        raise RenderError("invalid_output", "The rendered short's audio track is not valid")
     measured = measure_loudness(rendered, render_options_from(settings))
     edit.audio_loudness_lufs = round(measured.integrated, 2) if measured else None
     edit.audio_true_peak_dbtp = round(measured.true_peak, 2) if measured else None
