@@ -92,7 +92,7 @@ function LevelSlider({ label, value, min, max, step, onChange, hint }: { label: 
         onChange={(e) => onChange(Number(e.target.value))}
         aria-valuetext={formatDb(value)}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className="h-1.5 w-full cursor-pointer accent-[var(--accent)]"
+        className="h-6 w-full cursor-pointer accent-[var(--accent)]"
       />
       {hint ? (
         <p id={`${id}-hint`} className="text-[11px] text-subtle">
