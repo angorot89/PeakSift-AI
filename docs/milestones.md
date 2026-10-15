@@ -131,6 +131,23 @@ Delivered:
 
 Definition of done — a user can open a generated clip → generate word sync and watch its real progress → pick a caption preset, position and opening hook → preview the active word over the playing clip → render a 9:16 short with word-synced captions (with any layout or Smart reframe) → download it → fall back to phrase timing or retry when word timing fails.
 
+## Milestone 9 — Audio & Sound Design V0.9 *(complete)*
+
+Creators finish a short's audio in PeakSift: their own music and sound effects, automatic ducking under speech, and final loudness normalization.
+
+Delivered:
+
+- `audio_assets` table: private, project-scoped music and sound effects (allow-listed kind), sanitized display names, generated storage keys, probed metadata, sha256 duplicate reuse within a project, bounded waveform peaks
+- Secure uploads (MP3, WAV, M4A, AAC, OGG, Opus): content validated with ffprobe (container matches extension, supported codec, real audio, no video, positive duration), size and per-kind duration limits, nothing kept on refusal; waveform peaks streamed from an FFmpeg pipe; owner-only Range preview stream
+- An edit's `audio` section (`audio_mix_v1`): source gain, music (start point, loop, fades, gain, ducking preset), up to 12 sound-effect cues, normalization — validated, rounded, fingerprinted, with exact asset ids; edits without it unchanged
+- Mixing engine: one FFmpeg plan from validated numbers onto a bed of the clip's exact length (video duration authoritative); music trim/loop/fades; `sidechaincompress` ducking (Light / Medium / Strong, tuned by measurement); delayed, trimmed effects
+- Loudness: −1 dBFS safety limiter always; two-pass `loudnorm` to PeakSift's `social_v1` target (−14 LUFS, ≤ −1.5 dBTP, linear gain where possible); silence handled
+- Render integration: assets re-checked, track prepared in the attempt workspace, AAC muxed into the short; output validated (stereo 48 kHz, video length), loudness and true peak recorded, clipped results refused
+- Editor: Audio section (levels, music picker with waveform/listen/upload, music controls, ducking with text state, effect cues, lightweight timeline with keyboard-movable markers, normalization) and a video-clocked browser preview (hardened: pause, seeks, restart, loops, live changes, one sound at a time, nothing left playing); reviewed at 1440, 1024, 768 and 375 px
+- Hardening (output validation, symlink containment, degenerate uploads, unusual formats, log redaction), CI (audio-mix matrix with measured ducking and loudness, audio files refused from the repository) and documentation ([audio-sound-design.md](audio-sound-design.md))
+
+Definition of done — a user can open a generated clip → upload music and sound effects → set the music's volume, start, loop and fades → keep ducking on → place effects on the timeline → preview them with the video → render a short (with any layout, Smart Reframe, captions and hook) whose speech stays clear, music dips under it, effects land on time and loudness is consistent → download it.
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -139,8 +156,10 @@ Definition of done — a user can open a generated clip → generate word sync a
 - V0.4 AI Clip Detection — COMPLETE
 - V0.5 Clip Generation — COMPLETE
 - V0.6 Short-form Editing — COMPLETE
+- V0.6.1 Design Upgrade — COMPLETE
 - V0.7 Smart Reframing — COMPLETE
 - V0.8 Dynamic Captions & Creator Polish — COMPLETE
+- V0.9 Audio & Sound Design — COMPLETE
 
 No later milestone has been defined or started.
 
@@ -148,7 +167,7 @@ No later milestone has been defined or started.
 
 - Creator intelligence & metadata (titles, hooks, descriptions)
 - Publishing integrations
-- Sound effects and music
+- Licensed music and sound-effect libraries, beat-synced editing
 - Brand kits, custom fonts and a caption timing editor
 - Global asset libraries
 - Morocco Mode (localization layer extending Global). Before any Moroccan accuracy claim, benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio — none of that has been tested yet.
