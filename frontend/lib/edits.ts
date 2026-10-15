@@ -1,4 +1,5 @@
 import { API_URL, apiFetch, postJson } from "@/lib/api";
+import { audioFromConfiguration, audioSummary, normalizeAudio, sameAudio, type AudioRequest } from "@/lib/audio-mix";
 import type { CaptionTiming, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
 import { stageRanks } from "@/lib/status-sync";
 
@@ -30,6 +31,9 @@ export type EditRequest = {
   hook_style?: HookStyle;
   hook_position?: HookPosition;
   hook_duration_seconds?: number;
+  /** Optional audio finishing (music, sound effects, levels, normalization). Omitted keeps
+   * the clip's own audio exactly as before. */
+  audio?: AudioRequest;
 };
 
 export type ClipEdit = {
@@ -144,11 +148,13 @@ export function editStageLabel(edit: ClipEdit): string {
 type Described = Pick<
   ClipEdit,
   "layout" | "captions_enabled" | "caption_style" | "caption_position" | "caption_timing" | "hook_enabled"
->;
+> &
+  Partial<Pick<ClipEdit, "configuration">>;
 
-/** "Smart reframe · Focus captions · Bottom · Hook" — enough to tell variants apart. */
+/** "Smart reframe · Focus captions · Bottom · Hook · Music" — enough to tell variants apart. */
 export function describeEdit(edit: Described) {
-  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}`;
+  const audio = audioSummary(audioFromConfiguration(edit.configuration));
+  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}${audio ? ` · ${audio}` : ""}`;
 }
 
 const round3 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 1000) / 1000);
@@ -175,7 +181,8 @@ export function sameSettings(edit: ClipEdit, request: EditRequest) {
       (edit.hook_text === normalizeHookText(request.hook_text ?? "") &&
         edit.hook_style === request.hook_style &&
         edit.hook_position === request.hook_position &&
-        round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds)))
+        round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds))) &&
+    sameAudio(audioFromConfiguration(edit.configuration), normalizeAudio(request.audio))
   );
 }
 
@@ -220,6 +227,13 @@ export function friendlyEditError(edit: Pick<ClipEdit, "error_code">): string {
       return "The smart framing for this clip is no longer usable. Analyze the framing again, or set a focal point.";
     case "queue_unavailable":
       return "The rendering queue is busy or offline. Try again in a moment.";
+    case "audio_asset_unavailable":
+      return "A selected music track or sound effect is no longer available. Choose it again, then render.";
+    case "audio_mix_failed":
+    case "loudness_failed":
+      return "The audio couldn't be mixed. Try again, or try another music file.";
+    case "audio_clipped":
+      return "The finished audio would clip. Lower the music or effect volume, or turn on normalization.";
     default:
       return "Something went wrong while rendering. Try again.";
   }
