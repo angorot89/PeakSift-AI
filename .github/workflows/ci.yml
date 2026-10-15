@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - name: Unit tests (status synchronisation, caption timing)
+      - name: Unit tests (status synchronisation, caption timing, audio mix)
         run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
@@ -92,7 +92,7 @@ jobs:
         # test media is generated at test time.
         run: |
           set -euo pipefail
-          tracked="$(git ls-files '*.onnx' '*.tflite' '*.pt' '*.pth' '*.bin' '*.safetensors' 'backend/models/*' 'media/*' '*.mp4' '*.mov' '*.wav')"
+          tracked="$(git ls-files '*.onnx' '*.tflite' '*.pt' '*.pth' '*.bin' '*.safetensors' 'backend/models/*' 'media/*' '*.mp4' '*.mov' '*.wav' '*.mp3' '*.m4a' '*.aac' '*.ogg' '*.opus' '*.flac' '*.aiff')"
           [ -z "$tracked" ] || { echo "model weights or media committed:"; echo "$tracked"; exit 1; }
           echo "no weights or media in the repository"
       - name: Install FFmpeg and caption fonts
@@ -155,6 +155,11 @@ jobs:
         # MP4 (1080x1920, H.264, AAC, duration) and frames (active word moves, hook shown then
         # gone, text inside the safe area).
         run: python scripts/dynamic_caption_probe.py
+      - name: Audio mix matrix, ducking and loudness on this FFmpeg
+        # Deterministic test tones through the real mixer: 8 source/music/effect combinations
+        # at exact length, measured ducking dip and recovery, -14 LUFS / true peak, and a full
+        # mix composed into a short with AAC stereo 48 kHz audio.
+        run: python scripts/audio_mix_probe.py
       - name: Smart reframe renders the deepest allowed crop path on this FFmpeg
         # The moving crop is an FFmpeg expression tree; expression limits differ by build.
         run: python scripts/smart_crop_probe.py
