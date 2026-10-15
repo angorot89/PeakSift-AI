@@ -187,7 +187,7 @@ export function AudioTimeline({
           if (event.button === 0) seek(timeAt(event.clientX));
         }}
         onKeyDown={onStripKey}
-        className="relative h-16 cursor-pointer touch-none overflow-hidden rounded-lg border border-border bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
+        className="relative h-[4.5rem] cursor-pointer touch-none overflow-hidden rounded-lg border border-border bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent"
       >
         <div className="absolute inset-x-0 top-2 h-7 px-0.5 text-accent/70">
           {musicPeaks && musicPeaks.length ? (
@@ -196,7 +196,7 @@ export function AudioTimeline({
             <div className="flex h-full items-center px-2 text-[11px] text-subtle">No music</div>
           )}
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-6 border-t border-border/70">
+        <div className="absolute inset-x-0 bottom-0 h-7 border-t border-border/70">
           {cues.map((cue, index) => (
             <button
               key={cue.key}
@@ -209,8 +209,9 @@ export function AudioTimeline({
               aria-valuetext={`${cue.label} at ${formatClock(cue.at)}`}
               onPointerDown={(event) => onMarkerPointer(event, index)}
               onKeyDown={(event) => onMarkerKey(event, index, cue.at)}
-              style={{ left: `${(cue.at / safeDuration) * 100}%` }}
-              className="absolute top-0.5 flex h-5 min-w-5 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-md border border-emerald-300/70 bg-emerald-400/20 px-1 text-[10px] font-semibold text-emerald-100 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent"
+              // Clamped so a marker at the very start or end stays fully visible.
+              style={{ left: `clamp(12px, ${(cue.at / safeDuration) * 100}%, calc(100% - 12px))` }}
+              className="absolute top-0.5 flex h-6 min-w-6 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-md border border-emerald-300/70 bg-emerald-400/20 px-1 text-[10px] font-semibold text-emerald-100 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-accent"
             >
               {index + 1}
             </button>
