@@ -28,7 +28,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         path="/",
         httponly=True,
         samesite="lax",
-        secure=settings.is_production,
+        secure=settings.cookie_secure,
     )
 
 
@@ -74,7 +74,7 @@ def logout(response: Response) -> None:
         path="/",
         httponly=True,
         samesite="lax",
-        secure=settings.is_production,
+        secure=settings.cookie_secure,
     )
 
 
