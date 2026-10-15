@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Info, Music2, Pause, Play, Plus, Trash2, Upload, Volume2, Waves } from "lucide-react";
 import { AudioTimeline, heardPeaks, Waveform } from "@/components/app/editor/audio-timeline";
 import { ControlGroup, InlineCheck, OptionCard } from "@/components/app/editor/controls";
@@ -169,6 +169,16 @@ export function AudioPanel({
   const id = useId();
   const listening = useAssetListening();
   const [playing, setPlaying] = useState<string | null>(null);
+  useEffect(() => {
+    // One sound at a time: playing the preview stops a "Listen" player.
+    if (!video) return;
+    const stop = () => {
+      listening.stop();
+      setPlaying(null);
+    };
+    video.addEventListener("play", stop);
+    return () => video.removeEventListener("play", stop);
+  }, [video, listening]);
   const music = assets?.filter((a) => a.kind === "music") ?? [];
   const effects = assets?.filter((a) => a.kind === "sfx") ?? [];
   const chosen = value.music ? (assets?.find((a) => a.id === value.music!.asset_id) ?? null) : null;
