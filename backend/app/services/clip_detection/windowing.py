@@ -8,12 +8,12 @@
 """
 
 import hashlib
-import math
 import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 
 from app.services.clip_detection.contract import AnalysisWindow, TranscriptLine
+from app.services.media_timing import MediaTimingError, fit_to_media
 
 # A single transcript segment longer than this is cut; real speech segments are far shorter.
 MAX_LINE_CHARS = 2000
@@ -48,29 +48,23 @@ def normalize_text(text: str) -> str:
 def prepare_lines(
     lines: Iterable[TranscriptLine], *, video_duration: float, tolerance_seconds: float
 ) -> tuple[TranscriptLine, ...]:
-    """Normalise and validate transcript lines; never silently 'fix' timestamps."""
+    """Normalise and validate transcript lines against the video.
+
+    A small overshoot past the video's end (within ``tolerance_seconds``) is normalized to the
+    end, exactly as at transcription; anything else invalid is refused, never "fixed".
+    """
     prepared: list[TranscriptLine] = []
     previous_start = -1.0
     for index, line in enumerate(lines):
         start, end = float(line.start), float(line.end)
-        if not (math.isfinite(start) and math.isfinite(end)):
+        try:  # the same media-bounds rule as at transcription (see media_timing.py)
+            start, end = fit_to_media(start, end, video_duration, tolerance=tolerance_seconds)
+        except MediaTimingError as error:
             raise TranscriptError(
-                "transcript_invalid", f"Transcript line {index} has a non-finite time"
-            )
-        if start < 0:
-            raise TranscriptError("transcript_invalid", f"Transcript line {index} starts before 0")
-        if end <= start:
-            raise TranscriptError(
-                "transcript_invalid", f"Transcript line {index} ends before it starts"
-            )
+                "transcript_invalid", f"Transcript line {index}: {error}"
+            ) from None
         if start < previous_start:
             raise TranscriptError("transcript_invalid", f"Transcript line {index} is out of order")
-        if video_duration > 0 and end > video_duration + tolerance_seconds:
-            raise TranscriptError(
-                "transcript_invalid",
-                f"Transcript line {index} ends after the video "
-                f"({end:.1f}s > {video_duration:.1f}s)",
-            )
         previous_start = start
         text = normalize_text(line.text)
         if not text:

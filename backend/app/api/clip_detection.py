@@ -118,7 +118,8 @@ def _current_lines(db: DbSession, video: Video, settings) -> tuple[TranscriptLin
         return prepare_lines(
             (TranscriptLine(s.start_time, s.end_time, s.text) for s in segments),
             video_duration=float(video.duration_seconds or 0.0),
-            tolerance_seconds=settings.clip_detection_timestamp_tolerance_seconds,
+            # Transcript lines follow the transcript's own media-bounds rule (media_timing.py).
+            tolerance_seconds=settings.transcription_timestamp_tolerance_seconds,
         )
     except TranscriptError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error.message) from None

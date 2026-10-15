@@ -30,6 +30,7 @@ from app.services.audio_extraction import (
     extract_normalized_audio,
     normalized_audio_key,
 )
+from app.services.media_timing import MediaTimingError, fit_to_media, media_duration
 from app.services.storage import LocalMediaStorage
 from app.services.transcription.chunking import (
     AudioChunk,
@@ -212,6 +213,8 @@ def _execute(
         raise PipelineFailure("audio_unreadable", "The extracted audio has no readable duration")
     transcription.audio_storage_key = audio.storage_key
     transcription.audio_duration_seconds = audio.duration_seconds
+    # Persisted segments must lie inside the media: the shorter of the video and its audio.
+    duration = media_duration(video.duration_seconds, audio.duration_seconds)
     transcription.progress_percent = AUDIO_READY_PROGRESS
     _heartbeat(transcription, db, task_id)
 
@@ -246,7 +249,9 @@ def _execute(
             sleep,
         )
         _heartbeat(transcription, db, commit=False)
-        segments = _absolute_segments(result.segments, chunk, settings)
+        segments = _fit_to_media(
+            _absolute_segments(result.segments, chunk, settings), duration, settings
+        )
         for segment in segments:
             db.add(
                 TranscriptSegment(
@@ -283,6 +288,27 @@ def _execute(
         sequence,
         len(chunks),
     )
+
+
+def _fit_to_media(
+    segments: tuple[ProviderSegment, ...], duration: float | None, settings: Settings
+) -> tuple[ProviderSegment, ...]:
+    """Normalize a small overshoot past the media's end; refuse anything worse."""
+    fitted = []
+    for segment in segments:
+        try:
+            start, end = fit_to_media(
+                segment.start,
+                segment.end,
+                duration,
+                tolerance=settings.transcription_timestamp_tolerance_seconds,
+            )
+        except MediaTimingError as error:
+            raise ProviderOutputError(str(error)) from None
+        fitted.append(
+            ProviderSegment(start=start, end=end, text=segment.text, speaker=segment.speaker)
+        )
+    return tuple(fitted)
 
 
 def _absolute_segments(

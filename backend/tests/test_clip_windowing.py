@@ -65,7 +65,7 @@ def test_prepare_normalises_and_drops_empty_lines():
         ([TranscriptLine(2.0, 2.0, "a")], "ends before it starts"),
         ([TranscriptLine(3.0, 2.0, "a")], "ends before it starts"),
         ([TranscriptLine(5.0, 6.0, "a"), TranscriptLine(1.0, 2.0, "b")], "out of order"),
-        ([TranscriptLine(0.0, 12.0, "a")], "ends after the video"),
+        ([TranscriptLine(0.0, 12.0, "a")], "ends after the media"),
         ([TranscriptLine(float("nan"), 2.0, "a")], "non-finite"),
         ([TranscriptLine(0.0, float("inf"), "a")], "non-finite"),
     ],
@@ -77,11 +77,11 @@ def test_prepare_refuses_bad_timelines(items, fragment):
     assert fragment in info.value.message
 
 
-def test_prepare_allows_small_overrun_within_tolerance():
+def test_prepare_normalizes_a_small_overrun_to_the_video_end():
     prepared = prepare_lines(
         [TranscriptLine(0.0, 10.8, "a")], video_duration=10.0, tolerance_seconds=1.0
     )
-    assert prepared[0].end == 10.8
+    assert prepared[0].end == 10.0  # the same media-bounds rule as at transcription
 
 
 def test_prepare_skips_duration_check_when_duration_unknown():

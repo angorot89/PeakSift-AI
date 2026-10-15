@@ -186,7 +186,9 @@ def test_previous_chunk_text_is_passed_as_prompt_only(
 
 
 def test_progress_is_monotonic_and_real(monkeypatch, db_session, storage, transcription):
-    FakeMedia(monkeypatch, storage, chunks=(600,) * 8 + (50,))
+    FakeMedia(monkeypatch, storage, duration=4850.0, chunks=(600,) * 8 + (50,))
+    transcription.video.duration_seconds = 4850.0  # a consistent long video for 9 chunks
+    db_session.commit()
     provider = SpyProvider(db_session, transcription)
 
     run(transcription, db_session, provider, storage)
@@ -772,3 +774,38 @@ def test_stale_attempt_only_cleans_its_own_workspace(
     run(transcription, db_session, ResumesAndFails(), storage, task_id="task-1")
 
     assert media.cleaned == [attempt_workspace(transcription.id, "task-1")]
+
+
+def test_a_final_segment_slightly_past_the_media_end_is_normalized(
+    monkeypatch, db_session, storage, transcription
+):
+    transcription.video.duration_seconds = 20.0
+    db_session.commit()
+    FakeMedia(monkeypatch, storage, duration=20.0, chunks=(20.0,))
+    provider = FakeProvider(
+        segments=(ProviderSegment(0.0, 10.0, "first"), ProviderSegment(10.0, 20.08, "last"))
+    )
+    result = run(transcription, db_session, provider, storage)
+    assert result.status == "completed", result.error_message
+    assert [(s.start_time, s.end_time) for s in segments_of(db_session, result)] == [
+        (0.0, 10.0),
+        (10.0, 20.0),
+    ]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        ProviderSegment(10.0, 83.0, "far past the end"),
+        ProviderSegment(20.5, 21.0, "starts after the end"),
+    ],
+)
+def test_segments_outside_the_media_fail_the_transcription(
+    monkeypatch, db_session, storage, transcription, bad
+):
+    transcription.video.duration_seconds = 20.0
+    db_session.commit()
+    FakeMedia(monkeypatch, storage, duration=20.0, chunks=(20.0,))
+    result = run(transcription, db_session, FakeProvider(segments=(bad,)), storage)
+    assert result.status == "failed" and result.error_code == "provider_output"
+    assert segments_of(db_session, result) == []
