@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.core.config import get_settings
-from app.services.audio_mix.config import MusicConfig
+from app.services.audio_mix.config import DuckingStrength, MusicConfig
 from app.services.audio_mix.mixer import render_mix
 from app.services.audio_mix.plan import (
     MixPlanRequest,
@@ -27,8 +27,9 @@ def music(tmp_path: Path, **config) -> MusicInput:
     path = tmp_path / "music.wav"
     if not path.exists():
         tone(path, CODED, 15)
+    # Plain mixing here: ducking (on by default with music over a source) has its own tests.
     defaults = {"asset_id": "00000000-0000-0000-0000-000000000001", "fade_in_seconds": 0,
-                "fade_out_seconds": 0, "gain_db": 0}  # fmt: skip
+                "fade_out_seconds": 0, "gain_db": 0, "ducking": DuckingStrength.OFF}  # fmt: skip
     return MusicInput(path, 15.0, MusicConfig(**{**defaults, **config}))
 
 
