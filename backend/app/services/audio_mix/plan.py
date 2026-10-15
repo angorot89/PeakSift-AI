@@ -13,6 +13,9 @@ Timeline (all in the edited short's own time, ``0 … duration``):
   ``loop`` is on, a second, endlessly looping copy of the track (from its beginning) follows
   the first pass; without ``loop`` the music simply ends. Fades are applied to the music
   that actually plays (clamped so they never exceed it), then the gain.
+- **ducking**: when the source exists and ducking is on, the source is split and also drives a
+  ``sidechaincompress`` on the music (see ``ducking.py``). Without source audio there is
+  nothing to duck under, so the music plays as configured.
 
 Working format: 48 kHz stereo float. Mono sources are duplicated to both channels.
 """
@@ -22,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.services.audio_mix.config import MusicConfig
+from app.services.audio_mix.ducking import ducking_filter
 
 SAMPLE_RATE = 48000
 WORK_FORMAT = f"aresample={SAMPLE_RATE},aformat=sample_fmts=fltp:channel_layouts=stereo"
@@ -82,14 +86,25 @@ class _Graph:
         return len(self.inputs) - 1
 
 
+def _ducking(request: MixPlanRequest) -> str | None:
+    """The sidechain compressor for the music, when there is music and source to duck under."""
+    if request.music is None or request.source is None:
+        return None
+    if music_timeline(request.music, request.duration).plays_seconds <= 0:
+        return None  # no music plays, so there is nothing to duck
+    return ducking_filter(request.music.config.ducking)
+
+
 def _source_chain(graph: _Graph, request: MixPlanRequest) -> str | None:
     if request.source is None:
         return None
     index = graph.add_input(request.source)
     d = _n(request.duration)
+    # With ducking the source also becomes the control signal ("key") of the compressor.
+    tail = ",asplit=2[source][duck_key]" if _ducking(request) else "[source]"
     graph.chains.append(
         f"[{index}:a:0]{WORK_FORMAT},volume={_n(request.source_gain_db)}dB,"
-        f"atrim=duration={d},asetpts=PTS-STARTPTS,apad=whole_dur={d}[source]"
+        f"atrim=duration={d},asetpts=PTS-STARTPTS,apad=whole_dur={d}{tail}"
     )
     return "[source]"
 
@@ -118,7 +133,12 @@ def _music_chain(graph: _Graph, request: MixPlanRequest) -> str | None:
         out_start = timeline.plays_seconds - timeline.fade_out
         steps.append(f"afade=t=out:st={_n(out_start)}:d={_n(timeline.fade_out)}")
     steps.append(f"volume={_n(config.gain_db)}dB")
-    graph.chains.append(f"{label}{','.join(steps)}[music]")
+    ducking = _ducking(request)
+    if ducking is None:
+        graph.chains.append(f"{label}{','.join(steps)}[music]")
+        return "[music]"
+    graph.chains.append(f"{label}{','.join(steps)}[music_level]")
+    graph.chains.append(f"[music_level][duck_key]{ducking}[music]")
     return "[music]"
 
 
