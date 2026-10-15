@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.audio_assets import limits_router as audio_limits_router
 from app.api.audio_assets import router as audio_assets_router
@@ -19,38 +21,59 @@ from app.api.reframe import router as reframe_router
 from app.api.transcriptions import router as transcriptions_router
 from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 
-settings = get_settings()
-
-app = FastAPI(title="PeakSift AI API", version="0.1.0")
-register_error_handlers(app)  # before CORS, so error responses still get CORS headers
-
-app.add_middleware(
-    CORSMiddleware,
-    # Explicit origin (never "*") because credentials are allowed.
-    allow_origins=[settings.frontend_url.rstrip("/")],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+ROUTERS = (
+    health_router,
+    auth_router,
+    projects_router,
+    videos_router,
+    video_content_router,
+    transcriptions_router,
+    clip_providers_router,
+    clip_detection_router,
+    clips_router,
+    video_clips_router,
+    clip_media_router,
+    clip_edits_router,
+    edit_media_router,
+    reframe_router,
+    caption_tracks_router,
+    caption_styles_router,
+    audio_assets_router,
+    audio_limits_router,
 )
 
-app.include_router(health_router)
-app.include_router(auth_router)
-app.include_router(projects_router)
-app.include_router(videos_router)
-app.include_router(video_content_router)
-app.include_router(transcriptions_router)
-app.include_router(clip_providers_router)
-app.include_router(clip_detection_router)
-app.include_router(clips_router)
-app.include_router(video_clips_router)
-app.include_router(clip_media_router)
-app.include_router(clip_edits_router)
-app.include_router(edit_media_router)
-app.include_router(reframe_router)
-app.include_router(caption_tracks_router)
-app.include_router(caption_styles_router)
-app.include_router(audio_assets_router)
-app.include_router(audio_limits_router)
+
+def create_app(settings: Settings) -> FastAPI:
+    """The API application for these settings (servers use ``app`` below)."""
+    # Interactive API docs are a development aid; production does not publish them.
+    docs = (
+        {"docs_url": None, "redoc_url": None, "openapi_url": None} if settings.is_production else {}
+    )
+    application = FastAPI(title="PeakSift AI API", version="1.0.0", **docs)
+    register_error_handlers(application)  # before CORS, so error responses get CORS headers
+    application.add_middleware(
+        CORSMiddleware,
+        # Explicit origin (never "*") because credentials are allowed.
+        allow_origins=[settings.frontend_url.rstrip("/")],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    if settings.allowed_host_list:
+        # Requests for any other Host are refused (required in production; see config.py).
+        application.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_host_list)
+    if settings.trusted_proxy_list:
+        # Only these proxies may set the client address and scheme (X-Forwarded-For /
+        # -Proto); anyone else's forwarded headers are ignored.
+        application.add_middleware(
+            ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxy_list
+        )
+    for router in ROUTERS:
+        application.include_router(router)
+    return application
+
+
+app = create_app(get_settings())

@@ -1,6 +1,8 @@
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,8 +13,15 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_env: str = "development"
+    # development | test | production. Production refuses to start on unsafe or incomplete
+    # configuration (see `_production_is_safe`); it is never inferred from a debug flag.
+    app_env: Literal["development", "test", "production"] = "development"
     frontend_url: str = "http://localhost:3000"
+    # Host names this API answers to (comma-separated; required in production, no wildcards).
+    allowed_hosts: str = ""
+    # Reverse proxies whose X-Forwarded-For / X-Forwarded-Proto are trusted (comma-separated
+    # IPs or CIDRs). Empty: forwarded headers are ignored and the socket peer is the client.
+    trusted_proxies: str = ""
 
     # SQLAlchemy URL, e.g. postgresql+psycopg://user:password@localhost:5432/peaksift
     database_url: str
@@ -192,9 +201,72 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _production_is_safe(self) -> "Settings":
+        if self.app_env != "production":
+            return self
+        problems = production_problems(self)
+        if problems:
+            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
+        return self
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Auth cookies are Secure in production (HTTPS is required there)."""
+        return self.is_production
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [h.strip().lower() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    @property
+    def trusted_proxy_list(self) -> list[str]:
+        return [p.strip() for p in self.trusted_proxies.split(",") if p.strip()]
+
+
+# Values that must never sign production tokens (placeholders from docs and examples).
+_PLACEHOLDER_SECRETS = {"change-me", "changeme", "secret", "replace-me", "your-secret-key"}
+
+
+def production_problems(settings: Settings) -> list[str]:
+    """Every reason this configuration must not run in production (names only, no values)."""
+    problems: list[str] = []
+    explicit = settings.model_fields_set
+    secret = settings.secret_key.get_secret_value()
+    if (
+        secret.lower().strip("-_ ") in _PLACEHOLDER_SECRETS
+        or "change" in secret.lower()
+        or len(set(secret)) < 10
+    ):
+        problems.append("SECRET_KEY is a placeholder or has too little variety")
+    frontend = urlsplit(settings.frontend_url)
+    if frontend.scheme != "https" or not frontend.hostname or "*" in settings.frontend_url:
+        problems.append("FRONTEND_URL must be an explicit https:// origin")
+    hosts = settings.allowed_host_list
+    if not hosts:
+        problems.append("ALLOWED_HOSTS is required")
+    elif any("*" in host for host in hosts):
+        problems.append("ALLOWED_HOSTS must not contain wildcards")
+    for proxy in settings.trusted_proxy_list:
+        try:
+            ipaddress.ip_network(proxy, strict=False)
+        except ValueError:
+            problems.append("TRUSTED_PROXIES must be IP addresses or CIDR ranges")
+            break
+    if "*" in settings.trusted_proxy_list:
+        problems.append("TRUSTED_PROXIES must not trust every address")
+    for name in ("database_url", "redis_url"):
+        if name not in explicit:
+            problems.append(f"{name.upper()} must be set explicitly")
+    if settings.celery_task_always_eager:
+        problems.append("CELERY_TASK_ALWAYS_EAGER must be off")
+    if "media_root" not in explicit or not settings.media_root.is_absolute():
+        problems.append("MEDIA_ROOT must be set to an absolute path")
+    return problems
 
 
 @lru_cache
