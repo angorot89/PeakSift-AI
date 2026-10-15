@@ -13,6 +13,10 @@ Timeline (all in the edited short's own time, ``0 … duration``):
   ``loop`` is on, a second, endlessly looping copy of the track (from its beginning) follows
   the first pass; without ``loop`` the music simply ends. Fades are applied to the music
   that actually plays (clamped so they never exceed it), then the gain.
+- **sound effects**: each cue plays its file from the start, at its own gain, delayed to its
+  time in the short (whole milliseconds; cue times are on a 10 ms grid). A cue never runs past
+  the end of the short (it is trimmed), and a cue at or after the end is left out. Effects
+  are not ducked and do not duck the music.
 - **ducking**: when the source exists and ducking is on, the source is split and also drives a
   ``sidechaincompress`` on the music (see ``ducking.py``). Without source audio there is
   nothing to duck under, so the music plays as configured.
@@ -24,7 +28,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.services.audio_mix.config import MusicConfig
+from app.services.audio_mix.config import MusicConfig, SfxCue
 from app.services.audio_mix.ducking import ducking_filter
 
 SAMPLE_RATE = 48000
@@ -47,11 +51,19 @@ class MusicInput:
 
 
 @dataclass(frozen=True)
+class SfxInput:
+    path: Path
+    track_seconds: float
+    cue: SfxCue
+
+
+@dataclass(frozen=True)
 class MixPlanRequest:
     duration: float  # the short's duration: authoritative
     source: Path | None  # the clip, when it has an audio stream
     source_gain_db: float = 0.0
     music: MusicInput | None = None
+    sfx: tuple[SfxInput, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -142,12 +154,30 @@ def _music_chain(graph: _Graph, request: MixPlanRequest) -> str | None:
     return "[music]"
 
 
+def _sfx_chains(graph: _Graph, request: MixPlanRequest) -> list[str]:
+    labels: list[str] = []
+    for effect in request.sfx:
+        at = effect.cue.at_seconds
+        plays = min(effect.track_seconds, request.duration - at)
+        if at < 0 or plays <= 0:
+            continue  # starts at or after the end of the short: nothing of it is heard
+        index = graph.add_input(effect.path)
+        label = f"[sfx{len(labels)}]"
+        graph.chains.append(
+            f"[{index}:a:0]{WORK_FORMAT},atrim=duration={_n(plays)},asetpts=PTS-STARTPTS,"
+            f"volume={_n(effect.cue.gain_db)}dB,adelay=delays={round(at * 1000)}:all=1{label}"
+        )
+        labels.append(label)
+    return labels
+
+
 def build_mix_command(ffmpeg_path: str, request: MixPlanRequest, target: Path) -> list[str]:
     """One FFmpeg run that writes the short's mixed audio (48 kHz stereo float WAV)."""
     if not math.isfinite(request.duration) or request.duration <= 0:
         raise ValueError("The short's duration must be positive")
     graph = _Graph()
     parts = [p for p in (_source_chain(graph, request), _music_chain(graph, request)) if p]
+    parts += _sfx_chains(graph, request)
     d = _n(request.duration)
     graph.chains.append(f"anullsrc=r={SAMPLE_RATE}:cl=stereo,atrim=duration={d}[bed]")
     graph.chains.append(

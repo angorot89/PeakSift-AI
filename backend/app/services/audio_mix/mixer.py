@@ -27,6 +27,8 @@ def render_mix(
         redactions[str(request.source)] = "<source>"
     if request.music is not None:
         redactions[str(request.music.path)] = "<music>"
+    for effect in request.sfx:
+        redactions[str(effect.path)] = "<sfx>"
     target.unlink(missing_ok=True)
     try:
         run_ffmpeg(command, options, heartbeat, redactions)
