@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { crossedCues, dbToGain, musicLevelAt, musicPositionAt, type MusicRequest } from "@/lib/audio-mix";
 
 export type PreviewPlan = {
@@ -161,17 +161,20 @@ export function useAssetListening() {
     },
     [],
   );
-  return {
-    play(url: string, onEnded: () => void) {
-      if (!player.current) player.current = new Audio();
-      const element = player.current;
-      element.pause();
-      element.src = url;
-      element.onended = onEnded;
-      void element.play().catch(onEnded);
-    },
-    stop() {
-      player.current?.pause();
-    },
-  };
+  return useMemo(
+    () => ({
+      play(url: string, onEnded: () => void) {
+        if (!player.current) player.current = new Audio();
+        const element = player.current;
+        element.pause();
+        element.src = url;
+        element.onended = onEnded;
+        void element.play().catch(onEnded);
+      },
+      stop() {
+        player.current?.pause();
+      },
+    }),
+    [],
+  );
 }
