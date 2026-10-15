@@ -698,3 +698,19 @@ def test_stale_detection_cannot_complete_the_new_attempt(db_session, run, settin
     row, titles = _run_state(db_session, run)
     assert row.status == "analyzing" and row.completed_at is None
     assert titles == []  # attempt 1's ranked candidates were never written
+
+
+def test_detection_runs_on_a_transcript_ending_slightly_past_the_video(db_session, run, settings):
+    last = run.transcription.segments[-1]
+    last.end_time = VIDEO_DURATION + 0.08  # persisted before media-bounds normalization
+    db_session.commit()
+    lines = [
+        TranscriptLine(s.start_time, min(s.end_time, VIDEO_DURATION), s.text)
+        for s in run.transcription.segments
+    ]
+    run.transcript_fingerprint = transcript_fingerprint(run.transcription_id, lines)
+    db_session.commit()
+    result = execute(
+        run, db_session, SpyProvider(db_session, run, respond=proposals_for_window), settings
+    )
+    assert result.status == "completed", result.error_message

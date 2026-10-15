@@ -300,7 +300,9 @@ def _load_transcript(
     return prepare_lines(
         (TranscriptLine(start=s.start_time, end=s.end_time, text=s.text) for s in segments),
         video_duration=float(run.video.duration_seconds or 0.0),
-        tolerance_seconds=config.timestamp_tolerance_seconds,
+        # Transcript lines follow the transcript's own media-bounds rule (media_timing.py);
+        # the snapshot's tolerance is for snapping model-proposed times.
+        tolerance_seconds=get_settings().transcription_timestamp_tolerance_seconds,
     )
 
 
