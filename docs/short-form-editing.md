@@ -4,6 +4,8 @@ This page explains how PeakSift turns a generated clip into a 9:16 vertical shor
 
 > **V0.8:** word-synced dynamic captions — the Focus, Punch, Minimal and Boxed presets with the spoken word emphasised, the social safe area and the opening hook (renderer `caption_v2`) — are documented in [dynamic-captions.md](dynamic-captions.md). This page describes the V0.6 phrase renderer (`caption_v1`) used by the Clean, Bold and Creator styles; existing edits keep their original behaviour.
 
+> **V0.9:** an edit can also carry an audio section — music, sound effects, ducking and loudness normalization — documented in [audio-sound-design.md](audio-sound-design.md). Without it the clip's own audio is kept exactly as described here.
+
 ## What it does, and does not do
 
 When a clip is ready, its owner picks a **layout** and **caption** options and clicks **Render short**. A background worker composes the clip at 1080 × 1920 with FFmpeg. If captions are on, it burns in captions built from the persisted transcript. The worker validates the result with ffprobe and stores it as a private MP4, which the owner can preview and download.

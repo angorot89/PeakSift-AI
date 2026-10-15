@@ -127,7 +127,7 @@ Short-form edits (9:16 variants of a ready clip):
 
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
-| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator" \| "focus" \| "punch" \| "minimal" \| "boxed", "caption_position": "top" \| "center" \| "bottom", "caption_timing": "aligned_word" \| "phrase_fallback" (dynamic styles only; default aligned_word), "caption_track_id": uuid (aligned_word only; a completed track of this clip), "hook_enabled": bool, "hook_text": 1–60 characters, "hook_style": "headline" \| "boxed" \| "minimal", "hook_position": "top" \| "center", "hook_duration_seconds": 0.5–5}` (unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
+| POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator" \| "focus" \| "punch" \| "minimal" \| "boxed", "caption_position": "top" \| "center" \| "bottom", "caption_timing": "aligned_word" \| "phrase_fallback" (dynamic styles only; default aligned_word), "caption_track_id": uuid (aligned_word only; a completed track of this clip), "hook_enabled": bool, "hook_text": 1–60 characters, "hook_style": "headline" \| "boxed" \| "minimal", "hook_position": "top" \| "center", "hook_duration_seconds": 0.5–5, "audio": {"source_gain_db": −24…6, "normalize": bool, "music": {"asset_id", "gain_db": −40…0, "source_start_seconds", "loop", "fade_in_seconds"/"fade_out_seconds": 0–10, "ducking": "off" \| "light" \| "medium" \| "strong"} \| null, "sfx": [≤ 12 × {"asset_id", "at_seconds", "gain_db": −30…6}]}}` (audio assets must be this project's, of the right kind; unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
 | GET    | `…/clips/{clip_id}/edits` | yes | The clip's variants, newest first (`offset`, `limit` 1–50). |
 | GET    | `…/clips/{clip_id}/edits/{edit_id}` | yes | Edit state: `status`, stage `progress_percent`, `attempt`, `is_stale`, the configuration, output metadata and `caption_cue_count` once ready, safe `error_code`/`error_message`. A `ready` edit whose file is missing is reported as `failed`/`artifact_missing`. |
 | POST   | `…/edits/{edit_id}/retry` | yes | Re-queue a failed or stale edit on the same row (row-locked; `409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
@@ -152,6 +152,11 @@ Smart reframing (face-tracking crop paths for a ready clip; see [docs/smart-refr
 | POST   | `…/clips/{clip_id}/caption-tracks/{track_id}/retry` | yes | Re-queue a failed or stale track (row-locked; `409` otherwise or after `CAPTION_TIMING_MAX_ATTEMPTS`). |
 | GET    | `…/clips/{clip_id}/caption-timing` | yes | `{word_timing: none\|running\|completed\|failed, track, phrase_timing_available}` for the editor. |
 | GET    | `…/clips/{clip_id}/caption-preview?style=&position=&timing=&track_id=` | yes | The renderer's own cues `{start, end, timed, lines: [[{text, start, end, attached}]]}` for the live preview; `409` when they cannot be built yet. |
+| POST   | `/projects/{id}/audio-assets` | yes | Upload music or a sound effect (`multipart/form-data`: `file`, `kind` = `music` \| `sfx`). Validated by content with ffprobe; `201` new, `200` the project's existing asset for the same file and kind; `413` too large or too long; `415`/`422` not usable audio. Nothing is kept on refusal. |
+| GET    | `/projects/{id}/audio-assets[?kind=]` / `…/{asset_id}` | yes | The project's audio (newest first) / one asset: kind, display name, size, duration, sample rate, channels, codec, container — no keys, paths or hashes. |
+| GET    | `/projects/{id}/audio-assets/{asset_id}/waveform` | yes | `{buckets, peaks}`: 200–1000 peak amplitudes (0–100 % of full scale). |
+| GET    | `/projects/{id}/audio-assets/{asset_id}/content` | yes | Owner-only preview stream with HTTP Range (`private, no-store`). |
+| GET    | `/audio-upload-limits` | yes | `{max_bytes, music_max_duration_seconds, sfx_max_duration_seconds, accepted_extensions}`. |
 | GET    | `/caption-styles` | yes | The dynamic renderer's presets, placements, safe area, hook limits, font ratio and emoji policy (`monochrome`/`omitted`). |
 
 No task ids, model paths, storage keys or FFmpeg details are returned.
@@ -256,6 +261,16 @@ PEAKSIFT_REAL_WHISPER=1 pytest tests/test_caption_timing_provider.py -k real   #
 
 The full design and limitations are in [docs/dynamic-captions.md](../docs/dynamic-captions.md).
 
+## Audio & sound design
+
+`app/services/audio_assets.py` validates and indexes uploads (ffprobe checks, sha256 while storing, waveform peaks from an FFmpeg pipe). `app/services/audio_mix/` finishes a short's audio: `config.py` (the edit's `audio` section, `audio_mix_v1`), `plan.py` (one FFmpeg run from validated numbers onto a bed of the clip's length: source gain, music trim/loop/fades/gain, delayed effects), `ducking.py` (Light / Medium / Strong → `sidechaincompress` constants), `loudness.py` (−1 dBFS limiter, two-pass `loudnorm` to −14 LUFS) and `mixer.py` (`render_mix`, `prepare_track`). The edit pipeline mixes into the attempt's workspace, muxes AAC, validates the track and records `audio_loudness_lufs` / `audio_true_peak_dbtp`.
+
+```bash
+python scripts/audio_mix_probe.py   # mix matrix, measured ducking and loudness, full short (CI)
+```
+
+The full design and limitations are in [docs/audio-sound-design.md](../docs/audio-sound-design.md).
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner, maps the stored key to a path inside `MEDIA_ROOT`, and streams it through the shared Range implementation in `app/api/media_streaming.py`. The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -281,6 +296,8 @@ app/
   services/clip_render/        # Artifact storage, FFmpeg renderer, Celery render pipeline
   services/clip_edit/          # Edit config, 9:16 composition, smart/manual crops, captions + styles, edit artifacts, pipeline
   services/reframe/            # Smart reframing: config, sampling, detector contract + YuNet, tracking, crop path, pipeline
+  services/audio_assets.py     # Audio uploads: validation by content, probing, sha256, waveform peaks
+  services/audio_mix/          # Audio section config, FFmpeg mix plan, ducking presets, loudness, mixer
   services/caption_timing/     # Word timing: config, provider contract + validation, faster-whisper words, pipeline
   services/clip_detection/     # Contract + schema, prompt, factory, ollama + openai providers, windowing,
                                # validation, ranking, detection_config, pipeline
@@ -293,7 +310,7 @@ app/
   workers/caption_tasks.py     # peaksift.generate_caption_track
   workers/dispatch.py          # enqueue helpers (pre-chosen task ids); broker outage -> JobQueueUnavailable
 alembic/             # Migration environment and versions/
-scripts/             # celery_smoke.py, fetch_reframe_model.py, smart_crop_probe.py, caption_font_probe.py, dynamic_caption_probe.py
+scripts/             # celery_smoke.py, fetch_reframe_model.py, smart_crop_probe.py, caption_font_probe.py, dynamic_caption_probe.py, audio_mix_probe.py
 tests/               # pytest suite (conftest.py holds the DB fixtures)
 ```
 
@@ -311,6 +328,8 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
 | `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
+| `AUDIO_UPLOAD_MAX_BYTES` | `104857600` (100 MiB)                   | Largest accepted music or sound-effect file  |
+| `AUDIO_UPLOAD_MAX_DURATION_SECONDS` / `AUDIO_SFX_MAX_DURATION_SECONDS` | `1200` / `30` | Longest music track / sound effect |
 | `FFPROBE_PATH`      | `ffprobe`                                      | ffprobe binary (name on `PATH` or absolute path) |
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary for audio extraction, clip rendering and shorts (needs libass for captions) |

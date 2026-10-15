@@ -19,7 +19,7 @@ Other scripts:
 
 ```bash
 npm run lint     # ESLint
-npm test         # Unit tests (node --test: status sync, caption timing)
+npm test         # Unit tests (node --test: status sync, caption timing, audio mix)
 npm run build    # Production build
 npm run start    # Serve the production build
 ```
@@ -41,7 +41,7 @@ npm run start    # Serve the production build
 | `/projects` | The signed-in user's projects                                       |
 | `/projects/new` | Create a project (name only)                                   |
 | `/projects/[id]` | The project workspace. A **workflow stepper** (Upload, Transcribe, Find clips, Generate, Edit — Done / In progress / Next / Needs attention, each linking to its section, nothing locked) above four numbered panels: **1 Source video** (upload drop zone with real progress, then a labelled "Source preview" player beside duration/resolution/size/upload date; codecs behind "Show technical details"; Replace), **2 Transcript** (start, live status with real progress, stalled/failed alerts with retry, a bounded scrollable timestamped transcript, Copy transcript), **3 Clip moments** (provider/model choice from server allow-lists, "Find clip moments", staged progress, run history, and ranked candidate cards: rank, title, time range, one prominent overall score, the hook, "Why it was selected" (clamped), score breakdown and transcript excerpt behind a disclosure, Saved/Dismissed chips, Preview source in a labelled frame, Generate clip with real render states, and a compact "Generated clip" player with **Create vertical short** and **Download MP4**), **4 Generated clips** (frame thumbnails, status, number of shorts, Download, Create short / Open editor) |
-| `/projects/[id]/clips/[clipId]` | The **short-form editor** for one ready clip: a 9:16 stage (labelled approximate **Preview** with a real transcript caption, or the **Rendered short**; with Smart reframe the preview follows the completed crop path frame by frame), visual settings (layout cards, a **Smart reframe** panel — Analyze framing with real stages and progress, a plain-language confidence summary, Retry, and an Automatic / Focal point switch with a keyboard-accessible focal-point picker — Captions switch, a **Word synced / Phrase timed** panel with the timing state as text and Generate / Retry, caption-preset cards (Focus, Punch, Minimal, Boxed) with live samples, Top/Center/Bottom picker, an **Opening hook** panel, a **Safe area** guide, and a live preview of the renderer's own cues and active word following the video clock), **Render short** replaced by the real Queued/Rendering/Validating state while it runs, the rendered result with **Download short** / **Create another version** / **Back to clip**, and the versions list named by settings (status, play, download, retry) |
+| `/projects/[id]/clips/[clipId]` | The **short-form editor** for one ready clip: a 9:16 stage (labelled approximate **Preview** with a real transcript caption, or the **Rendered short**; with Smart reframe the preview follows the completed crop path frame by frame), visual settings (layout cards, a **Smart reframe** panel — Analyze framing with real stages and progress, a plain-language confidence summary, Retry, and an Automatic / Focal point switch with a keyboard-accessible focal-point picker — Captions switch, a **Word synced / Phrase timed** panel with the timing state as text and Generate / Retry, caption-preset cards (Focus, Punch, Minimal, Boxed) with live samples, Top/Center/Bottom picker, an **Opening hook** panel, a **Safe area** guide, a live preview of the renderer's own cues and active word following the video clock, and an **Audio** section — original level, music picker with waveform/listen/upload, music volume, start, loop, fades, automatic ducking, sound-effect cues on a lightweight timeline with keyboard-movable markers, normalization — with a browser audio preview that follows the video), **Render short** replaced by the real Queued/Rendering/Validating state while it runs, the rendered result with **Download short** / **Create another version** / **Back to clip**, and the versions list named by settings (status, play, download, retry) |
 
 `/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
 
@@ -79,6 +79,7 @@ components/
                    # clip render controls + rendered clip, project workflow stepper,
                    # generated clips panel, short-editor view; editor/ = stage (+ reframed preview),
                    # controls, caption controls + caption layer (live dynamic captions),
+                   # audio panel + audio timeline (music, effects, waveforms),
                    # smart-reframe panel + focal-point picker, versions
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
@@ -95,6 +96,9 @@ lib/
   clip-detection.ts # Provider options, detection runs, candidates, decisions; stage labels
   clips.ts         # Generated clips: generate/status/retry/list, content and download URLs
   edits.ts         # Short-form edits: option allow-lists, create/list/status/retry, content and download URLs
+  audio.ts         # Audio assets: list, waveform, limits, XHR upload with progress, content URLs
+  audio-mix.ts     # The edit's audio section: normalization, timing rules shared with the renderer (unit-tested)
+  use-audio-preview.ts # Browser audio preview with the video as master clock; asset "Listen" player
   captions.ts      # Dynamic captions: caption styles, word timing start/status/retry, caption preview
   caption-timing.ts # Pure cue / active-word lookup for the preview (unit-tested)
   status-sync.ts   # Status ordering and polling that never moves backwards (unit-tested)
