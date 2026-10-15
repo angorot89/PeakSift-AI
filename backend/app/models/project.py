@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.audio_asset import AudioAsset
     from app.models.user import User
     from app.models.video import Video
 
@@ -36,6 +37,9 @@ class Project(Base):
     owner: Mapped["User"] = relationship(back_populates="projects")
     videos: Mapped[list["Video"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
+    )
+    audio_assets: Mapped[list["AudioAsset"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
 
     def __repr__(self) -> str:
