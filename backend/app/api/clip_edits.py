@@ -110,6 +110,8 @@ def _read(edit: ClipEdit) -> ClipEditRead:
         output_height=edit.output_height,
         render_profile=edit.render_profile,
         caption_cue_count=edit.caption_cue_count,
+        audio_loudness_lufs=edit.audio_loudness_lufs,
+        audio_true_peak_dbtp=edit.audio_true_peak_dbtp,
         duration_seconds=edit.duration_seconds,
         width=edit.width,
         height=edit.height,
@@ -238,12 +240,6 @@ def _require_audio(db: DbSession, clip: Clip, video: Video, config: EditConfig) 
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="A sound effect starts after the end of the clip",
             )
-    # The audio configuration is stored and fingerprinted, but shorts are not mixed yet:
-    # refuse clearly instead of rendering without the requested audio.
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="Audio mixing is not available on this server yet",
-    )
 
 
 def _enqueue_or_503(db: DbSession, edit: ClipEdit, *, created: bool) -> None:

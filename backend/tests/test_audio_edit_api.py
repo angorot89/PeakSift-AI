@@ -88,10 +88,26 @@ def test_malformed_audio_requests_are_422(client, ctx, audio):
     assert client.post(ctx["base"], json=body(audio)).status_code == 422
 
 
-def test_valid_audio_is_refused_clearly_until_the_mixer_renders_it(client, ctx):
+def test_valid_audio_edits_are_created_once_and_keep_their_exact_assets(client, ctx, monkeypatch):
+    queued = []
+    monkeypatch.setattr(
+        "app.api.clip_edits.enqueue_clip_edit",
+        lambda edit_id, *, task_id: queued.append(edit_id),
+    )
     audio = {
-        "music": {"asset_id": ctx["music"]},
+        "music": {"asset_id": ctx["music"], "gain_db": -18, "ducking": "strong"},
         "sfx": [{"asset_id": ctx["hit"], "at_seconds": 2}],
     }
-    response = client.post(ctx["base"], json=body(audio))
-    assert response.status_code == 409 and "not available" in response.json()["detail"]
+    first = client.post(ctx["base"], json=body(audio))
+    assert first.status_code == 201, first.text
+    snapshot = first.json()["configuration"]["audio"]
+    assert (
+        snapshot["music"]["asset_id"] == ctx["music"] and snapshot["music"]["ducking"] == "strong"
+    )
+    assert [cue["asset_id"] for cue in snapshot["sfx"]] == [ctx["hit"]]
+    again = client.post(ctx["base"], json=body(audio))
+    assert again.status_code == 200 and again.json()["id"] == first.json()["id"]
+    plain = client.post(ctx["base"], json=body(None))
+    assert plain.status_code == 201 and plain.json()["id"] != first.json()["id"]
+    assert "audio" not in plain.json()["configuration"]
+    assert len(queued) == 2

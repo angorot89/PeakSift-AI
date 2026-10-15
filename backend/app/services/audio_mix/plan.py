@@ -28,7 +28,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.services.audio_mix.config import MusicConfig, SfxCue
+from app.services.audio_mix.config import AudioMix, MusicConfig, SfxCue
 from app.services.audio_mix.ducking import ducking_filter
 
 SAMPLE_RATE = 48000
@@ -152,6 +152,33 @@ def _music_chain(graph: _Graph, request: MixPlanRequest) -> str | None:
     graph.chains.append(f"{label}{','.join(steps)}[music_level]")
     graph.chains.append(f"[music_level][duck_key]{ducking}[music]")
     return "[music]"
+
+
+def mix_request(
+    mix: AudioMix,
+    *,
+    duration: float,
+    source: Path | None,
+    assets: dict[str, tuple[Path, float]],
+) -> MixPlanRequest | None:
+    """The plan for an edit's audio section, or None when nothing at all would be heard.
+
+    ``assets`` maps each referenced asset id to its resolved file and duration (the caller has
+    checked ownership and kind). ``source`` is the clip, when it has an audio stream.
+    """
+    music = None
+    if mix.music is not None:
+        path, seconds = assets[mix.music.asset_id]
+        music = MusicInput(path, seconds, mix.music)
+    effects = tuple(
+        SfxInput(assets[cue.asset_id][0], assets[cue.asset_id][1], cue) for cue in mix.sfx
+    )
+    request = MixPlanRequest(duration, source, mix.source_gain_db, music, effects)
+    music_plays = music is not None and music_timeline(music, duration).plays_seconds > 0
+    effects_play = any(e.cue.at_seconds < duration for e in effects)
+    if source is None and not music_plays and not effects_play:
+        return None  # a silent short stays without an audio stream, as before
+    return request
 
 
 def _sfx_chains(graph: _Graph, request: MixPlanRequest) -> list[str]:

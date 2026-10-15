@@ -23,6 +23,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import inspect as sa_inspect
@@ -31,6 +32,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.models import (
+    AudioAsset,
+    AudioAssetKind,
     ClipEdit,
     ClipEditStatus,
     ClipStatus,
@@ -40,6 +43,9 @@ from app.models import (
     TranscriptionStatus,
     TranscriptSegment,
 )
+from app.services.audio_mix.loudness import measure_loudness
+from app.services.audio_mix.mixer import prepare_track
+from app.services.audio_mix.plan import mix_request
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.caption_v2 import build_dynamic_ass
 from app.services.clip_edit.captions import SourceSegment, build_cues
@@ -59,12 +65,16 @@ from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
+from app.services.ffprobe import ProbeError, probe
 from app.services.storage import InvalidStorageKey, LocalMediaStorage, StorageError
 
 logger = logging.getLogger(__name__)
 
 CLAIMED_PROGRESS = 5
 CAPTIONS_READY_PROGRESS = 15
+AUDIO_READY_PROGRESS = 25
+# A finished track measuring above this true peak (dBTP) is treated as clipped and refused.
+CLIPPING_TRUE_PEAK_DBTP = 0.0
 RENDER_DONE_PROGRESS = 85
 VALIDATING_PROGRESS = 90
 MAX_ERROR_LENGTH = 500
@@ -266,6 +276,14 @@ def _execute(
     edit.progress_percent = CAPTIONS_READY_PROGRESS
     _heartbeat(edit, db, task_id)
 
+    extra: dict = {}
+    if config.audio is not None:
+        track = _prepare_audio(edit, db, settings, store, workspace, config, source, task_id)
+        if track is not None:
+            extra["audio"] = track
+        edit.progress_percent = AUDIO_READY_PROGRESS
+        _heartbeat(edit, db, task_id)
+
     composed = composer(
         source,
         store.render_path(edit.id, attempt),
@@ -277,7 +295,10 @@ def _execute(
         heartbeat=lambda: _heartbeat(edit, db, task_id),
         crop_points=crop_points,
         focus=((config.focus_x, config.focus_y) if config.layout == Layout.MANUAL_CROP else None),
+        **extra,
     )
+    if "audio" in extra:
+        _check_final_audio(edit, store.render_path(edit.id, attempt), settings)
     edit.progress_percent = RENDER_DONE_PROGRESS
     _heartbeat(edit, db, task_id)
 
@@ -308,6 +329,90 @@ def _execute(
         composed.duration_seconds,
         composed.size_bytes,
     )
+
+
+def _prepare_audio(
+    edit: ClipEdit,
+    db: Session,
+    settings: Settings,
+    store: EditArtifactStore,
+    workspace: Path,
+    config: EditConfig,
+    source: Path,
+    task_id: str | None,
+) -> Path | None:
+    """Mix and finish the edit's audio section into the attempt workspace.
+
+    The referenced assets are re-checked here (the snapshot names them; they must still be
+    this project's, of the right kind, with their file present). Returns None when nothing
+    would be heard (a silent clip without music or effects stays without an audio stream).
+    """
+    mix = config.audio
+    try:
+        meta = probe(source, ffprobe_path=settings.ffprobe_path)
+    except ProbeError:
+        raise PipelineFailure("clip_missing", "The source clip could not be read") from None
+    if not meta.duration_seconds:
+        raise PipelineFailure("clip_missing", "The source clip has no duration")
+    project_id = edit.clip.video.project_id
+    wanted = {uuid.UUID(asset_id) for asset_id in mix.asset_ids}
+    rows = {
+        str(asset.id): asset
+        for asset in db.scalars(
+            select(AudioAsset).where(AudioAsset.id.in_(wanted), AudioAsset.project_id == project_id)
+        )
+    } if wanted else {}  # fmt: skip
+    kinds = {cue.asset_id: AudioAssetKind.SFX for cue in mix.sfx}
+    if mix.music is not None:
+        kinds[mix.music.asset_id] = AudioAssetKind.MUSIC
+    assets: dict[str, tuple[Path, float]] = {}
+    for asset_id, kind in kinds.items():
+        asset = rows.get(asset_id)
+        try:
+            path = store.storage.path_for(asset.storage_key) if asset else None
+        except InvalidStorageKey:
+            path = None
+        if asset is None or asset.kind != kind or path is None or not path.is_file():
+            raise PipelineFailure(
+                "audio_asset_unavailable",
+                "A selected music track or sound effect is no longer available",
+            )
+        assets[asset_id] = (path, float(asset.duration_seconds))
+    request = mix_request(
+        mix,
+        duration=float(meta.duration_seconds),
+        source=source if meta.audio_codec is not None else None,
+        assets=assets,
+    )
+    if request is None:
+        return None
+    track, loudness = prepare_track(
+        request,
+        workspace,
+        normalize=mix.normalize,
+        options=render_options_from(settings),
+        heartbeat=lambda: _heartbeat(edit, db, task_id),
+    )
+    logger.info(
+        "Clip edit %s audio: music %s, %s effects, mix loudness %s",
+        edit.id,
+        "on" if mix.music else "off",
+        len(mix.sfx),
+        f"{loudness.integrated:.1f} LUFS" if loudness else "n/a",
+    )
+    return track
+
+
+def _check_final_audio(edit: ClipEdit, rendered: Path, settings: Settings) -> None:
+    """Measure the encoded short's audio; record it, and refuse an obviously clipped result."""
+    measured = measure_loudness(rendered, render_options_from(settings))
+    edit.audio_loudness_lufs = round(measured.integrated, 2) if measured else None
+    edit.audio_true_peak_dbtp = round(measured.true_peak, 2) if measured else None
+    if measured is not None and measured.true_peak > CLIPPING_TRUE_PEAK_DBTP:
+        raise RenderError(
+            "audio_clipped",
+            "The finished audio clips; lower the music or effect volume, or turn on normalization",
+        )
 
 
 def _crop_path(edit: ClipEdit, db: Session, config: EditConfig) -> list[CropPoint]:
