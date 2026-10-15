@@ -116,6 +116,8 @@ class ClipEditRead(BaseModel):
     output_height: int
     render_profile: str
     caption_cue_count: int | None
+    audio_loudness_lufs: float | None = None
+    audio_true_peak_dbtp: float | None = None
     duration_seconds: float | None
     width: int | None
     height: int | None

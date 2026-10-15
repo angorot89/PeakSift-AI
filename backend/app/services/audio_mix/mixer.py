@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from app.services.audio_mix.loudness import Loudness, finish_audio
 from app.services.audio_mix.plan import MixPlanRequest, build_mix_command
 from app.services.clip_render.renderer import RenderError, RenderOptions, run_ffmpeg
 
@@ -43,3 +44,25 @@ def render_mix(
         target.unlink(missing_ok=True)
         raise
     return target
+
+
+def prepare_track(
+    request: MixPlanRequest,
+    workspace: Path,
+    *,
+    normalize: bool,
+    options: RenderOptions,
+    heartbeat: Callable[[], None] | None = None,
+) -> tuple[Path, Loudness | None]:
+    """Mix, then finish (limit, optionally normalize) the short's audio inside ``workspace``.
+
+    Returns the final WAV and the loudness measurement used. Intermediate files stay in the
+    attempt's workspace, which the render pipeline removes on success and on failure.
+    """
+    mixed = render_mix(request, workspace / "audio-mix.wav", options, heartbeat)
+    final = workspace / "audio-final.wav"
+    loudness = finish_audio(mixed, final, normalize=normalize, options=options)
+    mixed.unlink(missing_ok=True)
+    if heartbeat is not None:
+        heartbeat()
+    return final, loudness

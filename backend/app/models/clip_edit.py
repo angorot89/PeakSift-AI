@@ -172,6 +172,10 @@ class ClipEdit(Base):
     video_codec: Mapped[str | None] = mapped_column(String(64))
     audio_codec: Mapped[str | None] = mapped_column(String(64))
     caption_cue_count: Mapped[int | None] = mapped_column(Integer)
+    # Edits with an audio section: the encoded short's measured integrated loudness (LUFS) and
+    # true peak (dBTP), recorded after rendering. Null for silent shorts and plain edits.
+    audio_loudness_lufs: Mapped[float | None] = mapped_column(Float)
+    audio_true_peak_dbtp: Mapped[float | None] = mapped_column(Float)
 
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(String(500))

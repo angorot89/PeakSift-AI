@@ -54,7 +54,7 @@ def amplitude(samples: np.ndarray, start: float, end: float, frequency: float) -
     seg = window(samples, start, end)
     spectrum = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) * 4 / len(seg)
     freqs = np.fft.rfftfreq(len(seg), 1 / RATE)
-    near = np.abs(freqs - frequency) <= 3
+    near = np.abs(freqs - frequency) <= max(3.0, RATE / len(seg))  # at least one bin
     return float(spectrum[near].max())
 
 

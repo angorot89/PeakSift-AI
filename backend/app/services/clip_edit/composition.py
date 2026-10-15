@@ -12,7 +12,9 @@ ASS file referenced by a fixed relative name with FFmpeg running inside the work
 no filesystem path is embedded in a filtergraph either. Rotation metadata is applied while
 decoding, so phone footage is composed upright.
 
-Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio.
+Output: fast-start MP4, H.264 (libx264, yuv420p), AAC when the source has audio — or, when
+the edit has an audio section, AAC from the prepared, mixed and finished track (a second
+input; see ``app/services/audio_mix``), which replaces the clip's own audio stream.
 """
 
 import logging
@@ -207,6 +209,7 @@ def build_edit_command(
     crf: int,
     audio_bitrate: str,
     video_graph: str | None = None,
+    audio_track: Path | None = None,
 ) -> list[str]:
     # Smart reframe passes its own validated crop graph; every other layout uses constants.
     graph = video_graph if video_graph is not None else layout_filter(layout)
@@ -224,12 +227,18 @@ def build_edit_command(
         "-y",
         "-i",
         str(source),
+    ]
+    if audio_track is not None:
+        command += ["-i", str(audio_track)]
+    command += [
         "-filter_complex",
         graph,
         "-map",
         video_label,
     ]
-    if has_audio:
+    if audio_track is not None:
+        command += ["-map", "1:a:0"]
+    elif has_audio:
         command += ["-map", "0:a:0"]
     command += [
         "-sn",
@@ -245,7 +254,7 @@ def build_edit_command(
         "-pix_fmt",
         PIXEL_FORMAT,
     ]
-    if has_audio:
+    if has_audio or audio_track is not None:
         command += ["-c:a", AUDIO_CODEC, "-b:a", audio_bitrate]
     command += ["-movflags", "+faststart", "-f", "mp4", str(target)]
     return command
@@ -282,6 +291,7 @@ def compose_short(
     heartbeat: Callable[[], None] | None = None,
     crop_points: Sequence[CropPoint] | None = None,
     focus: tuple[float, float] | None = None,
+    audio: Path | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
 
@@ -302,7 +312,9 @@ def compose_short(
         raise RenderError("source_unreadable", "The generated clip could not be read") from None
     if not source_meta.duration_seconds:
         raise RenderError("source_unreadable", "The generated clip has no duration")
-    has_audio = source_meta.audio_codec is not None
+    has_audio = source_meta.audio_codec is not None or audio is not None
+    if audio is not None and (not audio.is_file() or audio.stat().st_size == 0):
+        raise RenderError("audio_mix_failed", "The prepared audio is missing")
 
     video_graph = None
     if layout == Layout.MANUAL_CROP:
@@ -334,12 +346,15 @@ def compose_short(
         crf=options.crf,
         audio_bitrate=options.audio_bitrate,
         video_graph=video_graph,
+        audio_track=audio,
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
     redactions = {str(source): "<source>", str(target): "<output>"}
     if workspace is not None:
         redactions[str(workspace)] = "<workspace>"
+    if audio is not None:
+        redactions[str(audio)] = "<audio>"
     try:
         run_ffmpeg(command, options, heartbeat, redactions, cwd=workspace)
         if not target.is_file() or target.stat().st_size == 0:
