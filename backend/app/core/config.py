@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     media_root: Path = Path("./media")
     # Largest accepted source video. Default 2 GiB.
     max_video_upload_bytes: int = Field(default=2 * 1024**3, gt=0)
+    # User-supplied audio (music and sound effects): largest file, longest music track and
+    # longest sound effect. Default 100 MiB, 20 minutes, 30 seconds.
+    audio_upload_max_bytes: int = Field(default=100 * 1024**2, gt=0)
+    audio_upload_max_duration_seconds: float = Field(default=20 * 60, gt=0)
+    audio_sfx_max_duration_seconds: float = Field(default=30, gt=0)
 
     # ffprobe binary used to read video metadata, and how long one probe may take.
     ffprobe_path: str = "ffprobe"

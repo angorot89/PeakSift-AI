@@ -29,7 +29,7 @@ class UploadValidationError(Exception):
         self.message = message
 
 
-def sanitize_filename(raw: str | None) -> str:
+def sanitize_filename(raw: str | None, *, fallback: str = "video") -> str:
     """Reduce a browser-supplied name to a safe display name.
 
     Only the final path component survives (both separators), control and
@@ -42,7 +42,7 @@ def sanitize_filename(raw: str | None) -> str:
     if len(name) > MAX_FILENAME_LENGTH:
         suffix = PurePosixPath(name).suffix[:16]
         name = name[: MAX_FILENAME_LENGTH - len(suffix)] + suffix
-    return name or "video"
+    return name or fallback
 
 
 def validate_upload(filename: str | None, content_type: str | None) -> tuple[str, str, str]:

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.audio_assets import limits_router as audio_limits_router
+from app.api.audio_assets import router as audio_assets_router
 from app.api.auth import router as auth_router
 from app.api.caption_styles import router as caption_styles_router
 from app.api.caption_tracks import router as caption_tracks_router
@@ -50,3 +52,5 @@ app.include_router(edit_media_router)
 app.include_router(reframe_router)
 app.include_router(caption_tracks_router)
 app.include_router(caption_styles_router)
+app.include_router(audio_assets_router)
+app.include_router(audio_limits_router)
