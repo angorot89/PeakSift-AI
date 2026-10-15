@@ -27,6 +27,8 @@ type PreviewProps = {
   layout: Layout;
   /** Text layers (captions, hook, safe-area guide) in output-frame coordinates. */
   overlay?: ReactNode;
+  /** Receives the playing preview video (the editor's audio preview follows its clock). */
+  onVideo?: (video: HTMLVideoElement | null) => void;
 };
 
 /**
@@ -34,9 +36,13 @@ type PreviewProps = {
  * It shows layout and caption placement; it is labelled as a preview because the server's
  * FFmpeg render (blur strength, exact glyph shapes) is the authoritative result.
  */
-export function PreviewStage({ clipSrc, layout, overlay }: PreviewProps) {
+export function PreviewStage({ clipSrc, layout, overlay, onVideo }: PreviewProps) {
   const front = useRef<HTMLVideoElement>(null);
   const back = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    onVideo?.(front.current);
+    return () => onVideo?.(null);
+  }, [onVideo]);
 
   // Keep the blurred backdrop in step with the playing foreground.
   useEffect(() => {
@@ -120,6 +126,7 @@ export function ReframedPreview({
   framing,
   overlay,
   badge,
+  onVideo,
 }: {
   clipSrc: string;
   sourceWidth: number;
@@ -128,8 +135,13 @@ export function ReframedPreview({
   /** Text layers in output-frame coordinates: they never move with the crop. */
   overlay?: ReactNode;
   badge?: ReactNode;
+  onVideo?: (video: HTMLVideoElement | null) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    onVideo?.(video.current);
+    return () => onVideo?.(null);
+  }, [onVideo]);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);

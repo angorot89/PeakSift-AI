@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, Plus, RotateCcw, 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { AudioPanel } from "@/components/app/editor/audio-panel";
 import { CaptionTimingPanel, HookPanel, PresetCards, SafeAreaToggle } from "@/components/app/editor/caption-controls";
 import { CaptionLayer, type HookPreview } from "@/components/app/editor/caption-layer";
 import { CaptionSwitch, LayoutPicker, PositionPicker } from "@/components/app/editor/controls";
@@ -20,6 +21,15 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, errorMessage } from "@/lib/api";
+import { audioContentUrl, getAudioUploadLimits, getWaveform, listAudio, type AudioAsset, type AudioUploadLimits } from "@/lib/audio";
+import {
+  DEFAULT_MUSIC,
+  DEFAULT_SFX_GAIN_DB,
+  MAX_SFX_CUES,
+  audioSummary,
+  normalizeAudio,
+  type AudioRequest,
+} from "@/lib/audio-mix";
 import {
   TRACK_STAGES,
   getCaptionPreview,
@@ -43,6 +53,7 @@ import {
   EDIT_STAGES,
   captionSummary,
   createEdit,
+  describeEdit,
   editContentUrl,
   editDownloadUrl,
   editStageLabel,
@@ -74,6 +85,7 @@ import {
 import { mergeJobs, newer } from "@/lib/status-sync";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
+import { useAudioPreview, type PreviewPlan } from "@/lib/use-audio-preview";
 import { listProjectVideos } from "@/lib/videos";
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
@@ -104,6 +116,11 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [hookPosition, setHookPosition] = useState<HookPosition>("top");
   const [hookDuration, setHookDuration] = useState(2);
   const [showSafeArea, setShowSafeArea] = useState(false);
+  const [audio, setAudio] = useState<AudioRequest>({ source_gain_db: 0, normalize: true, music: null, sfx: [] });
+  const [audioAssets, setAudioAssets] = useState<AudioAsset[] | null>(null);
+  const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
+  const [audioLimits, setAudioLimits] = useState<AudioUploadLimits | null>(null);
+  const [previewVideo, setPreviewVideo] = useState<HTMLVideoElement | null>(null);
   const [edits, setEdits] = useState<ClipEdit[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<"preview" | "rendered">("preview");
@@ -151,6 +168,51 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // ---- audio: the project's music and effects, their waveforms, the upload limits ---------
+  const loadWaveform = useCallback(
+    (asset: AudioAsset) =>
+      getWaveform(project.id, asset.id)
+        .then((wave) => setWaveforms((current) => ({ ...current, [asset.id]: wave.peaks })))
+        .catch(() => {}), // the waveform is a navigation aid; the asset stays usable without it
+    [project.id],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    listAudio(project.id)
+      .then((assets) => {
+        if (cancelled) return;
+        setAudioAssets(assets);
+        assets.forEach((asset) => void loadWaveform(asset));
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setAudioAssets([]);
+          setActionError(handleError(err));
+        }
+      });
+    getAudioUploadLimits()
+      .then((limits) => !cancelled && setAudioLimits(limits))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, loadWaveform, handleError]);
+
+  function audioUploaded(asset: AudioAsset) {
+    setAudioAssets((current) => [asset, ...(current ?? []).filter((a) => a.id !== asset.id)]);
+    void loadWaveform(asset);
+    setAudio((current) => {
+      if (asset.kind === "music") {
+        // A newly uploaded track becomes the music (levels and ducking are kept).
+        const keep = current.music ? { gain_db: current.music.gain_db, ducking: current.music.ducking } : {};
+        return { ...current, music: { asset_id: asset.id, ...DEFAULT_MUSIC, ...keep } };
+      }
+      if (current.sfx.length >= MAX_SFX_CUES) return current;
+      const at = Math.round(Math.min(clip.duration_seconds, previewVideo?.currentTime ?? 0) * 10) / 10;
+      return { ...current, sfx: [...current.sfx, { asset_id: asset.id, at_seconds: at, gain_db: DEFAULT_SFX_GAIN_DB }] };
+    });
+  }
 
   // ---- dynamic captions: the renderer's spec, word timing, the hook suggestion -------------
   useEffect(() => {
@@ -343,6 +405,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   // Automatic framing can render only from a completed analysis of this clip.
   const awaitingAnalysis = smart && !manual && !analysisDone;
 
+  // The audio section is sent only once something is chosen (music, effects or a level), so a
+  // creator who never opens Audio gets exactly the earlier render.
+  const audioActive = !!audio.music || audio.sfx.length > 0 || audio.source_gain_db !== 0;
+  const audioRequest = useMemo(() => (audioActive ? normalizeAudio(audio) : null), [audioActive, audio]);
   const request: EditRequest = useMemo(
     () => ({
       aspect_ratio: "9:16",
@@ -367,9 +433,25 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             hook_duration_seconds: hookDuration,
           }
         : {}),
+      ...(audioRequest ? { audio: audioRequest } : {}),
     }),
-    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration],
+    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest],
   );
+  // An approximate audio preview with the video as its clock (the render is authoritative).
+  const previewPlan: PreviewPlan | null = useMemo(() => {
+    if (!audioActive) return null;
+    const music = audio.music ? audioAssets?.find((a) => a.id === audio.music!.asset_id) : undefined;
+    return {
+      duration: clip.duration_seconds,
+      sourceGainDb: audio.source_gain_db,
+      music:
+        audio.music && music
+          ? { url: audioContentUrl(project.id, music.id), trackSeconds: music.duration_seconds, config: audio.music }
+          : null,
+      cues: audio.sfx.map((cue) => ({ url: audioContentUrl(project.id, cue.asset_id), at_seconds: cue.at_seconds, gain_db: cue.gain_db })),
+    };
+  }, [audioActive, audio, audioAssets, clip.duration_seconds, project.id]);
+  useAudioPreview(mode === "preview" ? previewVideo : null, previewPlan);
   // Word-synced captions render only from a completed word timing (never silently phrase).
   const awaitingWords = captions && timing === "aligned_word" && !trackReady;
   const hookLength = [...normalizeHookText(hookText)].length;
@@ -444,14 +526,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   }
 
   const backToProject = `/projects/${project.id}#generated`;
-  const renderedName = selected ? `${layoutLabel(selected.layout)} · ${captionSummary(selected)}` : "";
+  const renderedName = selected ? describeEdit(selected) : "";
+  const audioLabel = audioSummary(audioRequest);
   const settingsSummary = `${layoutLabel(request.layout)} · ${captionSummary({
     captions_enabled: captions,
     caption_style: preset,
     caption_position: position,
     caption_timing: timing,
     hook_enabled: hookOn,
-  })}`;
+  })}${audioLabel ? ` · ${audioLabel}` : ""}`;
 
   // ---- primary action area -------------------------------------------------------------
   let action;
@@ -650,6 +733,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                       sourceHeight={sourceHeight}
                       framing={framing}
                       overlay={overlay}
+                      onVideo={setPreviewVideo}
                       badge={
                         framing.kind === "center" ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
@@ -664,6 +748,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                       clipSrc={clipContentUrl(clip.id)}
                       layout={smart ? "center_crop" : layout}
                       overlay={overlay}
+                      onVideo={setPreviewVideo}
                     />
                   )}
                 </div>
@@ -759,6 +844,19 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 emojiOmitted={spec.emoji === "omitted"}
               />
             ) : null}
+            <div className="border-t border-border pt-5">
+              <AudioPanel
+                projectId={project.id}
+                value={audio}
+                onChange={setAudio}
+                assets={audioAssets}
+                waveforms={waveforms}
+                limits={audioLimits}
+                duration={clip.duration_seconds}
+                video={previewVideo}
+                onUploaded={audioUploaded}
+              />
+            </div>
           </div>
           <div className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
             <p className="text-xs text-muted">

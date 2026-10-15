@@ -7,12 +7,14 @@ import { Spinner } from "@/components/ui/progress";
 import { StatusPill } from "@/components/ui/status-pill";
 import {
   captionSummary,
+  describeEdit,
   editContentUrl,
   editDownloadUrl,
   isEditActive,
   layoutLabel,
   type ClipEdit,
 } from "@/lib/edits";
+import { audioFromConfiguration, audioSummary } from "@/lib/audio-mix";
 import { formatDuration } from "@/lib/format";
 
 function VersionStatus({ edit }: { edit: ClipEdit }) {
@@ -51,7 +53,8 @@ export function VersionList({
         const ready = edit.status === "ready";
         const stuck = edit.status === "failed" || (isEditActive(edit.status) && edit.is_stale);
         const selected = selectedId === edit.id;
-        const name = `${layoutLabel(edit.layout)} · ${captionSummary(edit)}`;
+        const name = describeEdit(edit);
+        const audio = audioSummary(audioFromConfiguration(edit.configuration));
         return (
           <li
             key={edit.id}
@@ -78,7 +81,10 @@ export function VersionList({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">{layoutLabel(edit.layout)}</p>
-              <p className="truncate text-xs text-muted">{captionSummary(edit)}</p>
+              <p className="truncate text-xs text-muted">
+                {captionSummary(edit)}
+                {audio ? ` · ${audio}` : ""}
+              </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <VersionStatus edit={edit} />
                 {ready && edit.duration_seconds != null ? (
