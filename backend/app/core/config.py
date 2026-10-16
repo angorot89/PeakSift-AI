@@ -221,6 +221,12 @@ class Settings(BaseSettings):
     publishing_provider: Literal["youtube", "fake"] = "youtube"
     # Bytes per resumable-upload request; Google requires multiples of 256 KiB. Default 8 MiB.
     youtube_upload_chunk_bytes: int = Field(default=8 * 1024 * 1024, ge=256 * 1024)
+    # A publish whose heartbeat is older than this is stalled (retryable).
+    publish_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    publish_max_attempts: int = Field(default=5, ge=1)
+    # After the upload: how often, and how many times, to ask YouTube about processing.
+    publish_status_poll_seconds: int = Field(default=30, ge=5)
+    publish_status_max_polls: int = Field(default=20, ge=1)
     # A Google Cloud "Web application" OAuth client. The redirect URI is the API's
     # /publishing/youtube/callback and must be registered on the client exactly.
     google_client_id: str = ""
