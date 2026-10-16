@@ -46,6 +46,7 @@ DEFAULT_LIMITS: dict[str, Limit] = {
     "reframe": Limit(100, HOUR),
     "caption_timing": Limit(100, HOUR),
     "oauth_start": Limit(10, HOUR),
+    "publish_start": Limit(30, HOUR),
 }
 
 
