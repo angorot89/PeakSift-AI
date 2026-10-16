@@ -10,6 +10,7 @@ import { CaptionLayer, type HookPreview } from "@/components/app/editor/caption-
 import { CaptionSwitch, LayoutPicker, PositionPicker } from "@/components/app/editor/controls";
 import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from "@/components/app/editor/preview-stage";
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
+import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
@@ -87,6 +88,7 @@ import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 import { useAudioPreview, type PreviewPlan } from "@/lib/use-audio-preview";
 import { listProjectVideos } from "@/lib/videos";
+import { getYouTubeStatus } from "@/lib/publishing";
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
@@ -125,6 +127,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<"preview" | "rendered">("preview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Whether this server can publish (the button appears only then).
+  const { data: publishing } = useApi(getYouTubeStatus);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [justFinished, setJustFinished] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -713,6 +717,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     <Download aria-hidden="true" />
                     Download short
                   </a>
+                  {publishing?.enabled ? (
+                    <PublishToYouTube editId={selected.id} editName={renderedName} />
+                  ) : null}
                   <Button variant="secondary" onClick={() => setMode("preview")}>
                     <Plus aria-hidden="true" />
                     Create another version

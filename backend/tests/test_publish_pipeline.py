@@ -319,6 +319,18 @@ def test_youtube_with_the_upload_only_scope_ends_honestly_at_uploaded(
     pipeline.check_status(job.id, db_session, settings=settings, provider=provider,
                           schedule_status_check=lambda j, d: scheduled.append(d))  # fmt: skip
     assert job.status == PublishStatus.UPLOADED and scheduled == []  # no claim of "published"
+    assert job.provider_processing_status == "unknown"
+    assert not pipeline.awaiting_processing(job, settings)  # nobody keeps waiting
+
+
+def test_processing_is_awaited_only_while_a_check_is_due(db_session, settings, storage, setup):
+    provider = FakePublishingProvider(processing_polls=2)
+    job = run(setup["job"], db_session, settings, storage, provider)
+    assert pipeline.awaiting_processing(job, settings)  # uploaded; the first check is due
+    pipeline.check_status(job.id, db_session, settings=settings, provider=provider)
+    assert job.status == PublishStatus.PROCESSING and pipeline.awaiting_processing(job, settings)
+    pipeline.check_status(job.id, db_session, settings=settings, provider=provider)
+    assert job.status == PublishStatus.PUBLISHED and not pipeline.awaiting_processing(job, settings)
 
 
 def test_a_rejected_video_is_a_provider_failure(db_session, settings, storage, setup):
