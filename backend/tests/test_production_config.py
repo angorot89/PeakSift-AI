@@ -120,3 +120,20 @@ def test_forwarded_headers_are_trusted_only_from_configured_proxies():
         "client": "198.51.100.7",
         "scheme": "http",
     }
+
+
+def test_a_rejected_configuration_never_echoes_any_value(monkeypatch):
+    secret_url = "redis://:Sup3rSecretRedisPassw0rd@redis:6379/0"
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(**production(redis_url=secret_url, secret_key="change-me" * 5))
+    text = str(excinfo.value)
+    assert "Sup3rSecret" not in text and "Passw0rd" not in text and "change-me" not in text
+    assert "input_value" not in text
+
+
+def test_empty_variables_mean_unset(monkeypatch):
+    monkeypatch.setenv("PUBLISHING_TOKEN_ENCRYPTION_KEY", "")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "")
+    settings = Settings()
+    assert settings.publishing_token_encryption_key is None
+    assert settings.google_client_secret is None

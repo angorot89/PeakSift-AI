@@ -4,6 +4,8 @@
 !.env.example
 *.pem
 *.key
+# TLS material for the production stack (deploy/scripts/dev-certs.sh writes here)
+deploy/certs/
 
 # ---------- Model weights (fetched by scripts, never committed) ----------
 *.onnx
