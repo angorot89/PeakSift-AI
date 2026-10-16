@@ -305,6 +305,19 @@ A user can connect one YouTube channel (`app/models/publishing_connection.py`, `
 - **Disconnect** revokes the token with the provider on a best-effort basis and always deletes it locally.
 - `YOUTUBE_PUBLISHING_ENABLED=true` refuses to start without a valid key (validated by setting name, never value).
 
+**Connecting** (`app/api/publishing.py`, `app/services/publishing/youtube_oauth.py`, Google's official `google-auth-oauthlib`):
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/publishing/youtube` | yes | `{enabled, connection: {provider, status, account_title, connected_at} \| null}` — never tokens |
+| POST | `/publishing/youtube/connect` | yes | `{authorization_url}`: Google's consent page (rate limited `oauth_start`, 10/hour); `409` when publishing is disabled |
+| GET | `/publishing/youtube/callback` | cookie | Google's redirect target. Always answers `303` to the frontend's fixed `/settings?youtube=connected` or `/settings?youtube=error&reason=<code>` (`denied`, `invalid_state`, `expired`, `signin_required`, `missing_refresh_token`, `insufficient_scope`, `exchange_failed`, `disabled`) |
+| DELETE | `/publishing/youtube` | yes | Revoke with Google (best effort) and delete: `{revoked_with_provider}` |
+
+- **Least privilege:** the only scope is `https://www.googleapis.com/auth/youtube.upload` (upload; it cannot read, change or delete videos). No OpenID scope is requested, so the channel name appears once the first upload reports it.
+- **Authorization code + PKCE (S256)**, `access_type=offline` and `prompt=consent` so a refresh token is issued. The `state` is 32 random bytes, stored only as a SHA-256 hash with the encrypted PKCE verifier, bound to the user who started, valid for 10 minutes and deleted atomically on first use (`oauth_states`); a replayed, forged, expired or another user's state is refused before any exchange.
+- The code is exchanged server-side; the refresh token is stored encrypted, the access token discarded. Neither ever reaches the browser, a URL or a log; redirects carry `Referrer-Policy: no-referrer` and go only to the configured frontend.
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:

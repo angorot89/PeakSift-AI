@@ -41,7 +41,7 @@ def save_connection(
     connection.provider = provider.value
     connection.status = ConnectionStatus.CONNECTED
     connection.account_id = account_id[:128]
-    connection.account_title = (account_title or "YouTube channel")[:255]
+    connection.account_title = (account_title or "")[:255]  # learned on first upload
     connection.scopes = " ".join(sorted(set(scopes)))[:1024]
     connection.refresh_token_ciphertext = sealed.ciphertext
     connection.token_key_version = sealed.key_version
