@@ -25,6 +25,13 @@ from app.models.clip_detection import (
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
 from app.models.oauth_state import OAuthState
 from app.models.project import Project, ProjectStatus
+from app.models.publish_job import (
+    ACTIVE_PUBLISH_STATUSES,
+    FINISHED_UPLOAD_STATUSES,
+    Privacy,
+    PublishJob,
+    PublishStatus,
+)
 from app.models.publishing_connection import (
     ConnectionStatus,
     PublishingConnection,
@@ -48,6 +55,8 @@ from app.models.user import User
 from app.models.video import Video, VideoStatus
 
 __all__ = [
+    "ACTIVE_PUBLISH_STATUSES",
+    "FINISHED_UPLOAD_STATUSES",
     "AudioAsset",
     "AudioAssetKind",
     "ACTIVE_CAPTION_TRACK_STATUSES",
@@ -73,6 +82,9 @@ __all__ = [
     "KeyframeMode",
     "ConnectionStatus",
     "OAuthState",
+    "Privacy",
+    "PublishJob",
+    "PublishStatus",
     "Project",
     "ProjectStatus",
     "PublishingConnection",
