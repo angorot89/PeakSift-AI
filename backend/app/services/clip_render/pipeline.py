@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -116,13 +116,16 @@ def run_clip_render(
     attempt = clip.attempt  # this run's temp file; fixed for the whole run
 
     def fail(code: str, message: str) -> None:
-        _fail(clip, db, store, code, message, task_id=task_id, attempt=attempt)
+        _fail(clip, clip_id, db, store, code, message, task_id=task_id, attempt=attempt)
 
     try:
         _execute(clip, db, settings, store, renderer, task_id, attempt)
     except PipelineSuperseded:
-        store.discard_temp(clip.id, attempt)
-        logger.info("Clip %s was taken over by a newer task; stopping", clip.id)
+        if _row_exists(clip_id, db):
+            store.discard_temp(clip_id, attempt)
+        else:
+            store.discard(clip_id)  # the clip (or its project) was deleted: keep nothing
+        logger.info("Clip %s was taken over or removed; stopping", clip_id)
     except (PipelineFailure, RenderError) as error:
         fail(error.code, error.message)
     except StorageError:
@@ -242,8 +245,20 @@ def _execute(
 def _still_owner(clip: Clip, db: Session, task_id: str | None) -> bool:
     if task_id is None:
         return True
-    current = db.scalar(select(Clip.celery_task_id).where(Clip.id == clip.id))
-    return not current or current == task_id
+    row = db.execute(select(Clip.celery_task_id).where(Clip.id == _key(clip))).first()
+    if row is None:
+        return False  # the clip was deleted: nothing may be finalized for it
+    return not row.celery_task_id or row.celery_task_id == task_id
+
+
+def _key(clip: Clip) -> uuid.UUID:
+    """The clip's id without reloading a row that may have been deleted."""
+    return inspect(clip).identity[0]
+
+
+def _row_exists(clip_id: uuid.UUID, db: Session) -> bool:
+    db.rollback()
+    return db.scalar(select(Clip.id).where(Clip.id == clip_id)) is not None
 
 
 def _ensure_still_owner(clip: Clip, db: Session, task_id: str | None) -> None:
@@ -261,6 +276,7 @@ def _heartbeat(clip: Clip, db: Session, task_id: str | None = None) -> None:
 
 def _fail(
     clip: Clip,
+    clip_id: uuid.UUID,
     db: Session,
     store: ClipArtifactStore,
     code: str,
@@ -271,10 +287,15 @@ def _fail(
 ) -> None:
     db.rollback()
     if not _still_owner(clip, db, task_id):
-        # A newer attempt owns the row and its files: clean up only our own temp output.
-        store.discard_temp(clip.id, attempt)
+        if _row_exists(clip_id, db):
+            # A newer attempt owns the row and its files: clean up only our own temp output.
+            store.discard_temp(clip_id, attempt)
+        else:
+            store.discard(clip_id)  # the clip was deleted
         logger.info(
-            "Clip %s failed after being taken over (%s); newer attempt untouched", clip.id, code
+            "Clip %s failed after being taken over or removed (%s); nothing else touched",
+            clip_id,
+            code,
         )
         return
     store.discard(clip.id)  # no partial or orphaned artifact survives a failure

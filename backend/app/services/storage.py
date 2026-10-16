@@ -23,6 +23,8 @@ import shutil
 import tempfile
 import uuid
 from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Protocol
 
@@ -62,6 +64,13 @@ class StorageUnavailable(StorageError):
     """The storage backend could not be reached or refused the request."""
 
 
+@dataclass(frozen=True)
+class StoredObject:
+    key: str
+    size: int
+    modified: datetime  # timezone-aware (UTC)
+
+
 def generate_key(extension: str, category: str = "videos") -> str:
     """A unique key such as ``videos/3f2c...9a.mp4``. The extension must be plain."""
     extension = extension.lower().lstrip(".")
@@ -96,6 +105,8 @@ class StorageProvider(Protocol):
     def iter_range(self, key: str, start: int, end: int) -> Iterator[bytes]: ...
 
     def delete(self, key: str) -> None: ...
+
+    def list_objects(self, prefix: str) -> Iterator[StoredObject]: ...
 
     def check(self) -> None: ...
 
@@ -239,6 +250,29 @@ class LocalStorageProvider:
                 parent.rmdir()
             except OSError:
                 break  # not empty (or already gone)
+
+    def list_objects(self, prefix: str) -> Iterator[StoredObject]:
+        """Every stored object whose key starts with ``prefix`` (a top-level category such as
+        ``videos``). Files that are not valid keys (partial writes) are not objects."""
+        base = self.root / validate_key(prefix)
+        if not base.is_dir() or base.is_symlink():
+            return
+        for path in sorted(base.rglob("*")):
+            if not path.is_file() or path.is_symlink():
+                continue
+            key = path.relative_to(self.root).as_posix()
+            try:
+                validate_key(key)
+            except InvalidStorageKey:
+                continue
+            stat = path.stat()
+            yield StoredObject(key, stat.st_size, datetime.fromtimestamp(stat.st_mtime, UTC))
+
+    def partial_files(self) -> Iterator[tuple[Path, datetime]]:
+        """Leftover ``.<name>.part`` files of interrupted writes (local storage only)."""
+        for path in self.root.rglob(".*.part"):
+            if path.is_file() and not path.is_symlink():
+                yield path, datetime.fromtimestamp(path.stat().st_mtime, UTC)
 
     def check(self) -> None:
         try:
@@ -403,6 +437,17 @@ class S3StorageProvider:
 
     def delete(self, key: str) -> None:
         self._call("delete_object", Key=validate_key(key))  # absent keys are not an error
+
+    def list_objects(self, prefix: str) -> Iterator[StoredObject]:
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        paginator = self._client.get_paginator("list_objects_v2")
+        try:
+            for page in paginator.paginate(Bucket=self.bucket, Prefix=f"{validate_key(prefix)}/"):
+                for item in page.get("Contents", []):
+                    yield StoredObject(item["Key"], int(item["Size"]), item["LastModified"])
+        except (ClientError, BotoCoreError):
+            raise StorageUnavailable("Object storage listing failed") from None
 
     def check(self) -> None:
         try:

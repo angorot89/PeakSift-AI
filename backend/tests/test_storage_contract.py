@@ -222,3 +222,40 @@ def test_storage_errors_never_carry_the_key(storage):
     with pytest.raises(InvalidStorageKey) as excinfo:
         storage.size("../private/thing.mp4")
     assert "private" not in str(excinfo.value)
+
+
+# --- listing -----
+
+
+def test_listing_returns_the_objects_under_a_category(storage):
+    videos = [storage.generate_key("mp4") for _ in range(3)]
+    for key in videos:
+        storage.save(io.BytesIO(DATA[:100]), key)
+    audio = storage.generate_key("mp3", category="audio")
+    storage.save(io.BytesIO(DATA[:7]), audio)
+
+    listed = list(storage.list_objects("videos"))
+
+    assert sorted(item.key for item in listed) == sorted(videos)
+    assert {item.size for item in listed} == {100}
+    assert all(item.modified.tzinfo is not None for item in listed)
+    assert [item.key for item in storage.list_objects("audio")] == [audio]
+    assert list(storage.list_objects("edits")) == []  # an empty category is fine
+
+
+def test_listing_refuses_an_unsafe_prefix(storage):
+    with pytest.raises(InvalidStorageKey):
+        list(storage.list_objects("../outside"))
+
+
+def test_local_listing_skips_partial_writes(tmp_path: Path):
+    from app.services.storage import LocalStorageProvider
+
+    local = LocalStorageProvider(tmp_path / "media")
+    key = local.generate_key("mp4")
+    local.save(io.BytesIO(b"done"), key)
+    partial = local.path_for(key).with_name(".half.mp4.part")
+    partial.write_bytes(b"half")
+
+    assert [item.key for item in local.list_objects("videos")] == [key]
+    assert [path for path, _ in local.partial_files()] == [partial]

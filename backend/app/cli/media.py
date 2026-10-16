@@ -2,6 +2,11 @@
 
     python -m app.cli.media migrate --from local --to s3 [--dry-run]
     python -m app.cli.media verify  --from local --to s3 [--checksum]
+    python -m app.cli.media cleanup [--grace-hours 24] [--apply]
+
+``cleanup`` reports (and with ``--apply`` removes) orphaned objects in the configured media
+storage, interrupted local writes and this host's stale scratch, all older than the grace
+period.
 
 Both backends are built from the current settings (MEDIA_ROOT for ``local``; the S3_*
 settings for ``s3``, which may be filled in before STORAGE_BACKEND is switched). Output
@@ -11,10 +16,18 @@ object is accounted for.
 
 import argparse
 import sys
+from datetime import timedelta
 
 from app.core.config import Settings, get_settings, storage_problems
+from app.services.media_cleanup import cleanup
 from app.services.media_migration import MediaObject, Report, migrate, verify
-from app.services.storage import LocalStorageProvider, S3StorageProvider, StorageProvider
+from app.services.storage import (
+    LocalStorageProvider,
+    S3StorageProvider,
+    StorageProvider,
+    media_storage,
+)
+from app.services.workspace import work_root
 
 BACKENDS = ("local", "s3")
 
@@ -46,6 +59,31 @@ def _summary(action: str, report: Report) -> int:
     return 0 if report.ok else 1
 
 
+def _cleanup(args, settings: Settings, session_factory) -> int:
+    # A job may legitimately run this long; anything younger could still be in use.
+    floor = settings.celery_task_time_limit_seconds / 3600
+    if args.grace_hours <= floor:
+        raise SystemExit(f"--grace-hours must exceed the job time limit ({floor:.1f} hours)")
+    with session_factory() as db:
+        report = cleanup(
+            db, media_storage(settings), work_root(settings),
+            grace=timedelta(hours=args.grace_hours), apply=args.apply,
+        )  # fmt: skip
+    for key, size in report.orphans:
+        print(f"{'orphan':>14}  {size:>12}  {key}")
+    for path in report.partials:
+        print(f"{'partial write':>14}  {'':>12}  {path}")
+    for path in report.scratch:
+        print(f"{'stale scratch':>14}  {'':>12}  {path}")
+    print(
+        f"cleanup: {len(report.orphans)} orphaned objects ({report.orphan_bytes} bytes), "
+        f"{len(report.partials)} partial writes, {len(report.scratch)} stale scratch entries; "
+        + (f"{report.removed} removed, {report.failed} failed" if args.apply else
+           "nothing removed (report only; pass --apply to remove)")
+    )  # fmt: skip
+    return 1 if report.failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m app.cli.media", description=__doc__.split("\n\n")[0]
@@ -62,13 +100,19 @@ def main(argv: list[str] | None = None) -> int:
     commands.choices["verify"].add_argument(
         "--checksum", action="store_true", help="also compare SHA-256 of every object"
     )
+    tidy = commands.add_parser("cleanup")
+    tidy.add_argument("--grace-hours", type=float, default=24.0,
+                      help="only consider what is older than this (default 24)")  # fmt: skip
+    tidy.add_argument("--apply", action="store_true", help="remove; otherwise only report")
     args = parser.parse_args(argv)
-    if args.source == args.destination:
-        parser.error("--from and --to must differ")
 
     from app.core.database import SessionLocal
 
     settings = get_settings()
+    if args.command == "cleanup":
+        return _cleanup(args, settings, SessionLocal)
+    if args.source == args.destination:
+        parser.error("--from and --to must differ")
     source, destination = provider(args.source, settings), provider(args.destination, settings)
     show = _printer(args.verbose)
     with SessionLocal() as db:
