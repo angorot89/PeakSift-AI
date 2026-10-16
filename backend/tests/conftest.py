@@ -27,6 +27,8 @@ os.environ["SECRET_KEY"] = "test-only-secret-key-not-for-production-0123456789"
 os.environ["APP_ENV"] = "test"
 # Uploaded test media goes to a throwaway directory, never the developer's MEDIA_ROOT.
 os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="peaksift-test-media-")
+# Job scratch space (inputs, intermediates, renders in validation), equally throwaway.
+os.environ["WORK_ROOT"] = tempfile.mkdtemp(prefix="peaksift-test-work-")
 # Background tasks run inline during tests; no broker or worker is required.
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "1"
 

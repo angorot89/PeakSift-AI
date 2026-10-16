@@ -91,6 +91,8 @@ class StorageProvider(Protocol):
 
     def download_file(self, key: str, destination: Path) -> int: ...
 
+    def fetch(self, key: str, directory: Path) -> Path: ...
+
     def iter_range(self, key: str, start: int, end: int) -> Iterator[bytes]: ...
 
     def delete(self, key: str) -> None: ...
@@ -98,7 +100,8 @@ class StorageProvider(Protocol):
     def check(self) -> None: ...
 
 
-def _copy_limited(stream: BinaryIO, target: BinaryIO, max_bytes: int | None) -> int:
+def copy_limited(stream: BinaryIO, target: BinaryIO, max_bytes: int | None) -> int:
+    """Copy in 1 MiB chunks; raise ``FileTooLarge`` past ``max_bytes``. Returns the count."""
     written = 0
     while chunk := stream.read(CHUNK_SIZE):
         written += len(chunk)
@@ -106,6 +109,18 @@ def _copy_limited(stream: BinaryIO, target: BinaryIO, max_bytes: int | None) -> 
             raise FileTooLarge(max_bytes)
         target.write(chunk)
     return written
+
+
+def _open_new(path: Path) -> BinaryIO:
+    """Open ``path`` for writing, creating its directory. A concurrent delete may prune that
+    directory between the two steps (it removes directories it leaves empty), so retry."""
+    for _ in range(5):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            return path.open("wb")
+        except FileNotFoundError:
+            continue
+    raise StorageError("Could not create the storage directory")
 
 
 def _partial_for(destination: Path) -> Path:
@@ -148,11 +163,10 @@ class LocalStorageProvider:
         path = self.path_for(key)
         if path.exists():
             raise ObjectExists("Storage key already exists")
-        path.parent.mkdir(parents=True, exist_ok=True)
         partial = _partial_for(path)
         try:
-            with partial.open("wb") as target:
-                written = _copy_limited(stream, target, max_bytes)
+            with _open_new(partial) as target:
+                written = copy_limited(stream, target, max_bytes)
             os.replace(partial, path)
         except BaseException:
             partial.unlink(missing_ok=True)
@@ -160,8 +174,24 @@ class LocalStorageProvider:
         return written
 
     def put_file(self, source: Path, key: str) -> int:
-        """Copy a local file in under ``key`` (never overwriting)."""
-        self.path_for(key)
+        """Copy a local file in under ``key`` (never overwriting). On the same filesystem
+        the file is hard-linked rather than copied; callers never modify a stored source."""
+        path = self.path_for(key)
+        if path.exists():
+            raise ObjectExists("Storage key already exists")
+        partial = _partial_for(path)
+        for _ in range(5):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(source, partial)
+            except FileNotFoundError:
+                if not Path(source).is_file():
+                    raise
+                continue  # the directory was pruned by a concurrent delete: retry
+            except OSError:
+                break  # another filesystem (or links unsupported): copy instead
+            os.replace(partial, path)
+            return path.stat().st_size
         with Path(source).open("rb") as stream:
             return self.save(stream, key)
 
@@ -180,6 +210,14 @@ class LocalStorageProvider:
             raise
         return destination.stat().st_size
 
+    def fetch(self, key: str, directory: Path) -> Path:
+        """A local path to read the object from: the stored file itself (no copy). Callers
+        only ever read it; ``directory`` is unused here."""
+        path = self.path_for(key)
+        if not path.is_file():
+            raise ObjectNotFound("Object not found")
+        return path
+
     def iter_range(self, key: str, start: int, end: int) -> Iterator[bytes]:
         """Bytes ``[start, end]`` in chunks; the file opens now and closes with the iterator."""
         path = self.path_for(key)
@@ -190,8 +228,17 @@ class LocalStorageProvider:
         return _iter_file(handle, start, end)
 
     def delete(self, key: str) -> None:
-        """Remove the file if present. Deleting a missing key is not an error."""
-        self.path_for(key).unlink(missing_ok=True)
+        """Remove the file if present, and directories it leaves empty. Deleting a missing
+        key is not an error."""
+        path = self.path_for(key)
+        path.unlink(missing_ok=True)
+        for parent in path.parents:
+            if parent == self.root:
+                break
+            try:
+                parent.rmdir()
+            except OSError:
+                break  # not empty (or already gone)
 
     def check(self) -> None:
         try:
@@ -298,7 +345,7 @@ class S3StorageProvider:
         """Spool ``stream`` to a temporary file (enforcing ``max_bytes``), then upload it."""
         validate_key(key)
         with tempfile.TemporaryFile() as spool:
-            written = _copy_limited(stream, spool, max_bytes)
+            written = copy_limited(stream, spool, max_bytes)
             spool.seek(0)
             self._upload(spool, key)
         return written
@@ -342,6 +389,12 @@ class S3StorageProvider:
             raise
         return destination.stat().st_size
 
+    def fetch(self, key: str, directory: Path) -> Path:
+        """Download the object into ``directory`` (a job's workspace) and return the copy."""
+        destination = Path(directory) / validate_key(key).rsplit("/", 1)[-1]
+        self.download_file(key, destination)
+        return destination
+
     def iter_range(self, key: str, start: int, end: int) -> Iterator[bytes]:
         """Request ``bytes=start-end`` now (so a missing object fails before any response
         starts) and stream the body in chunks; the connection closes with the iterator."""
@@ -374,3 +427,15 @@ def storage_from_settings(settings: "Settings") -> StorageProvider:
     if settings.storage_backend == "s3":
         return S3StorageProvider.from_settings(settings)
     return LocalStorageProvider(settings.media_root)
+
+
+_cached: "tuple[Settings, StorageProvider] | None" = None
+
+
+def media_storage(settings: "Settings") -> StorageProvider:
+    """The configured provider, built once per settings object (an S3 client is
+    thread-safe and costly to create). Used by the API and the workers alike."""
+    global _cached
+    if _cached is None or _cached[0] is not settings:
+        _cached = (settings, storage_from_settings(settings))
+    return _cached[1]

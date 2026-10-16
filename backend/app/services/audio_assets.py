@@ -31,13 +31,14 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.models import AudioAsset, AudioAssetKind, Project
 from app.services.ffprobe import ProbeError, run_ffprobe
-from app.services.storage import FileTooLarge, LocalStorageProvider
+from app.services.storage import FileTooLarge, StorageProvider, copy_limited
 from app.services.video_upload import (
     GENERIC_CONTENT_TYPES,
     UploadValidationError,
     sanitize_filename,
     too_large_message,
 )
+from app.services.workspace import scratch_directory
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +250,7 @@ def _existing(
 
 def store_audio_upload(
     db: Session,
-    storage: LocalStorageProvider,
+    storage: StorageProvider,
     project: Project,
     upload: UploadFile,
     kind: AudioAssetKind,
@@ -261,12 +262,33 @@ def store_audio_upload(
     (``created`` False) when the same file was already uploaded for the same purpose.
     """
     safe_name, extension, content_type = validate_audio_upload(upload.filename, upload.content_type)
-    key = storage.generate_key(extension, category="audio")
+    with scratch_directory(settings, "uploads") as spool_dir:
+        return _store(db, storage, project, upload, kind, settings, spool_dir,
+                      safe_name, extension, content_type)  # fmt: skip
+
+
+def _store(
+    db: Session,
+    storage: StorageProvider,
+    project: Project,
+    upload: UploadFile,
+    kind: AudioAssetKind,
+    settings: Settings,
+    spool_dir: Path,
+    safe_name: str,
+    extension: str,
+    content_type: str,
+) -> tuple[AudioAsset, bool]:
+    # Spooled locally (size-limited and hashed), validated there, and stored only once it
+    # has passed: a refused upload never reaches media storage.
+    path = spool_dir / f"upload.{extension}"
     reader = _HashingReader(upload.file)
     try:
-        size = storage.save(reader, key, max_bytes=settings.audio_upload_max_bytes)  # type: ignore[arg-type]
+        with path.open("wb") as target:
+            size = copy_limited(reader, target, settings.audio_upload_max_bytes)  # type: ignore[arg-type]
     except FileTooLarge as error:
         raise UploadValidationError(413, too_large_message(error.limit)) from None
+    key = storage.generate_key(extension, category="audio")
     keep = False
     try:
         if size == 0:
@@ -275,7 +297,6 @@ def store_audio_upload(
         existing = _existing(db, project, kind, digest)
         if existing is not None:
             return existing, False
-        path = storage.path_for(key)
         probed = probe_audio_asset(path, extension, ffprobe_path=settings.ffprobe_path)
         limit = max_duration_for(kind, settings)
         if probed.duration_seconds > limit:
@@ -299,6 +320,7 @@ def store_audio_upload(
             channels=probed.channels,
             waveform_peaks=peaks,
         )
+        storage.put_file(path, key)
         db.add(asset)
         try:
             db.commit()

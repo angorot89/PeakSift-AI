@@ -1,24 +1,30 @@
 """Post-upload processing: read metadata and move the video to ready or failed."""
 
 import logging
+from contextlib import ExitStack
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import Video, VideoStatus
 from app.services.ffprobe import ProbeError, probe
-from app.services.storage import LocalStorageProvider
+from app.services.storage import ObjectNotFound, StorageProvider
+from app.services.workspace import scratch_directory
 
 logger = logging.getLogger(__name__)
 
 MAX_ERROR_LENGTH = 500
 
 
-def process_video_metadata(db: Session, storage: LocalStorageProvider, video: Video) -> Video:
+def process_video_metadata(
+    db: Session, storage: StorageProvider, video: Video, *, local_copy: Path | None = None
+) -> Video:
     """uploaded → processing_metadata → ready, or → failed with a safe error message.
 
     Runs synchronously for Milestone 2. Never raises for a bad file: a broken upload
-    becomes a `failed` record rather than a failed request.
+    becomes a `failed` record rather than a failed request. ffprobe reads ``local_copy``
+    (the upload's spooled copy) when given, otherwise the stored object, fetched locally.
     """
     settings = get_settings()
     video.status = VideoStatus.PROCESSING_METADATA
@@ -26,11 +32,17 @@ def process_video_metadata(db: Session, storage: LocalStorageProvider, video: Vi
     db.commit()
 
     try:
-        metadata = probe(
-            storage.path_for(video.storage_key),
-            ffprobe_path=settings.ffprobe_path,
-            timeout_seconds=settings.ffprobe_timeout_seconds,
-        )
+        with ExitStack() as stack:
+            source = local_copy or storage.fetch(
+                video.storage_key, stack.enter_context(scratch_directory(settings, "probe"))
+            )
+            metadata = probe(
+                source,
+                ffprobe_path=settings.ffprobe_path,
+                timeout_seconds=settings.ffprobe_timeout_seconds,
+            )
+    except ObjectNotFound:
+        return _mark_failed(db, video, "The uploaded file is missing")
     except ProbeError as error:
         return _mark_failed(db, video, str(error))
     except Exception:

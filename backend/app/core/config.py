@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Local directory for uploaded media (development storage). Never committed.
     media_root: Path = Path("./media")
 
+    # Local scratch directory for media jobs (FFmpeg inputs, intermediates, renders being
+    # validated). Each attempt gets its own subdirectory, removed when it ends. Empty: a
+    # "peaksift-work" directory in the system temp dir. Never served, never backed up.
+    work_root: str = ""
+
     # Where persistent media lives: `local` (MEDIA_ROOT) or `s3` (a private bucket on any
     # S3-compatible service). The HTTP API behaves identically with either.
     storage_backend: Literal["local", "s3"] = "local"
@@ -280,15 +285,7 @@ def storage_problems(settings: Settings) -> list[str]:
             problems.append("S3_ENDPOINT_URL must be scheme://host[:port] without credentials")
         elif settings.s3_secure and endpoint.scheme != "https":
             problems.append("S3_ENDPOINT_URL must use https:// while S3_SECURE is true")
-    if not S3_MEDIA_PIPELINES_READY:
-        problems.append("STORAGE_BACKEND=s3 is not available until the media pipelines use it")
     return problems
-
-
-# The S3 provider exists, but uploads, workers and media endpoints still read MEDIA_ROOT;
-# until they all go through the storage contract, selecting S3 would split media between
-# two places, so it is refused.
-S3_MEDIA_PIPELINES_READY = False
 
 
 # Values that must never sign production tokens (placeholders from docs and examples).
@@ -327,8 +324,14 @@ def production_problems(settings: Settings) -> list[str]:
             problems.append(f"{name.upper()} must be set explicitly")
     if settings.celery_task_always_eager:
         problems.append("CELERY_TASK_ALWAYS_EAGER must be off")
-    if "media_root" not in explicit or not settings.media_root.is_absolute():
-        problems.append("MEDIA_ROOT must be set to an absolute path")
+    if settings.storage_backend == "local" and (
+        "media_root" not in explicit or not settings.media_root.is_absolute()
+    ):
+        problems.append("MEDIA_ROOT must be set to an absolute path (STORAGE_BACKEND=local)")
+    if settings.storage_backend == "s3" and "storage_backend" not in explicit:
+        problems.append("STORAGE_BACKEND must be set explicitly")
+    if settings.work_root and not Path(settings.work_root).is_absolute():
+        problems.append("WORK_ROOT must be an absolute path")
     return problems
 
 

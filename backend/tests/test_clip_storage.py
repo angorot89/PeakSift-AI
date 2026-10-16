@@ -16,7 +16,19 @@ from app.services.storage import InvalidStorageKey, LocalStorageProvider
 
 @pytest.fixture
 def store(tmp_path: Path) -> ClipArtifactStore:
-    return ClipArtifactStore(LocalStorageProvider(tmp_path / "media"))
+    return ClipArtifactStore(
+        LocalStorageProvider(tmp_path / "media"), LocalStorageProvider(tmp_path / "work")
+    )
+
+
+def final(store: ClipArtifactStore, clip_id) -> Path:
+    """The final artifact's file (these tests use the local provider)."""
+    return store.storage.path_for(clip_storage_key(clip_id))
+
+
+def clip_dirs(store: ClipArtifactStore, clip_id) -> list[Path]:
+    """The clip's directories in media storage and in scratch."""
+    return [root / "clips" / str(clip_id) for root in (store.storage.root, store.scratch.root)]
 
 
 # --- keys -----
@@ -38,10 +50,12 @@ def test_only_real_uuids_can_name_a_clip(bad):
         clip_temp_key(bad)
 
 
-def test_paths_stay_inside_the_media_root(store: ClipArtifactStore):
+def test_temp_files_live_in_scratch_and_finals_in_media_storage(store: ClipArtifactStore):
     clip_id = uuid.uuid4()
-    for path in (store.temp_path(clip_id), store.final_path(clip_id)):
-        assert store.storage.root in path.parents
+    temp, done = store.temp_path(clip_id), final(store, clip_id)
+    assert store.scratch.root in temp.parents and store.storage.root not in temp.parents
+    assert store.storage.root in done.parents
+    for path in (temp, done):
         assert path.parent.name == str(clip_id) and path.parent.parent.name == "clips"
 
 
@@ -62,7 +76,7 @@ def test_temp_path_creates_the_directory_and_clears_stale_temp(store: ClipArtifa
     assert second.parent.is_dir()
 
 
-def test_finalize_is_an_atomic_rename_and_removes_the_temp(store: ClipArtifactStore):
+def test_finalize_stores_the_temp_file_and_removes_it(store: ClipArtifactStore):
     clip_id = uuid.uuid4()
     temp = store.temp_path(clip_id)
     temp.write_bytes(b"\x00" * 1024)
@@ -71,7 +85,7 @@ def test_finalize_is_an_atomic_rename_and_removes_the_temp(store: ClipArtifactSt
 
     assert key == clip_storage_key(clip_id)
     assert store.exists(clip_id)
-    assert store.final_path(clip_id).read_bytes() == b"\x00" * 1024
+    assert final(store, clip_id).read_bytes() == b"\x00" * 1024
     assert not temp.exists()
 
 
@@ -92,14 +106,14 @@ def test_finalize_never_overwrites_a_final_artifact(store: ClipArtifactStore):
     store.temp_path(clip_id).write_bytes(b"second")
     with pytest.raises(ArtifactExists):
         store.finalize(clip_id)
-    assert store.final_path(clip_id).read_bytes() == b"first"
+    assert final(store, clip_id).read_bytes() == b"first"
 
 
 def test_exists_requires_a_non_empty_final_file(store: ClipArtifactStore):
     clip_id = uuid.uuid4()
     assert not store.exists(clip_id)
-    store.final_path(clip_id).parent.mkdir(parents=True)
-    store.final_path(clip_id).write_bytes(b"")
+    final(store, clip_id).parent.mkdir(parents=True)
+    final(store, clip_id).write_bytes(b"")
     assert not store.exists(clip_id)
 
 
@@ -107,12 +121,12 @@ def test_discard_removes_everything_and_is_idempotent(store: ClipArtifactStore):
     clip_id = uuid.uuid4()
     store.temp_path(clip_id).write_bytes(b"partial")
     store.discard(clip_id)
-    assert not store.final_path(clip_id).parent.exists()
+    assert not any(d.exists() for d in clip_dirs(store, clip_id))
 
     store.temp_path(clip_id).write_bytes(b"x")
     store.finalize(clip_id)
     store.discard(clip_id)
-    assert not store.exists(clip_id) and not store.final_path(clip_id).parent.exists()
+    assert not store.exists(clip_id) and not any(d.exists() for d in clip_dirs(store, clip_id))
     store.discard(clip_id)  # nothing there: still fine
 
 
@@ -122,13 +136,14 @@ def test_discard_temp_keeps_a_final_artifact(store: ClipArtifactStore):
     store.finalize(clip_id)
     store.temp_path(clip_id).write_bytes(b"leftover")
     store.discard_temp(clip_id)
-    assert store.exists(clip_id) and not store.storage.path_for(clip_temp_key(clip_id)).exists()
+    assert store.exists(clip_id) and not store.scratch.path_for(clip_temp_key(clip_id)).exists()
 
 
 def test_two_clips_never_share_a_location(store: ClipArtifactStore):
     a, b = uuid.uuid4(), uuid.uuid4()
-    assert store.final_path(a) != store.final_path(b)
-    assert store.final_path(a).parent != store.final_path(b).parent
+    assert final(store, a) != final(store, b)
+    assert final(store, a).parent != final(store, b).parent
+    assert store.temp_path(a).parent != store.temp_path(b).parent
 
 
 # --- download filename -----
@@ -184,7 +199,7 @@ def test_each_attempt_has_its_own_temp_file(store: ClipArtifactStore):
     assert not old.exists() and new.read_bytes() == b"fresh"  # ...without touching attempt 2
 
     store.finalize(clip_id, 2)
-    assert store.final_path(clip_id).read_bytes() == b"fresh"
+    assert final(store, clip_id).read_bytes() == b"fresh"
 
 
 def test_discard_removes_temp_files_of_every_attempt(store: ClipArtifactStore):
@@ -192,16 +207,22 @@ def test_discard_removes_temp_files_of_every_attempt(store: ClipArtifactStore):
     for attempt in (1, 2, 3):
         store.temp_path(clip_id, attempt).write_bytes(b"x")
     store.discard(clip_id)
-    assert not store.final_path(clip_id).parent.exists()
+    assert not any(d.exists() for d in clip_dirs(store, clip_id))
 
 
 def test_symlinked_clip_directory_cannot_escape_the_root(tmp_path: Path):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "clip.mp4").write_bytes(b"secret")
-    store = ClipArtifactStore(LocalStorageProvider(tmp_path / "media"))
+    store = ClipArtifactStore(
+        LocalStorageProvider(tmp_path / "media"), LocalStorageProvider(tmp_path / "work")
+    )
     clip_id = uuid.uuid4()
-    (store.storage.root / "clips").mkdir(parents=True)
-    (store.storage.root / "clips" / str(clip_id)).symlink_to(outside, target_is_directory=True)
+    for root in (store.storage.root, store.scratch.root):
+        (root / "clips").mkdir(parents=True)
+        (root / "clips" / str(clip_id)).symlink_to(outside, target_is_directory=True)
     with pytest.raises(InvalidStorageKey):
-        store.final_path(clip_id)
+        store.exists(clip_id)
+    with pytest.raises(InvalidStorageKey):
+        store.temp_path(clip_id)
+    assert (outside / "clip.mp4").read_bytes() == b"secret"

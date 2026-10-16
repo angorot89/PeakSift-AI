@@ -31,13 +31,19 @@ from app.services.audio_extraction import (
     normalized_audio_key,
 )
 from app.services.media_timing import MediaTimingError, fit_to_media, media_duration
-from app.services.storage import LocalStorageProvider
+from app.services.storage import (
+    InvalidStorageKey,
+    LocalStorageProvider,
+    ObjectNotFound,
+    StorageProvider,
+    media_storage,
+)
 from app.services.transcription.chunking import (
     AudioChunk,
     ChunkingError,
     attempt_workspace,
-    cleanup_chunks,
     cleanup_other_workspaces,
+    discard_workspace,
     shift_segments,
     split_audio,
 )
@@ -50,6 +56,7 @@ from app.services.transcription.contract import (
     validate_segments,
 )
 from app.services.transcription.factory import get_transcription_provider
+from app.services.workspace import scratch_storage
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +102,7 @@ def run_transcription(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalStorageProvider | None = None,
+    storage: StorageProvider | None = None,
     provider_factory: ProviderFactory | None = None,
     sleep: Callable[[float], None] = time.sleep,
     task_id: str | None = None,
@@ -107,7 +114,9 @@ def run_transcription(
     run stops at the next checkpoint without touching the row.
     """
     settings = settings or get_settings()
-    storage = storage or LocalStorageProvider(settings.media_root)
+    storage = storage or media_storage(settings)
+    # Normalized audio and chunks are intermediates: local scratch, never media storage.
+    scratch = scratch_storage(settings)
     provider_factory = provider_factory or get_transcription_provider  # resolved at call time
 
     transcription = db.get(Transcription, transcription_id)
@@ -119,13 +128,16 @@ def run_transcription(
     workspace = attempt_workspace(transcription.id, task_id)
     # Files of earlier attempts are derived data; a stalled worker still reading them only
     # fails its own (fenced) run.
-    cleanup_other_workspaces(storage, transcription.id, keep=workspace)
+    cleanup_other_workspaces(scratch, transcription.id, keep=workspace)
 
     def fail(code: str, message: str) -> None:
         _fail(transcription, db, code, message, task_id=task_id)
 
     try:
-        _execute(transcription, db, settings, storage, provider_factory, sleep, task_id, workspace)
+        _execute(
+            transcription, db, settings, storage, scratch, provider_factory, sleep, task_id,
+            workspace,
+        )  # fmt: skip
     except PipelineSuperseded:
         logger.info("Transcription %s was taken over by a newer task; stopping", transcription.id)
     except PipelineFailure as failure:
@@ -138,7 +150,8 @@ def run_transcription(
         logger.exception("Unexpected error transcribing %s", transcription.id)
         fail("internal_error", "Unexpected error during transcription")
     finally:
-        cleanup_chunks(storage, workspace)  # always this attempt's own chunks only
+        # This attempt's own scratch files only (fetched source, normalized audio, chunks).
+        discard_workspace(scratch, workspace)
     return transcription
 
 
@@ -188,7 +201,8 @@ def _execute(
     transcription: Transcription,
     db: Session,
     settings: Settings,
-    storage: LocalStorageProvider,
+    storage: StorageProvider,
+    scratch: LocalStorageProvider,
     provider_factory: ProviderFactory,
     sleep: Callable[[float], None],
     task_id: str | None,
@@ -197,13 +211,16 @@ def _execute(
     video = transcription.video
     if video.status != VideoStatus.READY:
         raise PipelineFailure("video_not_ready", "The video is not ready for transcription")
-    source = storage.path_for(video.storage_key)
-    if not source.is_file():
-        raise PipelineFailure("video_unavailable", "The source video file is missing")
+    inputs = scratch.path_for(f"transcription/{workspace}/input")
+    inputs.mkdir(parents=True, exist_ok=True)
+    try:
+        source = storage.fetch(video.storage_key, inputs)
+    except (ObjectNotFound, InvalidStorageKey):
+        raise PipelineFailure("video_unavailable", "The source video file is missing") from None
 
     audio = extract_normalized_audio(
         source,
-        storage,
+        scratch,
         normalized_audio_key(workspace),
         ffmpeg_path=settings.ffmpeg_path,
         ffprobe_path=settings.ffprobe_path,
@@ -211,7 +228,6 @@ def _execute(
     )
     if not audio.duration_seconds:
         raise PipelineFailure("audio_unreadable", "The extracted audio has no readable duration")
-    transcription.audio_storage_key = audio.storage_key
     transcription.audio_duration_seconds = audio.duration_seconds
     # Persisted segments must lie inside the media: the shorter of the video and its audio.
     duration = media_duration(video.duration_seconds, audio.duration_seconds)
@@ -219,8 +235,8 @@ def _execute(
     _heartbeat(transcription, db, task_id)
 
     chunks = split_audio(
-        storage.path_for(audio.storage_key),
-        storage,
+        scratch.path_for(audio.storage_key),
+        scratch,
         workspace,
         total_seconds=audio.duration_seconds,
         chunk_seconds=settings.transcription_chunk_seconds,
@@ -241,7 +257,7 @@ def _execute(
         result = _transcribe_with_retry(
             provider,
             TranscriptionRequest(
-                audio_path=storage.path_for(chunk.storage_key),
+                audio_path=scratch.path_for(chunk.storage_key),
                 language_hint=transcription.language,
                 prompt=previous_tail,
             ),

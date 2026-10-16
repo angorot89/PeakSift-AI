@@ -10,6 +10,7 @@ from app.models import Project, Video
 from app.schemas.video import VideoRead
 from app.services.video_processing import process_video_metadata
 from app.services.video_upload import UploadValidationError, check_declared_size, store_upload
+from app.services.workspace import scratch_directory
 
 router = APIRouter(prefix="/projects/{project_id}/videos", tags=["videos"])
 
@@ -50,15 +51,19 @@ def upload_video(
     storage: Storage,
     file: Annotated[UploadFile, File()],
 ) -> Video:
-    try:
-        video = store_upload(
-            db, storage, project, file, max_bytes=get_settings().max_video_upload_bytes
-        )
-    except UploadValidationError as error:
-        raise HTTPException(status_code=error.status_code, detail=error.message) from None
+    settings = get_settings()
+    # The upload is spooled locally (size-limited), stored, then probed from the spool.
+    with scratch_directory(settings, "uploads") as spool_dir:
+        try:
+            video, local = store_upload(
+                db, storage, project, file, max_bytes=settings.max_video_upload_bytes,
+                spool_dir=spool_dir,
+            )  # fmt: skip
+        except UploadValidationError as error:
+            raise HTTPException(status_code=error.status_code, detail=error.message) from None
 
-    # Synchronous for Milestone 2: the response already carries ready/failed.
-    return process_video_metadata(db, storage, video)
+        # Synchronous for Milestone 2: the response already carries ready/failed.
+        return process_video_metadata(db, storage, video, local_copy=local)
 
 
 @router.get("", response_model=list[VideoRead])

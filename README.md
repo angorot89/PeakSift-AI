@@ -84,7 +84,7 @@ alembic upgrade head
 uvicorn app.main:app --reload        # http://localhost:8000 — docs at /docs
 ```
 
-Uploaded videos and derived audio are written under `backend/media/` (`MEDIA_ROOT`), which is git-ignored.
+Uploaded videos, audio and rendered media are written under `backend/media/` (`MEDIA_ROOT`), which is git-ignored, or to a private S3-compatible bucket with `STORAGE_BACKEND=s3`. Jobs work in temporary per-attempt directories under `WORK_ROOT`.
 
 ### 3. Celery worker (transcription, clip detection, clip rendering, short-form edits, smart reframing, word timing)
 
@@ -132,7 +132,7 @@ Backend tests use a separate database (`TEST_DATABASE_URL`, default `peaksift_te
 
 1. Open a project and choose (or drag in) an MP4, MOV or WebM file.
 2. The browser streams it to `POST /projects/{id}/videos` with a progress bar.
-3. The API validates the name, extension and MIME type, writes the file under `MEDIA_ROOT` with a generated key, enforces `MAX_VIDEO_UPLOAD_BYTES` (default 2 GiB), then runs `ffprobe`.
+3. The API validates the name, extension and MIME type, spools the file locally, stores it in media storage under a generated key, enforces `MAX_VIDEO_UPLOAD_BYTES` (default 2 GiB), then runs `ffprobe`.
 4. The project page shows the result: **Ready** with real metadata and a preview player, or **Failed** with the reason and an option to upload a different file.
 
 ### Configuration that matters here

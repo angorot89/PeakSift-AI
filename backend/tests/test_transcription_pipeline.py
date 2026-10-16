@@ -70,7 +70,7 @@ class FakeMedia:
         self.cleaned: list[str] = []
         monkeypatch.setattr(pipeline, "extract_normalized_audio", self.extract)
         monkeypatch.setattr(pipeline, "split_audio", self.split)
-        monkeypatch.setattr(pipeline, "cleanup_chunks", self.cleanup)
+        monkeypatch.setattr(pipeline, "discard_workspace", self.cleanup)
 
     def extract(self, source, storage, key, **kwargs):
         self.extract_calls += 1
@@ -148,8 +148,10 @@ def test_full_pipeline_completes_with_absolute_timestamps(
     assert result.provider == "fake" and result.model == "fake-1"
     assert result.language == "en" and result.language_probability == 0.98
     assert result.started_at and result.completed_at and result.heartbeat_at
-    # Each attempt works in its own directory (task id tag; "inline" without one).
-    assert result.audio_storage_key == f"transcription/{transcription.id}/inline/normalized.mp3"
+    # Normalized audio is a scratch intermediate: nothing derived is kept in media storage,
+    # and the attempt's scratch directory (task id tag; "inline" without one) is removed.
+    assert result.audio_storage_key is None
+    assert media.cleaned == [f"{transcription.id}/inline"]
     assert result.audio_duration_seconds == 1250.0
     assert result.error_code is None and result.error_message is None
 
@@ -567,8 +569,13 @@ def test_real_media_pipeline_end_to_end(db_session, storage, tmp_path, transcrip
 
     assert result.status == "completed", result.error_message
     assert result.audio_duration_seconds == pytest.approx(2.0, abs=0.3)
-    assert storage.exists(result.audio_storage_key)
-    assert not (storage.root / "transcription" / str(transcription.id) / "chunks").exists()
+    # Intermediates lived in the attempt's scratch directory, which is gone; media storage
+    # holds only the source video.
+    assert result.audio_storage_key is None
+    assert not (Path(settings.work_root) / "transcription" / str(transcription.id)).exists()
+    assert sorted(p.relative_to(storage.root).as_posix() for p in storage.root.rglob("*.*")) == [
+        transcription.video.storage_key
+    ]
     assert len(segments_of(db_session, transcription)) == 2
 
 

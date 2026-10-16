@@ -26,6 +26,7 @@ A clip without an audio stream has no speech: the track completes with zero word
 import logging
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import delete, select
@@ -44,7 +45,13 @@ from app.services.caption_timing.contract import (
     validate_words,
 )
 from app.services.caption_timing.factory import get_timing_provider
-from app.services.storage import InvalidStorageKey, LocalStorageProvider
+from app.services.storage import (
+    InvalidStorageKey,
+    ObjectNotFound,
+    StorageProvider,
+    media_storage,
+)
+from app.services.workspace import job_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +107,13 @@ def run_caption_track(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalStorageProvider | None = None,
+    storage: StorageProvider | None = None,
     provider: CaptionTimingProvider | None = None,
     task_id: str | None = None,
 ) -> CaptionTrack | None:
     """Time the words of one ``CaptionTrack`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    storage = storage or LocalStorageProvider(settings.media_root)
+    storage = storage or media_storage(settings)
     track = db.get(CaptionTrack, track_id)
     if track is None:
         logger.warning("Caption track %s no longer exists; nothing to do", track_id)
@@ -123,7 +130,9 @@ def run_caption_track(
             db.rollback()
 
     try:
-        _execute(track, db, settings, storage, provider, task_id)
+        # The clip is read locally: in place, or fetched into this attempt's workspace.
+        with job_workspace(settings, "caption-timing", track.id, task_id) as work:
+            _execute(track, db, settings, storage, provider, task_id, work)
     except PipelineSuperseded:
         logger.info("Caption track %s was taken over or removed; stopping", track_id)
     except PipelineFailure as error:
@@ -174,9 +183,10 @@ def _execute(
     track: CaptionTrack,
     db: Session,
     settings: Settings,
-    storage: LocalStorageProvider,
+    storage: StorageProvider,
     provider: CaptionTimingProvider | None,
     task_id: str | None,
+    work: Path,
 ) -> None:
     try:
         config = CaptionTimingConfig.from_snapshot(track.config)  # the stored snapshot
@@ -188,11 +198,9 @@ def _execute(
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
     try:
-        source = storage.path_for(clip.storage_key)
-    except InvalidStorageKey:
+        source = storage.fetch(clip.storage_key, work)
+    except (ObjectNotFound, InvalidStorageKey):
         raise PipelineFailure("clip_missing", "The source clip file is missing") from None
-    if not source.is_file():
-        raise PipelineFailure("clip_missing", "The source clip file is missing")
     track.progress_percent = AUDIO_PROGRESS
     _heartbeat(track, db, task_id)
 

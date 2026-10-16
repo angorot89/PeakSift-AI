@@ -31,7 +31,7 @@ Long-term:
 - Backend: FastAPI, SQLAlchemy 2 (synchronous), Alembic, psycopg 3, pydantic-settings in `backend/`
 - Database: PostgreSQL
 - Auth: Argon2id (`pwdlib`), HS256 JWT (`PyJWT`) in an HttpOnly `SameSite=Lax` cookie
-- Media: local filesystem storage under `MEDIA_ROOT` (dev only); `ffprobe`/`ffmpeg` via argument-list subprocesses with timeouts; `python-multipart` for uploads
+- Media: storage contract with a local directory (`MEDIA_ROOT`) or a private S3-compatible bucket (`STORAGE_BACKEND`, boto3); jobs work in per-attempt scratch directories under `WORK_ROOT`; `ffprobe`/`ffmpeg` via argument-list subprocesses with timeouts; `python-multipart` for uploads
 - Background jobs: Celery on Redis (`app/workers/`), one job per worker, database is the source of truth
 - Speech-to-text: provider contract in `app/services/transcription/`; `faster-whisper` (local, lazy) and the OpenAI SDK (`whisper-1` for timestamps); provider is server configuration
 - Clip detection: provider contract in `app/services/clip_detection/` (windowing, validation, ranking, pipeline); `ollama` (httpx against an operator-configured endpoint) and `openai` (structured outputs); users choose provider/model only from server allow-lists
@@ -41,7 +41,6 @@ Long-term:
 - Smart reframing: `app/services/reframe/` (config snapshot, FFmpeg frame sampling, detector contract, YuNet face detector on onnxruntime, tracking, crop path, Celery pipeline); rendered by `clip_edit/smart_crop.py` as a time-varying FFmpeg crop. The model is installed by `scripts/fetch_reframe_model.py` (pinned sha256), never committed or auto-downloaded
 - Dynamic captions: `app/services/caption_timing/` (config snapshot, word-timing provider contract, faster-whisper word timestamps, validation, Celery pipeline) and `clip_edit/` (`dynamic_cues.py`, `caption_v2.py`, `caption_metrics.py`, `safe_area.py`, `hook.py`, `emoji.py`, `dynamic_text.py`); fonts Noto Sans, Noto Sans Arabic and a monochrome emoji font (Symbola or Noto Emoji), never committed
 - Audio & sound design: `app/models/audio_asset.py`, `app/services/audio_assets.py` (upload validation, probing, waveform), `app/services/audio_mix/` (config, plan, ducking, loudness, mixer); user-supplied audio only — never commit audio files or fetch audio from the internet; test audio is generated with FFmpeg
-- Planned later: S3-compatible object storage
 
 ## Conventions
 
