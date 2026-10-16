@@ -207,6 +207,16 @@ class Settings(BaseSettings):
     caption_timing_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     caption_timing_max_attempts: int = Field(default=5, ge=1)
 
+    # --- Publishing (V1.0: YouTube) --------------------------------------------------------
+    # Off unless explicitly enabled; when on, every setting it needs is validated at startup.
+    youtube_publishing_enabled: bool = False
+    # Encrypts stored OAuth refresh tokens (AES-256-GCM): 32 random bytes, base64. From the
+    # environment or a secret manager only — never the database, Git or logs.
+    publishing_token_encryption_key: SecretStr | None = None
+    publishing_token_key_version: int = Field(default=1, ge=1)
+    # Older keys still accepted for decryption during rotation: "1:<base64>,2:<base64>".
+    publishing_token_previous_keys: SecretStr | None = None
+
     # Rate limits (Redis). Off only in tests. RATE_LIMITS overrides individual budgets:
     # "login_ip=20/60,edit_render=200/3600" (see app/core/rate_limit.py for the names).
     rate_limit_enabled: bool = True
@@ -241,6 +251,13 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _publishing_is_complete(self) -> "Settings":
+        problems = publishing_problems(self)
+        if problems:
+            raise ValueError("Invalid publishing configuration: " + "; ".join(problems))
+        return self
+
+    @model_validator(mode="after")
     def _rate_limits_are_valid(self) -> "Settings":
         from app.core.rate_limit import parse_overrides
 
@@ -272,6 +289,33 @@ class Settings(BaseSettings):
     @property
     def trusted_proxy_list(self) -> list[str]:
         return [p.strip() for p in self.trusted_proxies.split(",") if p.strip()]
+
+
+def publishing_problems(settings: "Settings") -> list[str]:
+    """Why the publishing settings cannot work (names only, never values)."""
+    from app.services.publishing.tokens import TokenKeyError, decode_key, parse_previous_keys
+
+    problems: list[str] = []
+    key = settings.publishing_token_encryption_key
+    if key is not None:
+        try:
+            decode_key(key.get_secret_value())
+        except TokenKeyError as error:
+            problems.append(f"PUBLISHING_TOKEN_ENCRYPTION_KEY {error}")
+    previous = settings.publishing_token_previous_keys
+    if previous is not None:
+        try:
+            versions = parse_previous_keys(previous.get_secret_value())
+        except TokenKeyError as error:
+            problems.append(f"PUBLISHING_TOKEN_PREVIOUS_KEYS {error}")
+        else:
+            if settings.publishing_token_key_version in versions:
+                problems.append(
+                    "PUBLISHING_TOKEN_KEY_VERSION must differ from every previous key version"
+                )
+    if settings.youtube_publishing_enabled and key is None:
+        problems.append("PUBLISHING_TOKEN_ENCRYPTION_KEY is required when publishing is enabled")
+    return problems
 
 
 # S3 bucket names: 3-63 lowercase letters, digits, dots and hyphens.

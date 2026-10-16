@@ -24,6 +24,11 @@ from app.models.clip_detection import (
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
 from app.models.project import Project, ProjectStatus
+from app.models.publishing_connection import (
+    ConnectionStatus,
+    PublishingConnection,
+    PublishingProvider,
+)
 from app.models.reframe import (
     ACTIVE_REFRAME_STATUSES,
     KeyframeMode,
@@ -65,8 +70,11 @@ __all__ = [
     "ClipEditStatus",
     "ClipStatus",
     "KeyframeMode",
+    "ConnectionStatus",
     "Project",
     "ProjectStatus",
+    "PublishingConnection",
+    "PublishingProvider",
     "ReframeAnalysis",
     "ReframeConfidence",
     "ReframeKeyframe",

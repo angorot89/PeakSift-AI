@@ -297,6 +297,14 @@ python -m app.cli.media verify  --from local --to s3 --checksum  # every object,
 - Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
 - The reverse direction (`--from s3 --to local`) works the same way.
 
+## Publishing connections (YouTube)
+
+A user can connect one YouTube channel (`app/models/publishing_connection.py`, `app/services/publishing/`). Only the OAuth **refresh token** is kept, sealed with **AES-256-GCM** (`cryptography`) under `PUBLISHING_TOKEN_ENCRYPTION_KEY`; the associated data binds each ciphertext to its user, provider and key version, so a token copied to another row cannot be opened. Access tokens are never stored. Keys come only from the environment or a secret manager.
+
+- **Rotation:** set a new key with a higher `PUBLISHING_TOKEN_KEY_VERSION` and list the old one in `PUBLISHING_TOKEN_PREVIOUS_KEYS` (`1:<key>`); old tokens keep working and are re-encrypted with the current key the next time they are used.
+- **Disconnect** revokes the token with the provider on a best-effort basis and always deletes it locally.
+- `YOUTUBE_PUBLISHING_ENABLED=true` refuses to start without a valid key (validated by setting name, never value).
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
