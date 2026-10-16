@@ -63,6 +63,7 @@ from app.services.storage import (
 logger = logging.getLogger(__name__)
 
 MAX_ERROR_LENGTH = 500
+UNKNOWN_PROCESSING = "unknown"  # processing cannot be followed (e.g. upload-only scope)
 
 
 class PipelineSuperseded(Exception):
@@ -321,7 +322,7 @@ def check_status(
         return job
     connection = db.get(PublishingConnection, job.connection_id) if job.connection_id else None
     if connection is None or connection.status != ConnectionStatus.CONNECTED:
-        return job  # stays honestly "uploaded"
+        return _processing_unknown(job, db)  # stays honestly "uploaded"
     job.status_checks += 1
     db.commit()
     try:
@@ -333,7 +334,7 @@ def check_status(
         logger.info("Publish job %s: status unavailable (%s)", job.id, type(error).__name__)
         status = None
     if status is None or status.upload == UploadState.UNKNOWN:
-        return job  # YouTube will not say: the job ends at "uploaded"
+        return _processing_unknown(job, db)  # YouTube will not say: the job ends at "uploaded"
     job.provider_upload_status = status.upload.value
     if status.upload == UploadState.PROCESSED:
         job.status = PublishStatus.PUBLISHED
@@ -354,6 +355,24 @@ def check_status(
         if job.status_checks < settings.publish_status_max_polls:
             schedule_status_check(job.id, settings.publish_status_poll_seconds)
     return job
+
+
+def _processing_unknown(job: PublishJob, db: Session) -> PublishJob:
+    """Record that processing cannot be followed, so nobody waits for an answer."""
+    job.provider_processing_status = UNKNOWN_PROCESSING
+    db.commit()
+    return job
+
+
+def awaiting_processing(job: PublishJob, settings: Settings) -> bool:
+    """Whether a processing check is still due (the UI keeps following until it is not)."""
+    if job.status == PublishStatus.PROCESSING:
+        return job.status_checks < settings.publish_status_max_polls
+    return (
+        job.status == PublishStatus.UPLOADED
+        and job.provider_processing_status != UNKNOWN_PROCESSING
+        and job.status_checks < settings.publish_status_max_polls
+    )
 
 
 # --- state helpers -------------------------------------------------------------------------
@@ -405,4 +424,4 @@ def _fail(job, job_id, db, code, message, status, *, task_id) -> None:
     logger.warning("Publish job %s failed: %s", job_id, code)
 
 
-__all__ = ["check_status", "is_stale", "publish_short"]
+__all__ = ["awaiting_processing", "check_status", "is_stale", "publish_short"]

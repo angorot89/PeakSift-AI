@@ -27,7 +27,8 @@ BODY = {"title": "My first short", "description": "Made with PeakSift", "tags": 
 PUBLIC_FIELDS = {
     "id", "edit_id", "provider", "status", "progress_percent", "bytes_uploaded", "bytes_total",
     "title", "description", "tags", "privacy", "made_for_kids", "video_url", "studio_url",
-    "simulated", "error_code", "error_message", "retryable", "is_stale", "attempt",
+    "simulated", "error_code", "error_message", "retryable", "is_stale",
+    "awaiting_processing", "attempt",
     "created_at", "started_at", "completed_at", "published_at",
 }  # fmt: skip
 

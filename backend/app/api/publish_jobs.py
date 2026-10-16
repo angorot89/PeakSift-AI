@@ -35,7 +35,7 @@ from app.schemas.publishing import (
 from app.services.publishing import connections
 from app.services.publishing.jobs import PublishRefused, request_publish
 from app.services.publishing.metadata import MetadataError, PublishMetadata, prefill
-from app.services.publishing.pipeline import is_stale
+from app.services.publishing.pipeline import awaiting_processing, is_stale
 from app.workers.dispatch import JobQueueUnavailable, enqueue_publish, new_task_id
 
 edit_router = APIRouter(prefix="/edits/{edit_id}/publish", tags=["publishing"])
@@ -93,6 +93,7 @@ def _read(job: PublishJob) -> PublishJobRead:
         error_message=job.error_message,
         retryable=_retryable(job),
         is_stale=is_stale(job, get_settings()),
+        awaiting_processing=awaiting_processing(job, get_settings()),
         attempt=job.attempt,
         created_at=job.created_at,
         started_at=job.started_at,

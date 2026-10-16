@@ -350,7 +350,7 @@ provider_failed      YouTube rejected or could not process the video
 | --- | --- | --- |
 | GET | `/edits/{edit_id}/publish` | `{enabled, connection, edit_ready, defaults, jobs}`: the dialog's prefill (candidate title and hook, private, no tags) and this edit's publish history |
 | POST | `/edits/{edit_id}/publish` | Body `{title, description, tags, privacy, made_for_kids}` → `201` new queued job, or `200` with the existing job for the same request (never a second upload). `422` names the field breaking YouTube's rules; `409` when the edit is not ready, no account is connected or it needs reconnecting, or publishing is disabled; `503` when the queue is down (no job is left behind). Rate limited (`publish_start`, 30/hour) |
-| GET | `/publish-jobs/{job_id}` | Status, real progress (`bytes_uploaded`/`bytes_total`), `video_url` (`https://youtu.be/…`) and `studio_url` once YouTube created the video (`simulated` and no link for the fake provider), `error_code`/`error_message`, `retryable`, `is_stale` |
+| GET | `/publish-jobs/{job_id}` | Status, real progress (`bytes_uploaded`/`bytes_total`), `video_url` (`https://youtu.be/…`) and `studio_url` once YouTube created the video (`simulated` and no link for the fake provider), `error_code`/`error_message`, `retryable`, `is_stale`, `awaiting_processing` (a processing check is still due; false once processing is known — or unknowable with the upload-only scope) |
 | POST | `/publish-jobs/{job_id}/retry` | Only a job that `failed` before YouTube created a video, or a stalled one, up to `PUBLISH_MAX_ATTEMPTS`; resumes the stored session. A job with a video is never uploaded again (`409`) |
 
 ## Rate limits

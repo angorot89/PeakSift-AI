@@ -71,6 +71,9 @@ class PublishJobRead(BaseModel):
     error_message: str | None
     retryable: bool
     is_stale: bool
+    # True while YouTube's processing is still being checked; false once it is known or
+    # cannot be known (the upload-only scope cannot read processing).
+    awaiting_processing: bool
     attempt: int
     created_at: datetime
     started_at: datetime | None
