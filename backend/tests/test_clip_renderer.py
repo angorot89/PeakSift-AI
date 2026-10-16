@@ -380,7 +380,8 @@ def test_ffmpeg_failure_is_reported_without_paths(tmp_path: Path, caplog):
         )
     assert info.value.code == "ffmpeg_failed" and "exit code 7" in info.value.message
     assert str(tmp_path) not in info.value.message
-    assert "secret" in caplog.text  # operators still get the bounded stderr tail
+    # Operators still get the bounded stderr tail, with local paths redacted in the log.
+    assert "Error opening <path>" in caplog.text and str(tmp_path) not in caplog.text
 
 
 @requires_ffmpeg

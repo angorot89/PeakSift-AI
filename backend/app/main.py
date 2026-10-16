@@ -23,6 +23,7 @@ from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
+from app.core.observability import RequestContextMiddleware, configure_logging
 
 ROUTERS = (
     health_router,
@@ -52,6 +53,7 @@ def create_app(settings: Settings) -> FastAPI:
     docs = (
         {"docs_url": None, "redoc_url": None, "openapi_url": None} if settings.is_production else {}
     )
+    configure_logging(settings)
     application = FastAPI(title="PeakSift AI API", version="1.0.0", **docs)
     register_error_handlers(application)  # before CORS, so error responses get CORS headers
     application.add_middleware(
@@ -61,6 +63,7 @@ def create_app(settings: Settings) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
     if settings.allowed_host_list:
         # Requests for any other Host are refused (required in production; see config.py).
@@ -73,6 +76,8 @@ def create_app(settings: Settings) -> FastAPI:
         )
     for router in ROUTERS:
         application.include_router(router)
+    # Outermost: every response (errors and rejected hosts included) carries a request id.
+    application.add_middleware(RequestContextMiddleware)
     return application
 
 

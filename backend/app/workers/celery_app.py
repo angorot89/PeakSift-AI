@@ -20,9 +20,16 @@ Semantics chosen for long transcription jobs:
 """
 
 from celery import Celery
-from celery.signals import worker_process_init
+from celery.signals import (
+    before_task_publish,
+    setup_logging,
+    task_postrun,
+    task_prerun,
+    worker_process_init,
+)
 
 from app.core.config import get_settings
+from app.core.observability import configure_logging, job_var, request_id_var
 
 settings = get_settings()
 
@@ -66,3 +73,37 @@ def _reset_database_pool(**_: object) -> None:
     from app.core.database import engine
 
     engine.dispose(close=False)
+
+
+# --- logging and correlation ---------------------------------------------------------------
+
+REQUEST_ID_HEADER = "peaksift_request_id"
+_job_tokens: dict[str, tuple] = {}
+
+
+@setup_logging.connect
+def _configure_logging(**_: object) -> None:
+    """Workers log through the same redacting handler (JSON in production) as the API."""
+    configure_logging(get_settings())
+
+
+@before_task_publish.connect
+def _carry_request_id(headers: dict | None = None, **_: object) -> None:
+    """A job enqueued while handling a request carries that request's id to the worker."""
+    if headers is not None and (request_id := request_id_var.get()):
+        headers[REQUEST_ID_HEADER] = request_id
+
+
+@task_prerun.connect
+def _enter_job(task_id: str | None = None, task=None, args=None, **_: object) -> None:
+    job = {"task": task.name, "job_id": str(args[0]) if args else None}
+    tokens = (job_var.set(job),)
+    if request_id := task.request.get(REQUEST_ID_HEADER):  # absent in eager mode: inherit
+        tokens += (request_id_var.set(request_id),)
+    _job_tokens[task_id] = tokens
+
+
+@task_postrun.connect
+def _leave_job(task_id: str | None = None, **_: object) -> None:
+    for token in reversed(_job_tokens.pop(task_id, ())):
+        token.var.reset(token)

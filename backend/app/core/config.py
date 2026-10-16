@@ -207,6 +207,10 @@ class Settings(BaseSettings):
     caption_timing_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     caption_timing_max_attempts: int = Field(default=5, ge=1)
 
+    # Logging: one JSON object per line in production by default, readable text otherwise.
+    log_format: Literal["json", "text"] | None = None
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
     # Background jobs. Redis is the Celery broker; the database stays the source of truth.
     redis_url: str = "redis://localhost:6379/0"
     # Run tasks inline in the calling process (tests only). Never enable in production.
