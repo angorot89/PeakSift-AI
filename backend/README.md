@@ -344,6 +344,15 @@ provider_failed      YouTube rejected or could not process the video
 - **Accounts:** `authentication_required` (revoked or expired consent, or a token no configured key can open) marks the connection `needs_reconnect`; a disconnected account fails the job (`not_connected`).
 - Every commit checks the attempt token; a superseded attempt stops without writing. Settings: `PUBLISH_STALE_AFTER_SECONDS` (15 min), `PUBLISH_MAX_ATTEMPTS` (5), `PUBLISH_STATUS_POLL_SECONDS` (30), `PUBLISH_STATUS_MAX_POLLS` (20).
 
+**Publishing API** (`app/api/publish_jobs.py`; owner-scoped — `404` for anyone else, `401` signed out; never tokens, session URIs, task ids or storage keys):
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/edits/{edit_id}/publish` | `{enabled, connection, edit_ready, defaults, jobs}`: the dialog's prefill (candidate title and hook, private, no tags) and this edit's publish history |
+| POST | `/edits/{edit_id}/publish` | Body `{title, description, tags, privacy, made_for_kids}` → `201` new queued job, or `200` with the existing job for the same request (never a second upload). `422` names the field breaking YouTube's rules; `409` when the edit is not ready, no account is connected or it needs reconnecting, or publishing is disabled; `503` when the queue is down (no job is left behind). Rate limited (`publish_start`, 30/hour) |
+| GET | `/publish-jobs/{job_id}` | Status, real progress (`bytes_uploaded`/`bytes_total`), `video_url` (`https://youtu.be/…`) and `studio_url` once YouTube created the video (`simulated` and no link for the fake provider), `error_code`/`error_message`, `retryable`, `is_stale` |
+| POST | `/publish-jobs/{job_id}/retry` | Only a job that `failed` before YouTube created a video, or a stalled one, up to `PUBLISH_MAX_ATTEMPTS`; resumes the stored session. A job with a video is never uploaded again (`409`) |
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
@@ -356,6 +365,7 @@ Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-Aft
 | `transcription`, `clip_detection` | 30 per hour each | user | start and retry |
 | `clip_render`, `edit_render` | 200 per hour each | user | start and retry (an edit request counts even when it returns an existing edit) |
 | `reframe`, `caption_timing` | 100 per hour each | user | start and retry |
+| `oauth_start` / `publish_start` | 10 / 30 per hour | user | YouTube connect / publish and retry |
 
 - The client address is the one `ProxyHeadersMiddleware` derives from `TRUSTED_PROXIES` only; an untrusted peer cannot rotate identities with forged `X-Forwarded-For`.
 - Subjects are hashed before they reach Redis (no emails or addresses in clear). Authentication runs first, so anonymous requests to user-limited endpoints are `401`, not counted.

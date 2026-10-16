@@ -17,6 +17,8 @@ from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
+from app.api.publish_jobs import edit_router as publish_edit_router
+from app.api.publish_jobs import job_router as publish_job_router
 from app.api.publishing import router as publishing_router
 from app.api.reframe import router as reframe_router
 from app.api.transcriptions import router as transcriptions_router
@@ -46,6 +48,8 @@ ROUTERS = (
     audio_assets_router,
     audio_limits_router,
     publishing_router,
+    publish_edit_router,
+    publish_job_router,
 )
 
 
