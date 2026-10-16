@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, DbSession, Storage
-from app.api.media_streaming import stream_file
+from app.api.media_streaming import object_present, stream_object
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.models import (
@@ -47,7 +47,7 @@ from app.services.clip_edit.config import (
 )
 from app.services.clip_edit.pipeline import is_stale
 from app.services.clip_render.storage import safe_download_filename
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import StorageProvider
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_edit, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -127,14 +127,11 @@ def _read(edit: ClipEdit) -> ClipEditRead:
     )
 
 
-def _reconcile(db: DbSession, edit: ClipEdit | None, storage: LocalMediaStorage) -> ClipEdit | None:
+def _reconcile(db: DbSession, edit: ClipEdit | None, storage: StorageProvider) -> ClipEdit | None:
     """``ready`` must mean the file exists; a vanished artifact becomes a retryable failure."""
     if edit is None or edit.status != ClipEditStatus.READY:
         return edit
-    try:
-        present = bool(edit.storage_key) and storage.path_for(edit.storage_key).is_file()
-    except InvalidStorageKey:
-        present = False
+    present = object_present(storage, edit.storage_key)
     if not present:
         logger.error("Clip edit %s was ready but its artifact is missing; marking failed", edit.id)
         edit.status = ClipEditStatus.FAILED
@@ -430,17 +427,10 @@ def _owned_ready_edit(edit_id: uuid.UUID, user_id: uuid.UUID, db, storage):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Edit not found")
     if edit.status != ClipEditStatus.READY or not edit.storage_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Edit is not ready")
-    try:
-        path = storage.path_for(edit.storage_key)
-    except InvalidStorageKey:
-        logger.error("Clip edit %s has an invalid storage key", edit.id)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Edit file not found"
-        ) from None
-    if not path.is_file():
+    if not object_present(storage, edit.storage_key):
         logger.error("Clip edit %s is ready but its artifact is missing", edit.id)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Edit file not found")
-    return edit, path
+    return edit
 
 
 @media_router.get("/{edit_id}/content")
@@ -448,9 +438,11 @@ def edit_content(
     edit_id: uuid.UUID, request: Request, current_user: CurrentUser, db: DbSession, storage: Storage
 ) -> StreamingResponse:
     """Inline, Range-capable stream of the edited short for the browser's <video>."""
-    edit, path = _owned_ready_edit(edit_id, current_user.id, db, storage)
+    edit = _owned_ready_edit(edit_id, current_user.id, db, storage)
     name = safe_download_filename(edit.clip.candidate.title, edit.id, variant="vertical")
-    return stream_file(path, request, media_type=edit.content_type, filename=name)
+    return stream_object(
+        storage, edit.storage_key, request, media_type=edit.content_type, filename=name
+    )
 
 
 @media_router.get("/{edit_id}/download")
@@ -458,6 +450,13 @@ def edit_download(
     edit_id: uuid.UUID, request: Request, current_user: CurrentUser, db: DbSession, storage: Storage
 ) -> StreamingResponse:
     """The edited short as an attachment named ``<title-slug>-vertical-<id>.mp4``."""
-    edit, path = _owned_ready_edit(edit_id, current_user.id, db, storage)
+    edit = _owned_ready_edit(edit_id, current_user.id, db, storage)
     name = safe_download_filename(edit.clip.candidate.title, edit.id, variant="vertical")
-    return stream_file(path, request, media_type=edit.content_type, filename=name, attachment=True)
+    return stream_object(
+        storage,
+        edit.storage_key,
+        request,
+        media_type=edit.content_type,
+        filename=name,
+        attachment=True,
+    )

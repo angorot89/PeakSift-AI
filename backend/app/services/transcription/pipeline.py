@@ -31,7 +31,7 @@ from app.services.audio_extraction import (
     normalized_audio_key,
 )
 from app.services.media_timing import MediaTimingError, fit_to_media, media_duration
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.services.transcription.chunking import (
     AudioChunk,
     ChunkingError,
@@ -95,7 +95,7 @@ def run_transcription(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalMediaStorage | None = None,
+    storage: LocalStorageProvider | None = None,
     provider_factory: ProviderFactory | None = None,
     sleep: Callable[[float], None] = time.sleep,
     task_id: str | None = None,
@@ -107,7 +107,7 @@ def run_transcription(
     run stops at the next checkpoint without touching the row.
     """
     settings = settings or get_settings()
-    storage = storage or LocalMediaStorage(settings.media_root)
+    storage = storage or LocalStorageProvider(settings.media_root)
     provider_factory = provider_factory or get_transcription_provider  # resolved at call time
 
     transcription = db.get(Transcription, transcription_id)
@@ -188,7 +188,7 @@ def _execute(
     transcription: Transcription,
     db: Session,
     settings: Settings,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     provider_factory: ProviderFactory,
     sleep: Callable[[float], None],
     task_id: str | None,

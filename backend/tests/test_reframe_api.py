@@ -12,7 +12,7 @@ from app.api import reframe as api
 from app.core.config import Settings, get_settings
 from app.models import KeyframeMode, ReframeAnalysis, ReframeKeyframe, ReframeStatus
 from app.services.reframe.detection import detector_available
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers.dispatch import JobQueueUnavailable
 from tests.test_clip_edit_api import ready_clip, sign_up
 
@@ -45,12 +45,12 @@ ANALYSIS_KEYS = {
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():
@@ -75,7 +75,7 @@ def fake_queue(monkeypatch, db_session):
     return queued
 
 
-def clip_with_file(db: Session, storage: LocalMediaStorage, email="owner@example.com") -> dict:
+def clip_with_file(db: Session, storage: LocalStorageProvider, email="owner@example.com") -> dict:
     ctx = ready_clip(db, email)
     path = storage.path_for(ctx["clip"].storage_key)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.services.ffprobe import probe_audio
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.services.transcription import chunking
 from app.services.transcription.chunking import (
     ChunkingError,
@@ -24,19 +24,19 @@ TID = "11111111-1111-4111-8111-111111111111"
 
 
 @pytest.fixture
-def storage(tmp_path: Path) -> LocalMediaStorage:
-    return LocalMediaStorage(tmp_path / "media")
+def storage(tmp_path: Path) -> LocalStorageProvider:
+    return LocalStorageProvider(tmp_path / "media")
 
 
 @pytest.fixture
-def source(storage: LocalMediaStorage) -> Path:
+def source(storage: LocalStorageProvider) -> Path:
     path = storage.path_for(f"transcription/{TID}/normalized.mp3")
     path.parent.mkdir(parents=True)
     path.write_bytes(b"fake mp3")
     return path
 
 
-def files(storage: LocalMediaStorage) -> list[str]:
+def files(storage: LocalStorageProvider) -> list[str]:
     return sorted(str(p.relative_to(storage.root)) for p in storage.root.rglob("*") if p.is_file())
 
 
@@ -97,7 +97,7 @@ def test_invalid_chunk_size_is_rejected():
 # --- keys and commands -----
 
 
-def test_chunk_keys_are_internal_ordered_and_safe(storage: LocalMediaStorage):
+def test_chunk_keys_are_internal_ordered_and_safe(storage: LocalStorageProvider):
     assert chunk_key(TID, 0) == f"transcription/{TID}/chunks/0000.mp3"
     assert chunk_key(TID, 1234) == f"transcription/{TID}/chunks/1234.mp3"
     assert storage.root in storage.path_for(chunk_key(TID, 7)).parents
@@ -249,7 +249,7 @@ def test_shift_across_three_hours():
 
 
 @requires_ffmpeg
-def test_real_split_of_generated_audio(storage: LocalMediaStorage, tmp_path: Path):
+def test_real_split_of_generated_audio(storage: LocalStorageProvider, tmp_path: Path):
     source = storage.path_for(f"transcription/{TID}/normalized.mp3")
     source.parent.mkdir(parents=True)
     subprocess.run(
@@ -292,7 +292,7 @@ def test_real_split_of_generated_audio(storage: LocalMediaStorage, tmp_path: Pat
 
 
 @requires_ffmpeg
-def test_real_short_source_is_a_single_chunk(storage: LocalMediaStorage):
+def test_real_short_source_is_a_single_chunk(storage: LocalStorageProvider):
     source = storage.path_for(f"transcription/{TID}/normalized.mp3")
     source.parent.mkdir(parents=True)
     subprocess.run(
@@ -340,7 +340,7 @@ def test_attempt_workspaces_are_distinct_and_safe():
         attempt_workspace("not-a-uuid", "x")
 
 
-def test_cleaning_one_workspace_never_touches_another(storage: LocalMediaStorage):
+def test_cleaning_one_workspace_never_touches_another(storage: LocalStorageProvider):
     from app.services.transcription.chunking import (
         attempt_workspace,
         chunk_key,

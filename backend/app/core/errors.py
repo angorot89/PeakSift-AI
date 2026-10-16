@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.services.storage import StorageUnavailable
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,14 @@ def register_error_handlers(app: FastAPI) -> None:
         except Exception:
             logger.exception("Unhandled error on %s %s", request.method, request.url.path)
             return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+    @app.exception_handler(StorageUnavailable)
+    async def storage_unavailable_handler(request: Request, _: StorageUnavailable) -> JSONResponse:
+        # Media storage is down or misconfigured: a temporary condition, not a missing file.
+        logger.error("Media storage unavailable on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=503, content={"detail": "Media storage is temporarily unavailable"}
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:

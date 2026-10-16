@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 
 from app.services.clip_edit.composition import CAPTIONS_FILENAME
-from app.services.storage import LocalMediaStorage, StorageError
+from app.services.storage import LocalStorageProvider, StorageError
 
 FINAL_NAME = "edited.mp4"
 WORK_RENDER_NAME = "short.mp4"
@@ -54,7 +54,7 @@ def workspace_key(edit_id: uuid.UUID | str, attempt: int) -> str:
 
 
 class EditArtifactStore:
-    def __init__(self, storage: LocalMediaStorage) -> None:
+    def __init__(self, storage: LocalStorageProvider) -> None:
         self.storage = storage
 
     def workspace(self, edit_id: uuid.UUID | str, attempt: int) -> Path:

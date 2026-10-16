@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.models import AudioAsset, AudioAssetKind, Project
 from app.services.ffprobe import ProbeError, run_ffprobe
-from app.services.storage import FileTooLarge, LocalMediaStorage
+from app.services.storage import FileTooLarge, LocalStorageProvider
 from app.services.video_upload import (
     GENERIC_CONTENT_TYPES,
     UploadValidationError,
@@ -249,7 +249,7 @@ def _existing(
 
 def store_audio_upload(
     db: Session,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     project: Project,
     upload: UploadFile,
     kind: AudioAssetKind,

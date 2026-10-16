@@ -6,7 +6,7 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.models import Project, Video
-from app.services.storage import FileTooLarge, LocalMediaStorage
+from app.services.storage import FileTooLarge, LocalStorageProvider
 
 # Extension -> MIME types a browser may legitimately send for it. The first entry is
 # what we store, so the content type on record is canonical rather than client-chosen.
@@ -80,7 +80,7 @@ def too_large_message(limit: int) -> str:
 
 def store_upload(
     db: Session,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     project: Project,
     upload: UploadFile,
     *,

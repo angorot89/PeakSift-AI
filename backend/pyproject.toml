@@ -20,6 +20,7 @@ dependencies = [
     "numpy>=1.26,<3",  # PCM arrays handed to faster-whisper (decoded with ffmpeg)
     "openai>=3,<4",  # hosted speech-to-text and clip analysis (official SDK)
     "httpx>=0.28,<1",  # local clip analysis over an Ollama-compatible HTTP endpoint
+    "boto3>=1.40,<2",  # S3-compatible private media storage (AWS S3, MinIO, R2)
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ dev = [
     "pytest>=9.1,<10",
     "httpx>=0.28,<1",  # required by FastAPI's TestClient
     "ruff>=0.17,<0.18",
+    "moto[s3]>=5.1,<6",  # in-process S3 for the storage contract tests
 ]
 
 [build-system]

@@ -261,7 +261,7 @@ FFmpeg's `crop` filter evaluates `x` and `y` on every frame, with `t` set to the
 - **Ownership:** every reframe route sits behind the clip ownership chain (User → Project → Video → Clip → Analysis). Missing and foreign resources look identical (`404`), and anonymous requests get `401`.
 - **Untrusted requests:** a request can only ask "analyse this clip". The detector, model file and every tuning value are server configuration, and focal points are validated as finite and inside [0, 1].
 - **Subprocesses:** ffprobe and FFmpeg run with argument lists and timeouts, never `shell=True`, and their stderr is never stored or returned. Only ids cross Redis.
-- **Storage:** clip files resolve only through `LocalMediaStorage.path_for`, which refuses keys outside `MEDIA_ROOT`, including through symlinked directories (regression-tested).
+- **Storage:** clip files resolve only through `LocalStorageProvider.path_for`, which refuses keys outside `MEDIA_ROOT`, including through symlinked directories (regression-tested).
 - **Error messages:** stored and returned messages contain no paths, model locations, task ids or commands. The operator hint for a missing model goes to the server log only.
 - **Model integrity:** the model file is pinned by sha256, never committed and never fetched automatically.
 

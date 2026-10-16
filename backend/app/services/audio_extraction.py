@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.services.ffprobe import ProbeError, probe_audio
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def build_ffmpeg_command(ffmpeg_path: str, source: Path, target: Path) -> list[s
 
 def extract_normalized_audio(
     source: Path,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     key: str,
     *,
     ffmpeg_path: str = "ffmpeg",

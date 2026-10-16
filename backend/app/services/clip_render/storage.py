@@ -20,7 +20,7 @@ import unicodedata
 import uuid
 from pathlib import Path
 
-from app.services.storage import LocalMediaStorage, StorageError
+from app.services.storage import LocalStorageProvider, StorageError
 
 FINAL_NAME = "clip.mp4"
 TEMP_PREFIX = "clip-tmp-"
@@ -55,9 +55,9 @@ def clip_directory_key(clip_id: uuid.UUID | str) -> str:
 
 class ClipArtifactStore:
     """The few operations the renderer and pipeline need, all resolved through
-    ``LocalMediaStorage.path_for`` so nothing can escape the media root."""
+    ``LocalStorageProvider.path_for`` so nothing can escape the media root."""
 
-    def __init__(self, storage: LocalMediaStorage) -> None:
+    def __init__(self, storage: LocalStorageProvider) -> None:
         self.storage = storage
 
     def temp_path(self, clip_id: uuid.UUID | str, attempt: int = 1) -> Path:

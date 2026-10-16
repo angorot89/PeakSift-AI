@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import Project, Transcription, TranscriptSegment, User, Video
 from app.services.audio_extraction import AudioExtractionError, ExtractedAudio
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.services.transcription import pipeline
 from app.services.transcription.chunking import AudioChunk, ChunkingError, attempt_workspace
 from app.services.transcription.contract import ProviderSegment, TranscriptionProviderError
@@ -23,12 +23,12 @@ CHUNK_SECONDS = 600
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():
@@ -38,7 +38,7 @@ def clean_media_root(storage: LocalMediaStorage):
 
 
 @pytest.fixture
-def transcription(db_session: Session, storage: LocalMediaStorage) -> Transcription:
+def transcription(db_session: Session, storage: LocalStorageProvider) -> Transcription:
     user = User(email="creator@example.com", password_hash="x")
     project = Project(name="Stream", owner=user)
     key = storage.generate_key("mp4")
@@ -62,7 +62,7 @@ class FakeMedia:
     """Replaces ffmpeg-based extraction and chunking with instant fakes that write files."""
 
     def __init__(
-        self, monkeypatch, storage: LocalMediaStorage, *, duration=1250.0, chunks=(600, 600, 50)
+        self, monkeypatch, storage: LocalStorageProvider, *, duration=1250.0, chunks=(600, 600, 50)
     ):
         self.storage, self.duration, self.chunk_durations = storage, duration, chunks
         self.extract_calls = 0

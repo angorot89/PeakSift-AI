@@ -19,7 +19,7 @@ from app.core.config import Settings, get_settings
 from app.models import ClipCandidate, ClipDetectionRun, Transcription, TranscriptSegment, Video
 from app.services.clip_render import pipeline
 from app.services.ffprobe import probe
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from tests.media_fixtures import generate_video, requires_ffmpeg
 
 PASSWORD = "correct horse battery"
@@ -37,12 +37,12 @@ class _Reusable:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():

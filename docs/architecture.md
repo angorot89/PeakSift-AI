@@ -123,7 +123,7 @@ Worker (app/services/clip_render/):
   → validating   ownership re-checked                                                         (90)
   → atomic rename to clips/<id>/clip.mp4, then one commit: storage_key + metadata + ready     (100)
   | failed       safe error_code/message, all artifacts removed
-GET /clips/{id}/content | /download  →  owner check → path_for(storage_key) → Range stream
+GET /clips/{id}/content | /download  →  owner check → storage contract (storage_key) → Range stream
 ```
 
 - **Accuracy:** re-encoding with input seeking (never `-c copy`), so the first frame is the first one at or after the candidate start; the output keeps the source's resolution, aspect ratio and (decoded) orientation, rounding odd sizes to even for `yuv420p`.
@@ -148,7 +148,7 @@ Worker (app/services/clip_edit/):
   → validating ffprobe: h264, 1080×1920, fps, duration vs clip, audio iff source         (90)
   → atomic rename to edits/<id>/edited.mp4, then one commit: storage_key + metadata + ready (100)
   | failed      safe error_code/message, all of the edit's files removed
-GET /edits/{id}/content | /download  →  owner check → path_for(storage_key) → Range stream
+GET /edits/{id}/content | /download  →  owner check → storage contract (storage_key) → Range stream
 ```
 
 - **Derived, never destructive:** the V0.5 clip file is the read-only input; every edit is its own row and file.
@@ -218,7 +218,9 @@ Full reference: [audio-sound-design.md](audio-sound-design.md).
 ### Storage
 
 - Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`, `edits/<edit-uuid>/work-<attempt>/{captions.ass,short.mp4}` → `edits/<edit-uuid>/edited.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
-- Nothing under `MEDIA_ROOT` is served statically. Object storage (S3/R2) is planned and will implement the same `save / exists / delete / path_for` surface.
+- Nothing under `MEDIA_ROOT` is served statically.
+- **Storage contract** (`app/services/storage.py`): `StorageProvider` — `exists`, `size`, `save` (stream, never overwrites, size limit), `put_file`, `download_file` (to a local workspace), `iter_range` (a byte range in 1 MiB chunks), `delete` (idempotent), `check` (health). Two providers implement it: `LocalStorageProvider` (`MEDIA_ROOT`; `path_for` stays its chokepoint) and `S3StorageProvider` (a private bucket on any S3-compatible service through boto3: objects are written without ACLs, no public or presigned URLs, path-style addressing for MinIO, TLS required unless `S3_SECURE=false`). `STORAGE_BACKEND=local|s3` selects one. *Missing* (`ObjectNotFound`) and *broken* (`StorageUnavailable`) stay distinct — a HEAD on a missing bucket is a bare 404, so the S3 provider confirms the bucket before calling an object missing — and an outage is a `503`, never a reconciled "artifact missing".
+- Every media endpoint streams through `stream_object` in `app/api/media_streaming.py` on that contract (a ranged GET on S3), so the HTTP behaviour — `200`/`206`/`416`, suffix ranges, headers, owner checks — is identical on both backends; the contract and HTTP suites run against a local directory, an in-process S3 (moto) and, when `TEST_S3_*` is set, a live S3-compatible service.
 
 ### Authentication
 

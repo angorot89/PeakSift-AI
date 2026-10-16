@@ -1,4 +1,5 @@
 import ipaddress
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -33,6 +34,23 @@ class Settings(BaseSettings):
 
     # Local directory for uploaded media (development storage). Never committed.
     media_root: Path = Path("./media")
+
+    # Where persistent media lives: `local` (MEDIA_ROOT) or `s3` (a private bucket on any
+    # S3-compatible service). The HTTP API behaves identically with either.
+    storage_backend: Literal["local", "s3"] = "local"
+    # Empty endpoint: AWS S3 itself. MinIO/R2/...: the service URL (scheme://host[:port]).
+    s3_endpoint_url: str = ""
+    s3_region: str = "us-east-1"
+    s3_bucket: str = ""
+    # Both or neither; without them boto3's standard chain applies (e.g. an instance role).
+    s3_access_key_id: SecretStr | None = None
+    s3_secret_access_key: SecretStr | None = None
+    # Path-style addressing (http://host/bucket/key), usually needed for MinIO.
+    s3_path_style: bool = False
+    # TLS to the storage endpoint. When true an http:// endpoint is refused.
+    s3_secure: bool = True
+    s3_connect_timeout_seconds: float = Field(default=5, gt=0)
+    s3_read_timeout_seconds: float = Field(default=60, gt=0)
     # Largest accepted source video. Default 2 GiB.
     max_video_upload_bytes: int = Field(default=2 * 1024**3, gt=0)
     # User-supplied audio (music and sound effects): largest file, longest music track and
@@ -202,6 +220,13 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _storage_is_complete(self) -> "Settings":
+        problems = storage_problems(self)
+        if problems:
+            raise ValueError("Invalid storage configuration: " + "; ".join(problems))
+        return self
+
+    @model_validator(mode="after")
     def _production_is_safe(self) -> "Settings":
         if self.app_env != "production":
             return self
@@ -226,6 +251,44 @@ class Settings(BaseSettings):
     @property
     def trusted_proxy_list(self) -> list[str]:
         return [p.strip() for p in self.trusted_proxies.split(",") if p.strip()]
+
+
+# S3 bucket names: 3-63 lowercase letters, digits, dots and hyphens.
+_BUCKET_PATTERN = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
+
+def storage_problems(settings: Settings) -> list[str]:
+    """Why the S3 storage settings cannot work (names only, never values)."""
+    if settings.storage_backend != "s3":
+        return []
+    problems: list[str] = []
+    if not _BUCKET_PATTERN.fullmatch(settings.s3_bucket):
+        problems.append("S3_BUCKET must be a valid bucket name")
+    if (settings.s3_access_key_id is None) != (settings.s3_secret_access_key is None):
+        problems.append("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together")
+    if settings.s3_endpoint_url:
+        endpoint = urlsplit(settings.s3_endpoint_url)
+        if (
+            endpoint.scheme not in ("http", "https")
+            or not endpoint.hostname
+            or endpoint.username
+            or endpoint.password
+            or endpoint.path not in ("", "/")
+            or endpoint.query
+            or endpoint.fragment
+        ):
+            problems.append("S3_ENDPOINT_URL must be scheme://host[:port] without credentials")
+        elif settings.s3_secure and endpoint.scheme != "https":
+            problems.append("S3_ENDPOINT_URL must use https:// while S3_SECURE is true")
+    if not S3_MEDIA_PIPELINES_READY:
+        problems.append("STORAGE_BACKEND=s3 is not available until the media pipelines use it")
+    return problems
+
+
+# The S3 provider exists, but uploads, workers and media endpoints still read MEDIA_ROOT;
+# until they all go through the storage contract, selecting S3 would split media between
+# two places, so it is refused.
+S3_MEDIA_PIPELINES_READY = False
 
 
 # Values that must never sign production tokens (placeholders from docs and examples).

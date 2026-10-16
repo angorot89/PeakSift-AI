@@ -53,7 +53,7 @@ from app.services.reframe.sampling import (
     sample_frames,
 )
 from app.services.reframe.tracking import track_subjects
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import InvalidStorageKey, LocalStorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +98,13 @@ def run_reframe_analysis(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalMediaStorage | None = None,
+    storage: LocalStorageProvider | None = None,
     detector: SubjectDetectionProvider | None = None,
     task_id: str | None = None,
 ) -> ReframeAnalysis | None:
     """Analyse one ``ReframeAnalysis`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    storage = storage or LocalMediaStorage(settings.media_root)
+    storage = storage or LocalStorageProvider(settings.media_root)
     analysis = db.get(ReframeAnalysis, analysis_id)
     if analysis is None:
         logger.warning("Reframe analysis %s no longer exists; nothing to do", analysis_id)
@@ -175,7 +175,7 @@ def _execute(
     analysis: ReframeAnalysis,
     db: Session,
     settings: Settings,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     detector: SubjectDetectionProvider | None,
     task_id: str | None,
 ) -> None:

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from app.services.audio_extraction import AUDIO_BITRATE, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE
 from app.services.ffprobe import ProbeError, probe_audio
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.services.transcription.contract import ProviderSegment
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def build_chunk_command(
 
 def split_audio(
     source: Path,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     transcription_id: uuid.UUID | str,
     *,
     total_seconds: float,
@@ -198,7 +198,7 @@ def attempt_workspace(transcription_id: uuid.UUID | str, task_id: str | None) ->
 
 
 def cleanup_other_workspaces(
-    storage: LocalMediaStorage, transcription_id: uuid.UUID | str, keep: str
+    storage: LocalStorageProvider, transcription_id: uuid.UUID | str, keep: str
 ) -> None:
     """Remove derived files of earlier attempts (and the pre-V0.6 flat layout), keeping
     ``keep`` (a workspace from ``attempt_workspace``)."""
@@ -215,7 +215,7 @@ def cleanup_other_workspaces(
             entry.unlink(missing_ok=True)
 
 
-def cleanup_chunks(storage: LocalMediaStorage, transcription_id: uuid.UUID | str) -> None:
+def cleanup_chunks(storage: LocalStorageProvider, transcription_id: uuid.UUID | str) -> None:
     """Delete the chunk directory; the normalized audio next to it is kept."""
     directory = storage.path_for(chunks_prefix(transcription_id))
     if directory.is_dir():

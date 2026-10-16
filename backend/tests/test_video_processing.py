@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.models import Project, User, Video, VideoStatus
 from app.services import video_processing
 from app.services.ffprobe import ProbeError, VideoMetadata
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from tests.media_fixtures import generate_video, requires_ffmpeg
 
 PASSWORD = "correct horse battery"
@@ -21,7 +21,7 @@ READY_METADATA = VideoMetadata(
 
 
 def stored_video(
-    db_session: Session, storage: LocalMediaStorage, content: bytes = b"data"
+    db_session: Session, storage: LocalStorageProvider, content: bytes = b"data"
 ) -> Video:
     user = User(email="creator@example.com", password_hash="x")
     project = Project(name="P", owner=user)
@@ -40,12 +40,12 @@ def stored_video(
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in storage.root.rglob("*"):
         if path.is_file():

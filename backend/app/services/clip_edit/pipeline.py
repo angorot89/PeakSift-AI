@@ -67,7 +67,7 @@ from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
 from app.services.ffprobe import ProbeError, probe, probe_audio
-from app.services.storage import InvalidStorageKey, LocalMediaStorage, StorageError
+from app.services.storage import InvalidStorageKey, LocalStorageProvider, StorageError
 
 logger = logging.getLogger(__name__)
 
@@ -110,13 +110,13 @@ def run_clip_edit(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalMediaStorage | None = None,
+    storage: LocalStorageProvider | None = None,
     composer: Composer | None = None,
     task_id: str | None = None,
 ) -> ClipEdit | None:
     """Execute the render for a ``ClipEdit`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    store = EditArtifactStore(storage or LocalMediaStorage(settings.media_root))
+    store = EditArtifactStore(storage or LocalStorageProvider(settings.media_root))
     composer = composer or compose_short  # resolved at call time (tests patch the module)
 
     edit = db.get(ClipEdit, edit_id)

@@ -22,7 +22,7 @@ from app.services.clip_render import pipeline
 from app.services.clip_render.pipeline import is_stale, run_clip_render
 from app.services.clip_render.renderer import RenderedClip, RenderError
 from app.services.clip_render.storage import ClipArtifactStore, clip_storage_key
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers import dispatch
 from app.workers.celery_app import celery_app
 from app.workers.clip_render_tasks import render_clip_task
@@ -40,12 +40,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():
@@ -55,7 +55,7 @@ def clean_media_root(storage: LocalMediaStorage):
 
 
 @pytest.fixture
-def clip(db_session: Session, storage: LocalMediaStorage, tmp_path: Path) -> Clip:
+def clip(db_session: Session, storage: LocalStorageProvider, tmp_path: Path) -> Clip:
     """A queued clip for candidate [2, 4] of a real 6 s generated source video."""
     key = storage.generate_key("mp4")
     source_path = storage.path_for(key)

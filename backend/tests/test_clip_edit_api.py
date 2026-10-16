@@ -22,7 +22,7 @@ from app.models import (
 )
 from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.storage import clip_storage_key
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers.dispatch import JobQueueUnavailable
 
 PASSWORD = "correct horse battery"
@@ -74,12 +74,12 @@ EDIT_KEYS = {
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():
@@ -185,7 +185,7 @@ BLUR_BOLD = {
 }
 
 
-def mark_ready(db_session: Session, storage: LocalMediaStorage, edit_id: str) -> ClipEdit:
+def mark_ready(db_session: Session, storage: LocalStorageProvider, edit_id: str) -> ClipEdit:
     edit = db_session.get(ClipEdit, uuid.UUID(edit_id))
     store = EditArtifactStore(storage)
     store.workspace(edit.id, edit.attempt)

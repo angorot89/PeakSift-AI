@@ -18,19 +18,19 @@ from app.models import (
     Video,
 )
 from app.services.clip_render.storage import ClipArtifactStore, clip_storage_key
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 
 PASSWORD = "correct horse battery"
 CONTENT = bytes(range(256)) * 20  # 5120 distinguishable bytes
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file():
@@ -48,7 +48,7 @@ def sign_up(client: TestClient, email: str) -> None:
 
 def make_clip(
     db_session: Session,
-    storage: LocalMediaStorage,
+    storage: LocalStorageProvider,
     email: str,
     *,
     status: str = "ready",

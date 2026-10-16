@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.clip_edits import OwnedClip
 from app.api.deps import DbSession, Storage
+from app.api.media_streaming import object_present
 from app.core.config import Settings, get_settings
 from app.models import (
     CaptionTrack,
@@ -42,7 +43,7 @@ from app.services.caption_timing.pipeline import is_stale
 from app.services.clip_edit.config import CaptionPosition, CaptionTiming, DynamicPreset
 from app.services.clip_edit.dynamic_text import DynamicCaptionError, dynamic_cues
 from app.services.clip_edit.emoji import emoji_font, split_emoji
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import StorageProvider
 from app.workers.dispatch import JobQueueUnavailable, enqueue_caption_track, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -119,15 +120,12 @@ def _current(db: DbSession, clip: Clip) -> CaptionTrack | None:
     )
 
 
-def _require_timeable(clip: Clip, storage: LocalMediaStorage) -> None:
+def _require_timeable(clip: Clip, storage: StorageProvider) -> None:
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Generate the clip before timing captions"
         )
-    try:
-        present = storage.path_for(clip.storage_key).is_file()
-    except InvalidStorageKey:
-        present = False
+    present = object_present(storage, clip.storage_key)
     if not present:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

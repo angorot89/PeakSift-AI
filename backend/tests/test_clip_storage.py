@@ -11,12 +11,12 @@ from app.services.clip_render.storage import (
     clip_temp_key,
     safe_download_filename,
 )
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import InvalidStorageKey, LocalStorageProvider
 
 
 @pytest.fixture
 def store(tmp_path: Path) -> ClipArtifactStore:
-    return ClipArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    return ClipArtifactStore(LocalStorageProvider(tmp_path / "media"))
 
 
 # --- keys -----
@@ -199,7 +199,7 @@ def test_symlinked_clip_directory_cannot_escape_the_root(tmp_path: Path):
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "clip.mp4").write_bytes(b"secret")
-    store = ClipArtifactStore(LocalMediaStorage(tmp_path / "media"))
+    store = ClipArtifactStore(LocalStorageProvider(tmp_path / "media"))
     clip_id = uuid.uuid4()
     (store.storage.root / "clips").mkdir(parents=True)
     (store.storage.root / "clips" / str(clip_id)).symlink_to(outside, target_is_directory=True)

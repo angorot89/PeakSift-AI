@@ -11,7 +11,7 @@ from app.api import clips as api
 from app.core.config import Settings, get_settings
 from app.models import Clip, ClipCandidate, ClipDetectionRun, TranscriptSegment, Video
 from app.services.clip_render.storage import ClipArtifactStore
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from app.workers.dispatch import JobQueueUnavailable
 
 PASSWORD = "correct horse battery"
@@ -147,7 +147,7 @@ def clips_url(ctx: dict) -> str:
 
 def mark_ready(db_session: Session, clip: Clip) -> None:
     """A ready clip always has its file: write a small one at the final key."""
-    store = ClipArtifactStore(LocalMediaStorage(Path(get_settings().media_root)))
+    store = ClipArtifactStore(LocalStorageProvider(Path(get_settings().media_root)))
     store.temp_path(clip.id).write_bytes(b"\x00" * 64)
     clip.storage_key = store.finalize(clip.id)
     clip.status, clip.progress_percent = "ready", 100

@@ -39,7 +39,7 @@ from app.services.clip_render.renderer import (
     render_clip,
 )
 from app.services.clip_render.storage import ClipArtifactStore, StorageError
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +93,13 @@ def run_clip_render(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalMediaStorage | None = None,
+    storage: LocalStorageProvider | None = None,
     renderer: Renderer = render_clip,
     task_id: str | None = None,
 ) -> Clip | None:
     """Execute the render for a ``Clip`` row. Problems are recorded on the row, never raised."""
     settings = settings or get_settings()
-    store = ClipArtifactStore(storage or LocalMediaStorage(settings.media_root))
+    store = ClipArtifactStore(storage or LocalStorageProvider(settings.media_root))
 
     clip = db.get(Clip, clip_id)
     if clip is None:

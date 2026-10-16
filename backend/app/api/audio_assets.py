@@ -25,13 +25,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, Storage
-from app.api.media_streaming import stream_file
+from app.api.media_streaming import object_present, stream_object
 from app.api.videos import OwnedProject
 from app.core.config import get_settings
 from app.models import AudioAsset, AudioAssetKind
 from app.schemas.audio_asset import AudioAssetRead, AudioUploadLimits, AudioWaveformRead
 from app.services.audio_assets import ACCEPTED_EXTENSIONS, store_audio_upload
-from app.services.storage import InvalidStorageKey
 from app.services.video_upload import UploadValidationError, check_declared_size
 
 router = APIRouter(prefix="/projects/{project_id}/audio-assets", tags=["audio"])
@@ -125,10 +124,12 @@ def audio_content(asset: OwnedAudioAsset, request: Request, storage: Storage) ->
 
     Served inline with private, no-store caching; there is no public URL.
     """
-    try:
-        path = storage.path_for(asset.storage_key)
-    except InvalidStorageKey:
-        path = None
-    if path is None or not path.is_file():
+    if not object_present(storage, asset.storage_key):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file is missing")
-    return stream_file(path, request, media_type=asset.content_type, filename=asset.display_name)
+    return stream_object(
+        storage,
+        asset.storage_key,
+        request,
+        media_type=asset.content_type,
+        filename=asset.display_name,
+    )

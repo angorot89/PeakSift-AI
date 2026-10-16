@@ -78,7 +78,7 @@ clips/<clip-uuid>/clip-tmp-<attempt>.mp4   while rendering/validating
 clips/<clip-uuid>/clip.mp4                 the validated artifact
 ```
 
-Only a real UUID can name a clip directory, every path is resolved through `LocalMediaStorage.path_for` (which refuses traversal and symlink escapes), and nothing under `MEDIA_ROOT` is served statically. Candidate titles, filenames, project or user names never become paths.
+Only a real UUID can name a clip directory, every path is resolved through `LocalStorageProvider.path_for` (which refuses traversal and symlink escapes), and nothing under `MEDIA_ROOT` is served statically. Candidate titles, filenames, project or user names never become paths.
 
 ## API
 

@@ -20,7 +20,7 @@ from app.services.clip_edit.config import (
     EditConfig,
 )
 from app.services.clip_edit.pipeline import run_clip_edit
-from app.services.storage import LocalMediaStorage
+from app.services.storage import LocalStorageProvider
 from tests.media_fixtures import FFMPEG, requires_ffmpeg, requires_libass
 from tests.test_caption_track_model import make_track
 from tests.test_clip_edit_api import ready_clip, sign_up
@@ -37,12 +37,12 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def storage() -> LocalMediaStorage:
-    return LocalMediaStorage(Path(get_settings().media_root))
+def storage() -> LocalStorageProvider:
+    return LocalStorageProvider(Path(get_settings().media_root))
 
 
 @pytest.fixture(autouse=True)
-def clean_media_root(storage: LocalMediaStorage):
+def clean_media_root(storage: LocalStorageProvider):
     yield
     for path in sorted(storage.root.rglob("*"), reverse=True):
         if path.is_file() or path.is_symlink():

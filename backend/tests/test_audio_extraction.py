@@ -12,7 +12,7 @@ from app.services.audio_extraction import (
     normalized_audio_key,
 )
 from app.services.ffprobe import probe_audio
-from app.services.storage import InvalidStorageKey, LocalMediaStorage
+from app.services.storage import InvalidStorageKey, LocalStorageProvider
 from tests.media_fixtures import generate_video, requires_ffmpeg
 
 
@@ -22,8 +22,8 @@ class FakeCompletedProcess:
 
 
 @pytest.fixture
-def storage(tmp_path: Path) -> LocalMediaStorage:
-    return LocalMediaStorage(tmp_path / "media")
+def storage(tmp_path: Path) -> LocalStorageProvider:
+    return LocalStorageProvider(tmp_path / "media")
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def source(tmp_path: Path) -> Path:
     return path
 
 
-def leftovers(storage: LocalMediaStorage) -> list[Path]:
+def leftovers(storage: LocalStorageProvider) -> list[Path]:
     return [p for p in storage.root.rglob("*") if p.is_file()]
 
 
@@ -55,7 +55,7 @@ def test_command_is_an_argument_list_with_speech_settings(tmp_path: Path):
     assert "-nostdin" in command
 
 
-def test_normalized_audio_key_is_internal_and_safe(storage: LocalMediaStorage):
+def test_normalized_audio_key_is_internal_and_safe(storage: LocalStorageProvider):
     key = normalized_audio_key(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 
     assert key == "transcription/12345678-1234-5678-1234-567812345678/normalized.mp3"
@@ -192,7 +192,7 @@ def test_unsafe_key_is_rejected_before_anything_happens(monkeypatch, storage, so
 
 
 @requires_ffmpeg
-def test_real_extraction_produces_mono_16khz_mp3(tmp_path: Path, storage: LocalMediaStorage):
+def test_real_extraction_produces_mono_16khz_mp3(tmp_path: Path, storage: LocalStorageProvider):
     video = generate_video(tmp_path / "clip.mp4", seconds=2, fps=25)
 
     result = extract_normalized_audio(video, storage, normalized_audio_key("real-1"))
@@ -209,7 +209,7 @@ def test_real_extraction_produces_mono_16khz_mp3(tmp_path: Path, storage: LocalM
 
 
 @requires_ffmpeg
-def test_real_video_without_audio_fails_cleanly(tmp_path: Path, storage: LocalMediaStorage):
+def test_real_video_without_audio_fails_cleanly(tmp_path: Path, storage: LocalStorageProvider):
     video = generate_video(tmp_path / "silent.mp4", seconds=1, fps=25, audio=False)
 
     with pytest.raises(AudioExtractionError) as excinfo:
@@ -220,7 +220,7 @@ def test_real_video_without_audio_fails_cleanly(tmp_path: Path, storage: LocalMe
 
 
 @requires_ffmpeg
-def test_real_invalid_source_fails_cleanly(tmp_path: Path, storage: LocalMediaStorage):
+def test_real_invalid_source_fails_cleanly(tmp_path: Path, storage: LocalStorageProvider):
     bogus = tmp_path / "bogus.mp4"
     bogus.write_bytes(b"\x00" * 4096)
 
