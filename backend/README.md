@@ -275,6 +275,24 @@ The full design and limitations are in [docs/audio-sound-design.md](../docs/audi
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
 
+## Moving media to object storage
+
+Media can move between backends without downtime for reads; the database is the list of what must exist (source videos, audio assets, ready clips, ready edits).
+
+```bash
+# 1. Fill in S3_* (STORAGE_BACKEND stays local) and create a PRIVATE bucket.
+python -m app.cli.media migrate --from local --to s3 --dry-run   # what would be copied
+python -m app.cli.media migrate --from local --to s3             # copy (resumable: rerun freely)
+python -m app.cli.media verify  --from local --to s3 --checksum  # every object, SHA-256
+# 2. Only when verify exits 0: set STORAGE_BACKEND=s3 and restart the API and workers.
+# 3. Keep MEDIA_ROOT until you have checked the application on S3; nothing is deleted for you.
+```
+
+- **Copy-first, never destructive:** the source is only read. An object already at the destination with the same size is skipped, so an interrupted run resumes; one with a different size is a *conflict*, reported and never overwritten.
+- **Honest report:** each object is `copied`, `present`, `missing` (the database references it but the source lacks it), `conflict` or `failed`; verify adds `absent` and `size differs` / `content differs`. The exit status is non-zero while anything is unaccounted for. Output names storage keys and counts, never credentials.
+- Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
+- The reverse direction (`--from s3 --to local`) works the same way.
+
 ## Structure
 
 ```
@@ -288,6 +306,9 @@ app/
   models/            # SQLAlchemy models: User, Project, Video, Transcription(+Segment), ClipDetectionRun, ClipCandidate, Clip, ClipEdit, ReframeAnalysis(+Keyframe)
   schemas/           # Pydantic request/response schemas
   services/storage.py # Storage contract: local directory or private S3 bucket; safe keys, ranged reads
+  services/workspace.py # Per-attempt local scratch (WORK_ROOT) for jobs and uploads
+  services/media_migration.py # Copy/verify media between backends (database-referenced keys)
+  cli/media.py       # `python -m app.cli.media migrate|verify`
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
