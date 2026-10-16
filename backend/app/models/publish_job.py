@@ -136,6 +136,8 @@ class PublishJob(Base):
     provider_video_id: Mapped[str | None] = mapped_column(String(64))
     provider_upload_status: Mapped[str | None] = mapped_column(String(32))
     provider_processing_status: Mapped[str | None] = mapped_column(String(32))
+    # How many times processing was checked after the upload (bounded by configuration).
+    status_checks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(String(500))

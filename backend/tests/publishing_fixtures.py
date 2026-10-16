@@ -12,7 +12,8 @@ from app.services.publishing.tokens import TokenCipher, decode_key, generate_key
 from tests.test_clip_edit_model import make_clip, make_edit
 
 REFRESH_TOKEN = "1//0gPublishingTestRefreshToken"
-CIPHER = TokenCipher(decode_key(generate_key()), 1)
+KEY = generate_key()
+CIPHER = TokenCipher(decode_key(KEY), 1)
 
 
 def ready_edit(db: Session, *, status: str = "ready") -> tuple[User, ClipEdit]:

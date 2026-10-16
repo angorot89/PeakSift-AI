@@ -322,6 +322,28 @@ A user can connect one YouTube channel (`app/models/publishing_connection.py`, `
 
 **Provider contract** (`app/services/publishing/provider.py`): the pipeline sees only `authorize` (refresh token → a short-lived opaque credential, never stored), `start_upload` (a resumable session URI — a secret, stored encrypted), `upload_chunk` / `query_upload` (bytes the provider has *confirmed*, so an interrupted upload resumes exactly where the provider stopped and the video is created once) and `video_status`. Every failure is one of `authentication_required`, `permission_denied`, `quota_exceeded`, `rate_limited`, `invalid_metadata`, `upload_session_expired`, `network_error`, `provider_error`, `processing_failed`, with a user-safe message and a retry decision (only rate limiting, network and provider errors and an expired session are retryable). `PUBLISHING_PROVIDER=fake` selects an in-memory simulation (`fake.py`; video ids `fake-…`, labelled simulated) for tests and non-production stacks; production refuses it.
 
+**YouTube upload** (`app/services/publishing/youtube.py`, `uploader.py`): Google's documented resumable `videos.insert`. `POST …/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status` with the metadata (title, description, tags, category, `privacyStatus`, `selfDeclaredMadeForKids`) returns the session URI (stored encrypted); `PUT` with `Content-Range: bytes a-b/total` sends `YOUTUBE_UPLOAD_CHUNK_BYTES` (default 8 MiB, a multiple of 256 KiB as Google requires) and `308 Range: bytes=0-N` says what YouTube stored; `PUT` with `bytes */total` asks where an interrupted upload stands. The loop always resumes from YouTube's confirmed offset, reports only confirmed bytes (monotonic), checks attempt ownership before every chunk and retries only retryable failures, at most five times in a row with exponential backoff. Access tokens come from the refresh token through `google-auth` per job (`invalid_grant` becomes `authentication_required`). Google's HTTP status and `reason` map to the normalized codes; Google's messages, the session URI and tokens never leave the module or reach a log (HTTP client loggers stay at WARNING as well). Processing status needs a read scope this integration does not request, so it is reported as unknown and the job ends honestly at **uploaded**.
+
+**The pipeline** (`app/services/publishing/pipeline.py`, Celery `peaksift.publish_short` and `peaksift.check_publish_status`, ids only):
+
+```
+queued → preparing   claim (fencing token); the edit must still be READY with its file present;
+                      the connection must exist and be connected; refresh token decrypted
+       → uploading   authorize; open the resumable session and STORE IT (encrypted, bound to the
+                      job) BEFORE sending a byte; stream the short from storage in ranged chunks
+       → uploaded    video id recorded, session secret deleted, channel name learned (100 %)
+       → processing → published      countdown status checks (PUBLISH_STATUS_POLL_SECONDS,
+                      at most PUBLISH_STATUS_MAX_POLLS); YouTube's upload-only scope cannot read
+                      processing, so YouTube jobs end honestly at "uploaded"
+failed               PeakSift could not finish (network, quota, metadata, account...): retryable;
+                      the session is kept so the retry resumes it
+provider_failed      YouTube rejected or could not process the video
+```
+
+- **No duplicates:** a killed worker, a crash after the last byte, a retry or a redelivered message all resume the stored session (YouTube reports the video if it already exists); a job with a video id is never uploaded again. An expired session (no video yet) is replaced once per attempt.
+- **Accounts:** `authentication_required` (revoked or expired consent, or a token no configured key can open) marks the connection `needs_reconnect`; a disconnected account fails the job (`not_connected`).
+- Every commit checks the attempt token; a superseded attempt stops without writing. Settings: `PUBLISH_STALE_AFTER_SECONDS` (15 min), `PUBLISH_MAX_ATTEMPTS` (5), `PUBLISH_STATUS_POLL_SECONDS` (30), `PUBLISH_STATUS_MAX_POLLS` (20).
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
