@@ -219,6 +219,8 @@ class Settings(BaseSettings):
     # Which publishing provider jobs use: "youtube", or "fake" — an in-memory simulation for
     # tests and non-production stacks (refused in production).
     publishing_provider: Literal["youtube", "fake"] = "youtube"
+    # Bytes per resumable-upload request; Google requires multiples of 256 KiB. Default 8 MiB.
+    youtube_upload_chunk_bytes: int = Field(default=8 * 1024 * 1024, ge=256 * 1024)
     # A Google Cloud "Web application" OAuth client. The redirect URI is the API's
     # /publishing/youtube/callback and must be registered on the client exactly.
     google_client_id: str = ""
@@ -321,6 +323,8 @@ def publishing_problems(settings: "Settings") -> list[str]:
                 problems.append(
                     "PUBLISHING_TOKEN_KEY_VERSION must differ from every previous key version"
                 )
+    if settings.youtube_upload_chunk_bytes % (256 * 1024):
+        problems.append("YOUTUBE_UPLOAD_CHUNK_BYTES must be a multiple of 262144 (256 KiB)")
     if not settings.youtube_publishing_enabled:
         return problems
     if key is None:
