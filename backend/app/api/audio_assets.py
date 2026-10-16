@@ -28,6 +28,7 @@ from app.api.deps import CurrentUser, DbSession, Storage
 from app.api.media_streaming import object_present, stream_object
 from app.api.videos import OwnedProject
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import AudioAsset, AudioAssetKind
 from app.schemas.audio_asset import AudioAssetRead, AudioUploadLimits, AudioWaveformRead
 from app.schemas.project import MediaDeletionRead
@@ -76,7 +77,7 @@ def upload_limits(_: CurrentUser) -> AudioUploadLimits:
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=AudioAssetRead,
-    dependencies=[Depends(reject_oversized_body)],
+    dependencies=[per_user("audio_upload"), Depends(reject_oversized_body)],
 )
 def upload_audio(
     project: OwnedProject,

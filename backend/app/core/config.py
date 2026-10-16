@@ -207,6 +207,11 @@ class Settings(BaseSettings):
     caption_timing_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     caption_timing_max_attempts: int = Field(default=5, ge=1)
 
+    # Rate limits (Redis). Off only in tests. RATE_LIMITS overrides individual budgets:
+    # "login_ip=20/60,edit_render=200/3600" (see app/core/rate_limit.py for the names).
+    rate_limit_enabled: bool = True
+    rate_limits: str = ""
+
     # Logging: one JSON object per line in production by default, readable text otherwise.
     log_format: Literal["json", "text"] | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -233,6 +238,13 @@ class Settings(BaseSettings):
         problems = storage_problems(self)
         if problems:
             raise ValueError("Invalid storage configuration: " + "; ".join(problems))
+        return self
+
+    @model_validator(mode="after")
+    def _rate_limits_are_valid(self) -> "Settings":
+        from app.core.rate_limit import parse_overrides
+
+        parse_overrides(self.rate_limits)  # raises with a message naming the setting only
         return self
 
     @model_validator(mode="after")
@@ -328,6 +340,8 @@ def production_problems(settings: Settings) -> list[str]:
             problems.append(f"{name.upper()} must be set explicitly")
     if settings.celery_task_always_eager:
         problems.append("CELERY_TASK_ALWAYS_EAGER must be off")
+    if not settings.rate_limit_enabled:
+        problems.append("RATE_LIMIT_ENABLED must be on")
     if settings.storage_backend == "local" and (
         "media_root" not in explicit or not settings.media_root.is_absolute()
     ):

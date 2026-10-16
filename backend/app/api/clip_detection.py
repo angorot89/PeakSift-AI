@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import CurrentUser, DbSession
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import (
     ACTIVE_CLIP_DETECTION_STATUSES,
     CandidateDecision,
@@ -254,7 +255,12 @@ def _enqueue_or_503(db: DbSession, run: ClipDetectionRun, *, created: bool) -> N
 # --- runs ---------------------------------------------------------------------------------
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=DetectionRunRead)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    response_model=DetectionRunRead,
+    dependencies=[per_user("clip_detection")],
+)
 def start_detection(
     body: StartDetectionRequest, video: OwnedVideo, db: DbSession
 ) -> DetectionRunRead:
@@ -337,7 +343,11 @@ def get_run(run: OwnedRun, video: OwnedVideo, db: DbSession) -> DetectionRunRead
     return _read(db, run, current_fingerprint=... if active else _current_fingerprint(db, video))
 
 
-@router.post("/{run_id}/retry", response_model=DetectionRunRead)
+@router.post(
+    "/{run_id}/retry",
+    response_model=DetectionRunRead,
+    dependencies=[per_user("clip_detection")],
+)
 def retry_run(run: OwnedRun, video: OwnedVideo, db: DbSession) -> DetectionRunRead:
     """Re-queue a failed or stalled run against the same transcript snapshot."""
     settings = get_settings()

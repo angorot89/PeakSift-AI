@@ -20,6 +20,7 @@ from app.api.deps import CurrentUser, DbSession, Storage
 from app.api.media_streaming import object_present, stream_object
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import (
     AudioAsset,
     AudioAssetKind,
@@ -262,7 +263,12 @@ def _enqueue_or_503(db: DbSession, edit: ClipEdit, *, created: bool) -> None:
 # --- create / list / status / retry ------------------------------------------------------------
 
 
-@router.post("", response_model=ClipEditRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ClipEditRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[per_user("edit_render")],
+)
 def create_edit(
     body: EditRequest,
     clip: OwnedClip,
@@ -381,7 +387,9 @@ def get_edit(edit: OwnedEdit, db: DbSession, storage: Storage) -> ClipEditRead:
     return _read(_reconcile(db, edit, storage))
 
 
-@router.post("/{edit_id}/retry", response_model=ClipEditRead)
+@router.post(
+    "/{edit_id}/retry", response_model=ClipEditRead, dependencies=[per_user("edit_render")]
+)
 def retry_edit(
     edit: OwnedEdit, clip: OwnedClip, video: OwnedVideo, db: DbSession, storage: Storage
 ) -> ClipEditRead:

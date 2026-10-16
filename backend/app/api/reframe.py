@@ -19,6 +19,7 @@ from app.api.clip_edits import OwnedClip
 from app.api.deps import DbSession, Storage
 from app.api.media_streaming import object_present
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import (
     Clip,
     ClipStatus,
@@ -134,7 +135,12 @@ def _enqueue_or_503(db: DbSession, analysis: ReframeAnalysis, *, created: bool) 
         ) from None
 
 
-@router.post("", response_model=ReframeAnalysisRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ReframeAnalysisRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[per_user("reframe")],
+)
 def start_analysis(clip: OwnedClip, db: DbSession, storage: Storage, response: Response):
     """Analyse the clip's framing with the server's current configuration. The same
     configuration returns the existing analysis (200); a failed one must be retried (409)."""
@@ -243,7 +249,11 @@ def get_crop_path(analysis: OwnedAnalysis, db: DbSession) -> CropPathRead:
     )
 
 
-@router.post("/{analysis_id}/retry", response_model=ReframeAnalysisRead)
+@router.post(
+    "/{analysis_id}/retry",
+    response_model=ReframeAnalysisRead,
+    dependencies=[per_user("reframe")],
+)
 def retry_analysis(
     analysis: OwnedAnalysis, clip: OwnedClip, db: DbSession, storage: Storage
 ) -> ReframeAnalysisRead:

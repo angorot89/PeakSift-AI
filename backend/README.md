@@ -297,6 +297,24 @@ python -m app.cli.media verify  --from local --to s3 --checksum  # every object,
 - Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
 - The reverse direction (`--from s3 --to local`) works the same way.
 
+## Rate limits
+
+Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
+
+| Name | Default | Subject | Endpoints |
+| --- | --- | --- | --- |
+| `login_ip` / `login_account` | 20 per minute / 10 per 15 minutes | client address / account (email, case-insensitive) | `POST /auth/login` |
+| `register_ip` | 10 per hour | client address | `POST /auth/register` |
+| `video_upload` / `audio_upload` | 30 / 100 per hour | user | video and audio uploads |
+| `transcription`, `clip_detection` | 30 per hour each | user | start and retry |
+| `clip_render`, `edit_render` | 200 per hour each | user | start and retry (an edit request counts even when it returns an existing edit) |
+| `reframe`, `caption_timing` | 100 per hour each | user | start and retry |
+
+- The client address is the one `ProxyHeadersMiddleware` derives from `TRUSTED_PROXIES` only; an untrusted peer cannot rotate identities with forged `X-Forwarded-For`.
+- Subjects are hashed before they reach Redis (no emails or addresses in clear). Authentication runs first, so anonymous requests to user-limited endpoints are `401`, not counted.
+- `RATE_LIMITS="login_ip=20/60,edit_render=200/3600"` overrides budgets (unknown names or bad values refuse to start). `RATE_LIMIT_ENABLED` exists only so tests can switch limits off; production refuses to start without them.
+- **Fail closed:** if Redis cannot be reached, a limited endpoint answers `503` instead of running unlimited; readiness reports the same outage.
+
 ## Logs and request ids
 
 - Every response carries **`X-Request-ID`** (a well-formed incoming id from the proxy is kept; anything else is replaced). Every log line written while handling the request carries it, and a job enqueued by that request carries it to the worker, whose lines add `task` and `job_id` — one id follows a creator's click from the proxy to the render.

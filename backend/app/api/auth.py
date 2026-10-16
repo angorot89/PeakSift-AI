@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
+from app.core.rate_limit import enforce, per_ip
 from app.core.security import (
     DUMMY_PASSWORD_HASH,
     create_access_token,
@@ -32,7 +33,12 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserRead)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserRead,
+    dependencies=[per_ip("register_ip")],
+)
 def register(payload: UserCreate, response: Response, db: DbSession) -> User:
     if db.scalar(select(User.id).where(User.email == payload.email)) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=EMAIL_TAKEN)
@@ -50,8 +56,10 @@ def register(payload: UserCreate, response: Response, db: DbSession) -> User:
     return user
 
 
-@router.post("/login", response_model=UserRead)
+@router.post("/login", response_model=UserRead, dependencies=[per_ip("login_ip")])
 def login(payload: UserLogin, response: Response, db: DbSession) -> User:
+    # Per account too: spreading guesses over many addresses does not help.
+    enforce("login_account", payload.email.lower())
     user = db.scalar(select(User).where(User.email == payload.email))
 
     if user is None:

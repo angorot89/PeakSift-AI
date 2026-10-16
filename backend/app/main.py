@@ -63,7 +63,7 @@ def create_app(settings: Settings) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["X-Request-ID"],
+        expose_headers=["X-Request-ID", "Retry-After"],
     )
     if settings.allowed_host_list:
         # Requests for any other Host are refused (required in production; see config.py).

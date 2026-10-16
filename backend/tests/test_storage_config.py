@@ -84,6 +84,7 @@ def production_s3(**overrides) -> dict:
         frontend_url="https://app.peaksift.example",
         allowed_hosts="api.peaksift.example",
         celery_task_always_eager=False,
+        rate_limit_enabled=True,
         **overrides,
     )
 

@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from app.api.deps import DbSession
 from app.api.videos import OwnedProject
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import (
     Transcription,
     TranscriptionStatus,
@@ -93,7 +94,9 @@ def _enqueue_or_503(db: DbSession, transcription: Transcription, *, created: boo
         ) from None
 
 
-@router.post("/transcription", response_model=TranscriptionRead)
+@router.post(
+    "/transcription", response_model=TranscriptionRead, dependencies=[per_user("transcription")]
+)
 def start_transcription(video: OwnedVideo, db: DbSession, response_status: None = None):
     """Queue a transcription. Idempotent: an existing job is returned instead of duplicated."""
     existing = video.transcription
@@ -131,7 +134,11 @@ def get_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
     return _read(db, video.transcription)
 
 
-@router.post("/transcription/retry", response_model=TranscriptionRead)
+@router.post(
+    "/transcription/retry",
+    response_model=TranscriptionRead,
+    dependencies=[per_user("transcription")],
+)
 def retry_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
     """Re-queue a failed or stale transcription. Live or completed jobs are not restarted."""
     transcription = video.transcription

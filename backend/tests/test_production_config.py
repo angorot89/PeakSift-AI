@@ -22,6 +22,7 @@ def production(**overrides) -> dict:
         "trusted_proxies": "10.0.0.0/8",
         "media_root": "/var/lib/peaksift/media",
         "celery_task_always_eager": False,  # the test suite's environment enables it
+        "rate_limit_enabled": True,  # and disables this
     }
     values.update(overrides)
     return values
