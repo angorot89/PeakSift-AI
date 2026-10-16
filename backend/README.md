@@ -318,6 +318,8 @@ A user can connect one YouTube channel (`app/models/publishing_connection.py`, `
 - **Authorization code + PKCE (S256)**, `access_type=offline` and `prompt=consent` so a refresh token is issued. The `state` is 32 random bytes, stored only as a SHA-256 hash with the encrypted PKCE verifier, bound to the user who started, valid for 10 minutes and deleted atomically on first use (`oauth_states`); a replayed, forged, expired or another user's state is refused before any exchange.
 - The code is exchanged server-side; the refresh token is stored encrypted, the access token discarded. Neither ever reaches the browser, a URL or a log; redirects carry `Referrer-Policy: no-referrer` and go only to the configured frontend.
 
+**Publish jobs** (`app/models/publish_job.py`, `app/services/publishing/metadata.py`, `jobs.py`): a job is the user's explicit request to upload one **READY** edit through a `connected` account with the metadata they reviewed. Metadata follows YouTube's documented rules and is **refused with the field named, never truncated**: title 1–100 characters, description ≤ 5000 bytes, tags ≤ 500 characters as YouTube counts them (quotes around tags with spaces, commas between), at most 50 tags, no `<`/`>` or control characters; privacy `private` (default), `unlisted` or `public`; an explicit "made for kids" declaration (default no). The dialog's prefill is the clip candidate's own title and hook — no AI. A SHA-256 fingerprint over the connection, edit and metadata makes the request idempotent: asking again (even concurrently) returns the same job instead of uploading twice.
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
