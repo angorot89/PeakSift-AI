@@ -20,15 +20,15 @@ from app.services.storage import (
     S3StorageProvider,
     StorageUnavailable,
 )
-from tests.storage_backends import BACKENDS, live_available, provider
+from tests.storage_backends import BACKENDS, provider, skip_unless_live
 
 DATA = bytes(range(256)) * 40  # 10 KiB of distinguishable bytes
 
 
 @pytest.fixture(params=BACKENDS)
 def storage(request, tmp_path, monkeypatch):
-    if request.param == "s3-live" and not live_available():
-        pytest.skip("TEST_S3_ENDPOINT_URL / credentials are not set")
+    if request.param == "s3-live":
+        skip_unless_live()
     with provider(request.param, tmp_path, monkeypatch) as store:
         yield store
 

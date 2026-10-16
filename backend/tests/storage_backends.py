@@ -26,6 +26,17 @@ def live_available() -> bool:
     return all(os.environ.get(name) for name in LIVE_ENV)
 
 
+def skip_unless_live() -> None:
+    """Skip a live-S3 case locally; in CI (``REQUIRE_LIVE_S3=1``) a missing service fails."""
+    if live_available():
+        return
+    import pytest
+
+    if os.environ.get("REQUIRE_LIVE_S3"):
+        pytest.fail("REQUIRE_LIVE_S3 is set but TEST_S3_* is not configured")
+    pytest.skip("TEST_S3_ENDPOINT_URL / credentials are not set")
+
+
 def live_settings(bucket: str) -> Settings:
     """Settings for the live service, built without validation (S3 is not selectable as
     the application backend yet; the provider itself is what is under test)."""
