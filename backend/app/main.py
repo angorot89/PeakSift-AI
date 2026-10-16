@@ -27,6 +27,7 @@ from app.api.videos import router as videos_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.observability import RequestContextMiddleware, configure_logging
+from app.core.security_headers import SecurityHeadersMiddleware
 
 ROUTERS = (
     health_router,
@@ -82,6 +83,7 @@ def create_app(settings: Settings) -> FastAPI:
         )
     for router in ROUTERS:
         application.include_router(router)
+    application.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production)
     # Outermost: every response (errors and rejected hosts included) carries a request id.
     application.add_middleware(RequestContextMiddleware)
     return application
