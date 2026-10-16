@@ -62,6 +62,10 @@ pytest
 
 Tests run against a **separate** database (`TEST_DATABASE_URL`, default `postgresql+psycopg://localhost:5432/peaksift_test`), never against `DATABASE_URL`. The suite applies the Alembic migrations once at the start, rolls every test back, and downgrades the schema at the end.
 
+**Live S3:** the storage contract, HTTP contract and S3 media regression suites also run against a real S3-compatible service when `TEST_S3_ENDPOINT_URL`, `TEST_S3_ACCESS_KEY_ID` and `TEST_S3_SECRET_ACCESS_KEY` point at one (each test creates and removes its own bucket); otherwise those cases skip. CI builds MinIO from source (`deploy/minio.Dockerfile`), starts it with generated credentials and sets `REQUIRE_LIVE_S3=1`, which turns a missing service into a failure instead of a skip.
+
+**CI jobs:** *Frontend* (lint, unit tests, type check, build); *Backend* (ruff, migrations, media probes, the full suite with live S3, a real broker smoke); *Production containers* (build every image, start the HTTPS stack, smoke test through the proxy, backup + verify + disposable restore inside the stack, non-root users, no secret fragment in any log); *Security* (no credentials or secret files tracked, `pip-audit`, `npm audit` on production dependencies). The YouTube suites run on mocked transports only — CI has no Google credentials and makes no Google calls.
+
 ## Lint and format (Ruff)
 
 ```bash

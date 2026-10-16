@@ -23,7 +23,7 @@ from app.services.storage import S3StorageProvider
 from app.services.workspace import work_root
 from tests.audio_fixtures import tone
 from tests.media_fixtures import generate_video, requires_ffmpeg
-from tests.storage_backends import live_available, provider
+from tests.storage_backends import provider, skip_unless_live
 
 PASSWORD = "correct horse battery"
 
@@ -43,8 +43,8 @@ class _Reusable:
 def bucket(request, monkeypatch, tmp_path, db_session: Session):
     """Every part of the application (API and workers) uses one S3 bucket: in-process
     (moto), or a live S3-compatible service when ``TEST_S3_*`` is configured."""
-    if request.param == "s3-live" and not live_available():
-        pytest.skip("TEST_S3_ENDPOINT_URL / credentials are not set")
+    if request.param == "s3-live":
+        skip_unless_live()
     with provider(request.param, tmp_path, monkeypatch) as s3:
         monkeypatch.setattr(storage_module, "_cached", None)
         monkeypatch.setattr(storage_module, "storage_from_settings", lambda settings: s3)
