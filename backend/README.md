@@ -192,7 +192,7 @@ Manual check with the real model (downloads `tiny`, ~75 MB, macOS only because i
 
 ### Long audio: chunking and absolute timestamps
 
-`app/services/transcription/chunking.py` splits `transcription/<id>/normalized.mp3` into deterministic, contiguous, non-overlapping chunks of `TRANSCRIPTION_CHUNK_SECONDS` (default 10 minutes ≈ 4.8 MB) under `transcription/<id>/chunks/NNNN.mp3`; a final remainder under one second is folded into the previous chunk. Cuts use ffmpeg input seeking on the constant-bitrate MP3, which lands within one MP3 frame (~26 ms) of the requested time. Each chunk carries its absolute start, and `shift_segments` adds it to the provider's chunk-relative times before anything is stored — a provider segment `12.4 → 18.9` in the chunk starting at `600` becomes `612.4 → 618.9`. Any failure while splitting removes every chunk file; after a job finishes the chunk directory is deleted and the normalized audio is kept for retries.
+`app/services/transcription/chunking.py` splits the attempt's scratch `transcription/<id>/<attempt>/normalized.mp3` into deterministic, contiguous, non-overlapping chunks of `TRANSCRIPTION_CHUNK_SECONDS` (default 10 minutes ≈ 4.8 MB) under `…/chunks/NNNN.mp3` (all under `WORK_ROOT`, never media storage); a final remainder under one second is folded into the previous chunk. Cuts use ffmpeg input seeking on the constant-bitrate MP3, which lands within one MP3 frame (~26 ms) of the requested time. Each chunk carries its absolute start, and `shift_segments` adds it to the provider's chunk-relative times before anything is stored — a provider segment `12.4 → 18.9` in the chunk starting at `600` becomes `612.4 → 618.9`. Any failure while splitting removes every chunk file; when a job ends its whole scratch directory (fetched source, normalized audio, chunks) is deleted.
 
 **Boundary limitation (V0.3):** boundaries are plain time cuts, not silence-aware, so a word spoken exactly across a boundary can be split between two segments. There is no overlap and therefore no duplicated text; a short piece of the previous chunk's text may be passed to the provider as a prompt for continuity only. Semantic/silence-aware chunking is future work.
 
@@ -213,7 +213,7 @@ queued → extracting_audio (normalized.mp3, progress 5)
 - **Retries:** transient provider errors (rate limits, timeouts, connection problems, 5xx) are retried inside the task with exponential backoff (`TRANSCRIPTION_PROVIDER_MAX_ATTEMPTS`, `TRANSCRIPTION_RETRY_BACKOFF_SECONDS`: 2 s, 4 s, …). Configuration, capability, invalid-audio, missing-file and malformed-output errors fail immediately. There is no Celery-level autoretry, so a broken file can never loop.
 - **Timestamps:** provider times are chunk-relative; the pipeline rejects a segment that ends beyond its chunk (plus `TRANSCRIPTION_TIMESTAMP_TOLERANCE_SECONDS`) and shifts the rest by the chunk's absolute start before inserting. Segments are committed per chunk with a continuous `sequence_index`.
 - **Prompting:** the last `TRANSCRIPTION_PROMPT_TAIL_CHARS` of the previous chunk's text are passed to the provider as a prompt for continuity only; nothing from it is stored.
-- **Sessions and cleanup:** the worker opens its own SQLAlchemy session per task and disposes the inherited connection pool on process start. Chunk files are deleted after success or failure; `normalized.mp3` is kept for retries.
+- **Sessions and cleanup:** the worker opens its own SQLAlchemy session per task and disposes the inherited connection pool on process start. The attempt's scratch directory is deleted after success or failure; nothing derived is kept in media storage.
 
 ### OpenAI (hosted)
 
@@ -327,7 +327,8 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `SECRET_KEY`        | *(required, ≥ 32 chars)*                       | Signs auth tokens. Generate: `openssl rand -hex 32` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
 | `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
-| `STORAGE_BACKEND`   | `local`                                        | `local` (`MEDIA_ROOT`) or `s3` (private bucket; `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PATH_STYLE`, `S3_SECURE`). `s3` is refused until the media pipelines use the contract |
+| `STORAGE_BACKEND`   | `local`                                        | `local` (`MEDIA_ROOT`) or `s3` (private bucket; `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PATH_STYLE`, `S3_SECURE`) |
+| `WORK_ROOT`         | system temp `peaksift-work`                    | Local scratch for jobs and uploads being validated; per-attempt directories, removed when they end. Absolute in production |
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
 | `AUDIO_UPLOAD_MAX_BYTES` | `104857600` (100 MiB)                   | Largest accepted music or sound-effect file  |
 | `AUDIO_UPLOAD_MAX_DURATION_SECONDS` / `AUDIO_SFX_MAX_DURATION_SECONDS` | `1200` / `30` | Longest music track / sound effect |

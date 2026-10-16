@@ -19,8 +19,8 @@ Two sections: what is **built** (Milestones 1–7) and what is **planned**. Plan
                                                       └───────────────────┘        │ Celery worker    │
                                                                                    │ transcription:   │
                                                       ┌───────────────────┐        │  ffmpeg → chunks │
-                                                      │ MEDIA_ROOT (local │ ◀────▶ │  → faster-whisper│
-                                                      │ files, dev only)  │        │    | OpenAI      │
+                                                      │ media storage     │ ◀────▶ │  → faster-whisper│
+                                                      │ (local or S3)     │        │    | OpenAI      │
                                                       └───────────────────┘        │ clip detection:  │
                                                                                    │  windows → Ollama│
                                                       ┌───────────────────┐        │    | OpenAI      │
@@ -60,9 +60,10 @@ Two sections: what is **built** (Milestones 1–7) and what is **planned**. Plan
 ```
 POST /projects/{id}/videos
   → validate (filename sanitised, .mp4/.mov/.webm, plausible MIME, non-empty)
-  → stream to MEDIA_ROOT/videos/<uuid>.<ext> in 1 MiB chunks, enforcing MAX_VIDEO_UPLOAD_BYTES
-  → insert `videos` row (status uploaded)            — file deleted if this fails
-  → ffprobe (argument list, JSON output, FFPROBE_TIMEOUT_SECONDS)
+  → spool to a private temp file under WORK_ROOT in 1 MiB chunks, enforcing MAX_VIDEO_UPLOAD_BYTES
+  → store as videos/<uuid>.<ext> through the storage contract (local directory or private bucket)
+  → insert `videos` row (status uploaded)            — object deleted if this fails
+  → ffprobe the spooled copy (argument list, JSON output, FFPROBE_TIMEOUT_SECONDS); spool removed
   → status ready + duration/width/height/fps/codecs, or status failed + safe error_message
   → response (same shape as GET /projects/{id}/videos/{video_id})
 ```
@@ -75,11 +76,12 @@ Probing is synchronous in Milestone 2; no queue or worker exists. The browser th
 POST …/transcription  →  Transcription row (queued)  →  Celery task id stored  →  202-style quick return
 Worker:
   claim (DB state + fencing token)
-  → extract normalized audio   transcription/<id>/normalized.mp3   (progress 5)
-  → split into 10-minute chunks  transcription/<id>/chunks/NNNN.mp3
+  → fetch the source into the attempt's scratch directory (read in place on local storage)
+  → extract normalized audio   scratch: transcription/<id>/<attempt>/normalized.mp3   (progress 5)
+  → split into 10-minute chunks  scratch: transcription/<id>/<attempt>/chunks/NNNN.mp3
   → per chunk: provider.transcribe → validate → shift to absolute time → commit segments, progress, heartbeat
   → completed (full_text, progress 100)   |   failed (error_code, safe error_message, no partial segments)
-  → chunk files removed; normalized audio kept for retries
+  → the attempt's scratch directory is removed (nothing derived is kept in media storage)
 ```
 
 - **Providers** implement one contract (`ProviderTranscriptionResult` with ordered `ProviderSegment`s) and declare capabilities. The factory refuses any provider without segment timestamps. `faster_whisper` (default, local, lazy-loaded and cached per worker process; audio decoded with ffmpeg) and `openai` (hosted; `whisper-1` + `verbose_json` for structured timestamps — the GPT-4o transcription models are text-only in the installed SDK and are refused as the timestamp model). Timestamps are never fabricated.
@@ -217,9 +219,10 @@ Full reference: [audio-sound-design.md](audio-sound-design.md).
 
 ### Storage
 
-- Development storage is the local filesystem under `MEDIA_ROOT` (default `backend/media`, git-ignored). Keys are application-generated (`videos/<uuid4>.<ext>`, `transcription/<id>/normalized.mp3`, `transcription/<id>/chunks/NNNN.mp3`, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4` → `clips/<clip-uuid>/clip.mp4`, `edits/<edit-uuid>/work-<attempt>/{captions.ass,short.mp4}` → `edits/<edit-uuid>/edited.mp4`); the original filename is metadata only. `path_for` is the single chokepoint that proves a key resolves inside the root.
-- Nothing under `MEDIA_ROOT` is served statically.
-- **Storage contract** (`app/services/storage.py`): `StorageProvider` — `exists`, `size`, `save` (stream, never overwrites, size limit), `put_file`, `download_file` (to a local workspace), `iter_range` (a byte range in 1 MiB chunks), `delete` (idempotent), `check` (health). Two providers implement it: `LocalStorageProvider` (`MEDIA_ROOT`; `path_for` stays its chokepoint) and `S3StorageProvider` (a private bucket on any S3-compatible service through boto3: objects are written without ACLs, no public or presigned URLs, path-style addressing for MinIO, TLS required unless `S3_SECURE=false`). `STORAGE_BACKEND=local|s3` selects one. *Missing* (`ObjectNotFound`) and *broken* (`StorageUnavailable`) stay distinct — a HEAD on a missing bucket is a bare 404, so the S3 provider confirms the bucket before calling an object missing — and an outage is a `503`, never a reconciled "artifact missing".
+- **Media storage** (`STORAGE_BACKEND`) holds only persistent media: `videos/<uuid4>.<ext>`, `audio/<uuid4>.<ext>`, `clips/<clip-uuid>/clip.mp4`, `edits/<edit-uuid>/edited.mp4`. Keys are application-generated; the original filename is metadata only. Locally it is `MEDIA_ROOT` (default `backend/media`, git-ignored), where `path_for` is the single chokepoint that proves a key resolves inside the root; in production it can be a private S3-compatible bucket. Nothing in it is served statically.
+- **Scratch** (`WORK_ROOT`, default a `peaksift-work` directory in the system temp dir) holds everything a job only needs while it runs: uploads being validated, fetched inputs, normalized audio and chunks, `clips/<clip-uuid>/clip-tmp-<attempt>.mp4`, `edits/<edit-uuid>/work-<attempt>/{inputs/,captions.ass,short.mp4}`, frame-sampling and word-timing inputs. Each attempt owns its directory (fencing) and removes it when it ends; scratch is never served and never backed up.
+- **Jobs read local files:** inputs come from `fetch(key, directory)` — the stored file itself on local storage (no copy), a download into the attempt's directory on S3 — and finished renders are validated in scratch, then stored with `put_file` (never overwrites, all-or-nothing; a hard link on the same local filesystem). `ready` therefore always means a validated row *and* an object in media storage; the API re-checks the object and reconciles a vanished one to a retryable failure.
+- **Storage contract** (`app/services/storage.py`): `StorageProvider` — `exists`, `size`, `save` (stream, never overwrites, size limit), `put_file`, `download_file` and `fetch` (to a local workspace), `iter_range` (a byte range in 1 MiB chunks), `delete` (idempotent), `check` (health). Two providers implement it: `LocalStorageProvider` (`MEDIA_ROOT`; `path_for` stays its chokepoint) and `S3StorageProvider` (a private bucket on any S3-compatible service through boto3: objects are written without ACLs, no public or presigned URLs, path-style addressing for MinIO, TLS required unless `S3_SECURE=false`). `STORAGE_BACKEND=local|s3` selects one. *Missing* (`ObjectNotFound`) and *broken* (`StorageUnavailable`) stay distinct — a HEAD on a missing bucket is a bare 404, so the S3 provider confirms the bucket before calling an object missing — and an outage is a `503`, never a reconciled "artifact missing".
 - Every media endpoint streams through `stream_object` in `app/api/media_streaming.py` on that contract (a ranged GET on S3), so the HTTP behaviour — `200`/`206`/`416`, suffix ranges, headers, owner checks — is identical on both backends; the contract and HTTP suites run against a local directory, an in-process S3 (moto) and, when `TEST_S3_*` is set, a live S3-compatible service.
 
 ### Authentication

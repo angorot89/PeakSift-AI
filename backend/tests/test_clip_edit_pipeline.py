@@ -252,7 +252,9 @@ def test_storage_keys_are_generated_and_attempt_scoped():
 
 
 def test_workspaces_are_isolated_and_finalize_is_atomic(tmp_path: Path):
-    store = EditArtifactStore(LocalStorageProvider(tmp_path / "media"))
+    store = EditArtifactStore(
+        LocalStorageProvider(tmp_path / "media"), LocalStorageProvider(tmp_path / "work")
+    )
     edit_id = uuid.uuid4()
     store.workspace(edit_id, 1)
     store.workspace(edit_id, 2)
@@ -264,7 +266,7 @@ def test_workspaces_are_isolated_and_finalize_is_atomic(tmp_path: Path):
         store.finalize(edit_id, 1)
     assert store.finalize(edit_id, 2) == edit_storage_key(edit_id)
     assert (
-        store.final_path(edit_id).read_bytes() == b"fresh"
+        store.storage.path_for(edit_storage_key(edit_id)).read_bytes() == b"fresh"
         and not store.render_path(edit_id, 2).exists()
     )
     store.workspace(edit_id, 3)
@@ -273,6 +275,7 @@ def test_workspaces_are_isolated_and_finalize_is_atomic(tmp_path: Path):
         store.finalize(edit_id, 3)  # never overwrite a final artifact
     store.discard(edit_id)
     assert not store.storage.path_for(f"edits/{edit_id}").exists()
+    assert not store.scratch.path_for(f"edits/{edit_id}").exists()
 
 
 def test_workspace_creation_clears_crash_leftovers(tmp_path: Path):
@@ -286,14 +289,19 @@ def test_workspace_creation_clears_crash_leftovers(tmp_path: Path):
 
 
 def test_symlinked_edit_directory_cannot_escape(tmp_path: Path):
-    store = EditArtifactStore(LocalStorageProvider(tmp_path / "media"))
+    store = EditArtifactStore(
+        LocalStorageProvider(tmp_path / "media"), LocalStorageProvider(tmp_path / "work")
+    )
     outside = tmp_path / "outside"
     outside.mkdir()
     edit_id = uuid.uuid4()
-    (store.storage.root / "edits").mkdir(parents=True)
-    (store.storage.root / "edits" / str(edit_id)).symlink_to(outside, target_is_directory=True)
+    for root in (store.storage.root, store.scratch.root):
+        (root / "edits").mkdir(parents=True)
+        (root / "edits" / str(edit_id)).symlink_to(outside, target_is_directory=True)
     with pytest.raises(InvalidStorageKey):
-        store.final_path(edit_id)
+        store.exists(edit_id)
+    with pytest.raises(InvalidStorageKey):
+        store.workspace(edit_id, 1)
 
 
 # --- real renders -----
@@ -475,11 +483,11 @@ def test_ready_edit_ignores_duplicate_delivery(db_session, settings, storage):
     edit = make_edit(db_session, storage)
     composer = SpyComposer(db_session, edit)
     execute(edit, db_session, settings, storage, composer)
-    stamp = EditArtifactStore(storage).final_path(edit.id).stat().st_mtime_ns
+    stamp = storage.path_for(edit_storage_key(edit.id)).stat().st_mtime_ns
     execute(edit, db_session, settings, storage, composer)
     assert (
         len(composer.calls) == 1
-        and EditArtifactStore(storage).final_path(edit.id).stat().st_mtime_ns == stamp
+        and storage.path_for(edit_storage_key(edit.id)).stat().st_mtime_ns == stamp
     )
 
 
@@ -540,7 +548,7 @@ def test_stalled_attempt_cannot_touch_the_new_attempt(db_session, settings, stor
     assert row.error_code is None and row.storage_key is None
     store = EditArtifactStore(storage)
     assert store.render_path(edit.id, 2).read_bytes() == b"attempt 2 output"
-    assert not storage.path_for(workspace_key(edit.id, 1)).exists()  # it cleaned up its own files
+    assert not store.scratch.path_for(workspace_key(edit.id, 1)).exists()  # its own files only
 
 
 def test_stalled_attempt_cannot_complete_the_new_attempt(db_session, settings, storage):
@@ -598,7 +606,7 @@ def test_a_failing_database_while_recording_a_failure_does_not_raise(
     db_session.expire_all()
     row = db_session.get(ClipEdit, edit.id)
     assert row.status == ClipEditStatus.RENDERING  # left for stale recovery + retry
-    assert not storage.path_for(workspace_key(edit.id, 1)).exists()
+    assert not EditArtifactStore(storage).scratch.path_for(workspace_key(edit.id, 1)).exists()
 
 
 def test_the_configured_caption_font_reaches_the_renderer(db_session, settings, storage):

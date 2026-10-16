@@ -1,26 +1,32 @@
 """Where rendered clips live and how they become final.
 
-Layout under ``MEDIA_ROOT`` (keys are application-generated; titles, filenames, project
-or user names never become paths)::
+Layout (keys are application-generated; titles, filenames, project or user names never
+become keys)::
 
-    clips/<clip-uuid>/clip-tmp-<attempt>.mp4   # being rendered / validated by that attempt
-    clips/<clip-uuid>/clip.mp4                 # the final, validated artifact
+    clips/<clip-uuid>/clip-tmp-<attempt>.mp4   # scratch (WORK_ROOT): rendered and validated
+    clips/<clip-uuid>/clip.mp4                 # media storage: the final, validated artifact
 
-A render writes the temporary file, validation inspects it, and only then is it renamed
-atomically to the final name. A reader can therefore never see a half-written final
-artifact, and a failed render is discarded without leaving a corrupt ``clip.mp4``.
+A render writes its attempt's temporary file in the local scratch area, validation
+inspects it, and only then is it stored under the final key through the storage contract
+(local directory or private bucket). Storing never overwrites and is all-or-nothing, so a
+reader can never see a half-written final artifact, and a failed render is discarded
+without leaving a corrupt ``clip.mp4``.
 
 Each attempt writes its own temp file, so a stalled worker that a retry has fenced out can
 never write into, or clean up, the file the new attempt is producing.
 """
 
-import os
 import re
 import unicodedata
 import uuid
 from pathlib import Path
 
-from app.services.storage import LocalStorageProvider, StorageError
+from app.services.storage import (
+    LocalStorageProvider,
+    ObjectNotFound,
+    StorageError,
+    StorageProvider,
+)
 
 FINAL_NAME = "clip.mp4"
 TEMP_PREFIX = "clip-tmp-"
@@ -54,52 +60,58 @@ def clip_directory_key(clip_id: uuid.UUID | str) -> str:
 
 
 class ClipArtifactStore:
-    """The few operations the renderer and pipeline need, all resolved through
-    ``LocalStorageProvider.path_for`` so nothing can escape the media root."""
+    """The few operations the renderer and pipeline need: temp files in the local scratch
+    area, final artifacts through the storage contract."""
 
-    def __init__(self, storage: LocalStorageProvider) -> None:
+    def __init__(
+        self, storage: StorageProvider, scratch: LocalStorageProvider | None = None
+    ) -> None:
+        from app.core.config import get_settings
+        from app.services.workspace import scratch_storage
+
         self.storage = storage
+        self.scratch = scratch or scratch_storage(get_settings())
 
     def temp_path(self, clip_id: uuid.UUID | str, attempt: int = 1) -> Path:
         """Where this attempt's renderer writes; the directory is created, stale temp removed."""
-        path = self.storage.path_for(clip_temp_key(clip_id, attempt))
+        path = self.scratch.path_for(clip_temp_key(clip_id, attempt))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.unlink(missing_ok=True)
         return path
 
-    def final_path(self, clip_id: uuid.UUID | str) -> Path:
-        return self.storage.path_for(clip_storage_key(clip_id))
-
     def exists(self, clip_id: uuid.UUID | str) -> bool:
-        path = self.final_path(clip_id)
-        return path.is_file() and path.stat().st_size > 0
+        try:
+            return self.storage.size(clip_storage_key(clip_id)) > 0
+        except ObjectNotFound:
+            return False
 
     def finalize(self, clip_id: uuid.UUID | str, attempt: int = 1) -> str:
-        """Atomically promote this attempt's validated temp file to the final artifact."""
-        temp = self.storage.path_for(clip_temp_key(clip_id, attempt))
-        final = self.final_path(clip_id)
+        """Store this attempt's validated temp file as the final artifact; return its key."""
+        temp = self.scratch.path_for(clip_temp_key(clip_id, attempt))
+        key = clip_storage_key(clip_id)
         if not temp.is_file() or temp.stat().st_size == 0:
             raise ArtifactMissing("There is no rendered output to finalize")
-        if final.exists():
+        if self.storage.exists(key):
             raise ArtifactExists("A final clip artifact already exists")
-        os.replace(temp, final)  # same directory: atomic on POSIX
-        return clip_storage_key(clip_id)
+        self.storage.put_file(temp, key)  # never overwrites; all-or-nothing
+        temp.unlink(missing_ok=True)
+        return key
 
     def discard(self, clip_id: uuid.UUID | str) -> None:
-        """Remove every temp file and the final artifact (and the empty directory). Idempotent."""
-        directory = self.storage.path_for(clip_directory_key(clip_id))
+        """Remove every temp file and the final artifact. Idempotent."""
+        directory = self.scratch.path_for(clip_directory_key(clip_id))
         if directory.is_dir():
             for temp in directory.glob(f"{TEMP_PREFIX}*.mp4"):
                 temp.unlink(missing_ok=True)
-        self.final_path(clip_id).unlink(missing_ok=True)
-        try:
-            directory.rmdir()
-        except OSError:
-            pass  # not empty or already gone
+            try:
+                directory.rmdir()
+            except OSError:
+                pass  # not empty or already gone
+        self.storage.delete(clip_storage_key(clip_id))
 
     def discard_temp(self, clip_id: uuid.UUID | str, attempt: int = 1) -> None:
         """Remove only this attempt's temp file (never another attempt's output)."""
-        self.storage.path_for(clip_temp_key(clip_id, attempt)).unlink(missing_ok=True)
+        self.scratch.path_for(clip_temp_key(clip_id, attempt)).unlink(missing_ok=True)
 
 
 # --- download names -----------------------------------------------------------------------------

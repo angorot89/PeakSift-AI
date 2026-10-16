@@ -67,7 +67,13 @@ from app.services.clip_edit.storage import EditArtifactStore
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
 from app.services.ffprobe import ProbeError, probe, probe_audio
-from app.services.storage import InvalidStorageKey, LocalStorageProvider, StorageError
+from app.services.storage import (
+    InvalidStorageKey,
+    ObjectNotFound,
+    StorageError,
+    StorageProvider,
+    media_storage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,13 +116,13 @@ def run_clip_edit(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalStorageProvider | None = None,
+    storage: StorageProvider | None = None,
     composer: Composer | None = None,
     task_id: str | None = None,
 ) -> ClipEdit | None:
     """Execute the render for a ``ClipEdit`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    store = EditArtifactStore(storage or LocalStorageProvider(settings.media_root))
+    store = EditArtifactStore(storage or media_storage(settings))
     composer = composer or compose_short  # resolved at call time (tests patch the module)
 
     edit = db.get(ClipEdit, edit_id)
@@ -213,16 +219,16 @@ def _execute(
     clip = edit.clip
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
-    try:
-        source = store.storage.path_for(clip.storage_key)
-    except InvalidStorageKey:
-        raise PipelineFailure("clip_missing", "The source clip file is missing") from None
-    if not source.is_file():
-        raise PipelineFailure("clip_missing", "The source clip file is missing")
-
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
 
     workspace = store.workspace(edit.id, attempt)
+    # Inputs are read locally: the stored file itself, or a copy fetched into the workspace.
+    inputs = workspace / "inputs"
+    inputs.mkdir()
+    try:
+        source = store.storage.fetch(clip.storage_key, inputs)
+    except (ObjectNotFound, InvalidStorageKey):
+        raise PipelineFailure("clip_missing", "The source clip file is missing") from None
     dynamic = config.caption_renderer == CAPTION_RENDERER_V2
     cues: list = []
     if config.captions_enabled and dynamic:
@@ -279,7 +285,9 @@ def _execute(
 
     extra: dict = {}
     if config.audio is not None:
-        track = _prepare_audio(edit, db, settings, store, workspace, config, source, task_id)
+        track = _prepare_audio(
+            edit, db, settings, store, workspace, config, source, task_id, inputs
+        )
         if track is not None:
             extra["audio"] = track
         edit.progress_percent = AUDIO_READY_PROGRESS
@@ -341,6 +349,7 @@ def _prepare_audio(
     config: EditConfig,
     source: Path,
     task_id: str | None,
+    inputs: Path,
 ) -> Path | None:
     """Mix and finish the edit's audio section into the attempt workspace.
 
@@ -369,11 +378,13 @@ def _prepare_audio(
     assets: dict[str, tuple[Path, float]] = {}
     for asset_id, kind in kinds.items():
         asset = rows.get(asset_id)
-        try:
-            path = store.storage.path_for(asset.storage_key) if asset else None
-        except InvalidStorageKey:
-            path = None
-        if asset is None or asset.kind != kind or path is None or not path.is_file():
+        path = None
+        if asset is not None and asset.kind == kind:
+            try:
+                path = store.storage.fetch(asset.storage_key, inputs)
+            except (ObjectNotFound, InvalidStorageKey):
+                path = None
+        if asset is None or path is None:
             raise PipelineFailure(
                 "audio_asset_unavailable",
                 "A selected music track or sound effect is no longer available",

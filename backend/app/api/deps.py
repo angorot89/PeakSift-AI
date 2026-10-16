@@ -3,26 +3,18 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings, get_settings
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models import User
-from app.services.storage import StorageProvider, storage_from_settings
+from app.services.storage import StorageProvider, media_storage
 
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-_provider: tuple[Settings, StorageProvider] | None = None
-
-
 def get_storage() -> StorageProvider:
-    """The configured media storage (``STORAGE_BACKEND``), built once per settings object:
-    an S3 client is thread-safe and costly to create."""
-    global _provider
-    settings = get_settings()
-    if _provider is None or _provider[0] is not settings:
-        _provider = (settings, storage_from_settings(settings))
-    return _provider[1]
+    """The configured media storage (``STORAGE_BACKEND``)."""
+    return media_storage(get_settings())
 
 
 Storage = Annotated[StorageProvider, Depends(get_storage)]

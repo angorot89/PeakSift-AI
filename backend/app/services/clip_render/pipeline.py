@@ -39,7 +39,13 @@ from app.services.clip_render.renderer import (
     render_clip,
 )
 from app.services.clip_render.storage import ClipArtifactStore, StorageError
-from app.services.storage import LocalStorageProvider
+from app.services.storage import (
+    InvalidStorageKey,
+    ObjectNotFound,
+    StorageProvider,
+    media_storage,
+)
+from app.services.workspace import job_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +99,13 @@ def run_clip_render(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalStorageProvider | None = None,
+    storage: StorageProvider | None = None,
     renderer: Renderer = render_clip,
     task_id: str | None = None,
 ) -> Clip | None:
     """Execute the render for a ``Clip`` row. Problems are recorded on the row, never raised."""
     settings = settings or get_settings()
-    store = ClipArtifactStore(storage or LocalStorageProvider(settings.media_root))
+    store = ClipArtifactStore(storage or media_storage(settings))
 
     clip = db.get(Clip, clip_id)
     if clip is None:
@@ -186,18 +192,21 @@ def _execute(
     video = clip.video
     if video.status != VideoStatus.READY:
         raise PipelineFailure("video_not_ready", "The source video is not ready")
-    source: Path = store.storage.path_for(video.storage_key)
-    if not source.is_file():
-        raise PipelineFailure("source_missing", "The source video file is missing")
-
-    rendered = renderer(
-        source,
-        store.temp_path(clip.id, attempt),
-        start=clip.start_time,
-        end=clip.end_time,
-        options=render_options_from(settings),
-        heartbeat=lambda: _heartbeat(clip, db, task_id),
-    )
+    # FFmpeg reads a local file: the stored source itself, or a copy fetched into this
+    # attempt's workspace (removed when the render ends).
+    with job_workspace(settings, "render", clip.id, task_id) as work:
+        try:
+            source: Path = store.storage.fetch(video.storage_key, work)
+        except (ObjectNotFound, InvalidStorageKey):
+            raise PipelineFailure("source_missing", "The source video file is missing") from None
+        rendered = renderer(
+            source,
+            store.temp_path(clip.id, attempt),
+            start=clip.start_time,
+            end=clip.end_time,
+            options=render_options_from(settings),
+            heartbeat=lambda: _heartbeat(clip, db, task_id),
+        )
     clip.progress_percent = RENDER_DONE_PROGRESS
     _heartbeat(clip, db, task_id)
 

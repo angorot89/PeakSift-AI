@@ -144,15 +144,16 @@ FFmpeg runs as an argument list, never a shell, with a timeout. Its working dire
 
 ## Storage
 
-Edited shorts are private derived files under `MEDIA_ROOT`:
+Edited shorts are private derived files in media storage (a local directory or a private S3 bucket; see [architecture](architecture.md#storage)):
 
 ```
-edits/<edit-uuid>/work-<attempt>/captions.ass   this attempt's caption file
-edits/<edit-uuid>/work-<attempt>/short.mp4      this attempt's render, being validated
-edits/<edit-uuid>/edited.mp4                    the validated short
+scratch: edits/<edit-uuid>/work-<attempt>/inputs/        the clip and audio assets, fetched (or read in place locally)
+scratch: edits/<edit-uuid>/work-<attempt>/captions.ass   this attempt's caption file
+scratch: edits/<edit-uuid>/work-<attempt>/short.mp4      this attempt's render, being validated
+media:   edits/<edit-uuid>/edited.mp4                    the validated short
 ```
 
-Keys are generated from UUIDs only, and every path goes through `LocalStorageProvider.path_for`, which refuses traversal and symlink escapes. The workspace is removed after success or failure. Nothing under `MEDIA_ROOT` is served statically.
+Keys are generated from UUIDs only, and every local path goes through `LocalStorageProvider.path_for`, which refuses traversal and symlink escapes. The workspace is removed after success or failure. Nothing in media storage is served statically.
 
 ## API
 

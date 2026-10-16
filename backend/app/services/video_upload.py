@@ -1,12 +1,12 @@
 """Validation and storage of uploaded source videos."""
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.models import Project, Video
-from app.services.storage import FileTooLarge, LocalStorageProvider
+from app.services.storage import FileTooLarge, StorageProvider, copy_limited
 
 # Extension -> MIME types a browser may legitimately send for it. The first entry is
 # what we store, so the content type on record is canonical rather than client-chosen.
@@ -80,25 +80,30 @@ def too_large_message(limit: int) -> str:
 
 def store_upload(
     db: Session,
-    storage: LocalStorageProvider,
+    storage: StorageProvider,
     project: Project,
     upload: UploadFile,
     *,
     max_bytes: int,
-) -> Video:
-    """Stream the upload into storage and record it. Leaves nothing behind on failure."""
+    spool_dir: Path,
+) -> tuple[Video, Path]:
+    """Spool the upload locally (enforcing the size limit), store it and record it.
+
+    Returns the video and the local spooled copy, which stays readable (for probing) until
+    ``spool_dir`` is removed. Leaves nothing behind on failure.
+    """
     safe_name, extension, content_type = validate_upload(upload.filename, upload.content_type)
     key = storage.generate_key(extension)
-
+    spool = spool_dir / f"upload.{extension}"
     try:
-        size = storage.save(upload.file, key, max_bytes=max_bytes)
+        with spool.open("wb") as target:
+            size = copy_limited(upload.file, target, max_bytes)
     except FileTooLarge as error:
         raise UploadValidationError(413, too_large_message(error.limit)) from None
-
     if size == 0:
-        storage.delete(key)
         raise UploadValidationError(400, "The uploaded file is empty")
 
+    storage.put_file(spool, key)
     video = Video(
         project=project,
         original_filename=safe_name,
@@ -113,4 +118,4 @@ def store_upload(
         db.rollback()
         storage.delete(key)
         raise
-    return video
+    return video, spool

@@ -215,6 +215,17 @@ def cleanup_other_workspaces(
             entry.unlink(missing_ok=True)
 
 
+def discard_workspace(storage: LocalStorageProvider, workspace: str) -> None:
+    """Remove one attempt's directory (``workspace`` from ``attempt_workspace``)."""
+    directory = storage.path_for(f"transcription/{workspace}")
+    if directory.is_dir() and not directory.is_symlink():
+        shutil.rmtree(directory, ignore_errors=True)
+    try:
+        directory.parent.rmdir()  # the transcription's directory, once no attempt is left
+    except OSError:
+        pass
+
+
 def cleanup_chunks(storage: LocalStorageProvider, transcription_id: uuid.UUID | str) -> None:
     """Delete the chunk directory; the normalized audio next to it is kept."""
     directory = storage.path_for(chunks_prefix(transcription_id))

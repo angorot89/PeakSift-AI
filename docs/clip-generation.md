@@ -71,14 +71,14 @@ FFmpeg runs as an argument list (never a shell) with stdin closed and stderr wri
 
 ## Storage
 
-Rendered clips are private derived files under `MEDIA_ROOT`:
+Rendered clips are private derived files in media storage (a local directory or a private S3 bucket; see [architecture](architecture.md#storage)):
 
 ```
-clips/<clip-uuid>/clip-tmp-<attempt>.mp4   while rendering/validating
-clips/<clip-uuid>/clip.mp4                 the validated artifact
+scratch (WORK_ROOT):  clips/<clip-uuid>/clip-tmp-<attempt>.mp4   while rendering/validating
+media storage:        clips/<clip-uuid>/clip.mp4                 the validated artifact
 ```
 
-Only a real UUID can name a clip directory, every path is resolved through `LocalStorageProvider.path_for` (which refuses traversal and symlink escapes), and nothing under `MEDIA_ROOT` is served statically. Candidate titles, filenames, project or user names never become paths.
+The source video is fetched into the attempt's scratch directory (read in place on local storage), and the validated render is stored with `put_file`, which never overwrites. Only a real UUID can name a clip directory, every local path is resolved through `LocalStorageProvider.path_for` (which refuses traversal and symlink escapes), and nothing in media storage is served statically. Candidate titles, filenames, project or user names never become paths.
 
 ## API
 

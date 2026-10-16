@@ -29,6 +29,7 @@ import uuid
 from collections.abc import Sequence
 from contextlib import closing
 from datetime import UTC, datetime
+from pathlib import Path
 
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import delete, select
@@ -53,7 +54,13 @@ from app.services.reframe.sampling import (
     sample_frames,
 )
 from app.services.reframe.tracking import track_subjects
-from app.services.storage import InvalidStorageKey, LocalStorageProvider
+from app.services.storage import (
+    InvalidStorageKey,
+    ObjectNotFound,
+    StorageProvider,
+    media_storage,
+)
+from app.services.workspace import job_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -98,13 +105,13 @@ def run_reframe_analysis(
     db: Session,
     *,
     settings: Settings | None = None,
-    storage: LocalStorageProvider | None = None,
+    storage: StorageProvider | None = None,
     detector: SubjectDetectionProvider | None = None,
     task_id: str | None = None,
 ) -> ReframeAnalysis | None:
     """Analyse one ``ReframeAnalysis`` row. Problems are recorded, never raised."""
     settings = settings or get_settings()
-    storage = storage or LocalStorageProvider(settings.media_root)
+    storage = storage or media_storage(settings)
     analysis = db.get(ReframeAnalysis, analysis_id)
     if analysis is None:
         logger.warning("Reframe analysis %s no longer exists; nothing to do", analysis_id)
@@ -121,7 +128,9 @@ def run_reframe_analysis(
             db.rollback()
 
     try:
-        _execute(analysis, db, settings, storage, detector, task_id)
+        # The clip is read locally: in place, or fetched into this attempt's workspace.
+        with job_workspace(settings, "reframe", analysis.id, task_id) as work:
+            _execute(analysis, db, settings, storage, detector, task_id, work)
     except PipelineSuperseded:
         logger.info("Reframe analysis %s was taken over or removed; stopping", analysis_id)
     except (PipelineFailure, SamplingError) as error:
@@ -175,9 +184,10 @@ def _execute(
     analysis: ReframeAnalysis,
     db: Session,
     settings: Settings,
-    storage: LocalStorageProvider,
+    storage: StorageProvider,
     detector: SubjectDetectionProvider | None,
     task_id: str | None,
+    work: Path,
 ) -> None:
     try:
         config = ReframeConfig.from_snapshot(analysis.config)
@@ -189,11 +199,9 @@ def _execute(
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
     try:
-        source = storage.path_for(clip.storage_key)
-    except InvalidStorageKey:
+        source = storage.fetch(clip.storage_key, work)
+    except (ObjectNotFound, InvalidStorageKey):
         raise PipelineFailure("clip_missing", "The source clip file is missing") from None
-    if not source.is_file():
-        raise PipelineFailure("clip_missing", "The source clip file is missing")
 
     geometry = probe_geometry(source, ffprobe_path=settings.ffprobe_path)
     analysis.source_width, analysis.source_height = geometry.width, geometry.height

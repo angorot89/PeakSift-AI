@@ -190,8 +190,8 @@ def test_real_render_makes_the_clip_ready_with_validated_metadata(
     assert result.storage_key == clip_storage_key(clip.id)
     store = ClipArtifactStore(storage)
     assert store.exists(clip.id)
-    assert not storage.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
-    assert result.file_size == store.final_path(clip.id).stat().st_size > 0
+    assert not store.scratch.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
+    assert result.file_size == storage.path_for(f"clips/{clip.id}/clip.mp4").stat().st_size > 0
     assert (result.width, result.height) == (64, 64)
     assert result.video_codec == "h264" and result.audio_codec == "aac"
     assert result.fps and result.fps > 0
@@ -247,7 +247,7 @@ def test_retry_discards_an_orphaned_final_artifact_first(db_session, clip, setti
 
     assert result.status == ClipStatus.READY
     assert (
-        store.final_path(clip.id).read_bytes() == b"\x00" * 2048
+        storage.path_for(f"clips/{clip.id}/clip.mp4").read_bytes() == b"\x00" * 2048
     )  # the new render, not the orphan
 
 
@@ -339,7 +339,7 @@ def test_failure_never_touches_source_candidate_or_transcript(db_session, clip, 
 def test_ready_clip_ignores_duplicate_delivery(db_session, clip, settings, storage):
     renderer = SpyRenderer(db_session, clip)
     execute(clip, db_session, settings, storage, renderer)
-    final = ClipArtifactStore(storage).final_path(clip.id)
+    final = storage.path_for(f"clips/{clip.id}/clip.mp4")
     stamp = final.stat().st_mtime_ns
 
     execute(clip, db_session, settings, storage, renderer)
@@ -369,7 +369,7 @@ def test_stale_clip_is_reclaimed_and_leftover_temp_removed(db_session, clip, set
     result = execute(clip, db_session, settings, storage, SpyRenderer(db_session, clip))
 
     assert result.status == ClipStatus.READY
-    assert ClipArtifactStore(storage).final_path(clip.id).read_bytes() == b"\x00" * 2048
+    assert storage.path_for(f"clips/{clip.id}/clip.mp4").read_bytes() == b"\x00" * 2048
 
 
 def test_failed_clip_is_ignored_until_reset(db_session, clip, settings, storage):
@@ -507,10 +507,10 @@ def test_zombie_that_fails_after_takeover_leaves_the_new_attempt_alone(
     assert result.status == ClipStatus.QUEUED  # not overwritten with the zombie's failure
     assert result.error_code is None and result.celery_task_id == "task-2"
     assert (
-        store.storage.path_for(f"clips/{clip.id}/clip-tmp-2.mp4").read_bytes()
+        store.scratch.path_for(f"clips/{clip.id}/clip-tmp-2.mp4").read_bytes()
         == b"attempt 2 output"
     )
-    assert not store.storage.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
+    assert not store.scratch.path_for(f"clips/{clip.id}/clip-tmp-1.mp4").exists()
 
 
 def test_zombie_stops_at_its_next_heartbeat_without_writing(db_session, clip, settings, storage):
