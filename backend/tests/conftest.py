@@ -31,6 +31,9 @@ os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="peaksift-test-media-")
 os.environ["WORK_ROOT"] = tempfile.mkdtemp(prefix="peaksift-test-work-")
 # Background tasks run inline during tests; no broker or worker is required.
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "1"
+# Rate limits are exercised by their own tests (with an in-memory counter); elsewhere a
+# suite registering hundreds of users from one address must not trip them.
+os.environ["RATE_LIMIT_ENABLED"] = "0"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 

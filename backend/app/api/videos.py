@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, Storage
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import Project, Video
 from app.schemas.video import VideoRead
 from app.services.video_processing import process_video_metadata
@@ -43,7 +44,7 @@ def reject_oversized_body(request: Request) -> None:
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=VideoRead,
-    dependencies=[Depends(reject_oversized_body)],
+    dependencies=[per_user("video_upload"), Depends(reject_oversized_body)],
 )
 def upload_video(
     project: OwnedProject,

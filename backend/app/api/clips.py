@@ -23,6 +23,7 @@ from app.api.deps import DbSession, Storage
 from app.api.media_streaming import object_present
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import CandidateDecision, Clip, ClipCandidate, ClipStatus, Video, VideoStatus
 from app.schemas.clip import ClipPage, ClipRead
 from app.services.clip_render.pipeline import is_stale
@@ -123,7 +124,12 @@ def _enqueue_or_503(db: DbSession, clip: Clip, *, created: bool) -> None:
 # --- generate / status / retry ---------------------------------------------------------------
 
 
-@router.post("/clip", response_model=ClipRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/clip",
+    response_model=ClipRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[per_user("clip_render")],
+)
 def generate_clip(
     candidate: OwnedCandidate,
     video: OwnedVideo,
@@ -190,7 +196,7 @@ def get_clip(candidate: OwnedCandidate, db: DbSession, storage: Storage) -> Clip
     return _read(clip, candidate.title, candidate.run_id)
 
 
-@router.post("/clip/retry", response_model=ClipRead)
+@router.post("/clip/retry", response_model=ClipRead, dependencies=[per_user("clip_render")])
 def retry_clip(
     candidate: OwnedCandidate, video: OwnedVideo, db: DbSession, storage: Storage
 ) -> ClipRead:

@@ -20,6 +20,7 @@ from app.api.clip_edits import OwnedClip
 from app.api.deps import DbSession, Storage
 from app.api.media_streaming import object_present
 from app.core.config import Settings, get_settings
+from app.core.rate_limit import per_user
 from app.models import (
     CaptionTrack,
     CaptionTrackStatus,
@@ -178,7 +179,10 @@ def timing_options(clip: OwnedClip, db: DbSession) -> CaptionTimingOptions:
 
 
 @router.post(
-    "/caption-tracks", response_model=CaptionTrackRead, status_code=status.HTTP_201_CREATED
+    "/caption-tracks",
+    response_model=CaptionTrackRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[per_user("caption_timing")],
 )
 def start_track(clip: OwnedClip, db: DbSession, storage: Storage, response: Response):
     """Time the clip's words with the server's configuration. The same configuration returns
@@ -282,7 +286,11 @@ def get_words(track: OwnedTrack, db: DbSession) -> CaptionWordsRead:
     )
 
 
-@router.post("/caption-tracks/{track_id}/retry", response_model=CaptionTrackRead)
+@router.post(
+    "/caption-tracks/{track_id}/retry",
+    response_model=CaptionTrackRead,
+    dependencies=[per_user("caption_timing")],
+)
 def retry_track(
     track: OwnedTrack, clip: OwnedClip, db: DbSession, storage: Storage
 ) -> CaptionTrackRead:
