@@ -36,6 +36,7 @@ from app.models import (
     Video,
 )
 from app.schemas.clip_edit import ClipEditPage, ClipEditRead, EditRequest
+from app.schemas.project import MediaDeletionRead
 from app.services.clip_edit.composition import supports_captions
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
@@ -47,6 +48,7 @@ from app.services.clip_edit.config import (
 )
 from app.services.clip_edit.pipeline import is_stale
 from app.services.clip_render.storage import safe_download_filename
+from app.services.media_deletion import delete_edit as delete_edit_and_media
 from app.services.storage import StorageProvider
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_edit, new_task_id
 
@@ -411,6 +413,16 @@ def retry_edit(
     db.commit()
     _enqueue_or_503(db, edit, created=False)
     return _read(edit)
+
+
+@router.delete("/{edit_id}", response_model=MediaDeletionRead)
+def delete_edit(edit: OwnedEdit, db: DbSession, storage: Storage) -> MediaDeletionRead:
+    """Delete an edit and its rendered short. The source clip is never touched. A render
+    still running for it notices the edit is gone and discards its own output."""
+    report = delete_edit_and_media(db, storage, edit)
+    return MediaDeletionRead(
+        media_files_removed=report.deleted, media_files_pending_cleanup=report.failed
+    )
 
 
 # --- private media ---------------------------------------------------------------------------

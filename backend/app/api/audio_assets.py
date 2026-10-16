@@ -30,7 +30,9 @@ from app.api.videos import OwnedProject
 from app.core.config import get_settings
 from app.models import AudioAsset, AudioAssetKind
 from app.schemas.audio_asset import AudioAssetRead, AudioUploadLimits, AudioWaveformRead
+from app.schemas.project import MediaDeletionRead
 from app.services.audio_assets import ACCEPTED_EXTENSIONS, store_audio_upload
+from app.services.media_deletion import delete_audio_asset, edits_using_asset
 from app.services.video_upload import UploadValidationError, check_declared_size
 
 router = APIRouter(prefix="/projects/{project_id}/audio-assets", tags=["audio"])
@@ -115,6 +117,23 @@ def get_waveform(asset: OwnedAudioAsset) -> AudioWaveformRead:
     peaks = [int(p) for p in asset.waveform_peaks]
     return AudioWaveformRead(
         asset_id=asset.id, duration_seconds=asset.duration_seconds, buckets=len(peaks), peaks=peaks
+    )
+
+
+@router.delete("/{asset_id}", response_model=MediaDeletionRead)
+def delete_audio(asset: OwnedAudioAsset, db: DbSession, storage: Storage) -> MediaDeletionRead:
+    """Delete an audio file the project no longer uses. Refused (409) while any edit's audio
+    section still references it: rendered and future edits must never lose an input."""
+    users = edits_using_asset(db, asset)
+    if users:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This audio is used by {users} edit{'s' if users != 1 else ''}; "
+            "delete those edits first",
+        )
+    report = delete_audio_asset(db, storage, asset)
+    return MediaDeletionRead(
+        media_files_removed=report.deleted, media_files_pending_cleanup=report.failed
     )
 
 

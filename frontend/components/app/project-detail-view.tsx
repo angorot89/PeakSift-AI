@@ -3,6 +3,7 @@
 import { FolderX } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
+import { DeleteProject } from "@/components/app/delete-project";
 import { PageHeader } from "@/components/app/page-header";
 import { ProjectWorkspace } from "@/components/app/source-video";
 import { WorkflowProvider, WorkflowStepper } from "@/components/app/project-workflow";
@@ -66,6 +67,7 @@ export function ProjectDetailView() {
         <WorkflowStepper />
       </PageHeader>
       <ProjectWorkspace projectId={project.id} />
+      <DeleteProject project={project} />
     </WorkflowProvider>
   );
 }

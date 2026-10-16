@@ -91,6 +91,7 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | GET    | `/projects`      | yes  | The current user's projects, newest first.               |
 | POST   | `/projects`      | yes  | Create a project from `{"name": "..."}`; `201`. Status starts as `created`. |
 | GET    | `/projects/{id}` | yes  | One of the current user's projects; `404` if it does not exist or belongs to someone else. |
+| DELETE | `/projects/{id}` | yes  | Body `{"confirm_name": "<exact project name>"}` (`422` otherwise). Deletes the project and everything in it in one commit, then its media files: `{media_files_removed, media_files_pending_cleanup}` — files that could not be removed now are left for `cleanup`. |
 | POST   | `/projects/{id}/videos` | yes | Upload a source video as `multipart/form-data` (field `file`); `201`. `.mp4`, `.mov`, `.webm` only (`415` otherwise), up to `MAX_VIDEO_UPLOAD_BYTES` (`413`), non-empty (`400`). `404` for projects that are not yours. The file is probed with ffprobe before the response, so `status` is already `ready` or `failed`. |
 | GET    | `/projects/{id}/videos` | yes | The project's videos, newest first.                  |
 | GET    | `/projects/{id}/videos/{video_id}` | yes | One video; `404` unless it belongs to that project and the project is yours. |
@@ -130,6 +131,7 @@ Short-form edits (9:16 variants of a ready clip):
 | POST   | `/projects/{id}/videos/{video_id}/clips/{clip_id}/edits` | yes | Body `{"aspect_ratio": "9:16", "layout": "center_crop" \| "blur_background" \| "fit" \| "smart_reframe" \| "manual_crop", "reframe_analysis_id": uuid (smart_reframe only), "focus_x"/"focus_y": 0–1 (manual_crop only), "captions_enabled": bool, "caption_style": "bold" \| "clean" \| "creator" \| "focus" \| "punch" \| "minimal" \| "boxed", "caption_position": "top" \| "center" \| "bottom", "caption_timing": "aligned_word" \| "phrase_fallback" (dynamic styles only; default aligned_word), "caption_track_id": uuid (aligned_word only; a completed track of this clip), "hook_enabled": bool, "hook_text": 1–60 characters, "hook_style": "headline" \| "boxed" \| "minimal", "hook_position": "top" \| "center", "hook_duration_seconds": 0.5–5, "audio": {"source_gain_db": −24…6, "normalize": bool, "music": {"asset_id", "gain_db": −40…0, "source_start_seconds", "loop", "fade_in_seconds"/"fade_out_seconds": 0–10, "ducking": "off" \| "light" \| "medium" \| "strong"} \| null, "sfx": [≤ 12 × {"asset_id", "at_seconds", "gain_db": −30…6}]}}` (audio assets must be this project's, of the right kind; unknown fields `422`; style/position default to bold/bottom and are dropped when captions are off). `201` new edit; `200` with the existing edit for the same normalized settings; `409` if that variant failed (use retry), the clip is not ready, captions are requested without a completed transcript or without libass; `503` if the queue is unreachable. |
 | GET    | `…/clips/{clip_id}/edits` | yes | The clip's variants, newest first (`offset`, `limit` 1–50). |
 | GET    | `…/clips/{clip_id}/edits/{edit_id}` | yes | Edit state: `status`, stage `progress_percent`, `attempt`, `is_stale`, the configuration, output metadata and `caption_cue_count` once ready, safe `error_code`/`error_message`. A `ready` edit whose file is missing is reported as `failed`/`artifact_missing`. |
+| DELETE | `…/edits/{edit_id}` | yes | Delete an edit and its short (never the source clip); a render still running discards its own output. |
 | POST   | `…/edits/{edit_id}/retry` | yes | Re-queue a failed or stale edit on the same row (row-locked; `409` otherwise or after `CLIP_RENDER_MAX_ATTEMPTS`). |
 | GET    | `/edits/{edit_id}/content` | yes | The short inline for `<video>`, Range-capable (`206`/`416`), `private, no-store`; `404` unless yours and ready. |
 | GET    | `/edits/{edit_id}/download` | yes | Attachment named `<title-slug>-vertical-<short-id>.mp4`. |
@@ -155,6 +157,7 @@ Smart reframing (face-tracking crop paths for a ready clip; see [docs/smart-refr
 | POST   | `/projects/{id}/audio-assets` | yes | Upload music or a sound effect (`multipart/form-data`: `file`, `kind` = `music` \| `sfx`). Validated by content with ffprobe; `201` new, `200` the project's existing asset for the same file and kind; `413` too large or too long; `415`/`422` not usable audio. Nothing is kept on refusal. |
 | GET    | `/projects/{id}/audio-assets[?kind=]` / `…/{asset_id}` | yes | The project's audio (newest first) / one asset: kind, display name, size, duration, sample rate, channels, codec, container — no keys, paths or hashes. |
 | GET    | `/projects/{id}/audio-assets/{asset_id}/waveform` | yes | `{buckets, peaks}`: 200–1000 peak amplitudes (0–100 % of full scale). |
+| DELETE | `/projects/{id}/audio-assets/{asset_id}` | yes | Delete an audio file; `409` while any edit's audio section uses it. |
 | GET    | `/projects/{id}/audio-assets/{asset_id}/content` | yes | Owner-only preview stream with HTTP Range (`private, no-store`). |
 | GET    | `/audio-upload-limits` | yes | `{max_bytes, music_max_duration_seconds, sfx_max_duration_seconds, accepted_extensions}`. |
 | GET    | `/caption-styles` | yes | The dynamic renderer's presets, placements, safe area, hook limits, font ratio and emoji policy (`monochrome`/`omitted`). |
@@ -293,6 +296,23 @@ python -m app.cli.media verify  --from local --to s3 --checksum  # every object,
 - Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
 - The reverse direction (`--from s3 --to local`) works the same way.
 
+## Deleting media and cleaning up
+
+Deletion is **rows first, files second**: the storage keys are captured, the rows are deleted in one commit, then the files are removed. A storage failure after the commit leaves *orphans* (files no row refers to); they are counted in the response, never returned to anyone, and removed by the cleanup command. A render still running for a deleted clip or edit notices its row is gone and stores nothing.
+
+```bash
+python -m app.cli.media cleanup                    # report only
+python -m app.cli.media cleanup --apply            # remove
+python -m app.cli.media cleanup --grace-hours 48   # default 24
+```
+
+`cleanup` considers, all **older than the grace period** (which must exceed the job time limit, so nothing in use is touched):
+- **orphaned objects** in the configured media storage (including pre-V1.0 normalized transcription audio, now scratch-only; their `audio_storage_key` is cleared);
+- **interrupted local writes** (`.*.part`) under `MEDIA_ROOT`;
+- **stale scratch** under this host's `WORK_ROOT` (run it on every worker host, e.g. daily from cron).
+
+On S3, also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day.
+
 ## Structure
 
 ```
@@ -308,7 +328,9 @@ app/
   services/storage.py # Storage contract: local directory or private S3 bucket; safe keys, ranged reads
   services/workspace.py # Per-attempt local scratch (WORK_ROOT) for jobs and uploads
   services/media_migration.py # Copy/verify media between backends (database-referenced keys)
-  cli/media.py       # `python -m app.cli.media migrate|verify`
+  services/media_deletion.py # Project/edit/audio deletion: rows first, then files, failures counted
+  services/media_cleanup.py  # Orphan, partial-write and stale-scratch cleanup
+  cli/media.py       # `python -m app.cli.media migrate|verify|cleanup`
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed
