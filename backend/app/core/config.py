@@ -12,7 +12,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings, read from environment variables (and `.env` if present)."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # An empty variable means "not set" (deployment tools pass unset options as "").
+        env_ignore_empty=True,
+        # Validation errors must never echo the configuration (it holds secrets).
+        hide_input_in_errors=True,
+    )
 
     # development | test | production. Production refuses to start on unsafe or incomplete
     # configuration (see `_production_is_safe`); it is never inferred from a debug flag.

@@ -212,16 +212,22 @@ jobs:
             test "$uid" != "0"
           done
           compose exec -T worker python -m app.cli.health --ping
-      - name: No secret appears in any container log
+      - name: No secret (or any 10-character piece of one) appears in any container log
         run: |
           set -euo pipefail
           docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs --no-color > stack.log
-          while IFS='=' read -r name value; do
-            case "$name" in SECRET_KEY|POSTGRES_PASSWORD|REDIS_PASSWORD|MINIO_ROOT_PASSWORD|S3_APP_SECRET_KEY)
-              if grep -qF -- "$value" stack.log; then echo "secret $name found in logs"; exit 1; fi ;;
-            esac
-          done < deploy/.env
-          echo "no secrets in $(wc -l < stack.log) log lines"
+          python3 - <<'PY'
+          import pathlib, sys
+          log = pathlib.Path("stack.log").read_text(errors="replace")
+          names = {"SECRET_KEY", "POSTGRES_PASSWORD", "REDIS_PASSWORD", "MINIO_ROOT_PASSWORD", "S3_APP_SECRET_KEY"}
+          leaks = []
+          for line in pathlib.Path("deploy/.env").read_text().splitlines():
+              name, _, value = line.partition("=")
+              if name in names and any(value[i:i + 10] in log for i in range(len(value) - 9)):
+                  leaks.append(name)
+          print(f"checked {len(log.splitlines())} log lines; leaks: {leaks or 'none'}")
+          sys.exit(1 if leaks else 0)
+          PY
       - name: Logs on failure
         if: failure()
         run: docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env logs --no-color --tail 200
