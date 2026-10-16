@@ -102,6 +102,9 @@ class UploadState(StrEnum):
     FAILED = "failed"  # processing failed
     REJECTED = "rejected"  # e.g. duplicate, copyright or terms-of-use rejection
     DELETED = "deleted"
+    # The granted scope does not let the provider report processing (YouTube's upload-only
+    # scope cannot read videos): the honest end state is "uploaded".
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True)

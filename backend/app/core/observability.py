@@ -158,6 +158,10 @@ def configure_logging(settings) -> None:
         logger.propagate = True
     # The query string can carry OAuth codes or signed-URL parameters; our access log line
     # (``app.access``) records the path without it, so uvicorn's own access log is muted.
+    # HTTP client libraries log full request URLs at INFO; for us those include resumable
+    # upload session URIs (bearer secrets). Redaction would catch them; keep them out anyway.
+    for name in ("httpx", "httpcore", "urllib3"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").disabled = True
     logging.getLogger("gunicorn.access").disabled = True
 

@@ -2,7 +2,7 @@
 
 Each implementation supplies a harness: the provider plus the few test-only controls the
 scenarios need (expire a session, revoke a token, list created videos). The YouTube
-implementation joins this suite with a mocked YouTube server.
+implementation runs it against a mocked YouTube server (``tests/youtube_mock.py``).
 """
 
 import os
@@ -18,6 +18,7 @@ from app.services.publishing.provider import (
     UploadState,
     VideoRequest,
 )
+from tests.youtube_mock import YouTubeHarness
 
 REFRESH = "1//0gContractRefreshToken"
 DATA = os.urandom(1000)
@@ -37,7 +38,7 @@ class FakeHarness:
         return {vid: video["data"] for vid, video in self.provider.videos.items()}
 
 
-HARNESSES = {"fake": FakeHarness}
+HARNESSES = {"fake": FakeHarness, "youtube": YouTubeHarness}
 
 
 @pytest.fixture(params=sorted(HARNESSES))
@@ -138,7 +139,7 @@ def test_a_revoked_account_needs_reconnecting(make):
 
 
 def test_processing_is_reported_until_the_video_is_processed(make):
-    harness = make(processing_polls=2) if make is FakeHarness else make()
+    harness = make(processing_polls=2)
     provider = harness.provider
     auth = provider.authorize(REFRESH)
     uri = provider.start_upload(auth, video())
