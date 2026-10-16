@@ -1,0 +1,14 @@
+# Only what the image needs; never secrets, media, models or local environments.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+media/
+models/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+tests/

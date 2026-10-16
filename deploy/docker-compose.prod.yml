@@ -1,0 +1,184 @@
+# PeakSift production stack (single host): HTTPS proxy, frontend, API, worker, PostgreSQL,
+# Redis and MinIO (private S3-compatible media storage).
+#
+#   cp deploy/.env.example deploy/.env      # then replace every placeholder
+#   deploy/scripts/dev-certs.sh             # local testing only; use real certificates
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build --wait
+#
+# See deploy/README.md. Nothing secret lives in this file: every credential comes from
+# deploy/.env (never committed).
+
+name: peaksift
+
+x-backend-env: &backend-env
+  APP_ENV: production
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+  FRONTEND_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+  ALLOWED_HOSTS: ${PUBLIC_HOST:?set PUBLIC_HOST},api,127.0.0.1,localhost
+  # Only the proxy may set X-Forwarded-For / -Proto.
+  TRUSTED_PROXIES: 172.28.0.10/32
+  DATABASE_URL: postgresql+psycopg://peaksift:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/peaksift
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379/0
+  STORAGE_BACKEND: s3
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_SECURE: "false"  # the internal network only; MinIO is never published
+  S3_PATH_STYLE: "true"
+  S3_REGION: us-east-1
+  S3_BUCKET: ${S3_BUCKET:-peaksift-media}
+  S3_ACCESS_KEY_ID: ${S3_APP_ACCESS_KEY:?set S3_APP_ACCESS_KEY}
+  S3_SECRET_ACCESS_KEY: ${S3_APP_SECRET_KEY:?set S3_APP_SECRET_KEY}
+  WORK_ROOT: /work
+  LOG_FORMAT: json
+  YOUTUBE_PUBLISHING_ENABLED: ${YOUTUBE_PUBLISHING_ENABLED:-false}
+  PUBLISHING_TOKEN_ENCRYPTION_KEY: ${PUBLISHING_TOKEN_ENCRYPTION_KEY:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_OAUTH_REDIRECT_URI: ${PUBLIC_URL}/api/publishing/youtube/callback
+  TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-faster_whisper}
+  FASTER_WHISPER_MODEL: ${FASTER_WHISPER_MODEL:-small}
+  CLIP_DETECTION_OLLAMA_ENABLED: ${CLIP_DETECTION_OLLAMA_ENABLED:-false}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+services:
+  proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      api: { condition: service_healthy }
+      frontend: { condition: service_healthy }
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      default: { ipv4_address: 172.28.0.10 }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    image: peaksift-frontend:${IMAGE_TAG:-local}
+    restart: unless-stopped
+
+  migrate:
+    build: &backend-build
+      context: ../backend
+      dockerfile: ../deploy/backend.Dockerfile
+      target: api
+    image: peaksift-api:${IMAGE_TAG:-local}
+    environment: *backend-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: *backend-build
+    image: peaksift-api:${IMAGE_TAG:-local}
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    volumes:
+      - work_api:/work
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/backend.Dockerfile
+      target: worker
+    image: peaksift-worker:${IMAGE_TAG:-local}
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    volumes:
+      - work_worker:/work
+      - models:/models
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: peaksift
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: peaksift
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peaksift -d peaksift"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # One-shot: the private bucket, and an application user that can reach only that bucket.
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-peaksift-media}
+      S3_APP_ACCESS_KEY: ${S3_APP_ACCESS_KEY}
+      S3_APP_SECRET_KEY: ${S3_APP_SECRET_KEY}
+    entrypoint: ["/bin/sh", "/init/minio-init.sh"]
+    volumes:
+      - ./scripts/minio-init.sh:/init/minio-init.sh:ro
+    restart: "no"
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  models:
+  work_api:
+  work_worker:

@@ -4,6 +4,8 @@
 
 PeakSift AI is a short-form clipping and creation platform. Creators bring long-form content — videos, streams, podcasts, interviews, recordings — and PeakSift helps them find the strongest moments and turn them into short-form clips for TikTok, YouTube Shorts, and Instagram Reels.
 
+> **Production:** `deploy/` holds the container images, an HTTPS reverse proxy and a single-host Compose stack (PostgreSQL, Redis, private MinIO storage) — see [deploy/README.md](deploy/README.md).
+
 ## Current status
 
 **Milestones 1–9 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7, Dynamic Captions & Creator Polish V0.8, Audio & Sound Design V0.9). What exists today:
