@@ -46,6 +46,12 @@ def migrated_database() -> Generator[None, None, None]:
     """Apply all migrations before the session and roll them back afterwards."""
     config = _alembic_config()
     command.upgrade(config, "head")
+    # Alembic's env.py applies alembic.ini's logging config (root at WARNING, its own
+    # handler); restore the application's, as the API and workers run with it.
+    from app.core.config import get_settings
+    from app.core.observability import configure_logging
+
+    configure_logging(get_settings())
     yield
     command.downgrade(config, "base")
 

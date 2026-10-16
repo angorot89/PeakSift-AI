@@ -297,6 +297,13 @@ python -m app.cli.media verify  --from local --to s3 --checksum  # every object,
 - Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
 - The reverse direction (`--from s3 --to local`) works the same way.
 
+## Logs and request ids
+
+- Every response carries **`X-Request-ID`** (a well-formed incoming id from the proxy is kept; anything else is replaced). Every log line written while handling the request carries it, and a job enqueued by that request carries it to the worker, whose lines add `task` and `job_id` — one id follows a creator's click from the proxy to the render.
+- **`LOG_FORMAT=json`** (the production default) writes one JSON object per line (`ts`, `level`, `logger`, `message`, `request_id`, `task`, `job_id`, `exception`); `text` is the development default. `LOG_LEVEL` defaults to `INFO`.
+- **Redaction** runs on every record from every logger (ours, uvicorn, gunicorn, Celery, libraries) and on tracebacks: OpenAI keys, Google OAuth codes, access and refresh tokens and client secrets, AWS key ids, JWTs and Bearer tokens, `Authorization`/cookie/password/secret/token/key values, credentials in URLs, OAuth `code`/`state` and `X-Amz-*`/`upload_id` query parameters, and local media and scratch paths (FFmpeg stderr names them).
+- The access line (`app.access`: method, **path without the query string**, status, duration) replaces uvicorn's and gunicorn's access logs, which are muted because query strings can carry OAuth codes. Health-probe requests are logged at `DEBUG`.
+
 ## Health checks
 
 - **API:** point the load balancer or orchestrator's *liveness* probe at `/health/live` (restart if it fails) and its *readiness* probe at `/health/ready` (stop routing traffic while a dependency is down). Readiness checks run concurrently under a single deadline, so a hung dependency fails the probe quickly instead of hanging it.
@@ -380,6 +387,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` (7 days)                     | Login lifetime                               |
 | `MEDIA_ROOT`        | `./media`                                      | Directory for uploaded media (local development storage; git-ignored) |
 | `STORAGE_BACKEND`   | `local`                                        | `local` (`MEDIA_ROOT`) or `s3` (private bucket; `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PATH_STYLE`, `S3_SECURE`) |
+| `LOG_FORMAT` / `LOG_LEVEL` | `json` in production, else `text` / `INFO` | Log format and level; secrets are always redacted |
 | `WORK_ROOT`         | system temp `peaksift-work`                    | Local scratch for jobs and uploads being validated; per-attempt directories, removed when they end. Absolute in production |
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
 | `AUDIO_UPLOAD_MAX_BYTES` | `104857600` (100 MiB)                   | Largest accepted music or sound-effect file  |
