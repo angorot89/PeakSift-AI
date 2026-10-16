@@ -21,6 +21,7 @@ dependencies = [
     "openai>=3,<4",  # hosted speech-to-text and clip analysis (official SDK)
     "httpx>=0.28,<1",  # local clip analysis over an Ollama-compatible HTTP endpoint
     "boto3>=1.40,<2",  # S3-compatible private media storage (AWS S3, MinIO, R2)
+    "cryptography>=45,<51",  # AES-GCM encryption of stored OAuth refresh tokens
 ]
 
 [project.optional-dependencies]
