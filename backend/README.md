@@ -383,6 +383,21 @@ Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-Aft
 - **Redaction** runs on every record from every logger (ours, uvicorn, gunicorn, Celery, libraries) and on tracebacks: OpenAI keys, Google OAuth codes, access and refresh tokens and client secrets, AWS key ids, JWTs and Bearer tokens, `Authorization`/cookie/password/secret/token/key values, credentials in URLs, OAuth `code`/`state` and `X-Amz-*`/`upload_id` query parameters, and local media and scratch paths (FFmpeg stderr names them).
 - The access line (`app.access`: method, **path without the query string**, status, duration) replaces uvicorn's and gunicorn's access logs, which are muted because query strings can carry OAuth codes. Health-probe requests are logged at `DEBUG`.
 
+## Backups and restore tests
+
+```bash
+python -m app.cli.backup create /backups/2026-10-17 --copy-media   # dump + manifest + media copy
+python -m app.cli.backup create /backups/2026-10-17 --upload       # …and copy it to BACKUP_S3_*
+python -m app.cli.backup verify /backups/2026-10-17                # checksums + pg_restore --list
+python -m app.cli.backup restore-test /backups/2026-10-17          # prove it restores, then clean up
+```
+
+- **`create`** writes a new directory (owner-only): `database.dump` (`pg_dump` custom format, no owners or privileges, `--lock-wait-timeout` so a locked table fails the backup quickly instead of hanging it) and `manifest.json` — format, application version, Alembic revision, dump size and SHA-256, every table's row count, and the database-referenced media inventory. `--copy-media` copies each object into `media/<key>` with its SHA-256; `--upload` copies the whole backup to the secondary bucket configured by `BACKUP_S3_*` (another account or region), under `backups/<name>/`.
+- **`verify`** recomputes the dump's size and checksum, asks `pg_restore` to read the archive, reports objects that were already missing when the backup was made, and re-checks every media copy.
+- **`restore-test`** restores into a **temporary database** on the same server (`peaksift_restore_<random>`), checks the schema revision, every table's row count and that the restored rows reference exactly the backed-up media, restores the media into a **temporary bucket** (or a temporary directory when the key cannot create buckets, or for local storage) and re-checks each SHA-256, then drops the database and removes the bucket or directory. Exit status is non-zero if anything does not match.
+- Passwords reach `pg_dump`/`pg_restore` only through the environment, never their arguments; output and manifests contain no credentials. `pg_dump`'s major version must be at least the server's (the production image ships the PostgreSQL 16 client).
+- **Real restore** (disaster recovery): create an empty database, `pg_restore --no-owner --no-privileges --dbname <db> database.dump`, copy `media/` back with `python -m app.cli.media migrate --from local --to s3` (pointing `MEDIA_ROOT` at the backup's `media/`), then start the stack; `alembic upgrade head` brings an older backup to the current schema.
+
 ## Health checks
 
 - **API:** point the load balancer or orchestrator's *liveness* probe at `/health/live` (restart if it fails) and its *readiness* probe at `/health/ready` (stop routing traffic while a dependency is down). Readiness checks run concurrently under a single deadline, so a hung dependency fails the probe quickly instead of hanging it.

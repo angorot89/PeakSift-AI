@@ -62,6 +62,21 @@ class Settings(BaseSettings):
     s3_path_style: bool = False
     # TLS to the storage endpoint. When true an http:// endpoint is refused.
     s3_secure: bool = True
+    # Optional secondary storage for backups (python -m app.cli.backup create --upload): a
+    # separate private bucket, ideally another account or region. Same rules as S3_*.
+    backup_s3_endpoint_url: str = ""
+    backup_s3_region: str = "us-east-1"
+    backup_s3_bucket: str = ""
+    backup_s3_access_key_id: SecretStr | None = None
+    backup_s3_secret_access_key: SecretStr | None = None
+    backup_s3_path_style: bool = False
+    backup_s3_secure: bool = True
+    # pg_dump / pg_restore (their major version must be at least the server's).
+    pg_dump_path: str = "pg_dump"
+    pg_restore_path: str = "pg_restore"
+    # pg_dump gives up (instead of waiting indefinitely) when another session holds a lock
+    # that blocks reading a table.
+    backup_lock_wait_timeout_seconds: int = Field(default=60, ge=1)
     s3_connect_timeout_seconds: float = Field(default=5, gt=0)
     s3_read_timeout_seconds: float = Field(default=60, gt=0)
     # Largest accepted source video. Default 2 GiB.

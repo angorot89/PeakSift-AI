@@ -310,29 +310,32 @@ class S3StorageProvider:
         self.bucket = bucket
 
     @classmethod
-    def from_settings(cls, settings: "Settings") -> "S3StorageProvider":
+    def from_settings(cls, settings: "Settings", prefix: str = "s3") -> "S3StorageProvider":
+        """The bucket named by ``<prefix>_*`` settings: ``s3`` (media) or ``backup_s3``."""
         import boto3
         from botocore.config import Config
 
-        access_key = settings.s3_access_key_id
-        secret_key = settings.s3_secret_access_key
+        def option(name: str):
+            return getattr(settings, f"{prefix}_{name}")
+
+        access_key, secret_key = option("access_key_id"), option("secret_access_key")
         client = boto3.client(
             "s3",
-            endpoint_url=settings.s3_endpoint_url or None,
-            region_name=settings.s3_region,
-            use_ssl=settings.s3_secure,
+            endpoint_url=option("endpoint_url") or None,
+            region_name=option("region"),
+            use_ssl=option("secure"),
             # Without explicit keys boto3 uses its standard chain (e.g. an instance role).
             aws_access_key_id=access_key.get_secret_value() if access_key else None,
             aws_secret_access_key=secret_key.get_secret_value() if secret_key else None,
             config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "path" if settings.s3_path_style else "auto"},
+                s3={"addressing_style": "path" if option("path_style") else "auto"},
                 connect_timeout=settings.s3_connect_timeout_seconds,
                 read_timeout=settings.s3_read_timeout_seconds,
                 retries={"mode": "standard", "max_attempts": 3},
             ),
         )
-        return cls(client, settings.s3_bucket)
+        return cls(client, option("bucket"))
 
     # -- errors: botocore exceptions never leave this class --------------------------------
 

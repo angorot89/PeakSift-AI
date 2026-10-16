@@ -4,8 +4,8 @@
 #   docker build -f deploy/backend.Dockerfile --target api    -t peaksift-api    backend
 #   docker build -f deploy/backend.Dockerfile --target worker -t peaksift-worker backend
 #
-# One base: Python 3.12 on Debian bookworm with FFmpeg (built with libass), fontconfig and
-# the caption fonts (Noto Sans, Noto Sans Arabic via fonts-noto-core, Symbola for emoji),
+# One base: Python 3.12 on Debian bookworm with FFmpeg (built with libass), the PostgreSQL 16
+# client tools (backups), fontconfig and the caption fonts (Noto Sans, Noto Sans Arabic via fonts-noto-core, Symbola for emoji),
 # the package installed system-wide, running as an unprivileged user. No secrets, media
 # or model weights are baked in: configuration comes from the environment, media from
 # the storage backend, models from the /models volume.
@@ -15,8 +15,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
+# PostgreSQL 16 client tools from the official PGDG repository: pg_dump must be at least the
+# server's major version (Debian bookworm ships 15), for python -m app.cli.backup.
 RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+ && install -d /usr/share/postgresql-common/pgdg \
+ && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+      https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+ && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg fontconfig fonts-noto-core fonts-symbola \
+      postgresql-client-16 \
+ && apt-get purge -y --auto-remove curl gnupg \
  && rm -rf /var/lib/apt/lists/* \
  && fc-cache -f \
  && groupadd --system --gid 10001 peaksift \
