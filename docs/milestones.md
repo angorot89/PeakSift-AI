@@ -148,6 +148,23 @@ Delivered:
 
 Definition of done — a user can open a generated clip → upload music and sound effects → set the music's volume, start, loop and fades → keep ducking on → place effects on the timeline → preview them with the video → render a short (with any layout, Smart Reframe, captions and hook) whose speech stays clear, music dips under it, effects land on time and loudness is consistent → download it.
 
+## Milestone 10 — Production & Publishing V1.0 *(complete; release awaits live YouTube verification)*
+
+PeakSift runs as a production service — object storage, health, observability, rate limits, containers, backups — and publishes finished shorts to YouTube.
+
+Delivered:
+
+- Media timing: one rule keeps transcript and candidate timing inside the media's real duration (normalizing small overshoots, refusing anything worse)
+- Strict production configuration: `APP_ENV` allow-list; startup refuses unsafe secrets, non-HTTPS origins, missing hosts or infrastructure settings, eager jobs or disabled rate limits — naming the setting, never its value; trusted-proxy handling, Secure cookies, docs off in production
+- Storage contract with local and private S3-compatible providers (MinIO, AWS S3, R2): ranged reads, identical HTTP Range behaviour on both, "missing" vs "unavailable" kept apart; every pipeline reads inputs into per-attempt scratch and stores only validated results; copy-first, resumable migration with checksum verification
+- Deletion and cleanup: projects (confirmed by exact name), edits and unused audio with their files; counted failures; orphan, partial-write and stale-scratch cleanup
+- Health (`/health/live`, `/health/ready`, worker diagnostic), request ids carried into jobs, redacted JSON logs, Redis rate limits (`429` + `Retry-After`, fail closed)
+- YouTube: encrypted (AES-256-GCM) one-per-user connections; OAuth with the upload scope only, PKCE and single-use user-bound state; publish jobs with YouTube's metadata rules (refused, never truncated), private by default, idempotent fingerprints; a provider contract with normalized errors; resumable uploads that resume from YouTube's confirmed offset and never create a second video; a fenced pipeline with bounded processing checks and an honest "uploaded" end state; the publishing API; Settings and the publish dialog
+- Production containers (non-root API with gunicorn + uvicorn workers, worker, standalone frontend, MinIO built from source), an HTTPS nginx proxy and a single-host Compose stack; security headers and a CSP compatible with Next.js and media; verifiable backups with disposable restore tests
+- CI: live S3 suites against MinIO (required), production containers built, started and smoke-tested with in-stack backup and restore, YouTube on mocks, a repository security scan and dependency audits; documentation ([production.md](production.md), [publishing.md](publishing.md), [youtube-setup.md](youtube-setup.md), [user-guide.md](user-guide.md), [deploy/README.md](../deploy/README.md))
+
+Definition of done — an operator can deploy PeakSift over HTTPS with private object storage, health checks, logs and backups; a creator can take a recording through transcription, clip detection, editing and rendering, connect YouTube, and publish a short privately with real progress, without duplicate uploads or exposed tokens.
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -160,13 +177,14 @@ Definition of done — a user can open a generated clip → upload music and sou
 - V0.7 Smart Reframing — COMPLETE
 - V0.8 Dynamic Captions & Creator Polish — COMPLETE
 - V0.9 Audio & Sound Design — COMPLETE
+- V1.0 Production & Publishing — COMPLETE (the v1.0.0 release awaits a live YouTube OAuth/upload verification)
 
 No later milestone has been defined or started.
 
 ## Later (opportunities, not committed scope)
 
 - Creator intelligence & metadata (titles, hooks, descriptions)
-- Publishing integrations
+- More publishing destinations (TikTok, Instagram, others), scheduling
 - Licensed music and sound-effect libraries, beat-synced editing
 - Brand kits, custom fonts and a caption timing editor
 - Global asset libraries
