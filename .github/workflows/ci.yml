@@ -202,6 +202,15 @@ jobs:
           python3 deploy/scripts/smoke.py https://localhost smoke.mp4
           docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T api \
             python -c "from app.core.config import get_settings as s; assert s().storage_backend == 's3'"
+      - name: Backup, verify and disposable restore inside the stack (PostgreSQL 16, MinIO)
+        run: |
+          set -euo pipefail
+          compose() { docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env "$@"; }
+          compose exec -T api pg_dump --version
+          compose exec -T api python -m app.cli.backup create /work/backup-ci --copy-media
+          compose exec -T api python -m app.cli.backup verify /work/backup-ci
+          compose exec -T api python -m app.cli.backup restore-test /work/backup-ci
+          compose exec -T api sh -c 'test "$(ls /work/backup-ci/media/videos | wc -l)" -ge 1'
       - name: Containers run as unprivileged users; the worker is healthy and answers
         run: |
           set -euo pipefail

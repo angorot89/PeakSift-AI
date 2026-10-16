@@ -50,5 +50,6 @@ so the browser talks to one origin. If you publish to YouTube, register
 - **Scratch:** `/work` volumes hold only in-flight job files. Run
   `docker compose … exec worker python -m app.cli.media cleanup --apply` daily to remove
   leftovers of crashed jobs and orphaned objects.
+- **Backups:** `docker compose -f deploy/docker-compose.prod.yml exec api python -m app.cli.backup create /work/backup-$(date +%F) --copy-media`, then `verify` and `restore-test` on it (a temporary database is created and dropped; media is restored to a temporary directory because the application key cannot create buckets). Copy the directory off the host — or set `BACKUP_S3_*` and add `--upload` — and run `restore-test` regularly. See backend/README.md "Backups and restore tests".
 - **Upgrades:** rebuild and `up -d`; `migrate` applies new migrations before the API and
   worker start.

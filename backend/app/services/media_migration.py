@@ -10,7 +10,7 @@ the old copy stays until an operator removes it.
 
 import hashlib
 import tempfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -77,12 +77,13 @@ def migrate(
     *,
     dry_run: bool = False,
     progress: Callable[[str, MediaObject], None] = lambda status, item: None,
+    objects: Iterable[MediaObject] | None = None,
 ) -> Report:
-    """Copy every database-referenced object that the destination lacks."""
+    """Copy every database-referenced object (or ``objects``) the destination lacks."""
     report = Report()
     with tempfile.TemporaryDirectory(prefix="peaksift-migrate-") as tmp:
         work = Path(tmp)
-        for item in media_objects(db):
+        for item in media_objects(db) if objects is None else objects:
             try:
                 size = _size(source, item.key)
                 if size is None:
