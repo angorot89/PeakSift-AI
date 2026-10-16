@@ -83,7 +83,8 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 
 | Method | Path             | Auth | Description                                              |
 | ------ | ---------------- | ---- | -------------------------------------------------------- |
-| GET    | `/health`        | no   | `{"status": "ok"}`                                       |
+| GET    | `/health`, `/health/live` | no | Liveness: `{"status": "ok"}`; touches no dependency |
+| GET    | `/health/ready`  | no   | Readiness: PostgreSQL, Redis and media storage within one 5 s deadline → `200 {"status": "ready", "checks": {…: "ok"}}` or `503 not_ready` naming only the unavailable component (no hosts or errors). External providers are not checked |
 | POST   | `/auth/register` | no   | Create an account; `201` + sets the auth cookie. `409` if the email is taken. |
 | POST   | `/auth/login`    | no   | `200` + sets the auth cookie. `401` with a generic message on bad credentials. |
 | POST   | `/auth/logout`   | no   | `204`; clears the auth cookie.                           |
@@ -296,6 +297,12 @@ python -m app.cli.media verify  --from local --to s3 --checksum  # every object,
 - Run the API and workers stopped (or read-only) between the final `migrate` and the switch, so no new upload lands only in the old backend; a second `migrate` right before switching copies anything new.
 - The reverse direction (`--from s3 --to local`) works the same way.
 
+## Health checks
+
+- **API:** point the load balancer or orchestrator's *liveness* probe at `/health/live` (restart if it fails) and its *readiness* probe at `/health/ready` (stop routing traffic while a dependency is down). Readiness checks run concurrently under a single deadline, so a hung dependency fails the probe quickly instead of hanging it.
+- **Workers:** `python -m app.cli.health` checks PostgreSQL, Redis, media storage, the scratch directory and the media tools (FFmpeg and ffprobe with libass) and exits non-zero on any failure — use it as the worker container's healthcheck. `--ping` additionally requires at least one running worker to answer over the broker.
+- Output is `name: ok|unavailable` only; the logs carry the exception type, never connection strings or credentials. The database connection itself times out after 5 seconds.
+
 ## Deleting media and cleaning up
 
 Deletion is **rows first, files second**: the storage keys are captured, the rows are deleted in one commit, then the files are removed. A storage failure after the commit leaves *orphans* (files no row refers to); they are counted in the response, never returned to anyone, and removed by the cleanup command. A render still running for a deleted clip or edit notices its row is gone and stores nothing.
@@ -331,6 +338,8 @@ app/
   services/media_deletion.py # Project/edit/audio deletion: rows first, then files, failures counted
   services/media_cleanup.py  # Orphan, partial-write and stale-scratch cleanup
   cli/media.py       # `python -m app.cli.media migrate|verify|cleanup`
+  cli/health.py      # `python -m app.cli.health [--ping]`: worker/host diagnostics
+  services/health.py # Readiness checks (database, Redis, storage, scratch, media tools)
   services/video_upload.py     # Upload validation (filename, extension, MIME, size) and storage
   services/ffprobe.py          # ffprobe invocation (argument list, JSON, timeout) and parsing
   services/video_processing.py # uploaded -> processing_metadata -> ready | failed

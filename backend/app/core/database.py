@@ -10,7 +10,12 @@ class Base(DeclarativeBase):
     """Declarative base shared by all ORM models."""
 
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+engine = create_engine(
+    get_settings().database_url,
+    pool_pre_ping=True,
+    # An unreachable database fails a request (and readiness) in seconds, not minutes.
+    connect_args={"connect_timeout": 5},
+)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
