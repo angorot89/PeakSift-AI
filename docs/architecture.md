@@ -276,7 +276,7 @@ Timestamps are timezone-aware. Project `status` is currently always `created`. V
 Backend ──▶ Object storage (source videos, generated clips, edited shorts)
 ```
 
-No milestone after V0.7 has been defined. Possible later work — creator intelligence and metadata, publishing, asset libraries, object storage replacing `MEDIA_ROOT` when deployment requires it — is not committed scope, and none of it exists yet.
+No milestone after V1.0 has been defined. Possible later work — creator intelligence and metadata, more publishing destinations and scheduling, asset libraries, Morocco Mode — is not committed scope (see [milestones.md](milestones.md)). Production operation and YouTube publishing are described in [production.md](production.md) and [publishing.md](publishing.md).
 
 ## Localization
 
