@@ -53,6 +53,10 @@ npm run start    # Serve the production build
 - Logout calls `POST /auth/logout`, which clears the cookie.
 - The video preview is a plain `<video src="…/videos/{id}/content">`; the browser attaches the cookie because the frontend and API are same-site (`localhost` in development), and the API checks ownership on every byte-range request. Candidate previews ("Preview source") reuse the same stream with a media fragment (`#t=start,end`) and stop at the end of the range. Rendered clips play from `<video src="…/clips/{id}/content">` with the same cookie mechanism, and **Download MP4** is a plain link to `…/clips/{id}/download` (an attachment), so nothing is buffered in JavaScript. Edited shorts work the same way through `…/edits/{id}/content` and `…/edits/{id}/download`.
 
+## Security headers
+
+`next.config.ts` sends, on every page, a Content-Security-Policy built by `lib/security-headers.ts` from `NEXT_PUBLIC_API_URL`: scripts, styles and fonts only from the app itself (Next's inline hydration scripts and React inline styles need `'unsafe-inline'`; `eval` is allowed only by the development server), data and media (`<video>`/`<audio>`) only from the app and the API origin, no plugins, no framing, forms only to the app, `upgrade-insecure-requests` when everything is HTTPS. Also `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, a restrictive `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`; the `X-Powered-By` header is off.
+
 ## Design system
 
 - **Tokens** (`app/globals.css`): three surface levels (`surface`, `surface-2`, `surface-3`), `border` / `border-strong`, text (`foreground`, `muted`, `subtle`), one accent (`accent`, `accent-soft`) used sparingly, status colours (`success`, `warning`, `danger`), restrained `fade-in` / `shimmer` motion, and tabular numerals for `<time>` and `.tabular`. `prefers-reduced-motion` disables animation and transitions.

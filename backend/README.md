@@ -353,6 +353,10 @@ provider_failed      YouTube rejected or could not process the video
 | GET | `/publish-jobs/{job_id}` | Status, real progress (`bytes_uploaded`/`bytes_total`), `video_url` (`https://youtu.be/…`) and `studio_url` once YouTube created the video (`simulated` and no link for the fake provider), `error_code`/`error_message`, `retryable`, `is_stale`, `awaiting_processing` (a processing check is still due; false once processing is known — or unknowable with the upload-only scope) |
 | POST | `/publish-jobs/{job_id}/retry` | Only a job that `failed` before YouTube created a video, or a stalled one, up to `PUBLISH_MAX_ATTEMPTS`; resumes the stored session. A job with a video is never uploaded again (`409`) |
 
+## Security headers
+
+Every API response (`app/core/security_headers.py`, pure ASGI so streaming is untouched) carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox` (the API serves data and media, never pages), `Cross-Origin-Resource-Policy: same-site`, a restrictive `Permissions-Policy`, `Cache-Control: no-store` unless an endpoint sets its own (media keeps `private, no-store`), and HSTS in production. The frontend sends its own CSP (see `frontend/lib/security-headers.ts`); the reverse proxy adds HSTS for every page.
+
 ## Rate limits
 
 Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-After` (seconds) once spent:
