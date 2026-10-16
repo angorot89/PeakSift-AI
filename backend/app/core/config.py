@@ -216,6 +216,9 @@ class Settings(BaseSettings):
     publishing_token_key_version: int = Field(default=1, ge=1)
     # Older keys still accepted for decryption during rotation: "1:<base64>,2:<base64>".
     publishing_token_previous_keys: SecretStr | None = None
+    # Which publishing provider jobs use: "youtube", or "fake" — an in-memory simulation for
+    # tests and non-production stacks (refused in production).
+    publishing_provider: Literal["youtube", "fake"] = "youtube"
     # A Google Cloud "Web application" OAuth client. The redirect URI is the API's
     # /publishing/youtube/callback and must be registered on the client exactly.
     google_client_id: str = ""
@@ -416,6 +419,8 @@ def production_problems(settings: Settings) -> list[str]:
         problems.append("CELERY_TASK_ALWAYS_EAGER must be off")
     if not settings.rate_limit_enabled:
         problems.append("RATE_LIMIT_ENABLED must be on")
+    if settings.publishing_provider != "youtube":
+        problems.append("PUBLISHING_PROVIDER must be youtube")
     if settings.storage_backend == "local" and (
         "media_root" not in explicit or not settings.media_root.is_absolute()
     ):
