@@ -216,6 +216,11 @@ class Settings(BaseSettings):
     publishing_token_key_version: int = Field(default=1, ge=1)
     # Older keys still accepted for decryption during rotation: "1:<base64>,2:<base64>".
     publishing_token_previous_keys: SecretStr | None = None
+    # A Google Cloud "Web application" OAuth client. The redirect URI is the API's
+    # /publishing/youtube/callback and must be registered on the client exactly.
+    google_client_id: str = ""
+    google_client_secret: SecretStr | None = None
+    google_oauth_redirect_uri: str = ""
 
     # Rate limits (Redis). Off only in tests. RATE_LIMITS overrides individual budgets:
     # "login_ip=20/60,edit_render=200/3600" (see app/core/rate_limit.py for the names).
@@ -313,8 +318,33 @@ def publishing_problems(settings: "Settings") -> list[str]:
                 problems.append(
                     "PUBLISHING_TOKEN_KEY_VERSION must differ from every previous key version"
                 )
-    if settings.youtube_publishing_enabled and key is None:
+    if not settings.youtube_publishing_enabled:
+        return problems
+    if key is None:
         problems.append("PUBLISHING_TOKEN_ENCRYPTION_KEY is required when publishing is enabled")
+    if not settings.google_client_id.endswith(".apps.googleusercontent.com"):
+        problems.append("GOOGLE_CLIENT_ID must be a Google OAuth web client id")
+    if (
+        settings.google_client_secret is None
+        or not settings.google_client_secret.get_secret_value()
+    ):
+        problems.append("GOOGLE_CLIENT_SECRET is required when publishing is enabled")
+    redirect = urlsplit(settings.google_oauth_redirect_uri)
+    local = redirect.hostname in ("localhost", "127.0.0.1")
+    if (
+        not redirect.hostname
+        or redirect.query
+        or redirect.fragment
+        or redirect.username
+        or not redirect.path.endswith("/publishing/youtube/callback")
+    ):
+        problems.append(
+            "GOOGLE_OAUTH_REDIRECT_URI must be the API's /publishing/youtube/callback URL"
+        )
+    elif redirect.scheme != "https" and not (redirect.scheme == "http" and local):
+        problems.append("GOOGLE_OAUTH_REDIRECT_URI must use https:// (http only for localhost)")
+    elif settings.is_production and redirect.scheme != "https":
+        problems.append("GOOGLE_OAUTH_REDIRECT_URI must use https:// in production")
     return problems
 
 

@@ -23,6 +23,7 @@ from app.models.clip_detection import (
     ClipDetectionStatus,
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
+from app.models.oauth_state import OAuthState
 from app.models.project import Project, ProjectStatus
 from app.models.publishing_connection import (
     ConnectionStatus,
@@ -71,6 +72,7 @@ __all__ = [
     "ClipStatus",
     "KeyframeMode",
     "ConnectionStatus",
+    "OAuthState",
     "Project",
     "ProjectStatus",
     "PublishingConnection",

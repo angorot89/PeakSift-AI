@@ -22,6 +22,9 @@ dependencies = [
     "httpx>=0.28,<1",  # local clip analysis over an Ollama-compatible HTTP endpoint
     "boto3>=1.40,<2",  # S3-compatible private media storage (AWS S3, MinIO, R2)
     "cryptography>=45,<51",  # AES-GCM encryption of stored OAuth refresh tokens
+    "google-auth>=2.40,<3",  # Google credentials (official)
+    "google-auth-oauthlib>=1.2,<2",  # OAuth authorization-code flow with PKCE (official)
+    "google-api-python-client>=2.170,<3",  # YouTube Data API: resumable videos.insert (official)
 ]
 
 [project.optional-dependencies]
