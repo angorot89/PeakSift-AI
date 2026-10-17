@@ -53,6 +53,7 @@ from app.models.transcription import (
 )
 from app.models.user import User
 from app.models.video import Video, VideoStatus
+from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
     "ACTIVE_PUBLISH_STATUSES",
@@ -99,4 +100,6 @@ __all__ = [
     "User",
     "Video",
     "VideoStatus",
+    "VisualAsset",
+    "VisualAssetKind",
 ]

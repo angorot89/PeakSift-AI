@@ -17,7 +17,15 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AudioAsset, Clip, ClipEdit, ClipEditStatus, ClipStatus, Video
+from app.models import (
+    AudioAsset,
+    Clip,
+    ClipEdit,
+    ClipEditStatus,
+    ClipStatus,
+    Video,
+    VisualAsset,
+)
 from app.services.storage import (
     InvalidStorageKey,
     ObjectNotFound,
@@ -28,7 +36,7 @@ from app.services.storage import (
 
 @dataclass(frozen=True)
 class MediaObject:
-    kind: str  # video | audio | clip | edit
+    kind: str  # video | audio | visual | thumbnail | clip | edit
     key: str
 
 
@@ -54,6 +62,8 @@ def media_objects(db: Session) -> Iterator[MediaObject]:
     queries = (
         ("video", select(Video.storage_key)),
         ("audio", select(AudioAsset.storage_key)),
+        ("visual", select(VisualAsset.storage_key)),
+        ("thumbnail", select(VisualAsset.thumbnail_storage_key)),
         ("clip", select(Clip.storage_key).where(Clip.status == ClipStatus.READY)),
         ("edit", select(ClipEdit.storage_key).where(ClipEdit.status == ClipEditStatus.READY)),
     )

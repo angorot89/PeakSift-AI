@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.audio_asset import AudioAsset
     from app.models.user import User
     from app.models.video import Video
+    from app.models.visual_asset import VisualAsset
 
 
 class ProjectStatus(StrEnum):
@@ -39,6 +40,9 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     audio_assets: Mapped[list["AudioAsset"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", passive_deletes=True
+    )
+    visual_assets: Mapped[list["VisualAsset"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", passive_deletes=True
     )
 

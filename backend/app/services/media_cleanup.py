@@ -20,13 +20,13 @@ from pathlib import Path
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models import AudioAsset, Clip, ClipEdit, Transcription, Video
+from app.models import AudioAsset, Clip, ClipEdit, Transcription, Video, VisualAsset
 from app.services.clip_edit.storage import edit_storage_key
 from app.services.clip_render.storage import clip_storage_key
 from app.services.storage import LocalStorageProvider, StorageError, StorageProvider
 
 # Categories of persistent media; ``transcription`` only holds legacy intermediates.
-CATEGORIES = ("videos", "audio", "clips", "edits", "transcription")
+CATEGORIES = ("videos", "audio", "visuals", "clips", "edits", "transcription")
 
 
 @dataclass
@@ -46,6 +46,10 @@ def referenced_keys(db: Session) -> set[str]:
     """Every key a row owns or may still produce (in-flight renders included)."""
     keys = set(db.scalars(select(Video.storage_key)))
     keys |= set(db.scalars(select(AudioAsset.storage_key)))
+    for key, thumbnail in db.execute(
+        select(VisualAsset.storage_key, VisualAsset.thumbnail_storage_key)
+    ):
+        keys |= {key, *([thumbnail] if thumbnail else [])}
     for clip_id, key in db.execute(select(Clip.id, Clip.storage_key)):
         keys |= {clip_storage_key(clip_id), *([key] if key else [])}
     for edit_id, key in db.execute(select(ClipEdit.id, ClipEdit.storage_key)):
