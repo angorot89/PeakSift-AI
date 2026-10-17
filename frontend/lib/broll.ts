@@ -33,6 +33,8 @@ export type BrollSuggestion = {
   query: string;
   reason: string;
   status: SuggestionStatus;
+  /** The project's visual assets that likely show it (strongest first); never auto-placed. */
+  matches: string[];
 };
 
 export type BrollState = { analysis: BrollAnalysis | null; suggestions: BrollSuggestion[] };

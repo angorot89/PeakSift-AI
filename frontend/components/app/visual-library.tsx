@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Film, Image as ImageIcon, Images, Search, Trash2, UploadCloud, X } from "lucide-react";
-import { type DragEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type DragEvent, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -16,6 +16,8 @@ import {
   formatVisualDuration,
   listVisuals,
   orientationLabel,
+  parseTagText,
+  updateVisual,
   uploadVisual,
   VISUAL_ACCEPT,
   visualContentUrl,
@@ -140,6 +142,10 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
         projectId={projectId}
         asset={preview}
         onClose={() => setPreview(null)}
+        onUpdated={(asset) => {
+          setAdded((previous) => [asset, ...previous.filter((a) => a.id !== asset.id)]);
+          setPreview(asset);
+        }}
         onDeleted={(id) => {
           setRemoved((previous) => new Set(previous).add(id));
           setPreview(null);
@@ -326,11 +332,13 @@ function PreviewDialog({
   projectId,
   asset,
   onClose,
+  onUpdated,
   onDeleted,
 }: {
   projectId: string;
   asset: VisualAsset | null;
   onClose: () => void;
+  onUpdated: (asset: VisualAsset) => void;
   onDeleted: (id: string) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -407,6 +415,7 @@ function PreviewDialog({
                 />
               )}
             </div>
+            <DetailsForm projectId={projectId} asset={asset} onUpdated={onUpdated} />
             {error ? <InlineAlert title="This visual could not be deleted">{error}</InlineAlert> : null}
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
               {confirming ? (
@@ -433,5 +442,70 @@ function PreviewDialog({
         </>
       ) : null}
     </dialog>
+  );
+}
+
+function DetailsForm({
+  projectId,
+  asset,
+  onUpdated,
+}: {
+  projectId: string;
+  asset: VisualAsset;
+  onUpdated: (asset: VisualAsset) => void;
+}) {
+  const id = useId();
+  const [name, setName] = useState(asset.display_name);
+  const [description, setDescription] = useState(asset.description);
+  const [tags, setTags] = useState(asset.tags.join(", "));
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const changed = name !== asset.display_name || description !== asset.description || tags !== asset.tags.join(", ");
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setState("saving");
+    setError(null);
+    try {
+      const updated = await updateVisual(projectId, asset.id, {
+        display_name: name,
+        description,
+        tags: parseTagText(tags),
+      });
+      setTags(updated.tags.join(", "));
+      setState("saved");
+      onUpdated(updated);
+    } catch (failure) {
+      setError(errorMessage(failure));
+      setState("idle");
+    }
+  }
+
+  const input =
+    "w-full rounded-lg border border-border bg-white/[0.03] px-3 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
+  return (
+    <form onSubmit={save} className="space-y-3 rounded-xl border border-border p-3">
+      <p className="text-[13px] font-medium text-foreground">Details</p>
+      <p className="text-xs text-muted">A description and tags help match B-roll suggestions to this asset.</p>
+      <div className="space-y-1">
+        <label htmlFor={`${id}-name`} className="text-xs font-medium text-muted">Name</label>
+        <input id={`${id}-name`} value={name} maxLength={255} onChange={(e) => { setName(e.target.value); setState("idle"); }} className={`${input} h-9`} />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor={`${id}-description`} className="text-xs font-medium text-muted">Description</label>
+        <textarea id={`${id}-description`} value={description} maxLength={500} rows={2} onChange={(e) => { setDescription(e.target.value); setState("idle"); }} className={`${input} py-2`} />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor={`${id}-tags`} className="text-xs font-medium text-muted">Tags <span className="font-normal">(comma-separated)</span></label>
+        <input id={`${id}-tags`} value={tags} onChange={(e) => { setTags(e.target.value); setState("idle"); }} placeholder="rocket, space, launch" className={`${input} h-9`} />
+      </div>
+      {error ? <InlineAlert title="The details could not be saved">{error}</InlineAlert> : null}
+      <div className="flex items-center gap-2">
+        <Button type="submit" size="sm" variant="secondary" disabled={!changed || state === "saving"}>
+          {state === "saving" ? "Saving…" : "Save details"}
+        </Button>
+        {state === "saved" && !changed ? <span role="status" className="text-xs text-emerald-300">Saved</span> : null}
+      </div>
+    </form>
   );
 }

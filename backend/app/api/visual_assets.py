@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi import status as http_status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import String, cast, or_, select
 
 from app.api.deps import CurrentUser, DbSession, Storage
 from app.api.media_streaming import object_present, stream_object
@@ -23,10 +23,16 @@ from app.core.config import get_settings
 from app.core.rate_limit import per_user
 from app.models import VisualAsset, VisualAssetKind
 from app.schemas.project import MediaDeletionRead
-from app.schemas.visual_asset import VisualAssetRead, VisualUploadLimits
+from app.schemas.visual_asset import VisualAssetRead, VisualAssetUpdate, VisualUploadLimits
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
 from app.services.video_upload import UploadValidationError, check_declared_size
-from app.services.visual_assets import ACCEPTED_EXTENSIONS, store_visual_upload
+from app.services.visual_assets import (
+    ACCEPTED_EXTENSIONS,
+    clean_description,
+    clean_display_name,
+    clean_tags,
+    store_visual_upload,
+)
 from app.services.visuals.layout import layout_summary
 
 router = APIRouter(prefix="/projects/{project_id}/visual-assets", tags=["visuals"])
@@ -121,9 +127,14 @@ def list_visuals(
     if kind is not None:
         statement = statement.where(VisualAsset.kind == kind.value)
     words = (q or "").split()
-    for word in words:  # every word must appear in the name (case-insensitive)
+    for word in words:  # every word must appear in the name, description or tags
+        pattern = f"%{_escape_like(word)}%"
         statement = statement.where(
-            VisualAsset.display_name.ilike(f"%{_escape_like(word)}%", escape="\\")
+            or_(
+                VisualAsset.display_name.ilike(pattern, escape="\\"),
+                VisualAsset.description.ilike(pattern, escape="\\"),
+                cast(VisualAsset.tags, String).ilike(pattern, escape="\\"),
+            )
         )
     statement = statement.order_by(VisualAsset.created_at.desc(), VisualAsset.id).limit(limit)
     return [_read(asset) for asset in db.scalars(statement)]
@@ -131,6 +142,23 @@ def list_visuals(
 
 @router.get("/{asset_id}", response_model=VisualAssetRead)
 def get_visual(asset: OwnedVisual) -> VisualAssetRead:
+    return _read(asset)
+
+
+@router.patch("/{asset_id}", response_model=VisualAssetRead)
+def update_visual(asset: OwnedVisual, body: VisualAssetUpdate, db: DbSession) -> VisualAssetRead:
+    """Rename an asset or describe and tag it (words that help match B-roll suggestions).
+    The file itself never changes."""
+    try:
+        if body.display_name is not None:
+            asset.display_name = clean_display_name(body.display_name)
+        if body.description is not None:
+            asset.description = clean_description(body.description)
+        if body.tags is not None:
+            asset.tags = clean_tags(body.tags)
+    except UploadValidationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.message) from None
+    db.commit()
     return _read(asset)
 
 

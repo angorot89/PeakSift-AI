@@ -18,6 +18,9 @@ export type VisualAsset = {
   has_alpha: boolean;
   has_audio: boolean;
   has_thumbnail: boolean;
+  /** The creator's words about it (help match B-roll suggestions). */
+  description: string;
+  tags: string[];
   created_at: string;
 };
 
@@ -37,16 +40,21 @@ export function orientationLabel(asset: Pick<VisualAsset, "width" | "height">): 
   return "Square";
 }
 
-/** The same rule as the API's search: every word must appear in the name (case-insensitive). */
-export function filterVisuals<T extends Pick<VisualAsset, "kind" | "display_name">>(
+/** The same rule as the API's search: every word must appear in the name, description or
+ * tags (case-insensitive). */
+export function filterVisuals<T extends Pick<VisualAsset, "kind" | "display_name"> & Partial<Pick<VisualAsset, "description" | "tags">>>(
   assets: T[],
   filter: VisualFilter,
   query: string,
 ): T[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  return assets.filter(
-    (asset) =>
-      (filter === "all" || asset.kind === filter) &&
-      words.every((word) => asset.display_name.toLowerCase().includes(word)),
-  );
+  return assets.filter((asset) => {
+    const text = [asset.display_name, asset.description ?? "", ...(asset.tags ?? [])].join(" ").toLowerCase();
+    return (filter === "all" || asset.kind === filter) && words.every((word) => text.includes(word));
+  });
+}
+
+/** "rocket, space, launch" → ["rocket", "space", "launch"] (the server normalizes further). */
+export function parseTagText(text: string): string[] {
+  return [...new Set(text.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean))];
 }

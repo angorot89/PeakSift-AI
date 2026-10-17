@@ -69,6 +69,9 @@ ACCEPTED_EXTENSIONS = tuple(sorted(ALLOWED_VISUAL_TYPES))
 # Video codecs FFmpeg decodes reliably in PeakSift's builds; anything else is refused.
 ALLOWED_VIDEO_CODECS = frozenset({"h264", "hevc", "vp8", "vp9", "av1", "mpeg4", "prores"})
 
+DESCRIPTION_MAX_LENGTH = 500
+TAG_MAX_LENGTH = 32
+TAGS_MAX = 20
 IMAGE_MAX_SIDE = 3840  # the stored rendition: more than enough for a 1080 × 1920 short
 MIN_SIDE = 16  # anything smaller is not a usable visual
 MAX_ASPECT = 20.0  # longer side / shorter side; beyond this, nothing fits a 9:16 frame
@@ -475,3 +478,40 @@ def _persist(
             for stored in (key, thumbnail_key):
                 if stored is not None:
                     storage.delete(stored)
+
+
+# --- the creator's words about an asset ---------------------------------------------------------
+
+
+def clean_display_name(raw: str) -> str:
+    """A safe display name (metadata only); refused when nothing printable remains."""
+    name = sanitize_filename(raw, fallback="")
+    if not name:
+        raise UploadValidationError(422, "The name cannot be empty")
+    return name
+
+
+def clean_description(raw: str) -> str:
+    text = " ".join("".join(ch for ch in raw if ch.isprintable()).split())
+    if len(text) > DESCRIPTION_MAX_LENGTH:
+        raise UploadValidationError(
+            422, f"The description can be at most {DESCRIPTION_MAX_LENGTH} characters"
+        )
+    return text
+
+
+def clean_tags(raw: list[str]) -> list[str]:
+    """Lower-case, single-spaced, letters/digits/spaces/hyphens, unique, in order."""
+    tags: list[str] = []
+    for item in raw:
+        tag = " ".join(
+            "".join(ch if (ch.isalnum() or ch in " -") else " " for ch in item.lower()).split()
+        ).strip(" -")
+        if not tag or tag in tags:
+            continue
+        if len(tag) > TAG_MAX_LENGTH:
+            raise UploadValidationError(422, f"A tag can be at most {TAG_MAX_LENGTH} characters")
+        tags.append(tag)
+    if len(tags) > TAGS_MAX:
+        raise UploadValidationError(422, f"An asset can have at most {TAGS_MAX} tags")
+    return tags

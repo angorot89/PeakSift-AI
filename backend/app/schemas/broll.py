@@ -47,6 +47,9 @@ class BrollSuggestionRead(BaseModel):
     query: str
     reason: str
     status: str
+    # The project's visual assets that likely show it (by name, description and tags),
+    # strongest first. Offered to the creator, never placed automatically.
+    matches: list[uuid.UUID] = []
 
 
 class BrollStateRead(BaseModel):

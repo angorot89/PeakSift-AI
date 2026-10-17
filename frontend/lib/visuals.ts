@@ -29,6 +29,13 @@ export const deleteVisual = (projectId: string, assetId: string) =>
     method: "DELETE",
   });
 
+/** Rename an asset or describe and tag it (omitted fields are kept). */
+export const updateVisual = (
+  projectId: string,
+  assetId: string,
+  details: { display_name?: string; description?: string; tags?: string[] },
+) => apiFetch<VisualAsset>(`${base(projectId)}/${assetId}`, { method: "PATCH", body: JSON.stringify(details) });
+
 /** Owner-only streams (session cookie, same-site): the stored file and its small preview. */
 export const visualContentUrl = (projectId: string, assetId: string) => `${API_URL}${base(projectId)}/${assetId}/content`;
 export const visualThumbnailUrl = (projectId: string, assetId: string) =>

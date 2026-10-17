@@ -2,8 +2,15 @@
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.services.visual_assets import (
+    DESCRIPTION_MAX_LENGTH,
+    TAG_MAX_LENGTH,
+    TAGS_MAX,
+)
 
 
 class VisualAssetRead(BaseModel):
@@ -22,6 +29,8 @@ class VisualAssetRead(BaseModel):
     has_alpha: bool
     has_audio: bool
     has_thumbnail: bool
+    description: str
+    tags: list[str]
     created_at: datetime
 
 
@@ -31,3 +40,19 @@ class VisualUploadLimits(BaseModel):
     max_image_pixels: int
     max_video_pixels: int
     accepted_extensions: list[str]
+
+
+class VisualAssetUpdate(BaseModel):
+    """The creator's words about an asset; omitted fields are kept."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: Annotated[str, Field(max_length=255)] | None = None
+    description: Annotated[str, Field(max_length=DESCRIPTION_MAX_LENGTH * 2)] | None = None
+    tags: (
+        Annotated[
+            list[Annotated[str, Field(max_length=TAG_MAX_LENGTH * 2)]],
+            Field(max_length=TAGS_MAX * 2),
+        ]
+        | None
+    ) = None
