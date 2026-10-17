@@ -75,6 +75,7 @@ from app.services.storage import (
     media_storage,
 )
 from app.services.visuals.assets import VisualsProblem, check_visuals, load_visual_assets
+from app.services.visuals.compositor import VisualLayer
 
 logger = logging.getLogger(__name__)
 
@@ -221,8 +222,6 @@ def _execute(
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
-    if config.visuals is not None:
-        _check_visuals(edit, db, config)
 
     workspace = store.workspace(edit.id, attempt)
     # Inputs are read locally: the stored file itself, or a copy fetched into the workspace.
@@ -296,6 +295,10 @@ def _execute(
         edit.progress_percent = AUDIO_READY_PROGRESS
         _heartbeat(edit, db, task_id)
 
+    if config.visuals is not None:
+        extra["visuals"] = _prepare_visuals(edit, db, store, inputs, config)
+        _heartbeat(edit, db, task_id)
+
     composed = composer(
         source,
         store.render_path(edit.id, attempt),
@@ -332,27 +335,47 @@ def _execute(
     edit.completed_at = _now()
     _heartbeat(edit, db, task_id)
     logger.info(
-        "Clip edit %s ready: %s, captions %s (%s cues), hook %s, %.2fs, %s bytes",
+        "Clip edit %s ready: %s, captions %s (%s cues), hook %s, %s visuals, %.2fs, %s bytes",
         edit.id,
         config.layout.value,
         "on" if config.captions_enabled else "off",
         edit.caption_cue_count,
         "on" if config.hook else "off",
+        len(config.visuals.elements) if config.visuals else 0,
         composed.duration_seconds,
         composed.size_bytes,
     )
 
 
-def _check_visuals(edit: ClipEdit, db: Session, config: EditConfig) -> None:
-    """The snapshot's visuals, re-checked against today's assets and the clip."""
+def _prepare_visuals(
+    edit: ClipEdit, db: Session, store: EditArtifactStore, inputs: Path, config: EditConfig
+) -> list[VisualLayer]:
+    """The snapshot's visuals, re-checked against today's assets and the clip, with each asset
+    fetched into this attempt's workspace (the stored file itself on local storage)."""
     assets = load_visual_assets(db, edit.clip.video.project_id, config.visuals.asset_ids)
     try:
         check_visuals(config.visuals, assets, float(edit.clip.duration_seconds))
     except VisualsProblem as problem:
         raise PipelineFailure(problem.code, problem.message) from None
-    raise PipelineFailure(
-        "visuals_unavailable", "Visual elements cannot be rendered on this server yet"
-    )
+    paths: dict[str, Path] = {}
+    for asset_id in config.visuals.asset_ids:
+        try:
+            paths[asset_id] = store.storage.fetch(assets[asset_id].storage_key, inputs)
+        except (ObjectNotFound, InvalidStorageKey):
+            raise PipelineFailure(
+                "visual_asset_unavailable", "A selected visual is no longer available"
+            ) from None
+    return [
+        VisualLayer(
+            element=element,
+            path=paths[element.asset_id],
+            kind=assets[element.asset_id].kind,
+            has_alpha=assets[element.asset_id].has_alpha,
+            width=assets[element.asset_id].width,
+            height=assets[element.asset_id].height,
+        )
+        for element in config.visuals.elements
+    ]
 
 
 def _prepare_audio(

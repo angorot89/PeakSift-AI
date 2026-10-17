@@ -38,6 +38,7 @@ from app.services.clip_render.renderer import (
 from app.services.ffprobe import ProbeError, VideoMetadata, probe
 from app.services.reframe.path import CropGeometry
 from app.services.reframe.sampling import SamplingError, probe_geometry
+from app.services.visuals.compositor import VisualLayer, layer_inputs, layers_graph
 
 logger = logging.getLogger(__name__)
 
@@ -154,12 +155,16 @@ def caption_text_renders(ffmpeg_path: str, font_family: str) -> bool:
     return True
 
 
-def supports_visuals(ffmpeg_path: str) -> bool:
-    """Whether this server can draw visual elements (B-roll, picture-in-picture, overlays).
+VISUAL_FILTERS = frozenset(
+    {"overlay", "fade", "gblur", "colorchannelmixer", "split", "pad", "crop", "scale", "color",
+     "setpts", "fps", "format", "setsar"}
+)  # fmt: skip
 
-    Not yet: the visual compositor is added with the renderer, so edits with visuals are
-    refused clearly instead of rendering without them."""
-    return False
+
+def supports_visuals(ffmpeg_path: str) -> bool:
+    """Whether this FFmpeg build has every filter the visual compositor uses."""
+    filters = ffmpeg_filters(ffmpeg_path)
+    return filters is not None and VISUAL_FILTERS <= filters
 
 
 def require_caption_rendering(ffmpeg_path: str, font_family: str) -> None:
@@ -218,15 +223,24 @@ def build_edit_command(
     audio_bitrate: str,
     video_graph: str | None = None,
     audio_track: Path | None = None,
+    visual_inputs: Sequence[str] = (),
+    visual_graph: str | None = None,
+    visual_label: str = "[framed]",
 ) -> list[str]:
     # Smart reframe passes its own validated crop graph; every other layout uses constants.
     graph = video_graph if video_graph is not None else layout_filter(layout)
+    picture = "[framed]"
+    if visual_graph:
+        # Visual elements are drawn over the framed clip and *before* the text layer, so
+        # captions and the hook stay on top of every cutaway and inset.
+        graph += f";{visual_graph}"
+        picture = visual_label
     if captions:
         # A fixed relative name: FFmpeg runs with the workspace as its working directory.
-        graph += f";[framed]subtitles=filename={CAPTIONS_FILENAME}[out]"
+        graph += f";{picture}subtitles=filename={CAPTIONS_FILENAME}[out]"
         video_label = "[out]"
     else:
-        video_label = "[framed]"
+        video_label = picture
     command = [
         ffmpeg_path,
         "-v",
@@ -238,6 +252,7 @@ def build_edit_command(
     ]
     if audio_track is not None:
         command += ["-i", str(audio_track)]
+    command += list(visual_inputs)  # after the audio track: input indexes follow this order
     command += [
         "-filter_complex",
         graph,
@@ -300,6 +315,7 @@ def compose_short(
     crop_points: Sequence[CropPoint] | None = None,
     focus: tuple[float, float] | None = None,
     audio: Path | None = None,
+    visuals: Sequence[VisualLayer] | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
 
@@ -343,6 +359,18 @@ def compose_short(
         except ValueError:
             raise RenderError("invalid_path", "The framing path is not valid") from None
 
+    visual_inputs: list[str] = []
+    visual_graph, visual_label = None, "[framed]"
+    if visuals:
+        if not supports_visuals(options.ffmpeg_path):
+            raise RenderError(
+                "visuals_unavailable", "This server's FFmpeg cannot draw visual elements"
+            )
+        fps = source_meta.fps if source_meta.fps and source_meta.fps > 0 else 30.0
+        layers = list(visuals)
+        visual_inputs = layer_inputs(layers, fps)
+        first_input = 2 if audio is not None else 1
+        visual_graph, visual_label = layers_graph(layers, first_input, fps)
     command = build_edit_command(
         options.ffmpeg_path,
         source,
@@ -355,6 +383,9 @@ def compose_short(
         audio_bitrate=options.audio_bitrate,
         video_graph=video_graph,
         audio_track=audio,
+        visual_inputs=visual_inputs,
+        visual_graph=visual_graph,
+        visual_label=visual_label,
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
@@ -363,6 +394,8 @@ def compose_short(
         redactions[str(workspace)] = "<workspace>"
     if audio is not None:
         redactions[str(audio)] = "<audio>"
+    for layer in visuals or ():
+        redactions[str(layer.path)] = "<visual>"
     try:
         run_ffmpeg(command, options, heartbeat, redactions, cwd=workspace)
         if not target.is_file() or target.stat().st_size == 0:
