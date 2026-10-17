@@ -1,3 +1,4 @@
+import { visualsFromConfiguration, visualsKey, visualsSummary, type VisualElementRequest } from "@/lib/visual-elements";
 import { API_URL, apiFetch, postJson } from "@/lib/api";
 import { audioFromConfiguration, audioSummary, normalizeAudio, sameAudio, type AudioRequest } from "@/lib/audio-mix";
 import type { CaptionTiming, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
@@ -34,6 +35,8 @@ export type EditRequest = {
   /** Optional audio finishing (music, sound effects, levels, normalization). Omitted keeps
    * the clip's own audio exactly as before. */
   audio?: AudioRequest;
+  /** Optional B-roll cutaways, picture-in-picture and overlays from the project's visuals. */
+  visuals?: { elements: VisualElementRequest[] };
 };
 
 export type ClipEdit = {
@@ -154,7 +157,8 @@ type Described = Pick<
 /** "Smart reframe · Focus captions · Bottom · Hook · Music" — enough to tell variants apart. */
 export function describeEdit(edit: Described) {
   const audio = audioSummary(audioFromConfiguration(edit.configuration));
-  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}${audio ? ` · ${audio}` : ""}`;
+  const visuals = visualsSummary(visualsFromConfiguration(edit.configuration).length);
+  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}${audio ? ` · ${audio}` : ""}${visuals ? ` · ${visuals}` : ""}`;
 }
 
 const round3 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 1000) / 1000);
@@ -182,7 +186,8 @@ export function sameSettings(edit: ClipEdit, request: EditRequest) {
         edit.hook_style === request.hook_style &&
         edit.hook_position === request.hook_position &&
         round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds))) &&
-    sameAudio(audioFromConfiguration(edit.configuration), normalizeAudio(request.audio))
+    sameAudio(audioFromConfiguration(edit.configuration), normalizeAudio(request.audio)) &&
+    visualsKey(visualsFromConfiguration(edit.configuration)) === visualsKey(request.visuals?.elements)
   );
 }
 

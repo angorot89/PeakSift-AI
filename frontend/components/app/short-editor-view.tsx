@@ -12,6 +12,8 @@ import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from 
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
+import { VisualsLayer } from "@/components/app/editor/visuals-layer";
+import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -89,6 +91,16 @@ import { usePolling } from "@/lib/use-polling";
 import { useAudioPreview, type PreviewPlan } from "@/lib/use-audio-preview";
 import { listProjectVideos } from "@/lib/videos";
 import { getYouTubeStatus } from "@/lib/publishing";
+import { getVisualLayout } from "@/lib/broll";
+import {
+  elementProblems,
+  elementRequest,
+  overlapProblems,
+  visualsSummary,
+  type VisualElementDraft,
+  type VisualLayout,
+} from "@/lib/visual-elements";
+import { listVisuals, type VisualAsset } from "@/lib/visuals";
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
@@ -122,6 +134,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [audioAssets, setAudioAssets] = useState<AudioAsset[] | null>(null);
   const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
   const [audioLimits, setAudioLimits] = useState<AudioUploadLimits | null>(null);
+  const [visuals, setVisuals] = useState<VisualElementDraft[]>([]);
+  const [visualAssets, setVisualAssets] = useState<VisualAsset[] | null>(null);
+  const [visualLayout, setVisualLayout] = useState<VisualLayout | null>(null);
   const [previewVideo, setPreviewVideo] = useState<HTMLVideoElement | null>(null);
   const [edits, setEdits] = useState<ClipEdit[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -202,6 +217,24 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       cancelled = true;
     };
   }, [project.id, loadWaveform, handleError]);
+
+  // ---- visuals: the project's images and B-roll videos, and where insets sit ---------------
+  useEffect(() => {
+    let cancelled = false;
+    listVisuals(project.id)
+      .then((assets) => !cancelled && setVisualAssets(assets))
+      .catch(() => !cancelled && setVisualAssets([]));
+    getVisualLayout()
+      .then((layout) => !cancelled && setVisualLayout(layout))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+  const visualAssetMap = useMemo(() => new Map((visualAssets ?? []).map((a) => [a.id, a])), [visualAssets]);
+  function visualUploaded(asset: VisualAsset) {
+    setVisualAssets((current) => [asset, ...(current ?? []).filter((a) => a.id !== asset.id)]);
+  }
 
   function audioUploaded(asset: AudioAsset) {
     setAudioAssets((current) => [asset, ...(current ?? []).filter((a) => a.id !== asset.id)]);
@@ -413,6 +446,17 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   // creator who never opens Audio gets exactly the earlier render.
   const audioActive = !!audio.music || audio.sfx.length > 0 || audio.source_gain_db !== 0;
   const audioRequest = useMemo(() => (audioActive ? normalizeAudio(audio) : null), [audioActive, audio]);
+  // Visuals are sent only when there are some, so an edit without them keeps its old settings.
+  const visualsRequest = useMemo(
+    () => (visuals.length ? { elements: visuals.map((e) => elementRequest(e, visualAssetMap.get(e.asset_id))) } : null),
+    [visuals, visualAssetMap],
+  );
+  const visualsInvalid = useMemo(
+    () =>
+      overlapProblems(visuals).size > 0 ||
+      visuals.some((e) => elementProblems(e, visualAssetMap.get(e.asset_id), clip.duration_seconds).length > 0),
+    [visuals, visualAssetMap, clip.duration_seconds],
+  );
   const request: EditRequest = useMemo(
     () => ({
       aspect_ratio: "9:16",
@@ -438,8 +482,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           }
         : {}),
       ...(audioRequest ? { audio: audioRequest } : {}),
+      ...(visualsRequest ? { visuals: visualsRequest } : {}),
     }),
-    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest],
+    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest, visualsRequest],
   );
   // An approximate audio preview with the video as its clock (the render is authoritative).
   const previewPlan: PreviewPlan | null = useMemo(() => {
@@ -460,21 +505,27 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const awaitingWords = captions && timing === "aligned_word" && !trackReady;
   const hookLength = [...normalizeHookText(hookText)].length;
   const hookInvalid = hookOn && (hookLength === 0 || hookLength > (spec?.hook.max_chars ?? 60));
-  const blocked = awaitingAnalysis || awaitingWords || hookInvalid;
+  const blocked = awaitingAnalysis || awaitingWords || hookInvalid || visualsInvalid;
   const hookPreview: HookPreview | null =
     hookOn && !hookInvalid
       ? { text: normalizeHookText(hookText), style: hookStyle, position: hookPosition, duration: hookDuration }
       : null;
-  const overlay = spec ? (
-    <CaptionLayer
-      spec={spec}
-      preset={captions ? preset : null}
-      position={position}
-      cues={captions && previewReady ? cues : null}
-      hook={hookPreview}
-      showSafeArea={showSafeArea}
-    />
-  ) : null;
+  // Visuals under the text layer: captions and the hook stay on top, as in the render.
+  const overlay = (
+    <>
+      <VisualsLayer projectId={project.id} elements={visuals} assets={visualAssetMap} layout={visualLayout} />
+      {spec ? (
+        <CaptionLayer
+          spec={spec}
+          preset={captions ? preset : null}
+          position={position}
+          cues={captions && previewReady ? cues : null}
+          hook={hookPreview}
+          showSafeArea={showSafeArea}
+        />
+      ) : null}
+    </>
+  );
   const match = blocked ? null : (edits?.find((e) => sameSettings(e, request)) ?? null);
   const matchActive = !!match && isEditActive(match.status) && !match.is_stale;
   const matchStuck = !!match && (match.status === "failed" || (isEditActive(match.status) && match.is_stale));
@@ -538,7 +589,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     caption_position: position,
     caption_timing: timing,
     hook_enabled: hookOn,
-  })}${audioLabel ? ` · ${audioLabel}` : ""}`;
+  })}${audioLabel ? ` · ${audioLabel}` : ""}${visuals.length ? ` · ${visualsSummary(visuals.length)}` : ""}`;
 
   // ---- primary action area -------------------------------------------------------------
   let action;
@@ -619,6 +670,16 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         <p className="text-center text-xs text-subtle">
           {hookLength === 0 ? "Add hook text, or turn the hook off." : "Shorten the hook text to render."}
         </p>
+      </div>
+    );
+  } else if (visualsInvalid) {
+    action = (
+      <div className="space-y-2">
+        <Button size="lg" className="w-full" disabled>
+          <Wand2 aria-hidden="true" />
+          Render short
+        </Button>
+        <p className="text-center text-xs text-subtle">Fix the highlighted visuals to render.</p>
       </div>
     );
   } else {
@@ -707,7 +768,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     Rendered MP4 · {selected.duration_seconds != null ? formatDuration(selected.duration_seconds) : ""} · 1080 × 1920
                   </p>
                 </div>
-                <div className="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center">
+                <div className="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                   <a
                     href={editDownloadUrl(selected.id)}
                     download
@@ -851,6 +912,19 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 emojiOmitted={spec.emoji === "omitted"}
               />
             ) : null}
+            <div className="border-t border-border pt-5">
+              <VisualsPanel
+                projectId={project.id}
+                videoId={clip.video_id}
+                clipId={clip.id}
+                duration={clip.duration_seconds}
+                video={previewVideo}
+                assets={visualAssets}
+                onUploaded={visualUploaded}
+                elements={visuals}
+                onChange={setVisuals}
+              />
+            </div>
             <div className="border-t border-border pt-5">
               <AudioPanel
                 projectId={project.id}

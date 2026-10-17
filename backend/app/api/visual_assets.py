@@ -27,6 +27,7 @@ from app.schemas.visual_asset import VisualAssetRead, VisualUploadLimits
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
 from app.services.video_upload import UploadValidationError, check_declared_size
 from app.services.visual_assets import ACCEPTED_EXTENSIONS, store_visual_upload
+from app.services.visuals.layout import layout_summary
 
 router = APIRouter(prefix="/projects/{project_id}/visual-assets", tags=["visuals"])
 limits_router = APIRouter(tags=["visuals"])
@@ -71,6 +72,13 @@ def upload_limits(_: CurrentUser) -> VisualUploadLimits:
         max_video_pixels=settings.visual_asset_max_video_pixel_count,
         accepted_extensions=list(ACCEPTED_EXTENSIONS),
     )
+
+
+@limits_router.get("/visual-layout")
+def visual_layout(_: CurrentUser) -> dict:
+    """Where picture-in-picture and overlays sit in the 1080 × 1920 short (the renderer's
+    numbers), so the editor's preview places them the same way."""
+    return layout_summary()
 
 
 @router.post(
