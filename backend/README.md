@@ -493,6 +493,7 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `VISUAL_ASSET_MAX_BYTES` | `524288000` (500 MiB) | Largest accepted image or B-roll video |
 | `VISUAL_ASSET_MAX_VIDEO_DURATION_SECONDS` | `600` | Longest B-roll video |
 | `VISUAL_ASSET_MAX_PIXEL_COUNT` / `VISUAL_ASSET_MAX_VIDEO_PIXEL_COUNT` | `40000000` / `9437184` | Largest image (checked before decoding) / B-roll video resolution (4096 × 2304) |
+| `BROLL_SUGGESTION_PROVIDER` / `BROLL_OLLAMA_MODEL` / `BROLL_FALLBACK_ENABLED` | `ollama` / first `OLLAMA_CLIP_MODELS` entry / `true` | Who suggests B-roll moments: a local model, or the deterministic name-based provider; the fallback answers (labelled) when the model cannot |
 | `FFPROBE_PATH`      | `ffprobe`                                      | ffprobe binary (name on `PATH` or absolute path) |
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary for audio extraction, clip rendering and shorts (needs libass for captions) |

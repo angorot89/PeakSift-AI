@@ -168,6 +168,11 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = Field(default=300, gt=0)
     # Context window requested per call; must hold the system prompt plus one analysis window.
     ollama_num_ctx: int = Field(default=8192, ge=2048)
+    # B-roll suggestions: "ollama" (a local model) or "keyword" (deterministic, name-based).
+    # With the fallback on, the keyword provider answers when the model cannot, and says so.
+    broll_suggestion_provider: Literal["ollama", "keyword"] = "ollama"
+    broll_ollama_model: str = ""  # empty: the first OLLAMA_CLIP_MODELS entry
+    broll_fallback_enabled: bool = True
 
     # Hosted provider: OpenAI structured outputs. Uses OPENAI_API_KEY (shared with
     # transcription). Comma-separated allow-list of models (first = default).
