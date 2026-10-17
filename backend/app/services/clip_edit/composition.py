@@ -38,7 +38,12 @@ from app.services.clip_render.renderer import (
 from app.services.ffprobe import ProbeError, VideoMetadata, probe
 from app.services.reframe.path import CropGeometry
 from app.services.reframe.sampling import SamplingError, probe_geometry
-from app.services.visuals.compositor import VisualLayer, layer_inputs, layers_graph
+from app.services.visuals.compositor import (
+    VisualLayer,
+    drawing_order,
+    layer_inputs,
+    layers_graph,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -367,7 +372,7 @@ def compose_short(
                 "visuals_unavailable", "This server's FFmpeg cannot draw visual elements"
             )
         fps = source_meta.fps if source_meta.fps and source_meta.fps > 0 else 30.0
-        layers = list(visuals)
+        layers = drawing_order(list(visuals))
         visual_inputs = layer_inputs(layers, fps)
         first_input = 2 if audio is not None else 1
         visual_graph, visual_label = layers_graph(layers, first_input, fps)

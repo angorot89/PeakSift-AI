@@ -21,7 +21,7 @@ type VideoWithFrameCallback = HTMLVideoElement & {
 };
 
 /** Call `onTime` with the clip time of every presented frame (rVFC, rAF fallback) and on seeks. */
-function useClipTime(onTime: (t: number) => void) {
+export function useClipTime(onTime: (t: number) => void) {
   const video = useContext(VideoClockContext);
   const latest = useRef(onTime);
   useEffect(() => {

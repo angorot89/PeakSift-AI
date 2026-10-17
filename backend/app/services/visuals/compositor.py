@@ -116,10 +116,17 @@ def _inset(source: str, index: int, element: VisualElement) -> tuple[str, str]:
     return f"{source}{chain},setsar=1[g{index}];", f"[g{index}]"
 
 
+def drawing_order(layers: list[VisualLayer]) -> list[VisualLayer]:
+    """Cutaways first, then insets (each in time order): a picture-in-picture or overlay that
+    overlaps a cutaway is drawn on top of it, never hidden under it."""
+    return sorted(layers, key=lambda layer: (layer.element.is_inset, layer.element.start))
+
+
 def layers_graph(
     layers: list[VisualLayer], first_input: int, fps: float, base: str = "[framed]"
 ) -> tuple[str, str]:
-    """Filtergraph segment drawing every layer over ``base``; returns (graph, output label)."""
+    """Filtergraph segment drawing every layer over ``base``; returns (graph, output label).
+    ``layers`` must be in drawing order (see ``drawing_order``), like their inputs."""
     graph = ""
     current = base
     for index, layer in enumerate(layers):
