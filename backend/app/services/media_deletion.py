@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AudioAsset, Clip, ClipEdit, Project, Video
+from app.models import AudioAsset, Clip, ClipEdit, Project, Video, VisualAsset
 from app.services.clip_edit.storage import edit_storage_key
 from app.services.clip_render.storage import clip_storage_key
 from app.services.storage import StorageError, StorageProvider
@@ -36,6 +36,8 @@ def project_media_keys(db: Session, project: Project) -> set[str]:
     keys |= set(
         db.scalars(select(AudioAsset.storage_key).where(AudioAsset.project_id == project.id))
     )
+    for asset in db.scalars(select(VisualAsset).where(VisualAsset.project_id == project.id)):
+        keys |= set(asset.storage_keys)
     video_ids = select(Video.id).where(Video.project_id == project.id)
     for clip_id, key in db.execute(
         select(Clip.id, Clip.storage_key).where(Clip.video_id.in_(video_ids))
@@ -94,6 +96,15 @@ def delete_audio_asset(db: Session, storage: StorageProvider, asset: AudioAsset)
     return delete_objects(storage, [key])
 
 
+def delete_visual_asset(
+    db: Session, storage: StorageProvider, asset: VisualAsset
+) -> DeletionReport:
+    keys = asset.storage_keys
+    db.delete(asset)
+    db.commit()
+    return delete_objects(storage, keys)
+
+
 def delete_edit(db: Session, storage: StorageProvider, edit: ClipEdit) -> DeletionReport:
     keys = {edit_storage_key(edit.id), *([edit.storage_key] if edit.storage_key else [])}
     db.delete(edit)
@@ -107,6 +118,7 @@ __all__ = [
     "delete_edit",
     "delete_objects",
     "delete_project",
+    "delete_visual_asset",
     "edits_using_asset",
     "project_media_keys",
 ]
