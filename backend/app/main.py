@@ -6,6 +6,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.api.audio_assets import limits_router as audio_limits_router
 from app.api.audio_assets import router as audio_assets_router
 from app.api.auth import router as auth_router
+from app.api.broll import router as broll_router
 from app.api.caption_styles import router as caption_styles_router
 from app.api.caption_tracks import router as caption_tracks_router
 from app.api.clip_detection import providers_router as clip_providers_router
@@ -49,6 +50,7 @@ ROUTERS = (
     caption_tracks_router,
     caption_styles_router,
     audio_assets_router,
+    broll_router,
     audio_limits_router,
     visual_assets_router,
     visual_limits_router,
