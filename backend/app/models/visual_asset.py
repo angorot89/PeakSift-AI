@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -12,10 +12,13 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -39,7 +42,8 @@ class VisualAsset(Base):
     both objects were stored before the row was committed; a refused upload leaves nothing
     behind. Images are stored as a normalized rendition (upright, RGB or RGBA, metadata
     stripped), so every later step sees exactly the pixels the creator saw. The asset is never
-    modified afterwards except for its descriptive metadata; edits reference it by id.
+    modified afterwards except for its descriptive metadata (name, description, tags); edits
+    reference it by id.
 
     Dimensions are *display* dimensions — after rotation and sample aspect ratio — so a
     portrait phone video is taller than it is wide here, whatever its coded size.
@@ -54,6 +58,8 @@ class VisualAsset(Base):
         CheckConstraint("file_size > 0", name="ck_visual_assets_file_size"),
         CheckConstraint("width > 0 AND height > 0", name="ck_visual_assets_dimensions"),
         CheckConstraint("length(sha256) = 64", name="ck_visual_assets_sha256"),
+        CheckConstraint("length(description) <= 500", name="ck_visual_assets_description"),
+        CheckConstraint("jsonb_typeof(tags) = 'array'", name="ck_visual_assets_tags"),
         # Images have no duration, frame rate or audio; videos have a positive duration.
         CheckConstraint(
             "(kind = 'image' AND duration_seconds IS NULL AND fps IS NULL AND NOT has_audio) "
@@ -89,6 +95,10 @@ class VisualAsset(Base):
     has_alpha: Mapped[bool] = mapped_column(Boolean, default=False)
     # Videos only: whether the file carries sound. B-roll is always rendered muted.
     has_audio: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Optional creator-written words that help match B-roll suggestions (never sent anywhere).
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    tags: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
 
     # A small preview image (bounded size), stored next to the asset in private storage.
     thumbnail_storage_key: Mapped[str | None] = mapped_column(String(255), unique=True)

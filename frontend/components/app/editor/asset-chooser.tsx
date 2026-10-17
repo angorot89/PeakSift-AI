@@ -24,6 +24,7 @@ export function AssetChooser({
   title,
   assets,
   query,
+  matches = [],
   onPick,
   onUploaded,
   onClose,
@@ -34,6 +35,8 @@ export function AssetChooser({
   assets: VisualAsset[] | null;
   /** The suggestion being matched, if any (shown for context). */
   query: string | null;
+  /** Assets that likely match the suggestion (ids, strongest first). */
+  matches?: string[];
   onPick: (asset: VisualAsset) => void;
   onUploaded: (asset: VisualAsset) => void;
   onClose: () => void;
@@ -54,6 +57,10 @@ export function AssetChooser({
   }, [open]);
 
   const shown = useMemo(() => filterVisuals(assets ?? [], filter, search), [assets, filter, search]);
+  const likely = useMemo(
+    () => matches.map((id) => (assets ?? []).find((a) => a.id === id)).filter((a): a is VisualAsset => !!a),
+    [matches, assets],
+  );
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -126,6 +133,19 @@ export function AssetChooser({
               </div>
             </div>
 
+            {likely.length && !search ? (
+              <div className="space-y-2">
+                <p className="text-[12px] font-medium text-muted">Likely matches (from names, descriptions and tags)</p>
+                <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Likely matches">
+                  {likely.map((asset) => (
+                    <li key={asset.id}>
+                      <AssetButton projectId={projectId} asset={asset} onPick={() => onPick(asset)} />
+                    </li>
+                  ))}
+                </ul>
+                <p className="pt-1 text-[12px] font-medium text-muted">All visual assets</p>
+              </div>
+            ) : null}
             {assets === null ? (
               <p className="text-sm text-muted">Loading visual assets…</p>
             ) : shown.length ? (

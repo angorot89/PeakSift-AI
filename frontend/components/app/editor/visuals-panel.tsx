@@ -133,7 +133,10 @@ export function VisualsPanel({
   function pick(asset: VisualAsset) {
     const context = chooser;
     setChooser(null);
-    if (!context) return;
+    if (context) placeAsset(asset, context);
+  }
+
+  function placeAsset(asset: VisualAsset, context: NonNullable<Chooser>) {
     if (context.replace) {
       const replaced = (e: VisualElementDraft): VisualElementDraft => ({
         ...e,
@@ -222,7 +225,10 @@ export function VisualsPanel({
             {open.map((s) => (
               <SuggestionCard
                 key={s.id}
+                projectId={projectId}
                 suggestion={s}
+                matches={s.matches.map((id) => byId.get(id)).filter((a): a is VisualAsset => !!a)}
+                onUseMatch={(asset) => placeAsset(asset, { suggestion: s, replace: null })}
                 onUse={() => setChooser({ suggestion: s, replace: null })}
                 onDismiss={() => void decide(s, "dismissed")}
                 onSeek={() => {
@@ -299,6 +305,7 @@ export function VisualsPanel({
         title={chooser?.suggestion ? `Choose a visual for “${chooser.suggestion.query}”` : "Choose a visual"}
         assets={assets}
         query={chooser?.suggestion?.query ?? null}
+        matches={chooser?.suggestion?.matches ?? []}
         onPick={pick}
         onUploaded={onUploaded}
         onClose={() => setChooser(null)}
@@ -308,13 +315,19 @@ export function VisualsPanel({
 }
 
 function SuggestionCard({
+  projectId,
   suggestion,
+  matches,
+  onUseMatch,
   onUse,
   onDismiss,
   onSeek,
   disabled,
 }: {
+  projectId: string;
   suggestion: BrollSuggestion;
+  matches: VisualAsset[];
+  onUseMatch: (asset: VisualAsset) => void;
   onUse: () => void;
   onDismiss: () => void;
   onSeek: () => void;
@@ -342,6 +355,33 @@ function SuggestionCard({
           </span>
         ) : null}
       </div>
+      {matches.length && !used ? (
+        <div className="mt-2">
+          <p className="text-[11px] font-medium text-muted">Suggested assets</p>
+          <ul className="mt-1 flex flex-wrap gap-1.5" aria-label={`Suggested assets for ${suggestion.query}`}>
+            {matches.map((asset) => (
+              <li key={asset.id}>
+                <button
+                  type="button"
+                  onClick={() => onUseMatch(asset)}
+                  disabled={disabled}
+                  aria-label={`Use ${asset.display_name} here`}
+                  title={asset.display_name}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 py-1 pr-2 pl-1 text-[11px] text-foreground hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+                >
+                  <span className={`size-7 overflow-hidden rounded ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
+                    {asset.has_thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
+                      <img src={visualThumbnailUrl(projectId, asset.id)} alt="" className="size-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="max-w-28 truncate">{asset.display_name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button size="sm" variant={used ? "ghost" : "secondary"} onClick={onUse} disabled={disabled}>
           <Plus aria-hidden="true" />

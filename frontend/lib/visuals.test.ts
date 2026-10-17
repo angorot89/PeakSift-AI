@@ -1,7 +1,7 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { filterVisuals, formatVisualDuration, orientationLabel } from "./visual-rules.ts";
+import { filterVisuals, formatVisualDuration, orientationLabel, parseTagText } from "./visual-rules.ts";
 
 describe("visual asset rules", () => {
   it("formats B-roll durations", () => {
@@ -30,5 +30,14 @@ describe("visual asset rules", () => {
     assert.deepEqual(names("all", "moon launch"), ["moon launch.mp4"]);
     assert.deepEqual(names("video", "rocket"), []);
     assert.deepEqual(names("all", "100%"), ["rocket_100%.jpg"]);
+  });
+
+  it("searches descriptions and tags too, and parses tag text", () => {
+    const assets = [
+      { kind: "video" as const, display_name: "clip-7.mp4", description: "NASA-style launch", tags: ["rocket"] },
+      { kind: "image" as const, display_name: "a.png", description: "", tags: [] },
+    ];
+    assert.deepEqual(filterVisuals(assets, "all", "rocket launch").map((a) => a.display_name), ["clip-7.mp4"]);
+    assert.deepEqual(parseTagText(" Rocket, space ,, rocket,Launch "), ["rocket", "space", "launch"]);
   });
 });

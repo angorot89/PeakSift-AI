@@ -29,6 +29,7 @@ from app.models import (
     Clip,
     ClipStatus,
     TranscriptionStatus,
+    VisualAsset,
 )
 from app.schemas.broll import (
     BrollAnalysisRead,
@@ -38,6 +39,7 @@ from app.schemas.broll import (
     BrollSuggestionUpdate,
 )
 from app.services.broll.config import BrollConfig
+from app.services.broll.matching import likely_matches
 from app.services.broll.pipeline import is_stale
 from app.workers.dispatch import JobQueueUnavailable, enqueue_broll_analysis, new_task_id
 
@@ -103,7 +105,9 @@ def _read(analysis: BrollAnalysis) -> BrollAnalysisRead:
     )
 
 
-def _suggestion(row: BrollSuggestion) -> BrollSuggestionRead:
+def _suggestion(
+    row: BrollSuggestion, library: list[VisualAsset] | None = None
+) -> BrollSuggestionRead:
     return BrollSuggestionRead(
         id=row.id,
         analysis_id=row.analysis_id,
@@ -112,6 +116,7 @@ def _suggestion(row: BrollSuggestion) -> BrollSuggestionRead:
         query=row.query,
         reason=row.reason,
         status=row.status,
+        matches=[uuid.UUID(i) for i in likely_matches(row.query, library)] if library else [],
     )
 
 
@@ -138,8 +143,10 @@ def _suggestions(db: DbSession, analysis: BrollAnalysis) -> list[BrollSuggestion
         select(BrollSuggestion)
         .where(BrollSuggestion.analysis_id == analysis.id)
         .order_by(BrollSuggestion.sequence_index)
-    )
-    return [_suggestion(row) for row in rows]
+    ).all()
+    project_id = analysis.clip.video.project_id
+    library = list(db.scalars(select(VisualAsset).where(VisualAsset.project_id == project_id)))
+    return [_suggestion(row, library) for row in rows]
 
 
 def _require_suggestable(clip: Clip) -> None:
