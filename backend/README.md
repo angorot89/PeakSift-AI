@@ -490,6 +490,9 @@ Settings are read from environment variables, or from `backend/.env` if present 
 | `MAX_VIDEO_UPLOAD_BYTES` | `2147483648` (2 GiB)                      | Largest accepted source video                |
 | `AUDIO_UPLOAD_MAX_BYTES` | `104857600` (100 MiB)                   | Largest accepted music or sound-effect file  |
 | `AUDIO_UPLOAD_MAX_DURATION_SECONDS` / `AUDIO_SFX_MAX_DURATION_SECONDS` | `1200` / `30` | Longest music track / sound effect |
+| `VISUAL_ASSET_MAX_BYTES` | `524288000` (500 MiB) | Largest accepted image or B-roll video |
+| `VISUAL_ASSET_MAX_VIDEO_DURATION_SECONDS` | `600` | Longest B-roll video |
+| `VISUAL_ASSET_MAX_PIXEL_COUNT` / `VISUAL_ASSET_MAX_VIDEO_PIXEL_COUNT` | `40000000` / `9437184` | Largest image (checked before decoding) / B-roll video resolution (4096 × 2304) |
 | `FFPROBE_PATH`      | `ffprobe`                                      | ffprobe binary (name on `PATH` or absolute path) |
 | `FFPROBE_TIMEOUT_SECONDS` | `30`                                     | Time limit for probing one file; exceeding it marks the video `failed` |
 | `FFMPEG_PATH`       | `ffmpeg`                                       | ffmpeg binary for audio extraction, clip rendering and shorts (needs libass for captions) |

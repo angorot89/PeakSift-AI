@@ -203,6 +203,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Settings for a throwaway stack (random secrets, generated here, never stored)
         run: |
+          # The MinIO secrets always start with "-" here: random secrets may, and minio-init
+          # must never read one as a command-line flag (a regression seen in CI).
           rand() { python3 -c "import secrets; print(secrets.token_urlsafe(32))"; }
           umask 077
           cat > deploy/.env <<ENV
@@ -212,9 +214,9 @@ jobs:
           POSTGRES_PASSWORD=$(rand)
           REDIS_PASSWORD=$(rand)
           MINIO_ROOT_USER=root$(python3 -c "import secrets; print(secrets.token_hex(6))")
-          MINIO_ROOT_PASSWORD=$(rand)
+          MINIO_ROOT_PASSWORD=-$(rand)
           S3_APP_ACCESS_KEY=app$(python3 -c "import secrets; print(secrets.token_hex(6))")
-          S3_APP_SECRET_KEY=$(rand)
+          S3_APP_SECRET_KEY=-$(rand)
           FASTER_WHISPER_MODEL=tiny
           ENV
           sed -i 's/^ *//' deploy/.env
