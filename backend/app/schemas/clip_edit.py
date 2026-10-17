@@ -14,6 +14,13 @@ from app.services.clip_edit.config import (
     Layout,
 )
 from app.services.clip_edit.hook import HookPosition, HookStyle
+from app.services.visuals.config import (
+    MAX_ELEMENTS,
+    VisualFit,
+    VisualMode,
+    VisualPosition,
+    VisualSize,
+)
 
 Seconds = Annotated[float, Field(allow_inf_nan=False)]
 Decibels = Annotated[float, Field(allow_inf_nan=False)]
@@ -52,6 +59,30 @@ class AudioRequest(BaseModel):
     sfx: Annotated[list[SfxCueRequest], Field(max_length=MAX_SFX_CUES)] = []
 
 
+class VisualElementRequest(BaseModel):
+    """One visual placed over the short. Bounds and the overlap policy are checked by
+    ``VisualsConfig``; the asset itself by the API (same project, kind, length)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID
+    mode: VisualMode
+    start_seconds: Seconds  # in the edited short (clip-local time)
+    end_seconds: Seconds
+    fit: VisualFit | None = None  # cutaway
+    position: VisualPosition | None = None  # pip / overlay
+    size: VisualSize | None = None  # pip / overlay
+    opacity: Annotated[float, Field(allow_inf_nan=False)] | None = None  # overlay
+    asset_offset_seconds: Seconds = 0.0  # videos: where playback starts
+    loop: StrictBool = False  # videos: repeat when shorter than the visual
+
+
+class VisualsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    elements: Annotated[list[VisualElementRequest], Field(max_length=MAX_ELEMENTS)] = []
+
+
 class EditRequest(BaseModel):
     """The only editing options a client can send. Unknown fields are rejected, and every
     value must come from an allow-list — no filters, fonts, paths, URLs or FFmpeg flags."""
@@ -83,6 +114,9 @@ class EditRequest(BaseModel):
     # Optional audio finishing; omitted (or a section that changes nothing) keeps the clip's
     # own audio exactly as before.
     audio: AudioRequest | None = None
+    # Optional B-roll cutaways, picture-in-picture and image overlays from the project's
+    # visual assets; omitted (or empty) draws only the clip, exactly as before.
+    visuals: VisualsRequest | None = None
 
 
 class ClipEditRead(BaseModel):

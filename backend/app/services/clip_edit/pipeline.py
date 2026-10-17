@@ -74,6 +74,7 @@ from app.services.storage import (
     StorageProvider,
     media_storage,
 )
+from app.services.visuals.assets import VisualsProblem, check_visuals, load_visual_assets
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,8 @@ def _execute(
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
+    if config.visuals is not None:
+        _check_visuals(edit, db, config)
 
     workspace = store.workspace(edit.id, attempt)
     # Inputs are read locally: the stored file itself, or a copy fetched into the workspace.
@@ -337,6 +340,18 @@ def _execute(
         "on" if config.hook else "off",
         composed.duration_seconds,
         composed.size_bytes,
+    )
+
+
+def _check_visuals(edit: ClipEdit, db: Session, config: EditConfig) -> None:
+    """The snapshot's visuals, re-checked against today's assets and the clip."""
+    assets = load_visual_assets(db, edit.clip.video.project_id, config.visuals.asset_ids)
+    try:
+        check_visuals(config.visuals, assets, float(edit.clip.duration_seconds))
+    except VisualsProblem as problem:
+        raise PipelineFailure(problem.code, problem.message) from None
+    raise PipelineFailure(
+        "visuals_unavailable", "Visual elements cannot be rendered on this server yet"
     )
 
 

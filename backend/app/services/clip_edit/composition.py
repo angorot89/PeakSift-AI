@@ -154,6 +154,14 @@ def caption_text_renders(ffmpeg_path: str, font_family: str) -> bool:
     return True
 
 
+def supports_visuals(ffmpeg_path: str) -> bool:
+    """Whether this server can draw visual elements (B-roll, picture-in-picture, overlays).
+
+    Not yet: the visual compositor is added with the renderer, so edits with visuals are
+    refused clearly instead of rendering without them."""
+    return False
+
+
 def require_caption_rendering(ffmpeg_path: str, font_family: str) -> None:
     """Raise a safe, specific ``RenderError`` unless captions can really be drawn."""
     filters = ffmpeg_filters(ffmpeg_path)
