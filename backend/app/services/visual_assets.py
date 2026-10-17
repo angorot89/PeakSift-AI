@@ -7,7 +7,10 @@ An upload is accepted only when its contents really are what its name says:
   decoded (decompression bombs), animated images are refused, and the decoded picture is
   normalized: rotated upright from its EXIF orientation, converted to RGB (or RGBA when any
   pixel is transparent — CMYK, palette and 16-bit images included), bounded to
-  ``IMAGE_MAX_SIDE`` and re-encoded (PNG with alpha, otherwise JPEG). The stored file is that
+  ``IMAGE_MAX_SIDE`` and re-encoded (PNG with alpha, otherwise JPEG). An embedded colour
+  profile (a phone's Display P3, a print CMYK profile) is converted to sRGB first, so colours
+  render as the creator saw them; a multi-picture JPEG (MPO, written by some phones and
+  cameras) keeps its primary picture. The stored file is that
   rendition, so EXIF metadata such as GPS positions is never kept, and every later step sees
   exactly the pixels the creator saw.
 - **Videos** (MP4, MOV, WebM) are probed with ffprobe: the container must match the
@@ -23,6 +26,7 @@ rejected is kept.
 """
 
 import hashlib
+import io
 import json
 import logging
 import math
@@ -34,7 +38,7 @@ from typing import Any, BinaryIO
 
 import numpy as np
 from fastapi import UploadFile
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -154,6 +158,22 @@ def _transparent(image: Image.Image) -> bool:
     return False
 
 
+def _to_srgb(image: Image.Image, profile: bytes | None, alpha: bool) -> Image.Image:
+    """Convert pixels described by an embedded ICC profile to sRGB. A missing, unusable or
+    unsupported profile leaves the pixels as they are (never a refusal)."""
+    if not profile or image.mode not in ("RGB", "RGBA", "CMYK"):
+        return image
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
+        target = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
+        output = "RGBA" if alpha and image.mode == "RGBA" else "RGB"
+        converted = ImageCms.profileToProfile(image, source, target, outputMode=output)
+    except (ImageCms.PyCMSError, OSError, ValueError, TypeError):
+        logger.info("An image's colour profile could not be applied; keeping its pixels")
+        return image
+    return converted if converted is not None else image
+
+
 def inspect_image(path: Path, extension: str, work: Path, settings: Settings) -> Inspection:
     """Decode, check and normalize an image. Raises UploadValidationError (never echoing it)."""
     family = ALLOWED_VISUAL_TYPES[extension][1]
@@ -162,15 +182,25 @@ def inspect_image(path: Path, extension: str, work: Path, settings: Settings) ->
         with warnings.catch_warnings():
             # Pillow only *warns* between its bomb threshold and twice it; refuse instead.
             warnings.simplefilter("error", Image.DecompressionBombWarning)
+            # Pillow's JPEG opener also opens multi-picture JPEGs (MPO): their extra pictures
+            # are previews or depth data, and the first picture is the photo.
             with Image.open(path, formats=[family]) as opened:
                 width, height = opened.size
                 _check_geometry(width, height, limit, "image")
-                if getattr(opened, "is_animated", False) or getattr(opened, "n_frames", 1) > 1:
+                multi_picture = opened.format == "MPO"
+                animated = (
+                    getattr(opened, "is_animated", False) or getattr(opened, "n_frames", 1) > 1
+                )
+                if animated and not multi_picture:
                     raise UploadValidationError(415, "Animated images are not supported")
+                if multi_picture:
+                    opened.seek(0)
+                profile = opened.info.get("icc_profile")
                 opened.load()  # the full decode: truncated or corrupt data fails here
                 image = ImageOps.exif_transpose(opened) or opened
                 image = _to_8bit(image)
                 alpha = _transparent(image)
+                image = _to_srgb(image, profile, alpha)
                 image = image.convert("RGBA" if alpha else "RGB")
     except UploadValidationError:
         raise
