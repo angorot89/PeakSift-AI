@@ -1,6 +1,13 @@
 """ORM models. Importing this package registers every table on `Base.metadata`."""
 
 from app.models.audio_asset import AudioAsset, AudioAssetKind
+from app.models.broll import (
+    ACTIVE_BROLL_ANALYSIS_STATUSES,
+    BrollAnalysis,
+    BrollAnalysisStatus,
+    BrollSuggestion,
+    BrollSuggestionStatus,
+)
 from app.models.caption_track import (
     ACTIVE_CAPTION_TRACK_STATUSES,
     CaptionTrack,
@@ -56,6 +63,11 @@ from app.models.video import Video, VideoStatus
 from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
+    "ACTIVE_BROLL_ANALYSIS_STATUSES",
+    "BrollAnalysis",
+    "BrollAnalysisStatus",
+    "BrollSuggestion",
+    "BrollSuggestionStatus",
     "ACTIVE_PUBLISH_STATUSES",
     "FINISHED_UPLOAD_STATUSES",
     "AudioAsset",
