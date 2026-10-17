@@ -1,7 +1,9 @@
 #!/bin/sh
 # Create the PRIVATE media bucket and an application user limited to it (idempotent).
 set -eu
-mc alias set root http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
+# "--" ends option parsing: a key or secret starting with "-" must never be read as a flag
+# (mc's parser would refuse it and echo it back).
+mc alias set -- root http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
 mc mb --ignore-existing "root/$S3_BUCKET" >/dev/null
 mc anonymous set none "root/$S3_BUCKET" >/dev/null   # never public
 cat > /tmp/peaksift-policy.json <<POLICY
@@ -17,8 +19,8 @@ cat > /tmp/peaksift-policy.json <<POLICY
 }
 POLICY
 mc admin policy create root peaksift-app /tmp/peaksift-policy.json >/dev/null 2>&1 || true
-mc admin user add root "$S3_APP_ACCESS_KEY" "$S3_APP_SECRET_KEY" >/dev/null
-mc admin policy attach root peaksift-app --user "$S3_APP_ACCESS_KEY" >/dev/null 2>&1 || true
+mc admin user add -- root "$S3_APP_ACCESS_KEY" "$S3_APP_SECRET_KEY" >/dev/null
+mc admin policy attach root peaksift-app --user="$S3_APP_ACCESS_KEY" >/dev/null 2>&1 || true
 # Multipart uploads abandoned by a crashed worker are removed by MinIO itself after 24 h
 # (its default stale-upload expiry); on AWS, add an AbortIncompleteMultipartUpload rule.
 echo "bucket $S3_BUCKET ready (private; application user limited to it)"
