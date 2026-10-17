@@ -38,7 +38,7 @@ from app.models import (
 )
 from app.schemas.clip_edit import ClipEditPage, ClipEditRead, EditRequest
 from app.schemas.project import MediaDeletionRead
-from app.services.clip_edit.composition import supports_captions
+from app.services.clip_edit.composition import supports_captions, supports_visuals
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
@@ -51,6 +51,7 @@ from app.services.clip_edit.pipeline import is_stale
 from app.services.clip_render.storage import safe_download_filename
 from app.services.media_deletion import delete_edit as delete_edit_and_media
 from app.services.storage import StorageProvider
+from app.services.visuals.assets import VisualsProblem, check_visuals, load_visual_assets
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_edit, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -242,6 +243,23 @@ def _require_audio(db: DbSession, clip: Clip, video: Video, config: EditConfig) 
             )
 
 
+def _require_visuals(db: DbSession, clip: Clip, video: Video, config: EditConfig) -> None:
+    """Referenced visuals must be this project's, suit their mode, and fit the clip."""
+    if config.visuals is None:
+        return
+    if not supports_visuals(get_settings().ffmpeg_path):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Visual elements are not available on this server",
+        )
+    assets = load_visual_assets(db, video.project_id, config.visuals.asset_ids)
+    try:
+        check_visuals(config.visuals, assets, float(clip.duration_seconds))
+    except VisualsProblem as problem:
+        # Another project's asset is indistinguishable from a missing one (no existence leak).
+        raise HTTPException(status_code=problem.status, detail=problem.message) from None
+
+
 def _enqueue_or_503(db: DbSession, edit: ClipEdit, *, created: bool) -> None:
     """The attempt token is already committed on the row; hand the job to the broker."""
     try:
@@ -297,6 +315,7 @@ def create_edit(
             caption_timing=body.caption_timing,
             caption_track_id=body.caption_track_id,
             audio=body.audio.model_dump(mode="json") if body.audio else None,
+            visuals=body.visuals.model_dump(mode="json") if body.visuals else None,
         )
     except ValueError as error:
         raise HTTPException(
@@ -316,6 +335,7 @@ def create_edit(
 
     _require_renderable(db, clip, video, config)
     _require_audio(db, clip, video, config)
+    _require_visuals(db, clip, video, config)
     edit = ClipEdit(
         clip_id=clip.id,
         video_id=video.id,
@@ -408,7 +428,9 @@ def retry_edit(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="This edit has been retried too many times"
         )
-    _require_renderable(db, clip, video, EditConfig.from_snapshot(edit.config))
+    stored = EditConfig.from_snapshot(edit.config)
+    _require_renderable(db, clip, video, stored)
+    _require_visuals(db, clip, video, stored)
     edit.status = ClipEditStatus.QUEUED
     edit.progress_percent = 0
     edit.attempt += 1
