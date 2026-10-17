@@ -101,6 +101,10 @@ class VisualAsset(Base):
     project: Mapped["Project"] = relationship(back_populates="visual_assets")
 
     @property
+    def has_thumbnail(self) -> bool:
+        return self.thumbnail_storage_key is not None
+
+    @property
     def storage_keys(self) -> list[str]:
         """Every object this asset owns."""
         thumbnail = [self.thumbnail_storage_key] if self.thumbnail_storage_key else []

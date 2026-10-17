@@ -96,6 +96,25 @@ def delete_audio_asset(db: Session, storage: StorageProvider, asset: AudioAsset)
     return delete_objects(storage, [key])
 
 
+def visual_asset_ids(config: dict | None) -> set[str]:
+    """The visual assets an edit configuration references (its ``visuals`` section)."""
+    visuals = (config or {}).get("visuals") or {}
+    return {
+        str(e.get("asset_id")) for e in visuals.get("elements") or [] if e and e.get("asset_id")
+    }
+
+
+def edits_using_visual_asset(db: Session, asset: VisualAsset) -> int:
+    """How many of the project's edits place ``asset`` in their visuals section."""
+    wanted = str(asset.id)
+    configs = db.scalars(
+        select(ClipEdit.config)
+        .join(Video, ClipEdit.video_id == Video.id)
+        .where(Video.project_id == asset.project_id)
+    )
+    return sum(1 for config in configs if wanted in visual_asset_ids(config))
+
+
 def delete_visual_asset(
     db: Session, storage: StorageProvider, asset: VisualAsset
 ) -> DeletionReport:
@@ -120,5 +139,7 @@ __all__ = [
     "delete_project",
     "delete_visual_asset",
     "edits_using_asset",
+    "edits_using_visual_asset",
     "project_media_keys",
+    "visual_asset_ids",
 ]

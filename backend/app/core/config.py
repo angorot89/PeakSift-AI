@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     audio_upload_max_bytes: int = Field(default=100 * 1024**2, gt=0)
     audio_upload_max_duration_seconds: float = Field(default=20 * 60, gt=0)
     audio_sfx_max_duration_seconds: float = Field(default=30, gt=0)
+    # Visual assets (images and B-roll videos): bytes per upload, video length, and pixel
+    # budgets checked before anything is decoded (images) or rendered (videos).
+    visual_asset_max_bytes: int = Field(default=500 * 1024**2, gt=0)
+    visual_asset_max_video_duration_seconds: float = Field(default=10 * 60, gt=0)
+    visual_asset_max_pixel_count: int = Field(default=40_000_000, gt=0)
+    visual_asset_max_video_pixel_count: int = Field(default=4096 * 2304, gt=0)
 
     # ffprobe binary used to read video metadata, and how long one probe may take.
     ffprobe_path: str = "ffprobe"
