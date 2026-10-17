@@ -34,6 +34,8 @@ MIN_ELEMENT_SECONDS = 0.5
 TIME_DECIMALS = 2
 OPACITY_RANGE = (0.2, 1.0)
 OPACITY_DECIMALS = 2
+TRANSITION_RANGE = (0.1, 0.5)  # seconds; never more than half the element
+DEFAULT_FADE_SECONDS = 0.3
 
 
 class VisualMode(StrEnum):
@@ -53,6 +55,11 @@ class VisualPosition(StrEnum):
     BOTTOM_LEFT = "bottom_left"
     BOTTOM_RIGHT = "bottom_right"
     CENTER = "center"  # overlays only
+
+
+class VisualTransition(StrEnum):
+    NONE = "none"  # appears and disappears at once
+    FADE = "fade"  # a short alpha fade in and out (a cross-fade for cutaways)
 
 
 class VisualSize(StrEnum):
@@ -108,6 +115,8 @@ class VisualElement:
     opacity: float | None = None  # overlay only (1.0 = opaque)
     asset_offset_seconds: float = 0.0  # videos: where playback starts inside the asset
     loop: bool = False  # videos: repeat when the asset is shorter than the element
+    transition: VisualTransition = VisualTransition.NONE
+    transition_seconds: float | None = None  # fade only
 
     @property
     def duration(self) -> float:
@@ -145,6 +154,21 @@ class VisualElement:
             if not low <= value <= high:
                 raise ValueError(f"Opacity must be between {low:g} and {high:g}")
             opacity = round(value, OPACITY_DECIMALS) + 0.0
+        transition = _enum(
+            VisualTransition, data.get("transition") or VisualTransition.NONE, "transition"
+        )
+        ramp = None
+        if transition == VisualTransition.FADE:
+            raw_ramp = data.get("transition_seconds")
+            ramp = round(
+                _number(DEFAULT_FADE_SECONDS if raw_ramp is None else raw_ramp, "Fade length"),
+                TIME_DECIMALS,
+            )
+            low, high = TRANSITION_RANGE
+            if not low <= ramp <= high:
+                raise ValueError(f"A fade lasts between {low:g} and {high:g} seconds")
+            if ramp * 2 > end - start:
+                raise ValueError("A fade cannot be longer than half the visual")
         return cls(
             start=start,
             end=end,
@@ -156,6 +180,8 @@ class VisualElement:
             opacity=opacity,
             asset_offset_seconds=offset,
             loop=loop,
+            transition=transition,  # type: ignore[arg-type]
+            transition_seconds=ramp,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -174,6 +200,9 @@ class VisualElement:
             snapshot["size"] = self.size.value if self.size else None
         if self.opacity is not None:
             snapshot["opacity"] = self.opacity
+        if self.transition == VisualTransition.FADE:
+            snapshot["transition"] = self.transition.value
+            snapshot["transition_seconds"] = self.transition_seconds
         return snapshot
 
 

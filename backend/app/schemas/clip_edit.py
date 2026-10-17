@@ -20,6 +20,7 @@ from app.services.visuals.config import (
     VisualMode,
     VisualPosition,
     VisualSize,
+    VisualTransition,
 )
 
 Seconds = Annotated[float, Field(allow_inf_nan=False)]
@@ -75,6 +76,8 @@ class VisualElementRequest(BaseModel):
     opacity: Annotated[float, Field(allow_inf_nan=False)] | None = None  # overlay
     asset_offset_seconds: Seconds = 0.0  # videos: where playback starts
     loop: StrictBool = False  # videos: repeat when shorter than the visual
+    transition: VisualTransition = VisualTransition.NONE
+    transition_seconds: Seconds | None = None  # fade length, 0.1-0.5 s (default 0.3)
 
 
 class VisualsRequest(BaseModel):
