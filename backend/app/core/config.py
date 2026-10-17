@@ -173,6 +173,8 @@ class Settings(BaseSettings):
     broll_suggestion_provider: Literal["ollama", "keyword"] = "ollama"
     broll_ollama_model: str = ""  # empty: the first OLLAMA_CLIP_MODELS entry
     broll_fallback_enabled: bool = True
+    broll_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    broll_max_attempts: int = Field(default=5, ge=1)
 
     # Hosted provider: OpenAI structured outputs. Uses OPENAI_API_KEY (shared with
     # transcription). Comma-separated allow-list of models (first = default).
