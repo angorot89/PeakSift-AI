@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { DeleteProject } from "@/components/app/delete-project";
 import { PageHeader } from "@/components/app/page-header";
 import { ProjectWorkspace } from "@/components/app/source-video";
+import { VisualLibrary } from "@/components/app/visual-library";
 import { WorkflowProvider, WorkflowStepper } from "@/components/app/project-workflow";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -67,6 +68,7 @@ export function ProjectDetailView() {
         <WorkflowStepper />
       </PageHeader>
       <ProjectWorkspace projectId={project.id} />
+      <VisualLibrary projectId={project.id} />
       <DeleteProject project={project} />
     </WorkflowProvider>
   );

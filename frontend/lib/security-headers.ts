@@ -30,7 +30,7 @@ export function contentSecurityPolicy(apiUrl: string, { development = false } = 
     // Development only: React Refresh evaluates code and the dev server opens a websocket.
     "script-src": development ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'",
     "style-src": "'self' 'unsafe-inline'",
-    "img-src": "'self' data:",
+    "img-src": withApi("'self'", "data:"),
     "font-src": "'self' data:",
     "media-src": withApi("'self'"),
     "connect-src": development ? withApi("'self'", "ws:") : withApi("'self'"),

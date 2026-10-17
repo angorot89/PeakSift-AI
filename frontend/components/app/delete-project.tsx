@@ -36,7 +36,7 @@ export function DeleteProject({ project }: { project: Project }) {
     <Panel
       id="delete-project"
       title="Delete project"
-      description="Permanently removes the project, its videos, transcripts, clips, edits and audio, including every media file. This cannot be undone."
+      description="Permanently removes the project, its videos, transcripts, clips, edits, audio and visual assets, including every media file. This cannot be undone."
       className="mt-8 border-rose-500/30"
     >
       {open ? (
