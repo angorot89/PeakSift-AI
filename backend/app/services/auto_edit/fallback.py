@@ -32,12 +32,17 @@ FALLBACK_PROVIDER = "fallback"
 FALLBACK_MODEL = "auto_edit_rules_v1"
 
 
+def geometry_layout(source_orientation: str) -> str:
+    """Framing without Smart Reframe: fill a near-vertical source, keep a landscape one whole."""
+    return "center_crop" if source_orientation in ("portrait", "square") else "blur_background"
+
+
 def _layout(context: AutoEditContext) -> tuple[str, str]:
     caps = context.capabilities
     allowed = context.recipe.get("smart_reframe_confidence") or ()
     if caps.smart_reframe and caps.reframe_confidence in allowed:
         return "smart_reframe", "Smart Reframe follows the speaker; framing confidence is good."
-    if context.source_orientation in ("portrait", "square"):
+    if geometry_layout(context.source_orientation) == "center_crop":
         return "center_crop", "The source is already close to vertical, so it fills the frame."
     reason = (
         "Framing confidence was too low for Smart Reframe, so the whole frame is kept."
