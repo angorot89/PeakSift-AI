@@ -105,7 +105,10 @@ class AutoEditContext:
     visual_assets: tuple[VisualOption, ...] = ()
     music: AudioOption | None = None  # only a track the creator explicitly chose
     sound_effects: tuple[AudioOption, ...] = ()
-    # Handle → real id. Server-side only: never part of planner_view().
+    # Server-side only (never part of planner_view()): the completed framing analysis and
+    # word-timing track a plan may use, and every handle's real id.
+    reframe_analysis_id: str | None = None
+    caption_track_id: str | None = None
     visual_ids: dict[str, str] = field(default_factory=dict)
     suggestion_ids: dict[str, str] = field(default_factory=dict)
     audio_ids: dict[str, str] = field(default_factory=dict)
