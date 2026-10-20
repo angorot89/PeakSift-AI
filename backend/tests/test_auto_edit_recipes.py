@@ -123,9 +123,10 @@ def test_the_planner_summary_is_bounds_only():
     summary = current_recipe("punchy").summary()
     assert summary["recipe"] == "punchy" and summary["sound_effects_allowed"] is True
     assert set(summary) == {
-        "recipe", "intent", "caption_presets", "caption_positions", "hook_allowed",
-        "hook_styles", "hook_max_seconds", "max_visuals", "visual_modes", "music_levels",
-        "ducking", "sound_effects_allowed",
+        "recipe", "intent", "smart_reframe_confidence", "caption_presets", "caption_positions",
+        "hook_allowed", "hook_styles", "hook_seconds", "hook_max_seconds", "max_visuals",
+        "visual_modes", "min_visual_seconds", "music_levels", "ducking",
+        "sound_effects_allowed",
     }  # fmt: skip
 
 

@@ -32,6 +32,7 @@ MUSIC_HANDLE = "music_1"
 EXPLANATION_MAX_CHARS = 200
 RAW_HOOK_MAX_CHARS = 120  # the renderer's own limit (60) is enforced by the plan validator
 MAX_PROPOSED_VISUALS = 8
+STRONG_MATCH_SCORE = 0.9  # matching.match_score: (nearly) every subject word covered
 
 
 # --- context ------------------------------------------------------------------------------------
@@ -79,6 +80,8 @@ class BrollOption:
     query: str
     reason: str
     matches: tuple[str, ...]  # visual handles
+    # The matches whose tags, name or description cover (nearly) the whole query.
+    strong_matches: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -144,6 +147,7 @@ class AutoEditContext:
                     "query": option.query,
                     "reason": option.reason,
                     "matching_assets": list(option.matches),
+                    "strong_matches": list(option.strong_matches),
                 }
                 for option in self.broll
             ],

@@ -178,8 +178,11 @@ class Settings(BaseSettings):
     # Auto Edit: the planner ("ollama", a local model at OLLAMA_BASE_URL), its model (empty:
     # the first OLLAMA_CLIP_MODELS entry) and the total time one plan may spend in the model
     # (one corrective attempt included).
-    auto_edit_planner_provider: Literal["ollama"] = "ollama"
+    # "fallback" uses only the deterministic planner. With the fallback on, it stands in when
+    # the model cannot answer, and the plan says so.
+    auto_edit_planner_provider: Literal["ollama", "fallback"] = "ollama"
     auto_edit_ollama_model: str = ""
+    auto_edit_fallback_enabled: bool = True
     auto_edit_timeout_seconds: float = Field(default=120, gt=0)
     # Auto Edit planning jobs: when a running one counts as stalled, and how often it may be
     # retried.
