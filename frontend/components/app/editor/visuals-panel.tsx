@@ -48,7 +48,7 @@ import {
   type VisualMode,
   type VisualPosition,
 } from "@/lib/visual-elements";
-import { formatVisualDuration, visualThumbnailUrl, type VisualAsset } from "@/lib/visuals";
+import { chooserFilter, chooserHint, formatVisualDuration, visualThumbnailUrl, type VisualAsset } from "@/lib/visuals";
 
 const field =
   "h-9 w-full rounded-lg border border-border bg-white/[0.03] px-2.5 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
@@ -126,6 +126,8 @@ export function VisualsPanel({
       void load();
     }
   }
+
+  const replacingMode = chooser?.replace ? (elements.find((e) => e.key === chooser.replace)?.mode ?? null) : null;
 
   function playhead() {
     return video ? Math.min(video.currentTime || 0, Math.max(0, duration - 0.5)) : 0;
@@ -302,8 +304,12 @@ export function VisualsPanel({
       )}
 
       <AssetChooser
+        // Remounted on every open: the filter and search always start fresh.
+        key={chooser ? "open" : "closed"}
         projectId={projectId}
         open={chooser !== null}
+        initialFilter={chooserFilter(replacingMode)}
+        hint={chooserHint(replacingMode)}
         title={chooser?.suggestion ? `Choose a visual for “${chooser.suggestion.query}”` : "Choose a visual"}
         assets={assets}
         query={chooser?.suggestion?.query ?? null}

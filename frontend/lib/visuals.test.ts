@@ -1,7 +1,7 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { filterVisuals, formatVisualDuration, orientationLabel, parseTagText } from "./visual-rules.ts";
+import { chooserFilter, chooserHint, filterVisuals, formatVisualDuration, orientationLabel, parseTagText } from "./visual-rules.ts";
 
 describe("visual asset rules", () => {
   it("formats B-roll durations", () => {
@@ -39,5 +39,20 @@ describe("visual asset rules", () => {
     ];
     assert.deepEqual(filterVisuals(assets, "all", "rocket launch").map((a) => a.display_name), ["clip-7.mp4"]);
     assert.deepEqual(parseTagText(" Rocket, space ,, rocket,Launch "), ["rocket", "space", "launch"]);
+  });
+});
+
+describe("asset chooser state", () => {
+  it("opens on all assets unless an overlay's image is being replaced", () => {
+    assert.equal(chooserFilter(null), "all");
+    assert.equal(chooserFilter("cutaway"), "all");
+    assert.equal(chooserFilter("pip"), "all");
+    assert.equal(chooserFilter("overlay"), "image");
+  });
+
+  it("explains the overlay filter, and only then", () => {
+    assert.match(chooserHint("overlay") ?? "", /Overlays use images/);
+    assert.equal(chooserHint("cutaway"), null);
+    assert.equal(chooserHint(null), null);
   });
 });
