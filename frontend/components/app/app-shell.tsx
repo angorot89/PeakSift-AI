@@ -57,7 +57,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                     }`}
                   >
                     <item.icon aria-hidden="true" className="size-4" />
-                    {item.label}
+                    {/* Phones: icons only (the label stays the link's name for assistive tech). */}
+                    <span className="max-sm:sr-only">{item.label}</span>
                   </Link>
                 );
               })}
@@ -72,7 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   {user.email.charAt(0)}
                 </span>
-                <span className="max-w-[22ch] truncate text-sm text-muted">{user.email}</span>
+                <span className="hidden max-w-[22ch] truncate text-sm text-muted lg:inline">{user.email}</span>
               </span>
             ) : null}
             <Button variant="ghost" size="sm" onClick={handleLogout} disabled={loggingOut} aria-label="Log out">
