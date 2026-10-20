@@ -341,7 +341,7 @@ function SuggestionCard({
           <button
             type="button"
             onClick={onSeek}
-            className="tabular text-[11px] text-subtle underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+            className="tabular -my-1 py-1 text-[11px] text-subtle underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent"
           >
             Suggested at {formatSeconds(suggestion.start)}–{formatSeconds(suggestion.end)}
           </button>
@@ -569,7 +569,7 @@ function ElementEditor({
               <label
                 key={mode}
                 className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-[11px] leading-tight has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
-                  unavailable ? "cursor-not-allowed opacity-50" : "border-border hover:border-border-strong"
+                  unavailable ? "cursor-not-allowed border-border opacity-50" : "border-border hover:border-border-strong"
                 }`}
                 title={unavailable ? "Overlays use images" : MODE_HINTS[mode]}
               >
