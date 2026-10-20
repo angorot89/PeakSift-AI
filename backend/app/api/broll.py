@@ -296,8 +296,9 @@ def retry_analysis(analysis: OwnedAnalysis, clip: OwnedClip, db: DbSession) -> B
 def update_suggestion(
     suggestion: OwnedSuggestion, body: BrollSuggestionUpdate, db: DbSession
 ) -> BrollSuggestionRead:
-    """The creator's decision: accepted (used), dismissed, or back to suggested. It never
-    changes what is rendered by itself — visuals are placed in an edit's configuration."""
+    """The creator's decision: accepted (chosen at least once — history, not current use),
+    dismissed, or back to suggested. It never changes what is rendered by itself — visuals are
+    placed in an edit's configuration, and current use is read from those visuals."""
     suggestion.status = body.status.value
     db.commit()
     return _suggestion(suggestion)

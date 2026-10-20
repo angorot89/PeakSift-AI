@@ -276,3 +276,15 @@ export function visualsFromConfiguration(configuration: Record<string, unknown> 
   const visuals = configuration?.visuals as { elements?: Comparable[] } | undefined;
   return visuals?.elements ?? [];
 }
+
+/** Whether a visual element fulfils a suggested moment: it covers at least half of it. A
+ * suggestion counts as "used" only while a current element fulfils it — removing that element
+ * makes it available again (the server's "accepted" status is history, not current use). */
+export function fulfills(
+  element: { start_seconds: number; end_seconds: number },
+  moment: { start: number; end: number },
+): boolean {
+  const length = moment.end - moment.start;
+  const overlap = Math.min(element.end_seconds, moment.end) - Math.max(element.start_seconds, moment.start);
+  return length > 0 && overlap >= length / 2 - 1e-6;
+}

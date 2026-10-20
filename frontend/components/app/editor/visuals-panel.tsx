@@ -37,6 +37,7 @@ import {
   elementProblems,
   FADE_RANGE,
   formatSeconds,
+  fulfills,
   MAX_ELEMENTS,
   MODE_LABELS,
   newElement,
@@ -227,6 +228,7 @@ export function VisualsPanel({
                 key={s.id}
                 projectId={projectId}
                 suggestion={s}
+                used={elements.some((e) => fulfills(e, s))}
                 matches={s.matches.map((id) => byId.get(id)).filter((a): a is VisualAsset => !!a)}
                 onUseMatch={(asset) => placeAsset(asset, { suggestion: s, replace: null })}
                 onUse={() => setChooser({ suggestion: s, replace: null })}
@@ -317,6 +319,7 @@ export function VisualsPanel({
 function SuggestionCard({
   projectId,
   suggestion,
+  used,
   matches,
   onUseMatch,
   onUse,
@@ -326,6 +329,8 @@ function SuggestionCard({
 }: {
   projectId: string;
   suggestion: BrollSuggestion;
+  /** A current visual element fulfils this suggestion (not "was once used"). */
+  used: boolean;
   matches: VisualAsset[];
   onUseMatch: (asset: VisualAsset) => void;
   onUse: () => void;
@@ -333,7 +338,6 @@ function SuggestionCard({
   onSeek: () => void;
   disabled: boolean;
 }) {
-  const used = suggestion.status === "accepted";
   return (
     <li className="rounded-lg border border-border bg-surface px-3 py-2.5">
       <div className="flex items-start justify-between gap-3">

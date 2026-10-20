@@ -10,6 +10,9 @@ or asset: creators match it to their own uploads (or ignore it).
 configuration returns the existing analysis; regenerating deliberately bumps ``generation`` in
 the configuration, which creates a new analysis. Suggestion status (suggested, accepted,
 dismissed) is the creator's decision and never changes what is rendered by itself.
+"accepted" is *history* — the creator chose an asset for it at least once. Whether a suggestion
+is *currently* used is decided by the edit itself: a visual element that covers its moment
+(removing that element makes the suggestion available again).
 """
 
 import uuid
@@ -55,7 +58,7 @@ ACTIVE_BROLL_ANALYSIS_STATUSES = (
 
 class BrollSuggestionStatus(StrEnum):
     SUGGESTED = "suggested"
-    ACCEPTED = "accepted"  # the creator used it (matched an asset)
+    ACCEPTED = "accepted"  # history: the creator chose an asset for it at least once
     DISMISSED = "dismissed"  # the creator does not want it
 
 
