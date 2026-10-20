@@ -84,7 +84,7 @@ def get_owned_edit(edit_id: uuid.UUID, clip: OwnedClip, db: DbSession) -> ClipEd
 OwnedEdit = Annotated[ClipEdit, Depends(get_owned_edit)]
 
 
-def _read(edit: ClipEdit) -> ClipEditRead:
+def read_edit(edit: ClipEdit) -> ClipEditRead:
     return ClipEditRead(
         id=edit.id,
         clip_id=edit.clip_id,
@@ -321,17 +321,27 @@ def create_edit(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
         ) from None
-    fingerprint = config.fingerprint()
-
-    existing = _reconcile(db, _existing(db, clip, fingerprint), storage)
-    if existing is not None:
-        if existing.status == ClipEditStatus.FAILED:
+    edit, created = create_or_reuse_edit(db, clip, video, storage, config)
+    if not created:
+        if edit.status == ClipEditStatus.FAILED:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The last render of these settings failed; use the retry endpoint",
             )
         response.status_code = status.HTTP_200_OK
-        return _read(existing)
+    return read_edit(edit)
+
+
+def create_or_reuse_edit(
+    db: DbSession, clip: Clip, video: Video, storage: StorageProvider, config: EditConfig
+) -> tuple[ClipEdit, bool]:
+    """The edit for this (normalized) configuration: the existing one (any status), or a new
+    one checked like every request and queued for rendering. Shared by the edit endpoint and
+    by applying an Auto Edit plan, so both go through exactly the same checks."""
+    fingerprint = config.fingerprint()
+    existing = _reconcile(db, _existing(db, clip, fingerprint), storage)
+    if existing is not None:
+        return existing, False
 
     _require_renderable(db, clip, video, config)
     _require_audio(db, clip, video, config)
@@ -372,10 +382,9 @@ def create_edit(
         winner = _existing(db, clip, fingerprint)
         if winner is None:  # pragma: no cover - the other transaction vanished
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Try again") from None
-        response.status_code = status.HTTP_200_OK
-        return _read(winner)
+        return winner, False
     _enqueue_or_503(db, edit, created=True)
-    return _read(edit)
+    return edit, True
 
 
 @router.get("", response_model=ClipEditPage)
@@ -399,12 +408,14 @@ def list_edits(
         .limit(limit)
     ).all()
     edits = [_reconcile(db, edit, storage) for edit in edits]
-    return ClipEditPage(total=total, offset=offset, limit=limit, edits=[_read(e) for e in edits])
+    return ClipEditPage(
+        total=total, offset=offset, limit=limit, edits=[read_edit(e) for e in edits]
+    )
 
 
 @router.get("/{edit_id}", response_model=ClipEditRead)
 def get_edit(edit: OwnedEdit, db: DbSession, storage: Storage) -> ClipEditRead:
-    return _read(_reconcile(db, edit, storage))
+    return read_edit(_reconcile(db, edit, storage))
 
 
 @router.post(
@@ -442,7 +453,7 @@ def retry_edit(
     edit.celery_task_id = new_task_id()  # fences out a stalled worker of the old attempt
     db.commit()
     _enqueue_or_503(db, edit, created=False)
-    return _read(edit)
+    return read_edit(edit)
 
 
 @router.delete("/{edit_id}", response_model=MediaDeletionRead)
