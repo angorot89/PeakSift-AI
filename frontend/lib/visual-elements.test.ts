@@ -5,6 +5,7 @@ import {
   assetTimeAt,
   elementProblems,
   elementRequest,
+  fulfills,
   insetRect,
   newElement,
   visualsKey,
@@ -103,5 +104,22 @@ describe("visual elements", () => {
   it("summarizes", () => {
     assert.equal(visualsSummary(0), null);
     assert.equal(visualsSummary(2), "2 visuals");
+  });
+});
+
+describe("suggestion use", () => {
+  const moment = { start: 10.2, end: 12.7 };
+  const el = (start_seconds: number, end_seconds: number) => ({ start_seconds, end_seconds });
+
+  it("a visual at the suggested moment fulfils it", () => {
+    assert.equal(fulfills(el(10.2, 12.7), moment), true); // placed from the suggestion (or Auto Edit)
+    assert.equal(fulfills(el(9.5, 11.5), moment), true); // nudged, still covers half
+  });
+
+  it("a visual elsewhere, or covering too little, does not", () => {
+    assert.equal(fulfills(el(3, 6), moment), false);
+    assert.equal(fulfills(el(12.0, 14.0), moment), false); // 0.7 s of 2.5 s
+    assert.equal(fulfills(el(12.7, 14.0), moment), false); // touching is not covering
+    assert.equal(fulfills(el(10, 12), { start: 5, end: 5 }), false);
   });
 });
