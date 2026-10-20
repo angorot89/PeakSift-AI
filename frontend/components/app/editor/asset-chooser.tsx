@@ -25,6 +25,8 @@ export function AssetChooser({
   assets,
   query,
   matches = [],
+  initialFilter = "all",
+  hint = null,
   onPick,
   onUploaded,
   onClose,
@@ -37,6 +39,10 @@ export function AssetChooser({
   query: string | null;
   /** Assets that likely match the suggestion (ids, strongest first). */
   matches?: string[];
+  /** Where the filter starts (the panel remounts the chooser on every open, so nothing from a
+   * previous open carries over). */
+  initialFilter?: VisualFilter;
+  hint?: string | null;
   onPick: (asset: VisualAsset) => void;
   onUploaded: (asset: VisualAsset) => void;
   onClose: () => void;
@@ -44,7 +50,7 @@ export function AssetChooser({
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const searchId = useId();
-  const [filter, setFilter] = useState<VisualFilter>("all");
+  const [filter, setFilter] = useState<VisualFilter>(initialFilter);
   const [search, setSearch] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +100,7 @@ export function AssetChooser({
               <p className="mt-0.5 text-sm text-muted">
                 {query ? "Pick something that shows this, or upload it." : "From this project's visual assets."}
               </p>
+              {hint ? <p className="mt-1 text-xs text-subtle">{hint}</p> : null}
             </div>
             <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Close" className="px-2">
               <X aria-hidden="true" />

@@ -58,3 +58,14 @@ export function filterVisuals<T extends Pick<VisualAsset, "kind" | "display_name
 export function parseTagText(text: string): string[] {
   return [...new Set(text.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean))];
 }
+
+/** The chooser's filter when it opens: images when replacing an overlay's asset (overlays use
+ * images; a video would turn it into picture-in-picture), otherwise everything — a filter
+ * chosen earlier is never carried over, so no asset seems to be missing. */
+export function chooserFilter(replacingMode: string | null): VisualFilter {
+  return replacingMode === "overlay" ? "image" : "all";
+}
+
+export function chooserHint(replacingMode: string | null): string | null {
+  return replacingMode === "overlay" ? "Overlays use images. Choosing a video turns this visual into picture-in-picture." : null;
+}
