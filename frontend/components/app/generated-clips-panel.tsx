@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, Download, Smartphone } from "lucide-react";
+import { Clapperboard, Download, Smartphone, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
@@ -8,6 +8,7 @@ import { EmptyState, LoadingState } from "@/components/app/states";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { Panel } from "@/components/ui/panel";
 import { StatusPill } from "@/components/ui/status-pill";
+import { autoEditHref } from "@/lib/auto-edit";
 import { clipContentUrl, clipDownloadUrl, isClipActive, type GeneratedClip } from "@/lib/clips";
 import { editorHref, isEditActive, listEdits } from "@/lib/edits";
 import { formatDuration, formatTimestamp } from "@/lib/format";
@@ -61,7 +62,7 @@ function ClipRow({ clip, shorts, projectId }: { clip: GeneratedClip; shorts: Sho
         </div>
       </div>
       {ready ? (
-        <div className="flex shrink-0 gap-2 sm:justify-end">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           <a
             href={clipDownloadUrl(clip.id)}
             download
@@ -71,6 +72,14 @@ function ClipRow({ clip, shorts, projectId }: { clip: GeneratedClip; shorts: Sho
             <Download aria-hidden="true" />
             Download
           </a>
+          <Link
+            href={autoEditHref(projectId, clip.id)}
+            className={buttonClasses("secondary", "sm")}
+            aria-label={`Auto Edit — ${clip.title}`}
+          >
+            <Wand2 aria-hidden="true" />
+            Auto Edit
+          </Link>
           <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "sm")}>
             <Smartphone aria-hidden="true" />
             {shorts && shorts.ready > 0 ? "Open editor" : "Create short"}

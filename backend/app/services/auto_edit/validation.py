@@ -115,11 +115,8 @@ def _explanation(proposed: str, unchanged: bool, server: str) -> str:
     """A planner's sentence only when its section was accepted unchanged and it is clean."""
     if unchanged:
         text = clean_text(proposed, EXPLANATION_MAX_CHARS)
-        if (
-            8 <= len(text) <= EXPLANATION_MAX_CHARS
-            and not _HANDLE.search(text)
-            and "://" not in text
-        ):
+        readable = text[:1].isupper() and "_" not in text  # a sentence, not an identifier
+        if 8 <= len(text) and readable and not _HANDLE.search(text) and "://" not in text:
             return text
     return server
 

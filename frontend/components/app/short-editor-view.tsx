@@ -50,8 +50,9 @@ import {
   type HookStyle,
   type PreviewCue,
 } from "@/lib/captions";
+import { autoEditHref } from "@/lib/auto-edit";
 import { getCandidate } from "@/lib/clip-detection";
-import { clipContentUrl, listVideoClips, type GeneratedClip } from "@/lib/clips";
+import { clipContentUrl, type GeneratedClip } from "@/lib/clips";
 import {
   EDIT_STAGES,
   captionSummary,
@@ -73,7 +74,8 @@ import {
   type PickableLayout,
 } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
-import { getProject, isProjectId, type Project } from "@/lib/projects";
+import { loadProjectClip } from "@/lib/project-clip";
+import { isProjectId, type Project } from "@/lib/projects";
 import {
   ANALYSIS_STAGES,
   getAnalysis,
@@ -89,7 +91,6 @@ import { mergeJobs, newer } from "@/lib/status-sync";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 import { useAudioPreview, type PreviewPlan } from "@/lib/use-audio-preview";
-import { listProjectVideos } from "@/lib/videos";
 import { getYouTubeStatus } from "@/lib/publishing";
 import { getVisualLayout } from "@/lib/broll";
 import {
@@ -696,6 +697,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <PageHeader
         back={{ href: backToProject, label: project.name }}
         title="Short-form editor"
+        action={
+          <ButtonLink href={autoEditHref(project.id, clip.id)} variant="secondary">
+            <Wand2 aria-hidden="true" />
+            Auto Edit
+          </ButtonLink>
+        }
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2">
             <span className="text-foreground">{clip.title}</span>
@@ -990,16 +997,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 /** /projects/[id]/clips/[clipId] — the focused short-form editing workspace for one clip. */
 export function ShortEditorView() {
   const { id, clipId } = useParams<{ id: string; clipId: string }>();
-  const load = useCallback(async () => {
-    if (!isProjectId(id) || !isProjectId(clipId)) throw new ApiError(404, "Clip not found");
-    const [project, videos] = await Promise.all([getProject(id), listProjectVideos(id)]);
-    for (const video of videos) {
-      const page = await listVideoClips(id, video.id);
-      const clip = page.clips.find((c) => c.id === clipId);
-      if (clip) return { project, clip };
-    }
-    throw new ApiError(404, "Clip not found");
-  }, [id, clipId]);
+  const load = useCallback(() => loadProjectClip(id, clipId), [id, clipId]);
   const { data, error, loading, reload } = useApi(load);
 
   if (loading) {
