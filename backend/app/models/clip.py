@@ -28,6 +28,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.auto_edit import AutoEditPlan
     from app.models.broll import BrollAnalysis
     from app.models.caption_track import CaptionTrack
     from app.models.clip_detection import ClipCandidate
@@ -140,6 +141,12 @@ class Clip(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="BrollAnalysis.created_at.desc()",
+    )
+    auto_edit_plans: Mapped[list["AutoEditPlan"]] = relationship(
+        back_populates="clip",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AutoEditPlan.created_at.desc()",
     )
 
     def __repr__(self) -> str:
