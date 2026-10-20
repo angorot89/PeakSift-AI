@@ -267,7 +267,8 @@ def _hook(proposal, context, recipe, caption_position, notes) -> tuple[dict, dic
         problem = "was empty"
     elif len(text) > MAX_HOOK_CHARS:
         problem = "was too long"
-    elif not hook_grounded(text, sources):
+    elif text != candidate and not hook_grounded(text, sources):
+        # The candidate's own hook comes from the clip's (validated) moment selection.
         problem = "was not grounded in what was said"
     elif context.lines and _same_words(text, context.lines[0].text):
         problem = "repeated the first caption word for word"
