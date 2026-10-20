@@ -165,6 +165,39 @@ Delivered:
 
 Definition of done — an operator can deploy PeakSift over HTTPS with private object storage, health checks, logs and backups; a creator can take a recording through transcription, clip detection, editing and rendering, connect YouTube, and publish a short privately with real progress, without duplicate uploads or exposed tokens.
 
+## V1.1 — B-roll & Visual Enrichment
+
+Status: **implementation complete, pending CI/merge/release** — stacked pull requests wait for
+GitHub Actions (unavailable because of account billing); nothing is merged or tagged.
+
+Creators add their own pictures and footage to a short: B-roll cutaways, picture-in-picture
+and image overlays, with local-AI suggestions of where a visual helps and matches from their own
+library. See [broll-visual-enrichment.md](broll-visual-enrichment.md).
+
+Delivered:
+
+- Visual asset library per project: JPEG/PNG/WebP and MP4/MOV/WebM validated from their contents
+  (Pillow, ffprobe), images normalized (EXIF orientation, sRGB, CMYK/16-bit/alpha, MPO, metadata
+  stripped), thumbnails, sha256 de-duplication, description and tags, search, owner-only Range
+  streaming, deletion refused while an edit uses an asset; local and S3 storage
+- B-roll suggestions: a fenced Celery job over the clip's words; a local Ollama model (JSON
+  schema, temperature 0) with an honest deterministic keyword fallback; validation, grounding
+  (anchored, no invented names, concrete) and density rules; an honest method on every analysis, noted in the editor
+- Matching suggestions to the creator's assets by tags, name and description — offered, never
+  placed automatically
+- Edit `visuals` section (`visuals_v1`): cutaway (fill/fit), picture-in-picture and overlay,
+  timing, position, size, opacity, video offset, loop, cut/fade; at most one cutaway and one
+  inset at a time; checked at the API and again at render; old fingerprints unchanged
+- FFmpeg compositor between framing and captions: per-element trimmed inputs, never stretched,
+  insets inside the social safe area, captions and hook on top, B-roll always muted, the clip's
+  duration and frame rate kept
+- Editor: Visuals section with suggestions, asset chooser, element cards and timeline, live
+  preview; project-page visual library
+- Hardening and quality: colour profiles, MPO, frame-exact offsets, fades, looping and frame-rate
+  tests; a render probe; CI steps for the V1.1 suites and the container smoke test
+- Acceptance: a real-stack run (HTTPS proxy, gunicorn, worker, PostgreSQL, Redis, MinIO, FFmpeg,
+  Ollama) from upload to downloaded short, and visual/UX review at 1440, 1024, 768 and 375 px
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -177,7 +210,8 @@ Definition of done — an operator can deploy PeakSift over HTTPS with private o
 - V0.7 Smart Reframing — COMPLETE
 - V0.8 Dynamic Captions & Creator Polish — COMPLETE
 - V0.9 Audio & Sound Design — COMPLETE
-- V1.0 Production & Publishing — COMPLETE (the v1.0.0 release awaits a live YouTube OAuth/upload verification)
+- V1.0 Production & Publishing — COMPLETE (released as v1.0.0 after a live private YouTube upload)
+- V1.1 B-roll & Visual Enrichment — IMPLEMENTATION COMPLETE, pending CI/merge/release
 
 No later milestone has been defined or started.
 

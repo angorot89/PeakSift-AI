@@ -1,6 +1,6 @@
 # PeakSift user guide
 
-From a long recording to a short on YouTube, in sixteen steps.
+From a long recording to a short on YouTube, in seventeen steps.
 
 1. **Create your account.** Open PeakSift, choose **Create account**, and register with your email
    and a password of at least 8 characters. You stay signed in on this browser until you log
@@ -31,15 +31,24 @@ From a long recording to a short on YouTube, in sixteen steps.
     the spoken word is highlighted (or use **Phrase timed**). Pick a preset — **Focus**,
     **Punch**, **Minimal** or **Boxed** — a position, and an optional opening hook. The
     **Safe area** guide shows where platform buttons cover the screen.
-13. **Finish the audio.** In **Audio**, adjust the original level, add music you own (start
+13. **Add visuals (optional).** On the project page, upload your own images (JPEG, PNG, WebP)
+    and B-roll videos (MP4, MOV, WebM) to the **Visual assets** library; give them a description and
+    tags that say what they show. In the editor's **Visuals** section, **Suggest B-roll** asks
+    the local AI where a visual would help and what it should show — each suggestion lists
+    your matching assets (by tags, name and description) to use in one click — or **Add
+    visual** to choose any asset. Each visual is a **Cutaway** (replaces the picture; your
+    voice keeps playing), **Picture-in-picture** or an image **Overlay**, with start/end,
+    position, size, opacity, the video's start point, looping and a cut or fade. Captions
+    and the hook always stay on top. B-roll sound is never used.
+14. **Finish the audio.** In **Audio**, adjust the original level, add music you own (start
     point, loop, fades, volume) with automatic ducking under speech, place sound effects on
     the timeline, and keep loudness normalization on. Preview plays them with the video.
-14. **Render and download.** **Render short** produces a 1080 × 1920 MP4 in the background.
+15. **Render and download.** **Render short** produces a 1080 × 1920 MP4 in the background.
     Each combination of settings is its own version; play any version and **Download short**.
-15. **Connect YouTube.** **Settings → YouTube → Connect YouTube** opens Google's consent page.
+16. **Connect YouTube.** **Settings → YouTube → Connect YouTube** opens Google's consent page.
     PeakSift asks only to upload videos — it cannot read, change or delete anything on your
     channel. You can **Disconnect** at any time.
-16. **Publish.** In the editor, **Publish to YouTube** (beside Download short) opens the
+17. **Publish.** In the editor, **Publish to YouTube** (beside Download short) opens the
     publish dialog. Review the title, description and tags (the counters show YouTube's
     limits), keep **Private** or choose Unlisted/Public, answer whether it is made for kids,
     and publish. The dialog shows the real progress — preparing, uploading, uploaded — with
@@ -59,5 +68,10 @@ From a long recording to a short on YouTube, in sixteen steps.
 - **Deleting a project** (bottom of the project page, confirmed by typing its exact name)
   permanently removes it with all its videos, clips, shorts, audio and files. It does not
   touch anything already published to YouTube.
-- **Your media is private:** only you can play or download your uploads, clips and shorts.
-  Upload only footage and music you own or are allowed to use.
+- **Your media is private:** only you can play or download your uploads, visuals, clips and
+  shorts. Upload only footage, images and music you own or are allowed to use — PeakSift
+  never searches or downloads media for you.
+- **Visuals in use:** a visual used by a rendered or saved short cannot be deleted until
+  those versions are deleted, so a short never loses a picture.
+- **Suggestions are suggestions:** the AI only proposes moments grounded in what was said;
+  a clip can get none. Matching reads words, not pictures — tag your assets.

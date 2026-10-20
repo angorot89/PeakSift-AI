@@ -288,3 +288,13 @@ The Global experience is the base. Morocco Mode, when built, extends it (additio
 - Keep the system simple; add components only when a milestone requires them.
 - The API is the security boundary; frontend route guards are a convenience.
 - User-supplied names never become paths or command arguments.
+
+## B-roll & visual enrichment (V1.1)
+
+Visual assets (`app/models/visual_asset.py`, `app/services/visual_assets.py`,
+`app/api/visual_assets.py`) are validated, normalized and stored through the
+`StorageProvider`. B-roll suggestions run as a Celery job (`app/services/broll/`) over the
+clip's words; matching is computed by the API. An edit's optional `visuals` section
+(`app/services/visuals/`) is drawn by `compose_short` between framing and captions:
+`[framed]` → visual layers → `[visual]` → captions + hook. Details:
+[broll-visual-enrichment.md](broll-visual-enrichment.md).
