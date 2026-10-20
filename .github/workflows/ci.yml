@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - name: Unit tests (status sync, captions, audio mix, publishing rules, security headers)
+      - name: Unit tests (status sync, captions, audio mix, publishing, security headers, visual assets and elements)
         run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
@@ -92,7 +92,7 @@ jobs:
         # test media is generated at test time.
         run: |
           set -euo pipefail
-          tracked="$(git ls-files '*.onnx' '*.tflite' '*.pt' '*.pth' '*.bin' '*.safetensors' 'backend/models/*' 'media/*' '*.mp4' '*.mov' '*.wav' '*.mp3' '*.m4a' '*.aac' '*.ogg' '*.opus' '*.flac' '*.aiff')"
+          tracked="$(git ls-files '*.onnx' '*.tflite' '*.pt' '*.pth' '*.bin' '*.safetensors' 'backend/models/*' 'media/*' '*.mp4' '*.mov' '*.webm' '*.wav' '*.mp3' '*.m4a' '*.aac' '*.ogg' '*.opus' '*.flac' '*.aiff' '*.jpg' '*.jpeg' '*.webp' 'backend/**/*.png' 'frontend/public/**/*.png')"
           [ -z "$tracked" ] || { echo "model weights or media committed:"; echo "$tracked"; exit 1; }
           echo "no weights or media in the repository"
       - name: Install FFmpeg and caption fonts
@@ -163,6 +163,12 @@ jobs:
       - name: Smart reframe renders the deepest allowed crop path on this FFmpeg
         # The moving crop is an FFmpeg expression tree; expression limits differ by build.
         run: python scripts/smart_crop_probe.py
+      - name: B-roll, picture-in-picture, overlays and fades render on this FFmpeg (V1.1 matrix)
+        # Generated fixtures (16:9 base clip, landscape/portrait images, transparent PNG,
+        # landscape/portrait B-roll videos) rendered into 1080 x 1920 shorts: image and video
+        # cutaways (fill/fit, offset), picture-in-picture, transparent overlay, fade, several
+        # elements in sequence, captions and the hook on top; pixels, duration, frame rate, codecs.
+        run: python scripts/visual_render_probe.py
       - uses: docker/setup-buildx-action@v3
       - name: Build MinIO from source (MinIO publishes no community images; layers cached)
         uses: docker/build-push-action@v6
@@ -193,6 +199,18 @@ jobs:
         env:
           REQUIRE_LIVE_S3: "1"
         run: pytest -rs  # -rs lists any skipped tests so a skipped media test is visible
+      - name: V1.1 visual enrichment suites (live S3 required, listed separately for visibility)
+        # Visual assets, B-roll suggestions, edit configuration, rendering, frame-level quality,
+        # hardening and the CI matrix (Smart Reframe, captions, hook, audio, full V1 edit, MinIO).
+        env:
+          REQUIRE_LIVE_S3: "1"
+        run: >-
+          pytest -rs -q tests/test_visual_asset_model.py tests/test_visual_assets_api.py
+          tests/test_visual_details.py tests/test_visual_hardening.py tests/test_visuals_config.py
+          tests/test_visual_edit_api.py tests/test_visual_transitions.py tests/test_visual_render.py
+          tests/test_visual_layout.py tests/test_broll_render_quality.py tests/test_visual_ci_matrix.py
+          tests/test_broll_model.py tests/test_broll_validation.py tests/test_broll_providers.py
+          tests/test_broll_pipeline.py tests/test_broll_api.py tests/test_broll_matching.py
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
 

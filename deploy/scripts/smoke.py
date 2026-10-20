@@ -101,5 +101,48 @@ if VIDEO:
         status, _, full = call("GET", f"/api/videos/{video['id']}/content")
         check("full download is byte-identical", status == 200 and full == data)
 
+# V1.1 visual assets on object storage: a generated PNG (standard library only) is validated,
+# thumbnailed and stored in the private bucket, streamed with Range, then deleted.
+def tiny_png(width: int = 64, height: int = 48) -> bytes:
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    rows = b"".join(b"\x00" + bytes((200, 40, 40)) * width for _ in range(height))
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(rows))
+            + chunk(b"IEND", b""))  # fmt: skip
+
+
+status, _, body = call("POST", "/api/projects", body={"name": "Smoke visuals"})
+visual_project = json.loads(body or b"{}").get("id")
+check("a project for visual assets", status == 201 and bool(visual_project))
+if visual_project:
+    png = tiny_png()
+    boundary = uuid.uuid4().hex
+    multipart = (
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"smoke.png\"\r\n"
+        f"Content-Type: image/png\r\n\r\n".encode() + png + f"\r\n--{boundary}--\r\n".encode()
+    )
+    base = f"/api/projects/{visual_project}/visual-assets"
+    status, _, body = call("POST", base, raw=multipart,
+                           headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})  # fmt: skip
+    asset = json.loads(body or b"{}")
+    check("visual asset validated and stored", status == 201 and asset.get("kind") == "image"
+          and asset.get("has_thumbnail") is True, f"{status} {body[:160]!r}")  # fmt: skip
+    if asset.get("id"):
+        status, _, thumb = call("GET", f"{base}/{asset['id']}/thumbnail")
+        image = thumb[:3] == b"\xff\xd8\xff" or thumb[:4] == b"\x89PNG"  # JPEG or PNG
+        check("thumbnail served from object storage", status == 200 and image, f"{status}")
+        status, _, part = call("GET", f"{base}/{asset['id']}/content", headers={"Range": "bytes=0-31"})
+        check("visual Range request served", status == 206 and len(part) == 32, f"{status}")
+        status, _, body = call("GET", "/api/visual-layout")
+        check("visual layout published", status == 200 and b"inset_width_fraction" in body)
+        status, _, body = call("DELETE", f"{base}/{asset['id']}")
+        removed = json.loads(body or b"{}").get("media_files_removed")
+        check("unused visual deleted with its thumbnail", status == 200 and removed == 2, f"{status} {removed}")
+
 print(f"{'FAILED' if failures else 'OK'}: {len(failures)} failure(s)")
 sys.exit(1 if failures else 0)
