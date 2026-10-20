@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - name: Unit tests (status sync, captions, audio mix, publishing, security headers, visual assets and elements)
+      - name: Unit tests (status sync, captions, audio mix, publishing, security headers, visual assets and elements, Auto Edit display, editor hydration)
         run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
@@ -169,6 +169,11 @@ jobs:
         # cutaways (fill/fit, offset), picture-in-picture, transparent overlay, fade, several
         # elements in sequence, captions and the hook on top; pixels, duration, frame rate, codecs.
         run: python scripts/visual_render_probe.py
+      - name: Auto Edit quality benchmark (deterministic rules, no model)
+        # Six representative clips x four recipes, planned by the rules and validated by the
+        # server: fails on any invalid configuration. Descriptive QA, no score. The same check
+        # runs against a local model with --planner ollama (never in CI).
+        run: python scripts/auto_edit_benchmark.py
       - uses: docker/setup-buildx-action@v3
       - name: Build MinIO from source (MinIO publishes no community images; layers cached)
         uses: docker/build-push-action@v6
@@ -211,6 +216,20 @@ jobs:
           tests/test_visual_layout.py tests/test_broll_render_quality.py tests/test_visual_ci_matrix.py
           tests/test_broll_model.py tests/test_broll_validation.py tests/test_broll_providers.py
           tests/test_broll_pipeline.py tests/test_broll_api.py tests/test_broll_matching.py
+      - name: V1.2 Auto Edit suites (live S3 required, listed separately for visibility)
+        # Domain, recipes, planner contract, local planner (mocked HTTP), fallback rules, server
+        # validation, pipeline, API, hardening, quality benchmark and the CI matrix (plans
+        # rendered through the real renderer, and plan/apply/render on MinIO). No model runs.
+        env:
+          REQUIRE_LIVE_S3: "1"
+        run: >-
+          pytest -rs -q tests/test_auto_edit_model.py tests/test_auto_edit_fingerprint.py
+          tests/test_auto_edit_state.py tests/test_auto_edit_recipes.py
+          tests/test_auto_edit_contract.py tests/test_auto_edit_ollama.py
+          tests/test_auto_edit_fallback.py tests/test_auto_edit_validation.py
+          tests/test_auto_edit_pipeline.py tests/test_auto_edit_api.py
+          tests/test_auto_edit_hardening.py tests/test_auto_edit_benchmark.py
+          tests/test_auto_edit_ci_matrix.py
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
 

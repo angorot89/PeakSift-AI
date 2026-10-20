@@ -144,5 +144,14 @@ if visual_project:
         removed = json.loads(body or b"{}").get("media_files_removed")
         check("unused visual deleted with its thumbnail", status == 200 and removed == 2, f"{status} {removed}")
 
+# Auto Edit: the recipes are served, and planning answers honestly without a clip.
+status, _, body = call("GET", "/api/auto-edit/recipes")
+recipes = [r.get("name") for r in json.loads(body or b"[]")] if status == 200 else []
+check("Auto Edit recipes served", recipes == ["clean", "punchy", "story", "minimal"], f"{status} {recipes}")
+if visual_project:
+    missing = f"/api/projects/{visual_project}/videos/{uuid.uuid4()}/clips/{uuid.uuid4()}/auto-edits"
+    status, _, _ = call("POST", missing, body={"recipe": "clean"})
+    check("Auto Edit on a missing clip is a 404", status == 404, str(status))
+
 print(f"{'FAILED' if failures else 'OK'}: {len(failures)} failure(s)")
 sys.exit(1 if failures else 0)
