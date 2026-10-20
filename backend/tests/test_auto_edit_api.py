@@ -3,7 +3,9 @@ attempt tokens, regeneration that keeps history, applying a ready plan exactly o
 edit (with every asset re-checked), nothing internal in responses, and ownership."""
 
 import json
+import tempfile
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -50,6 +52,8 @@ def storage() -> LocalStorageProvider:
 
 def clip_ctx(db, email="owner@example.com") -> dict:
     ctx = ready_clip(db, email)
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as clip_file:  # the rendered clip exists
+        storage().put_file(Path(clip_file.name), ctx["clip"].storage_key)
     ctx["base"] = ctx["base"].removesuffix("/edits") + "/auto-edits"
     ctx["edits"] = ctx["base"].removesuffix("/auto-edits") + "/edits"
     return ctx

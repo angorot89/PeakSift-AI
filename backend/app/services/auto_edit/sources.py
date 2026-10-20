@@ -176,6 +176,10 @@ def gather(
 ) -> Gathered:
     if not clip.duration_seconds or clip.status != "ready":
         raise SourcesUnavailable("clip_not_ready", "Generate the clip before using Auto Edit")
+    if not _present(storage, clip.storage_key):
+        raise SourcesUnavailable(
+            "clip_missing", "The clip file is missing; generate the clip again"
+        )
     recipe = recipe_version(request.recipe_version)
     duration = float(clip.duration_seconds)
     project_id = clip.video.project_id
