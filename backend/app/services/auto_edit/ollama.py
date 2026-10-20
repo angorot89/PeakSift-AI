@@ -66,9 +66,50 @@ CORRECTION = (
 )
 
 
+def constraints(context: AutoEditContext) -> list[str]:
+    """What this clip allows, stated plainly (small models follow sentences better than they
+    infer availability from data). Every rule is still enforced by the server."""
+    caps = context.capabilities
+    recipe = context.recipe
+    rules: list[str] = []
+    allowed = recipe.get("smart_reframe_confidence") or []
+    if not caps.smart_reframe or caps.reframe_confidence not in allowed:
+        rules.append("Smart Reframe is NOT available: use blur_background or center_crop.")
+    else:
+        rules.append("Smart Reframe is available: prefer it.")
+    rules.append(
+        f"captions.preset must be one of {recipe.get('caption_presets')}; captions.position "
+        f"one of {recipe.get('caption_positions')}; hook.style one of "
+        f"{recipe.get('hook_styles')}."
+    )
+    pairs = [
+        f"{option.handle} with {', '.join(option.matches)}"
+        for option in context.broll
+        if option.matches
+    ]
+    if not pairs:
+        rules.append("No B-roll suggestion has a matching asset: visuals must be [].")
+    else:
+        rules.append(
+            f"Visuals may only use these pairs: {'; '.join(pairs)}. Never invent other handles."
+        )
+    if context.music is None or not recipe.get("music_levels"):
+        rules.append("No music track was chosen: use_music must be false.")
+    sounds = [s for s in context.sound_effects if s.transition]
+    if not sounds or not recipe.get("sound_effects_allowed"):
+        rules.append("Transition sounds are not available: transition_sounds must be false.")
+    rules.append(
+        "hook.text: at most 60 characters, from the speaker's words or the candidate hook."
+    )
+    return rules
+
+
 def user_prompt(context: AutoEditContext) -> str:
-    return "Plan the edit for this clip. Input:\n" + json.dumps(
-        context.planner_view(), ensure_ascii=False, separators=(",", ":")
+    return (
+        "Plan the edit for this clip.\nConstraints for this clip:\n- "
+        + "\n- ".join(constraints(context))
+        + "\nInput:\n"
+        + json.dumps(context.planner_view(), ensure_ascii=False, separators=(",", ":"))
     )
 
 
