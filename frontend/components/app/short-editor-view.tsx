@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, Plus, RotateCcw, ScanFace, Smartphone, Wand2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, History, Plus, RotateCcw, ScanFace, Smartphone, Wand2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AudioPanel } from "@/components/app/editor/audio-panel";
 import { CaptionTimingPanel, HookPanel, PresetCards, SafeAreaToggle } from "@/components/app/editor/caption-controls";
@@ -50,7 +50,7 @@ import {
   type HookStyle,
   type PreviewCue,
 } from "@/lib/captions";
-import { autoEditHref } from "@/lib/auto-edit";
+import { autoEditHref, getPlan } from "@/lib/auto-edit";
 import { getCandidate } from "@/lib/clip-detection";
 import { clipContentUrl, type GeneratedClip } from "@/lib/clips";
 import {
@@ -73,6 +73,7 @@ import {
   type EditRequest,
   type PickableLayout,
 } from "@/lib/edits";
+import { DEFAULT_DRAFT, draftFromConfiguration, type EditorDraft } from "@/lib/edit-draft";
 import { formatDuration } from "@/lib/format";
 import { loadProjectClip } from "@/lib/project-clip";
 import { isProjectId, type Project } from "@/lib/projects";
@@ -132,6 +133,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [hookDuration, setHookDuration] = useState(2);
   const [showSafeArea, setShowSafeArea] = useState(false);
   const [audio, setAudio] = useState<AudioRequest>({ source_gain_db: 0, normalize: true, music: null, sfx: [] });
+  // An audio section exists once the creator uses Audio, or when loaded settings had one.
+  const [audioSection, setAudioSection] = useState(false);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[] | null>(null);
   const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
   const [audioLimits, setAudioLimits] = useState<AudioUploadLimits | null>(null);
@@ -150,6 +153,51 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [busy, setBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // ---- loading settings: a stored version or Auto Edit plan opens with exactly its settings ----
+  const search = useSearchParams();
+  const planParam = search.get("plan");
+  const editParam = search.get("edit");
+  // Any change by the creator wins over settings that arrive later from the network.
+  const touched = useRef(false);
+  const hydrated = useRef(false);
+  const [loadedFrom, setLoadedFrom] = useState<{ label: string; configuration: Record<string, unknown>; href?: string } | null>(null);
+  const edit = useCallback(<T,>(set: (value: T) => void) => (value: T) => {
+    touched.current = true;
+    set(value);
+  }, []);
+  const applyDraft = useCallback((draft: EditorDraft) => {
+    setLayout(draft.layout);
+    setFramingMode(draft.framingMode);
+    setFocus(draft.focus);
+    setCaptions(draft.captions);
+    setPreset(draft.preset);
+    setPosition(draft.position);
+    setTiming(draft.timing);
+    setHookOn(draft.hookOn);
+    if (draft.hookText !== null) setHookText(draft.hookText);
+    setHookStyle(draft.hookStyle);
+    setHookPosition(draft.hookPosition);
+    setHookDuration(draft.hookDuration);
+    setAudio(draft.audio);
+    setAudioSection(draft.audioSection);
+    setVisuals(draft.visuals);
+  }, []);
+  const hydrate = useCallback(
+    (configuration: Record<string, unknown> | null | undefined, label: string, href?: string) => {
+      if (hydrated.current) return;
+      hydrated.current = true;
+      if (!configuration || touched.current) return; // never overwrite the creator's changes
+      applyDraft(draftFromConfiguration(configuration, { analysisId: null, trackId: null }).draft);
+      setLoadedFrom({ label, configuration, href });
+    },
+    [applyDraft],
+  );
+  function resetToDefaults() {
+    touched.current = true;
+    applyDraft({ ...DEFAULT_DRAFT, focus: { ...DEFAULT_DRAFT.focus }, audio: { ...DEFAULT_DRAFT.audio, sfx: [] }, visuals: [] });
+    setLoadedFrom(null);
+  }
 
   const handleError = useCallback(
     (err: unknown) => {
@@ -171,6 +219,21 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           // Merge, never replace: a list fetched before a new render started must not drop it.
           setEdits((current) => mergeJobs(current, page.edits, EDIT_STAGES));
           setLoadError(null);
+          if (!hydrated.current && !planParam) {
+            // The requested version, else the newest one: the editor continues where it was.
+            const target = editParam ? page.edits.find((e) => e.id === editParam) : page.edits[0];
+            if (target) {
+              hydrate(target.configuration, describeEdit(target));
+              if (editParam && target.status === "ready") {
+                setSelectedId(target.id);
+                setMode("rendered");
+              } else if (editParam && isEditActive(target.status)) {
+                setPendingId(target.id);
+              }
+            } else {
+              hydrated.current = true;
+            }
+          }
           // When the version just started becomes ready, put the real output on the stage.
           const finished = page.edits.find((e) => e.id === pendingRef.current && e.status === "ready");
           if (finished) {
@@ -182,12 +245,30 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           }
         })
         .catch((err: unknown) => setLoadError(handleError(err))),
-    [project.id, clip.video_id, clip.id, handleError],
+    [project.id, clip.video_id, clip.id, handleError, hydrate, planParam, editParam],
   );
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // "Edit choices" from Auto Edit: the plan's settings, not yet rendered.
+  useEffect(() => {
+    if (!planParam || hydrated.current) return;
+    let cancelled = false;
+    getPlan(project.id, clip.video_id, clip.id, planParam)
+      .then((plan) => {
+        if (!cancelled) {
+          hydrate(plan.configuration, `Auto Edit plan · ${plan.recipe_label}`, autoEditHref(project.id, clip.id));
+        }
+      })
+      .catch(() => {
+        hydrated.current = true; // a missing plan leaves the editor as it is
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [planParam, project.id, clip.video_id, clip.id, hydrate]);
 
   // ---- audio: the project's music and effects, their waveforms, the upload limits ---------
   const loadWaveform = useCallback(
@@ -238,6 +319,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   }
 
   function audioUploaded(asset: AudioAsset) {
+    touched.current = true;
+    setAudioSection(true);
     setAudioAssets((current) => [asset, ...(current ?? []).filter((a) => a.id !== asset.id)]);
     void loadWaveform(asset);
     setAudio((current) => {
@@ -320,7 +403,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           ? await retryWordTiming(project.id, clip.video_id, clip.id, track.id)
           : await startWordTiming(project.id, clip.video_id, clip.id);
       acceptTrack(next);
-      setTiming("aligned_word");
+      edit(setTiming)("aligned_word");
     } catch (err) {
       setTrackError(handleError(err));
     } finally {
@@ -443,9 +526,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   // Automatic framing can render only from a completed analysis of this clip.
   const awaitingAnalysis = smart && !manual && !analysisDone;
 
-  // The audio section is sent only once something is chosen (music, effects or a level), so a
-  // creator who never opens Audio gets exactly the earlier render.
-  const audioActive = !!audio.music || audio.sfx.length > 0 || audio.source_gain_db !== 0;
+  // The audio section is sent only once the creator uses Audio (or loaded settings had one), so
+  // a creator who never opens Audio gets exactly the earlier render.
+  const audioActive = audioSection || !!audio.music || audio.sfx.length > 0 || audio.source_gain_db !== 0;
   const audioRequest = useMemo(() => (audioActive ? normalizeAudio(audio) : null), [audioActive, audio]);
   // Visuals are sent only when there are some, so an edit without them keeps its old settings.
   const visualsRequest = useMemo(
@@ -581,6 +664,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     setJustFinished(false);
   }
 
+  // What could not be loaded exactly (framing or word timing regenerated since), said plainly.
+  const hydrationNotes = useMemo(() => {
+    if (!loadedFrom || analysis === undefined || track === undefined) return [];
+    return draftFromConfiguration(loadedFrom.configuration, {
+      analysisId: analysis?.status === "completed" ? analysis.id : null,
+      trackId: track?.status === "completed" ? track.id : null,
+    }).notes;
+  }, [loadedFrom, analysis, track]);
+
   const backToProject = `/projects/${project.id}#generated`;
   const renderedName = selected ? describeEdit(selected) : "";
   const audioLabel = audioSummary(audioRequest);
@@ -655,7 +747,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           {trackRunning ? "Available when word sync finishes." : "Generate word sync first, or use phrase timing."}
         </p>
         {phraseAvailable ? (
-          <Button variant="ghost" className="w-full" onClick={() => setTiming("phrase_fallback")}>
+          <Button variant="ghost" className="w-full" onClick={() => edit(setTiming)("phrase_fallback")}>
             Use phrase timing instead
           </Button>
         ) : null}
@@ -842,18 +934,49 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           className="self-start rounded-2xl border border-border bg-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1"
         >
           <div className="border-b border-border px-4 py-4 sm:px-5">
-            <h2 className="text-[15px] font-semibold text-foreground">Edit settings</h2>
-            <p className="mt-0.5 text-sm text-muted">Choose how this clip becomes a vertical short.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-semibold text-foreground">Edit settings</h2>
+                <p className="mt-0.5 text-sm text-muted">Choose how this clip becomes a vertical short.</p>
+              </div>
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={resetToDefaults}>
+                <RotateCcw aria-hidden="true" />
+                Reset to defaults
+              </Button>
+            </div>
+            {loadedFrom ? (
+              <div role="status" className="mt-3 space-y-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-xs">
+                <p className="flex items-start gap-2 text-muted">
+                  <History aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+                  <span>
+                    Loaded the settings of <span className="break-words text-foreground">{loadedFrom.label}</span>.
+                    {loadedFrom.href ? (
+                      <>
+                        {" "}
+                        <Link href={loadedFrom.href} className="text-accent-soft underline-offset-2 hover:underline">
+                          Back to the plan
+                        </Link>
+                      </>
+                    ) : null}
+                  </span>
+                </p>
+                {hydrationNotes.map((note) => (
+                  <p key={note} className="pl-5.5 text-amber-200">
+                    {note}
+                  </p>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="space-y-6 px-4 py-5 sm:px-5">
             <div className="space-y-3">
-              <LayoutPicker value={layout} onChange={setLayout} name={`${id}-layout`} />
+              <LayoutPicker value={layout} onChange={edit(setLayout)} name={`${id}-layout`} />
               {smart ? (
                 <div className="animate-fade-in space-y-2">
                   <SmartReframePanel
                     name={`${id}-framing`}
                     mode={framingMode}
-                    onModeChange={setFramingMode}
+                    onModeChange={edit(setFramingMode)}
                     analysis={analysis}
                     busy={analysisBusy}
                     onAnalyze={() => void analyze(false)}
@@ -863,7 +986,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     sourceHeight={sourceHeight ?? 9}
                     focusX={focus.x}
                     focusY={focus.y}
-                    onFocusChange={(x, y) => setFocus({ x, y })}
+                    onFocusChange={(x, y) => edit(setFocus)({ x, y })}
                   />
                   {analysisError ? (
                     <InlineAlert title="Smart framing is unavailable">{analysisError}</InlineAlert>
@@ -872,12 +995,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               ) : null}
             </div>
             <div className="space-y-4">
-              <CaptionSwitch checked={captions} onChange={setCaptions} />
+              <CaptionSwitch checked={captions} onChange={edit(setCaptions)} />
               {captions ? (
                 <div className="animate-fade-in space-y-4">
                   <CaptionTimingPanel
                     timing={timing}
-                    onTimingChange={setTiming}
+                    onTimingChange={edit(setTiming)}
                     track={track}
                     phraseAvailable={phraseAvailable}
                     busy={trackBusy}
@@ -886,11 +1009,11 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     onRetry={() => void generateWordSync(true)}
                   />
                   {spec ? (
-                    <PresetCards spec={spec} value={preset} onChange={setPreset} name={`${id}-preset`} disabled={!captions} />
+                    <PresetCards spec={spec} value={preset} onChange={edit(setPreset)} name={`${id}-preset`} disabled={!captions} />
                   ) : null}
                   <PositionPicker
                     value={position}
-                    onChange={setPosition}
+                    onChange={edit(setPosition)}
                     name={`${id}-position`}
                     disabled={!captions}
                     taken={hookOn ? hookPosition : null}
@@ -903,18 +1026,19 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 spec={spec}
                 enabled={hookOn}
                 onEnabled={(on) => {
+                  touched.current = true;
                   // The hook never shares the captions' position: start it somewhere free.
                   if (on && captions && hookPosition === position) setHookPosition(position === "top" ? "center" : "top");
                   setHookOn(on);
                 }}
                 text={hookText}
-                onText={setHookText}
+                onText={edit(setHookText)}
                 style={hookStyle}
-                onStyle={setHookStyle}
+                onStyle={edit(setHookStyle)}
                 position={hookPosition}
-                onPosition={setHookPosition}
+                onPosition={edit(setHookPosition)}
                 duration={hookDuration}
-                onDuration={setHookDuration}
+                onDuration={edit(setHookDuration)}
                 captionPosition={captions ? position : null}
                 emojiOmitted={spec.emoji === "omitted"}
               />
@@ -929,14 +1053,17 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 assets={visualAssets}
                 onUploaded={visualUploaded}
                 elements={visuals}
-                onChange={setVisuals}
+                onChange={edit(setVisuals)}
               />
             </div>
             <div className="border-t border-border pt-5">
               <AudioPanel
                 projectId={project.id}
                 value={audio}
-                onChange={setAudio}
+                onChange={edit((next: AudioRequest) => {
+                  setAudioSection(true);
+                  setAudio(next);
+                })}
                 assets={audioAssets}
                 waveforms={waveforms}
                 limits={audioLimits}
