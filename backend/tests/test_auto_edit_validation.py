@@ -118,6 +118,17 @@ def test_a_good_proposal_becomes_a_normal_edit_configuration():
     assert plan.configuration.fingerprint()  # a real, hashable edit configuration
 
 
+@pytest.mark.parametrize(
+    "sentence",
+    ["center_crop for a clean and simple look.", "boxed captions for a clear read.", "ok"],
+)
+def test_identifier_like_or_lowercase_explanations_are_rewritten(sentence):
+    plan = validate(layout__mode="center_crop", explanations__layout=sentence)
+    assert plan.explanations["sections"]["layout"]["reason"] == (
+        "Fills the vertical frame from the centre."
+    )
+
+
 def test_explanations_are_product_copy_without_handles_or_ids():
     plan = validate(
         explanations__visuals="Adds visual_asset_1 at suggestion_1.",  # names handles
