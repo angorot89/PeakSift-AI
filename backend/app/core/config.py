@@ -175,6 +175,12 @@ class Settings(BaseSettings):
     broll_fallback_enabled: bool = True
     broll_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     broll_max_attempts: int = Field(default=5, ge=1)
+    # Auto Edit: the planner ("ollama", a local model at OLLAMA_BASE_URL), its model (empty:
+    # the first OLLAMA_CLIP_MODELS entry) and the total time one plan may spend in the model
+    # (one corrective attempt included).
+    auto_edit_planner_provider: Literal["ollama"] = "ollama"
+    auto_edit_ollama_model: str = ""
+    auto_edit_timeout_seconds: float = Field(default=120, gt=0)
     # Auto Edit planning jobs: when a running one counts as stalled, and how often it may be
     # retried.
     auto_edit_stale_after_seconds: int = Field(default=15 * 60, gt=0)
