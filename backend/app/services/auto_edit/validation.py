@@ -402,8 +402,6 @@ def _visuals(proposal, context, recipe, report, notes):
             f"{paced} suggested visual{'s were' if paced > 1 else ' was'} left out to keep "
             "this recipe's pacing."
         )
-    if dropped and not kept:
-        notes.append("No suggested visual could be used, so none were added.")
     if not kept:
         return [], [], {"choice": "No visuals", "reason": server_none}
     unchanged = dropped == 0 and all(c.mode in modes for c in choices)
