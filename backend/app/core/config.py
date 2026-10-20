@@ -175,6 +175,10 @@ class Settings(BaseSettings):
     broll_fallback_enabled: bool = True
     broll_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     broll_max_attempts: int = Field(default=5, ge=1)
+    # Auto Edit planning jobs: when a running one counts as stalled, and how often it may be
+    # retried.
+    auto_edit_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    auto_edit_max_attempts: int = Field(default=5, ge=1)
 
     # Hosted provider: OpenAI structured outputs. Uses OPENAI_API_KEY (shared with
     # transcription). Comma-separated allow-list of models (first = default).
