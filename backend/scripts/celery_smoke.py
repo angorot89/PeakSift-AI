@@ -28,6 +28,10 @@ EXPECTED_TASKS = (
     "peaksift.render_clip_edit",
     "peaksift.analyze_reframe",
     "peaksift.generate_caption_track",
+    "peaksift.suggest_broll",
+    "peaksift.plan_auto_edit",
+    "peaksift.publish_short",
+    "peaksift.check_publish_status",
 )
 
 
