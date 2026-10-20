@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.clip_edits import OwnedClip, create_or_reuse_edit, read_edit
 from app.api.deps import CurrentUser, DbSession, Storage
+from app.api.media_streaming import object_present
 from app.api.transcriptions import OwnedVideo
 from app.core.config import get_settings
 from app.core.rate_limit import per_user
@@ -129,11 +130,23 @@ def read_plan(plan: AutoEditPlan) -> AutoEditPlanRead:
     )
 
 
-def _require_plannable(clip: Clip) -> None:
+def _require_plannable(clip: Clip, storage: StorageProvider) -> None:
     if clip.status != ClipStatus.READY or not clip.duration_seconds:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Generate the clip before using Auto Edit",
+        )
+    try:
+        present = object_present(storage, clip.storage_key)
+    except StorageUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Media storage is unavailable. Try again in a moment.",
+        ) from None
+    if not present:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The clip file is missing; generate the clip again",
         )
 
 
@@ -272,7 +285,7 @@ def create_plan(
 ) -> AutoEditPlanRead:
     """Plan an edit with this recipe. The same recipe and inputs return the existing plan
     (200); changed inputs (a new caption track, a tagged asset…) make a new one."""
-    _require_plannable(clip)
+    _require_plannable(clip, storage)
     music = _owned_music(db, video, body.music_asset_id)
     request = AutoEditRequest.from_settings(
         get_settings(), recipe=body.recipe.value, music_asset_id=music
@@ -302,7 +315,9 @@ def get_plan(plan: OwnedPlan) -> AutoEditPlanRead:
 @router.post(
     "/{plan_id}/retry", response_model=AutoEditPlanRead, dependencies=[per_user("auto_edit")]
 )
-def retry_plan(plan: OwnedPlan, clip: OwnedClip, db: DbSession) -> AutoEditPlanRead:
+def retry_plan(
+    plan: OwnedPlan, clip: OwnedClip, db: DbSession, storage: Storage
+) -> AutoEditPlanRead:
     """Re-queue a failed or stalled plan on the same row with a fresh attempt token."""
     settings = get_settings()
     db.refresh(plan, with_for_update=True)  # concurrent retries serialize
@@ -315,7 +330,7 @@ def retry_plan(plan: OwnedPlan, clip: OwnedClip, db: DbSession) -> AutoEditPlanR
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="This plan has been retried too many times"
         )
-    _require_plannable(clip)
+    _require_plannable(clip, storage)
     plan.status = AutoEditStatus.QUEUED
     plan.progress_percent = 0
     plan.attempt += 1
@@ -346,7 +361,7 @@ def regenerate_plan(
             status_code=status.HTTP_409_CONFLICT,
             detail="This plan is still being made; wait for it before trying another",
         )
-    _require_plannable(clip)
+    _require_plannable(clip, storage)
     previous = AutoEditRequest.from_snapshot(plan.config)
     newest = db.scalar(
         select(func.max(AutoEditPlan.generation)).where(
@@ -374,9 +389,16 @@ def apply_plan(
 ) -> AutoEditApplyRead:
     """Turn a ready plan into a normal edit (rendered like any other); applying an applied plan
     returns its edit. Every asset is checked again now, exactly as for a manual edit."""
-    if plan.status == AutoEditStatus.APPLIED and plan.clip_edit is not None:
-        return AutoEditApplyRead(plan=read_plan(plan), edit=read_edit(plan.clip_edit))
-    if plan.status not in (AutoEditStatus.READY, AutoEditStatus.APPLIED):
+    if plan.status == AutoEditStatus.APPLIED:
+        if plan.clip_edit is not None:
+            return AutoEditApplyRead(plan=read_plan(plan), edit=read_edit(plan.clip_edit))
+        # Its version was deleted. An applied plan never changes, so it is not re-linked; the
+        # creator can open its settings in the editor ("Edit choices") or try another plan.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This plan's version was deleted; open its settings in the editor instead",
+        )
+    if plan.status != AutoEditStatus.READY:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Only a ready plan can be applied"
         )
@@ -388,14 +410,13 @@ def apply_plan(
             detail="This plan can no longer be applied; try another plan",
         ) from None
     edit, _ = create_or_reuse_edit(db, clip, video, storage, config)
-    if plan.status == AutoEditStatus.READY:
-        try:
-            state.mark_applied(plan, db, edit.id)
-        except state.PlanNotReady:  # pragma: no cover - changed concurrently
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="Only a ready plan can be applied"
-            ) from None
-        _accept_suggestions(db, plan)
+    try:
+        state.mark_applied(plan, db, edit.id)
+    except state.PlanNotReady:  # pragma: no cover - changed concurrently
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Only a ready plan can be applied"
+        ) from None
+    _accept_suggestions(db, plan)
     db.refresh(plan)
     return AutoEditApplyRead(plan=read_plan(plan), edit=read_edit(edit))
 

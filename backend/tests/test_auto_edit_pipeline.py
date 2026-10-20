@@ -47,10 +47,14 @@ SAID = [
 ]
 
 
-@pytest.fixture
-def settings() -> Settings:
+def pipeline_settings() -> Settings:
     return Settings(**{**get_settings().model_dump(), "auto_edit_planner_provider": "ollama",
                        "auto_edit_fallback_enabled": True})  # fmt: skip
+
+
+@pytest.fixture
+def settings() -> Settings:
+    return pipeline_settings()
 
 
 @pytest.fixture
@@ -68,6 +72,10 @@ def stored(storage: LocalStorageProvider, tmp_path: Path, extension: str, catego
 
 @pytest.fixture
 def world(db_session: Session, settings, storage, tmp_path):
+    return build_world(db_session, settings, storage, tmp_path)
+
+
+def build_world(db_session: Session, settings, storage, tmp_path):
     """A clip with transcript, word timing, framing, B-roll suggestions, assets and audio."""
     clip = make_clip(db_session)
     clip.storage_key = stored(storage, tmp_path, "mp4", "clips")

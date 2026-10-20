@@ -357,6 +357,10 @@ def _visuals(proposal, context, recipe, report, notes):
         if any(o.handle == option.handle for o in kept_options):
             dropped += 1
             continue
+        if any(option.start < o.end and option.end > o.start for o in kept_options):
+            notes.append(f"A visual for “{option.query}” was left out: it would overlap another.")
+            dropped += 1
+            continue
         too_close = any(
             option.start < o.end + recipe.min_gap_seconds
             and option.end > o.start - recipe.min_gap_seconds
@@ -377,9 +381,16 @@ def _visuals(proposal, context, recipe, report, notes):
             single = VisualsConfig.create({"elements": [element]})
             stand_in = SimpleNamespace(kind=asset.kind, duration_seconds=asset.duration)
             check_visuals(single, {element["asset_id"]: stand_in}, context.clip_duration)
-            VisualsConfig.create({"elements": [*kept, element]})
         except (ValueError, VisualsProblem):
             notes.append(f"A visual for “{option.query}” was left out: the asset cannot fill it.")
+            dropped += 1
+            continue
+        try:
+            VisualsConfig.create({"elements": [*kept, element]})
+        except ValueError:
+            notes.append(
+                f"A visual for “{option.query}” was left out: it would clash with another."
+            )
             dropped += 1
             continue
         kept.append(element)

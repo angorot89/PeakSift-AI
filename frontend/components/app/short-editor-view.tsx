@@ -221,13 +221,14 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           setLoadError(null);
           if (!hydrated.current && !planParam) {
             // The requested version, else the newest one: the editor continues where it was.
-            const target = editParam ? page.edits.find((e) => e.id === editParam) : page.edits[0];
+            // An unknown or deleted version falls back to the newest one.
+            const target = (editParam ? page.edits.find((e) => e.id === editParam) : undefined) ?? page.edits[0];
             if (target) {
               hydrate(target.configuration, describeEdit(target));
-              if (editParam && target.status === "ready") {
+              if (target.id === editParam && target.status === "ready") {
                 setSelectedId(target.id);
                 setMode("rendered");
-              } else if (editParam && isEditActive(target.status)) {
+              } else if (target.id === editParam && isEditActive(target.status)) {
                 setPendingId(target.id);
               }
             } else {

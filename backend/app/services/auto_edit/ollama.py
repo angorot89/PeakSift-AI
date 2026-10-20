@@ -80,9 +80,18 @@ class OllamaAutoEditPlanner:
         self._num_ctx = settings.ollama_num_ctx
         self._budget = settings.auto_edit_timeout_seconds
         self._connect = settings.ollama_connect_timeout_seconds
-        self._client = client or httpx.Client(base_url=settings.ollama_base_url.rstrip("/"))
+        self._base_url = settings.ollama_base_url.rstrip("/")
+        self._injected = client  # tests inject a client; otherwise one per plan, always closed
 
     def plan(self, context: AutoEditContext) -> PlannerResult:
+        client = self._injected or httpx.Client(base_url=self._base_url)
+        try:
+            return self._plan(context, client)
+        finally:
+            if self._injected is None:
+                client.close()
+
+    def _plan(self, context: AutoEditContext, client: httpx.Client) -> PlannerResult:
         deadline = time.monotonic() + self._budget
         messages: list[dict[str, str]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -93,7 +102,7 @@ class OllamaAutoEditPlanner:
             remaining = deadline - time.monotonic()
             if attempt > 1 and remaining < MIN_RETRY_SECONDS:
                 break
-            content = self._chat(messages, timeout=max(remaining, 1.0))
+            content = self._chat(client, messages, timeout=max(remaining, 1.0))
             try:
                 data = json.loads(content)
             except (TypeError, ValueError):
@@ -112,7 +121,7 @@ class OllamaAutoEditPlanner:
             ]
         raise last or PlannerTimeoutError("The local model ran out of planning time")
 
-    def _chat(self, messages: list[dict[str, str]], *, timeout: float) -> str:
+    def _chat(self, client: httpx.Client, messages: list[dict[str, str]], *, timeout: float) -> str:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -122,7 +131,7 @@ class OllamaAutoEditPlanner:
         }
         limits = httpx.Timeout(timeout, connect=min(self._connect, timeout))
         try:
-            response = self._client.post("/api/chat", json=payload, timeout=limits)
+            response = client.post("/api/chat", json=payload, timeout=limits)
         except httpx.ConnectError as error:
             raise PlannerUnavailableError("The local inference server is not reachable") from error
         except httpx.TimeoutException as error:

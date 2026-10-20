@@ -530,7 +530,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
                   <Clapperboard aria-hidden="true" />
                   Open in editor
                 </ButtonLink>
-              ) : (
+              ) : plan.status === "applied" ? null : (
                 <Button size="lg" onClick={() => void apply(plan)} disabled={busy !== null}>
                   <ListChecks aria-hidden="true" />
                   {busy === "apply" ? "Applying…" : "Use this edit"}
@@ -545,6 +545,12 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
                 {busy === "regenerate" ? "Starting…" : "Try another plan"}
               </Button>
             </div>
+          ) : null}
+          {reviewing && plan?.status === "applied" && !plan.clip_edit_id ? (
+            <p className="px-4 pb-4 text-xs text-subtle sm:px-6">
+              The version made from this plan was deleted. Use “Edit choices” to open its settings in the editor, or try
+              another plan.
+            </p>
           ) : null}
           {reviewing && plan?.status === "ready" ? (
             <p className="flex items-center gap-1.5 px-4 pb-4 text-xs text-subtle sm:px-6">
