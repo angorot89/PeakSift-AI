@@ -4,6 +4,7 @@ import uuid
 
 from kombu.exceptions import OperationalError
 
+from app.workers.auto_edit_tasks import plan_auto_edit_task
 from app.workers.broll_tasks import suggest_broll_task
 from app.workers.caption_tasks import generate_caption_track_task
 from app.workers.clip_detection_tasks import detect_clips
@@ -71,6 +72,15 @@ def enqueue_caption_track(caption_track_id: uuid.UUID, *, task_id: str) -> str:
         generate_caption_track_task.apply_async(
             args=[str(caption_track_id)], task_id=task_id, retry=False
         )
+    except OperationalError as error:
+        raise JobQueueUnavailable("The job queue is unavailable") from error
+    return task_id
+
+
+def enqueue_auto_edit_plan(plan_id: uuid.UUID, *, task_id: str) -> str:
+    """Queue `plan_auto_edit` under a pre-chosen task id and return it."""
+    try:
+        plan_auto_edit_task.apply_async(args=[str(plan_id)], task_id=task_id, retry=False)
     except OperationalError as error:
         raise JobQueueUnavailable("The job queue is unavailable") from error
     return task_id
