@@ -1,7 +1,16 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bestSceneLabel, isPreparing, matchReason, searchNote, searchText, STRENGTH_LABEL } from "./visual-search.ts";
+import {
+  bestSceneLabel,
+  isPreparing,
+  matchedTo,
+  matchReason,
+  sceneOffset,
+  searchNote,
+  searchText,
+  STRENGTH_LABEL,
+} from "./visual-search.ts";
 
 describe("visual search rules", () => {
   it("sends clean, bounded text", () => {
@@ -36,6 +45,23 @@ describe("visual search rules", () => {
       searchNote({ visual_search_used: false, assets_preparing: 0 }),
       "Searching names, descriptions and tags only right now.",
     );
+  });
+
+  it("starts a video element at its matched scene, never past the end (as the server does)", () => {
+    assert.equal(sceneOffset(8.4, 2.5, 20), 7.15);
+    assert.equal(sceneOffset(0.3, 2.5, 20), 0);
+    assert.equal(sceneOffset(19.5, 2.5, 20), 17.5);
+    assert.equal(sceneOffset(12, 2.5, 12.495), 9.99);
+    assert.equal(sceneOffset(null, 2.5, 20), 0);
+    assert.equal(sceneOffset(4, 3, 3), 0);
+    assert.equal(sceneOffset(Number.NaN, 2.5, 20), 0);
+    for (const scene of [0, 3.3, 9.9, 19.99]) assert.ok(sceneOffset(scene, 2.5, 20) + 2.5 <= 20);
+  });
+
+  it("says how a suggestion's asset matched", () => {
+    assert.equal(matchedTo("visual", "bridge joint"), "Matched visually to “bridge joint”");
+    assert.equal(matchedTo("visual_and_metadata", "bridge joint"), "Matched visually to “bridge joint”");
+    assert.equal(matchedTo("metadata", "bridge joint"), "Matched by its name or tags");
   });
 
   it("labels a video's best scene", () => {
