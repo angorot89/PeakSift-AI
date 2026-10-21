@@ -53,9 +53,11 @@ so the browser talks to one origin. If you publish to YouTube, register
   (about 600 MB into `SEMANTIC_MODEL_DIR`, `/models/clip-vit-b-32`; pinned revisions, size and
   SHA-256). Without it, uploads still work and each asset reports "visual search unavailable";
   after installing, `exec worker python -m app.cli.semantic reindex --failed` indexes them.
-  The worker loads the model on its first indexing job (about 600 MB of memory per worker
-  process; keep `CELERY_CONCURRENCY=1`, or set `SEMANTIC_QUEUE=semantic` and run a dedicated
-  worker with `-Q semantic --concurrency 1`). After changing the model, `python -m app.cli.semantic
+  The worker loads the model on its first indexing job (about 1 GB of memory per worker
+  process with both encoders; keep `CELERY_CONCURRENCY=1`, or set `SEMANTIC_QUEUE=semantic` and
+  run a dedicated worker with `-Q semantic --concurrency 1`). The API mounts the same `models`
+  volume read-only and loads only the text encoder, on the first search (about 0.5 GB per API
+  process: size `WEB_CONCURRENCY` accordingly, or set `SEMANTIC_PROVIDER=disabled`). After changing the model, `python -m app.cli.semantic
   status` shows stale assets and `reindex` (default: stale and never-indexed) refreshes them.
 - **Scratch:** `/work` volumes hold only in-flight job files. Run
   `docker compose … exec worker python -m app.cli.media cleanup --apply` daily to remove

@@ -91,6 +91,8 @@ services:
       minio-init: { condition: service_completed_successfully }
     volumes:
       - work_api:/work
+      # Read-only: semantic search embeds query text with the model the worker installed.
+      - models:/models:ro
     restart: unless-stopped
 
   worker:
