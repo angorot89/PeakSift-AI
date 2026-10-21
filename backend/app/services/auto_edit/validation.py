@@ -59,6 +59,9 @@ EXPLANATIONS_VERSION = "auto_edit_explanations_v1"
 SFX_GAIN_DB = -10.0  # transition sounds stay well under the voice
 HOOK_GROUNDING_SHARE = 0.6  # at least this share of a hook's content words must be in the clip
 _HANDLE = re.compile(r"\b(?:suggestion|visual_asset|music|sfx)_\d+\b")
+_INTERNAL = re.compile(
+    r"\b(candidate|handle|schema|json|proposal|planner|recipe bounds?)\b", re.IGNORECASE
+)
 _TOKEN = re.compile(r"[^\W\d_][\w'’-]*", re.UNICODE)
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 _STOP = frozenset(
@@ -115,7 +118,11 @@ def _explanation(proposed: str, unchanged: bool, server: str) -> str:
     """A planner's sentence only when its section was accepted unchanged and it is clean."""
     if unchanged:
         text = clean_text(proposed, EXPLANATION_MAX_CHARS)
-        readable = text[:1].isupper() and "_" not in text  # a sentence, not an identifier
+        readable = (
+            text[:1].isupper()
+            and "_" not in text  # a sentence, not an identifier
+            and not _INTERNAL.search(text)  # no internal vocabulary creators never see
+        )
         if 8 <= len(text) and readable and not _HANDLE.search(text) and "://" not in text:
             return text
     return server
@@ -465,8 +472,14 @@ def _audio(proposal, context, recipe, cutaways, notes) -> tuple[dict | None, dic
         if "music" in mix
         else "The voice comes first: the original audio, evenly loud."
     )
-    reason = _explanation(proposal.explanations.audio, unchanged, server)
-    return mix, {"choice": ", ".join(parts).capitalize(), "reason": reason}
+    # A planner's sentence about music must match the mix (no "music" talk without music).
+    talks_music = bool(
+        re.search(r"\b(music|ducking|ducked|track)\b", proposal.explanations.audio, re.I)
+    )
+    consistent = talks_music == ("music" in mix)
+    reason = _explanation(proposal.explanations.audio, unchanged and consistent, server)
+    choice = ", ".join(parts)
+    return mix, {"choice": choice[:1].upper() + choice[1:], "reason": reason}  # keeps "dB"
 
 
 # --- the plan -----------------------------------------------------------------------------------

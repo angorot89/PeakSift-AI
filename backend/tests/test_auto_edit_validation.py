@@ -120,7 +120,13 @@ def test_a_good_proposal_becomes_a_normal_edit_configuration():
 
 @pytest.mark.parametrize(
     "sentence",
-    ["center_crop for a clean and simple look.", "boxed captions for a clear read.", "ok"],
+    [
+        "center_crop for a clean and simple look.",
+        "boxed captions for a clear read.",
+        "ok",
+        "Used the candidate hook to draw attention.",
+        "Chosen from the JSON input.",
+    ],
 )
 def test_identifier_like_or_lowercase_explanations_are_rewritten(sentence):
     plan = validate(layout__mode="center_crop", explanations__layout=sentence)
@@ -345,6 +351,27 @@ def test_no_visuals_when_the_server_cannot_draw_them():
 
 
 # --- audio ----------------------------------------------------------------------------------------
+
+
+def test_the_audio_choice_keeps_its_units():
+    plan = validate(audio__use_music=True, audio__music_level="low", audio__transition_sounds=True)
+    choice = plan.explanations["sections"]["audio"]["choice"]
+    assert (
+        choice == "Original audio, normalized, music -20 dB with medium ducking, 1 transition sound"
+    )
+
+
+def test_an_audio_sentence_about_music_needs_music_in_the_mix():
+    plan = validate(
+        context=ctx(music=None),
+        audio__use_music=False,
+        explanations__audio="Kept music levels quiet and ducking strong for the voice.",
+    )
+    assert plan.explanations["sections"]["audio"]["reason"] == (
+        "The voice comes first: the original audio, evenly loud."
+    )
+    kept = validate(audio__use_music=False, explanations__audio="The voice stays clear and even.")
+    assert kept.explanations["sections"]["audio"]["reason"] == "The voice stays clear and even."
 
 
 def test_music_only_from_the_creators_track_at_recipe_levels():
