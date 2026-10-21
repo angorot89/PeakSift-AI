@@ -198,6 +198,38 @@ Delivered:
 - Acceptance: a real-stack run (HTTPS proxy, gunicorn, worker, PostgreSQL, Redis, MinIO, FFmpeg,
   Ollama) from upload to downloaded short, and visual/UX review at 1440, 1024, 768 and 375 px
 
+## V1.2 — Auto Edit & Creator Intelligence
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests on
+top of the unmerged V1.1 stack wait for GitHub Actions (unavailable because of account
+billing); nothing is merged or tagged. V1.1 must be merged and released first.
+
+A generated clip becomes a reviewable first draft: PeakSift reads what it already knows, a
+planner chooses options inside a creator recipe, the server validates every choice, the creator
+reviews and applies — and the plan becomes a normal edit rendered by the existing renderer. See
+[auto-edit.md](auto-edit.md).
+
+Delivered:
+
+- `AutoEditPlan` with a source fingerprint (equal inputs reuse a plan), attempt ownership,
+  stage-based progress and an immutable applied state
+- Four versioned recipes (Clean, Punchy, Story, Minimal): preferences and bounds within the
+  renderer's allow-lists
+- A planner contract with symbolic handles (no ids reach a model), a local Ollama planner
+  (JSON schema, one corrective attempt, per-clip constraints in the prompt, time-bounded) and
+  a deterministic fallback planner
+- An authoritative server validator: handles → ids, recipe bounds, grounded hooks, matching
+  assets only, safe degradation with creator-facing notes
+- A Celery planning job that consumes completed analyses (never starts them) and the Auto
+  Edit API (create, status, retry, regenerate, apply as a normal edit)
+- The Auto Edit page (recipes, honest stages, review with explanations, apply, edit choices,
+  try another plan, history) and entry points on the clip card and in the editor
+- Editor hydration from a version, a plan or the newest version, race-safe, with Reset to
+  defaults
+- B-roll suggestions "used" only while a visual fulfils them; the asset chooser opens fresh
+- Hardening, a deterministic quality benchmark (no scores), CI steps and a render matrix,
+  real-stack and visual/UX acceptance
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -212,6 +244,7 @@ Delivered:
 - V0.9 Audio & Sound Design — COMPLETE
 - V1.0 Production & Publishing — COMPLETE (released as v1.0.0 after a live private YouTube upload)
 - V1.1 B-roll & Visual Enrichment — IMPLEMENTATION COMPLETE, pending CI/merge/release
+- V1.2 Auto Edit & Creator Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 
