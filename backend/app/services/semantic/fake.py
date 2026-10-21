@@ -36,9 +36,15 @@ FAKE_IDENTITY = EmbeddingIdentity(
 CONCEPTS: dict[str, tuple[tuple[int, int, int], tuple[str, ...]]] = {
     "bridge": ((40, 90, 200), ("bridge", "bridges", "truss", "joint", "structure", "span")),
     "rocket": ((220, 60, 40), ("rocket", "launch", "spacecraft", "liftoff", "launchpad")),
-    "kitchen": ((240, 200, 40), ("kitchen", "food", "cooking", "chef", "recipe", "meal")),
+    "kitchen": (
+        (240, 200, 40),
+        ("kitchen", "food", "cooking", "chef", "recipe", "meal", "salad", "eat"),
+    ),
     "city": ((120, 120, 140), ("city", "skyline", "downtown", "skyscraper", "street")),
-    "car": ((30, 160, 70), ("car", "driving", "road", "vehicle", "dashboard", "interior")),
+    "car": (
+        (30, 160, 70),
+        ("car", "driving", "road", "vehicle", "dashboard", "interior", "steering", "wheel"),
+    ),
     "microphone": ((150, 60, 170), ("microphone", "podcast", "studio", "mic", "recording")),
 }
 _WORD = re.compile(r"[a-z]+")
