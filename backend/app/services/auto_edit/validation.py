@@ -334,11 +334,16 @@ def _visuals(proposal, context, recipe, report, notes):
     choices = proposal.visuals
     options = {option.handle: option for option in context.broll}
     assets = {asset.handle: asset for asset in context.visual_assets}
-    server_none = (
-        "No project asset matched a B-roll suggestion."
-        if context.broll
-        else "There were no B-roll suggestions for this clip."
-    )
+    if not context.broll:
+        server_none = "There were no B-roll suggestions for this clip."
+    elif any(option.matches for option in context.broll):
+        # Something was offered, but only as a possible match: say so, never "no match".
+        server_none = (
+            "No project visual strongly matched a B-roll suggestion; possible matches are "
+            "offered in the editor."
+        )
+    else:
+        server_none = "No project asset matched a B-roll suggestion."
     if not choices:
         reason = _explanation(proposal.explanations.visuals, True, server_none)
         return [], [], {"choice": "No visuals", "reason": reason}
