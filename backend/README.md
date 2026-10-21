@@ -5,7 +5,7 @@ FastAPI service with a PostgreSQL database (SQLAlchemy 2 + Alembic) and a Celery
 ## Prerequisites
 
 - Python 3.11+ (check with `python3 --version`)
-- PostgreSQL 14+ — either Docker (`docker compose up -d` from the repository root) or a local installation
+- PostgreSQL 14+ with the pgvector extension installed on the server (the migrations run `CREATE EXTENSION IF NOT EXISTS vector`) — either Docker (`docker compose up -d` from the repository root, `pgvector/pgvector:pg16`) or a local installation plus pgvector
 - FFmpeg with libass (`ffprobe` reads uploaded metadata; `ffmpeg` extracts audio and renders clips and shorts): `apt install ffmpeg` on Ubuntu; on macOS `brew install ffmpeg-full` and set `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`, `FFPROBE_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffprobe` in `.env` (Homebrew's default `ffmpeg` has no libass, so captioned shorts are refused). Without FFmpeg uploads still succeed but end in status `failed`.
 - Caption fonts: Noto Sans + Noto Sans Arabic (`apt install fonts-noto-core` / `brew install --cask font-noto-sans font-noto-sans-arabic`). No font files are committed.
 - Redis 7+ — either Docker Compose (included) or `brew install redis && brew services start redis`. It is the broker for background jobs; the API starts without it, but queuing a job fails with `503` until it is reachable.

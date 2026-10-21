@@ -26,6 +26,7 @@ dependencies = [
     "google-auth-oauthlib>=1.2,<2",  # OAuth authorization-code flow with PKCE (official)
     "google-api-python-client>=2.170,<3",  # YouTube Data API: resumable videos.insert (official)
     "pillow>=12,<14",  # visual assets: content-based image decoding, EXIF orientation, thumbnails
+    "pgvector>=0.5,<0.6",  # semantic visual search: the PostgreSQL vector type (official binding)
 ]
 
 [project.optional-dependencies]

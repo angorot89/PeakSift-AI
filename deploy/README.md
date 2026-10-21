@@ -9,7 +9,8 @@
 | `api` | `deploy/backend.Dockerfile` target `api` | gunicorn + `uvicorn-worker` (`WEB_CONCURRENCY`, default 2), user `peaksift` (uid 10001) |
 | `worker` | target `worker` | Celery, one job per process (`CELERY_CONCURRENCY`, default 1), FFmpeg with libass and the caption fonts |
 | `migrate` | target `api` | one-shot `alembic upgrade head` before the API and worker start |
-| `postgres`, `redis` | official images | data and the job broker / rate limiter (password-protected) |
+| `postgres` | `deploy/postgres.Dockerfile` (the official `postgres:16-alpine` image plus pgvector built from a pinned release) | data, including the semantic visual-search vectors |
+| `redis` | official image | the job broker / rate limiter (password-protected) |
 | `minio`, `minio-init` | `deploy/minio.Dockerfile` (MinIO and `mc` built from source at pinned releases — MinIO no longer publishes community images) | private media bucket; `minio-init` creates it (never public) and an application user limited to it |
 
 Nothing secret is baked into an image or written in the compose file: every credential

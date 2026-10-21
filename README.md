@@ -70,7 +70,7 @@ Details: [docs/architecture.md](docs/architecture.md), [backend/README.md](backe
 
 - Node.js 20.9+
 - Python 3.11+
-- PostgreSQL 14+ — either Docker (`docker compose up -d`, which creates the `peaksift` and `peaksift_test` databases) or a local installation
+- PostgreSQL 14+ with the [pgvector](https://github.com/pgvector/pgvector) extension available (the migrations create it) — either Docker (`docker compose up -d`, which creates the `peaksift` and `peaksift_test` databases on the `pgvector/pgvector:pg16` image) or a local installation plus pgvector (`brew install pgvector` for Homebrew's current PostgreSQL, or build it for your server version: `make PG_CONFIG=… && make install`)
 - FFmpeg (`ffprobe` for metadata, `ffmpeg` for audio and rendering): `apt install ffmpeg` on Ubuntu. On macOS use `brew install ffmpeg-full` and set `FFMPEG_PATH` / `FFPROBE_PATH` to `/opt/homebrew/opt/ffmpeg-full/bin/…` — Homebrew's default `ffmpeg` has no libass, so captioned shorts are refused with it. Without FFmpeg uploads end in status `failed` and transcription cannot run.
 - Caption fonts: Noto Sans (and Noto Sans Arabic) — `apt install fonts-noto-core` / `brew install --cask font-noto-sans font-noto-sans-arabic`.
 - Redis 7+ — Docker Compose (included) or `brew install redis && brew services start redis`. Broker for background jobs; the API starts without it, but starting a transcription or a clip detection answers `503` until it is reachable.
