@@ -51,6 +51,7 @@ from app.services.semantic.contract import (
 )
 from app.services.semantic.images import UnusableImage, canonical_rgb
 from app.services.semantic.registry import configured_identity, get_provider
+from app.services.semantic.sampling import SamplingError, sample_video
 from app.services.semantic.state import EmbeddingIdentity
 from app.services.semantic.vectors import InvalidVector, to_unit
 from app.services.storage import (
@@ -94,7 +95,10 @@ def now() -> datetime:
 
 def index_config(settings: Settings) -> dict:
     """The server settings an indexing run uses (recorded on the row; never user input)."""
-    return {"batch_size": settings.semantic_batch_size}
+    return {
+        "batch_size": settings.semantic_batch_size,
+        "video_max_frames": settings.semantic_video_max_frames,
+    }
 
 
 def new_task_id() -> str:
@@ -357,10 +361,31 @@ def image_frames(path: Path, settings: Settings) -> list[Frame]:
     return [Frame(None, image)]
 
 
-def asset_frames(asset: VisualAsset, path: Path, settings: Settings) -> list[Frame]:
+def video_frames(asset: VisualAsset, path: Path, settings: Settings, work: Path) -> list[Frame]:
+    """Representative frames (``sampling.sample_video``: bounded, deterministic, black and
+    duplicate frames skipped), each as canonical pixels with its time in the asset."""
+    try:
+        sampled = sample_video(
+            path,
+            float(asset.duration_seconds or 0.0),
+            work,
+            ffmpeg_path=settings.ffmpeg_path,
+            max_frames=settings.semantic_video_max_frames,
+            timeout=settings.semantic_frame_timeout_seconds,
+        )
+        return [Frame(frame.time, canonical_rgb(frame.image)) for frame in sampled]
+    except SamplingError as error:
+        raise IndexingFailure(error.code, error.message) from None
+    except UnusableImage as error:
+        raise IndexingFailure("unusable_image", str(error)) from None
+
+
+def asset_frames(asset: VisualAsset, path: Path, settings: Settings, work: Path) -> list[Frame]:
     if asset.kind == VisualAssetKind.IMAGE:
         return image_frames(path, settings)
-    raise IndexingFailure("unsupported_kind", "Visual search does not analyse this kind yet")
+    if asset.kind == VisualAssetKind.VIDEO:
+        return video_frames(asset, path, settings, work)
+    raise IndexingFailure("unsupported_kind", "Visual search does not analyse this kind")
 
 
 def _execute(
@@ -387,7 +412,7 @@ def _execute(
             path = storage.fetch(asset.storage_key, work)
         except (ObjectNotFound, InvalidStorageKey):
             raise IndexingFailure("asset_missing", "The visual's file is missing") from None
-        frames = asset_frames(asset, path, settings)
+        frames = asset_frames(asset, path, settings, work)
         if not frames:
             raise IndexingFailure("no_frames", "No usable picture was found in this visual")
         index.frames_total = len(frames)

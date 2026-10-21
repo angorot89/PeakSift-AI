@@ -269,6 +269,10 @@ class Settings(BaseSettings):
     # CPU threads per model session, and images per model call.
     semantic_threads: int = Field(default=2, ge=1, le=16)
     semantic_batch_size: int = Field(default=8, ge=1, le=32)
+    # Videos are represented by at most this many sampled frames (one per ~2 s of B-roll),
+    # whatever their length; each frame extraction may take this long.
+    semantic_video_max_frames: int = Field(default=8, ge=1, le=32)
+    semantic_frame_timeout_seconds: float = Field(default=30, gt=0)
     # Indexing jobs: when a running one counts as stalled, and how often one may be retried.
     semantic_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     semantic_max_attempts: int = Field(default=5, ge=1)
