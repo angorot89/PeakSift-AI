@@ -33,14 +33,15 @@ from app.models import (
 )
 from app.schemas.broll import (
     BrollAnalysisRead,
+    BrollMatchRead,
     BrollStartRequest,
     BrollStateRead,
     BrollSuggestionRead,
     BrollSuggestionUpdate,
 )
 from app.services.broll.config import BrollConfig
-from app.services.broll.matching import likely_matches
 from app.services.broll.pipeline import is_stale
+from app.services.semantic.matching import QueryMatches, match_queries
 from app.workers.dispatch import JobQueueUnavailable, enqueue_broll_analysis, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -105,9 +106,8 @@ def _read(analysis: BrollAnalysis) -> BrollAnalysisRead:
     )
 
 
-def _suggestion(
-    row: BrollSuggestion, library: list[VisualAsset] | None = None
-) -> BrollSuggestionRead:
+def _suggestion(row: BrollSuggestion, found: QueryMatches | None = None) -> BrollSuggestionRead:
+    matches = found.get(row.query) if found else []
     return BrollSuggestionRead(
         id=row.id,
         analysis_id=row.analysis_id,
@@ -116,7 +116,20 @@ def _suggestion(
         query=row.query,
         reason=row.reason,
         status=row.status,
-        matches=[uuid.UUID(i) for i in likely_matches(row.query, library)] if library else [],
+        matches=[match.asset.id for match in matches],
+        match_details=[
+            BrollMatchRead(
+                asset_id=match.asset.id,
+                strength=match.strength.value,
+                method=match.method.value,
+                best_frame_time=(
+                    round(match.best_frame_time, 1)
+                    if match.best_frame_time is not None and match.asset.kind == "video"
+                    else None
+                ),
+            )
+            for match in matches
+        ],
     )
 
 
@@ -146,7 +159,8 @@ def _suggestions(db: DbSession, analysis: BrollAnalysis) -> list[BrollSuggestion
     ).all()
     project_id = analysis.clip.video.project_id
     library = list(db.scalars(select(VisualAsset).where(VisualAsset.project_id == project_id)))
-    return [_suggestion(row, library) for row in rows]
+    found = match_queries(db, project_id, [row.query for row in rows], library, get_settings())
+    return [_suggestion(row, found) for row in rows]
 
 
 def _require_suggestable(clip: Clip) -> None:
