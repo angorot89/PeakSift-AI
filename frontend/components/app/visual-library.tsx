@@ -11,12 +11,20 @@ import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import {
+  bestSceneLabel,
   deleteVisual,
   filterVisuals,
   formatVisualDuration,
   listVisuals,
+  matchReason,
   orientationLabel,
   parseTagText,
+  SEARCH_DEBOUNCE_MS,
+  SEARCH_MAX_CHARS,
+  searchNote,
+  searchText,
+  searchVisuals,
+  STRENGTH_LABEL,
   updateVisual,
   uploadVisual,
   VISUAL_ACCEPT,
@@ -24,6 +32,9 @@ import {
   visualThumbnailUrl,
   type VisualAsset,
   type VisualFilter,
+  type VisualKind,
+  type VisualMatch,
+  type VisualSearchResults,
 } from "@/lib/visuals";
 
 type Filter = VisualFilter;
@@ -32,6 +43,42 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "image", label: "Images" },
   { value: "video", label: "Videos" },
 ];
+
+type Shown = { asset: VisualAsset; match?: VisualMatch };
+type Preview = { asset: VisualAsset; startAt: number | null };
+
+/** Debounced server search; answers to an older query never replace a newer one's. */
+function useVisualSearch(projectId: string, text: string, kind: VisualKind | null, version: number) {
+  const key = text ? `${kind ?? "all"}|${version}|${text}` : "";
+  const [state, setState] = useState<{
+    key: string;
+    results: VisualSearchResults<VisualAsset> | null;
+    error: string | null;
+  }>({ key: "", results: null, error: null });
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await searchVisuals(projectId, text, { kind });
+        if (!cancelled) setState({ key, results, error: null });
+      } catch (failure) {
+        if (!cancelled) setState({ key, results: null, error: errorMessage(failure) });
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [projectId, key, text, kind]);
+  const current = state.key === key;
+  return {
+    searching: Boolean(key) && !current,
+    // The last answer stays on screen while a newer query is on its way (no flicker).
+    results: key ? state.results : null,
+    error: current ? state.error : null,
+  };
+}
 
 type Upload = {
   key: string;
@@ -56,9 +103,20 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const [preview, setPreview] = useState<VisualAsset | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
 
-  const shown = useMemo(() => filterVisuals(assets, filter, query), [assets, filter, query]);
+  const text = searchText(query);
+  const search = useVisualSearch(projectId, text, filter === "all" ? null : filter, added.length + removed.size);
+  const shown: Shown[] = useMemo(() => {
+    if (!text) return filterVisuals(assets, filter, "").map((asset) => ({ asset }));
+    if (search.error) return filterVisuals(assets, filter, text).map((asset) => ({ asset }));
+    // Search answers carry the asset as the server saw it; prefer this page's latest copy.
+    const latest = new Map(assets.map((a) => [a.id, a]));
+    return (search.results?.results ?? [])
+      .filter((hit) => latest.has(hit.asset.id))
+      .map((hit) => ({ asset: latest.get(hit.asset.id) ?? hit.asset, match: hit.match }));
+  }, [assets, filter, text, search.results, search.error]);
+  const note = text && !search.error ? searchNote(search.results) : null;
 
   const busy = uploads.some((u) => u.state === "uploading" || u.state === "processing");
 
@@ -119,32 +177,56 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
           />
         ) : (
           <>
-            <Toolbar filter={filter} onFilter={setFilter} query={query} onQuery={setQuery} />
+            <Toolbar filter={filter} onFilter={setFilter} query={query} onQuery={setQuery} searching={search.searching} />
+            {note ? <p className="text-xs text-muted">{note}</p> : null}
+            {search.error ? (
+              <InlineAlert title="Visual search is unavailable right now">
+                Showing visuals whose name, description or tags match instead.
+              </InlineAlert>
+            ) : null}
             <p className="sr-only" role="status" aria-live="polite">
-              {shown.length} of {assets.length} visual assets shown
+              {search.searching
+                ? "Searching…"
+                : text
+                  ? `${shown.length} visual${shown.length === 1 ? "" : "s"} found`
+                  : `${shown.length} of ${assets.length} visual assets shown`}
             </p>
             {shown.length ? (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label="Visual assets">
-                {shown.map((asset) => (
+              <ul
+                className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+                aria-label={text ? "Search results" : "Visual assets"}
+                aria-busy={search.searching}
+              >
+                {shown.map(({ asset, match }) => (
                   <li key={asset.id}>
-                    <AssetCard projectId={projectId} asset={asset} onOpen={() => setPreview(asset)} />
+                    <AssetCard
+                      projectId={projectId}
+                      asset={asset}
+                      match={match}
+                      onOpen={() => setPreview({ asset, startAt: match?.best_frame_time ?? null })}
+                    />
                   </li>
                 ))}
               </ul>
+            ) : search.searching ? (
+              <p className="text-sm text-muted">Searching…</p>
             ) : (
-              <p className="text-sm text-muted">No visual assets match these filters.</p>
+              <p className="text-sm text-muted">
+                {text ? `No visuals match “${text}”.` : "No visual assets match these filters."}
+              </p>
             )}
           </>
         )}
       </div>
       <PreviewDialog
-        key={preview?.id ?? "closed"}
+        key={preview?.asset.id ?? "closed"}
         projectId={projectId}
-        asset={preview}
+        asset={preview?.asset ?? null}
+        startAt={preview?.startAt ?? null}
         onClose={() => setPreview(null)}
         onUpdated={(asset) => {
           setAdded((previous) => [asset, ...previous.filter((a) => a.id !== asset.id)]);
-          setPreview(asset);
+          setPreview((previous) => ({ asset, startAt: previous?.startAt ?? null }));
         }}
         onDeleted={(id) => {
           setRemoved((previous) => new Set(previous).add(id));
@@ -246,11 +328,13 @@ function Toolbar({
   onFilter,
   query,
   onQuery,
+  searching,
 }: {
   filter: Filter;
   onFilter: (filter: Filter) => void;
   query: string;
   onQuery: (query: string) => void;
+  searching: boolean;
 }) {
   const searchId = useId();
   return (
@@ -270,33 +354,52 @@ function Toolbar({
           </button>
         ))}
       </div>
-      <div className="relative w-full sm:w-64">
+      <div className="w-full sm:w-72">
         <label htmlFor={searchId} className="sr-only">
-          Search visual assets by name
+          Search your visuals
         </label>
-        <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
-        <input
-          id={searchId}
-          type="search"
-          value={query}
-          maxLength={100}
-          onChange={(event) => onQuery(event.target.value)}
-          placeholder="Search by name"
-          className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-3 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
-        />
+        <div className="relative">
+          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            maxLength={SEARCH_MAX_CHARS}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="Search your visuals"
+            aria-describedby={`${searchId}-hint`}
+            className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-9 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+          />
+          {searching ? <Spinner className="absolute top-1/2 right-3 size-4 -translate-y-1/2" /> : null}
+        </div>
+        <p id={`${searchId}-hint`} className="mt-1 text-[11px] text-subtle">
+          Search by what&apos;s in the image or video.
+        </p>
       </div>
     </div>
   );
 }
 
-function AssetCard({ projectId, asset, onOpen }: { projectId: string; asset: VisualAsset; onOpen: () => void }) {
+function AssetCard({
+  projectId,
+  asset,
+  match,
+  onOpen,
+}: {
+  projectId: string;
+  asset: VisualAsset;
+  match?: VisualMatch;
+  onOpen: () => void;
+}) {
   const Icon = asset.kind === "video" ? Film : ImageIcon;
+  const scene = asset.kind === "video" ? bestSceneLabel(match?.best_frame_time) : null;
+  const found = match ? ` — ${STRENGTH_LABEL[match.strength]}, ${matchReason(match).toLowerCase()}${scene ? `, ${scene.toLowerCase()}` : ""}` : "";
   return (
     <button
       type="button"
       onClick={onOpen}
       className="group block w-full overflow-hidden rounded-xl border border-border bg-surface-2 text-left transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      aria-label={`Preview ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})`}
+      aria-label={`Preview ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})${found}`}
     >
       <span className={`relative flex aspect-video items-center justify-center overflow-hidden ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
         {asset.has_thumbnail ? (
@@ -323,6 +426,18 @@ function AssetCard({ projectId, asset, onOpen }: { projectId: string; asset: Vis
           {orientationLabel(asset)}
           {asset.has_alpha ? " · Transparent" : ""}
         </span>
+        {match ? (
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1" title={matchReason(match)}>
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+                match.strength === "strong" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.07] text-muted"
+              }`}
+            >
+              {STRENGTH_LABEL[match.strength]}
+            </span>
+            {scene ? <span className="text-[11px] text-subtle">{scene}</span> : null}
+          </span>
+        ) : null}
       </span>
     </button>
   );
@@ -331,12 +446,15 @@ function AssetCard({ projectId, asset, onOpen }: { projectId: string; asset: Vis
 function PreviewDialog({
   projectId,
   asset,
+  startAt,
   onClose,
   onUpdated,
   onDeleted,
 }: {
   projectId: string;
   asset: VisualAsset | null;
+  /** Videos opened from a search result start at the scene that matched. */
+  startAt: number | null;
   onClose: () => void;
   onUpdated: (asset: VisualAsset) => void;
   onDeleted: (id: string) => void;
@@ -405,6 +523,12 @@ function PreviewDialog({
                   preload="metadata"
                   className="max-h-[60dvh] w-full object-contain"
                   aria-label={`Preview of ${asset.display_name}`}
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+                    if (startAt != null && Number.isFinite(video.duration)) {
+                      video.currentTime = Math.min(Math.max(0, startAt), video.duration);
+                    }
+                  }}
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
@@ -415,6 +539,9 @@ function PreviewDialog({
                 />
               )}
             </div>
+            {asset.kind === "video" && startAt != null ? (
+              <p className="text-xs text-muted">Opened at the scene that matched your search ({bestSceneLabel(startAt)?.replace("Best at ", "")}).</p>
+            ) : null}
             <DetailsForm projectId={projectId} asset={asset} onUpdated={onUpdated} />
             {error ? <InlineAlert title="This visual could not be deleted">{error}</InlineAlert> : null}
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">

@@ -3,6 +3,8 @@
 export type VisualKind = "image" | "video";
 
 /** A project's uploaded image or B-roll video (no storage keys, hashes or paths). */
+import type { VisualSearchStatus } from "./visual-search.ts";
+
 export type VisualAsset = {
   id: string;
   project_id: string;
@@ -22,6 +24,8 @@ export type VisualAsset = {
   description: string;
   tags: string[];
   created_at: string;
+  /** Whether it can be found by what it shows (absent from older responses). */
+  visual_search?: VisualSearchStatus | null;
 };
 
 export type VisualFilter = "all" | VisualKind;

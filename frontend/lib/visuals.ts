@@ -1,7 +1,9 @@
 import { API_URL, ApiError, apiFetch, messageFrom } from "@/lib/api";
 import type { VisualAsset, VisualKind } from "@/lib/visual-rules";
+import { searchText, type VisualSearchResults } from "@/lib/visual-search";
 
 export * from "@/lib/visual-rules";
+export * from "@/lib/visual-search";
 
 export type VisualUploadLimits = {
   max_bytes: number;
@@ -20,6 +22,14 @@ export function listVisuals(projectId: string, filters: { kind?: VisualKind | nu
   if (q) params.set("q", q.slice(0, 100));
   const query = params.toString();
   return apiFetch<VisualAsset[]>(`${base(projectId)}${query ? `?${query}` : ""}`);
+}
+
+/** Search the project's visuals by what they show and by their names, descriptions and tags. */
+export function searchVisuals(projectId: string, text: string, options: { kind?: VisualKind | null; limit?: number } = {}) {
+  const params = new URLSearchParams({ q: searchText(text) });
+  if (options.kind) params.set("kind", options.kind);
+  if (options.limit) params.set("limit", String(options.limit));
+  return apiFetch<VisualSearchResults<VisualAsset>>(`${base(projectId)}/search?${params.toString()}`);
 }
 
 export const getVisualUploadLimits = () => apiFetch<VisualUploadLimits>("/visual-upload-limits");
