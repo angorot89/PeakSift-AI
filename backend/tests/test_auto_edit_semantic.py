@@ -252,3 +252,19 @@ def test_existing_visual_option_shape_is_unchanged():
         "orientation",
         "duration",
     }
+
+
+def test_the_reason_never_says_no_match_when_a_possible_match_was_offered():
+    possible = replace(JOINT, strong_matches=())
+    plan = validate_plan(proposal(), ctx(broll=(possible,)), current_recipe("punchy"))
+    reason = plan.explanations["sections"]["visuals"]["reason"]
+    assert reason == (
+        "No project visual strongly matched a B-roll suggestion; possible matches are "
+        "offered in the editor."
+    )
+    unmatched = replace(JOINT, matches=(), strong_matches=())
+    plan = validate_plan(proposal(visuals=[]), ctx(broll=(unmatched,)), current_recipe("punchy"))
+    assert plan.explanations["sections"]["visuals"]["reason"] in (
+        "No project asset matched a B-roll suggestion.",
+        "Shows the joint.",  # the planner's own sentence, accepted when nothing changed
+    )
