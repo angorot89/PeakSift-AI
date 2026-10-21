@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Film, Image as ImageIcon, Images, Search, Trash2, UploadCloud, X } from "lucide-react";
+import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, UploadCloud, X } from "lucide-react";
 import { type DragEvent, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -10,18 +10,23 @@ import { ProgressBar, Spinner } from "@/components/ui/progress";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+import { usePolling } from "@/lib/use-polling";
 import { useVisualSearch } from "@/components/app/use-visual-search";
 import {
   bestSceneLabel,
   deleteVisual,
+  isPreparing,
   filterVisuals,
   formatVisualDuration,
   listVisuals,
   matchReason,
   orientationLabel,
   parseTagText,
+  retryVisualSearch,
   SEARCH_MAX_CHARS,
   searchNote,
+  asSentence,
+  searchStateLabel,
   searchText,
   STRENGTH_LABEL,
   updateVisual,
@@ -62,8 +67,22 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const assets = useMemo(() => {
     const seen = new Set<string>();
-    return [...added, ...(data ?? [])].filter((a) => !removed.has(a.id) && !seen.has(a.id) && Boolean(seen.add(a.id)));
+    // A locally added or edited copy keeps its details; its visual-search state comes from the
+    // latest load (indexing moves on in the background).
+    const loaded = new Map((data ?? []).map((a) => [a.id, a]));
+    return [...added, ...(data ?? [])]
+      .filter((a) => !removed.has(a.id) && !seen.has(a.id) && Boolean(seen.add(a.id)))
+      .map((a) => {
+        const fresh = loaded.get(a.id);
+        return fresh && fresh !== a ? { ...a, visual_search: fresh.visual_search } : a;
+      });
   }, [added, data, removed]);
+  // While any asset is still being prepared for visual search, refresh the list quietly.
+  usePolling(
+    assets.some((a) => isPreparing(a.visual_search?.state)),
+    async () => reload(),
+    projectId,
+  );
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -191,6 +210,11 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
         onUpdated={(asset) => {
           setAdded((previous) => [asset, ...previous.filter((a) => a.id !== asset.id)]);
           setPreview((previous) => ({ asset, startAt: previous?.startAt ?? null }));
+        }}
+        onRetried={(asset) => {
+          setAdded((previous) => [asset, ...previous.filter((a) => a.id !== asset.id)]);
+          setPreview((previous) => ({ asset, startAt: previous?.startAt ?? null }));
+          reload();
         }}
         onDeleted={(id) => {
           setRemoved((previous) => new Set(previous).add(id));
@@ -363,7 +387,7 @@ function AssetCard({
       type="button"
       onClick={onOpen}
       className="group block w-full overflow-hidden rounded-xl border border-border bg-surface-2 text-left transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      aria-label={`Preview ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})${found}`}
+      aria-label={`Preview ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})${found}${stateNote(asset)}`}
     >
       <span className={`relative flex aspect-video items-center justify-center overflow-hidden ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
         {asset.has_thumbnail ? (
@@ -381,6 +405,7 @@ function AssetCard({
           <Icon aria-hidden="true" className="size-3" />
           {asset.kind === "video" ? formatVisualDuration(asset.duration_seconds ?? 0) : "Image"}
         </span>
+        <SearchStateMark asset={asset} />
       </span>
       <span className="block px-2.5 py-2">
         <span className="block truncate text-[13px] font-medium text-foreground" title={asset.display_name}>
@@ -407,12 +432,79 @@ function AssetCard({
   );
 }
 
+/** Only "preparing" and "unavailable" are marked on a card; ready is the normal state. */
+function stateNote(asset: VisualAsset): string {
+  const state = asset.visual_search?.state;
+  if (state === "failed") return ". Visual search unavailable";
+  if (isPreparing(state)) return ". Preparing visual search";
+  return "";
+}
+
+function SearchStateMark({ asset }: { asset: VisualAsset }) {
+  const state = asset.visual_search?.state;
+  const label = searchStateLabel(asset.visual_search);
+  if (!label || state === "ready") return null;
+  const failed = state === "failed";
+  const Mark = failed ? CircleAlert : Loader;
+  return (
+    <span
+      title={label}
+      className={`absolute top-1.5 right-1.5 inline-flex size-5 items-center justify-center rounded-md bg-black/70 ${failed ? "text-amber-300" : "text-white/80"}`}
+    >
+      <Mark aria-hidden="true" className={`size-3 ${failed ? "" : "motion-safe:animate-spin"}`} />
+    </span>
+  );
+}
+
+function VisualSearchDetails({ projectId, asset, onRetried }: { projectId: string; asset: VisualAsset; onRetried: (asset: VisualAsset) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const status = asset.visual_search;
+  const label = searchStateLabel(status);
+  if (!status || !label) return null;
+  async function retry() {
+    setBusy(true);
+    setError(null);
+    try {
+      onRetried(await retryVisualSearch(projectId, asset.id));
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-[13px] font-medium text-foreground" role="status">
+          {label}
+        </p>
+        <p className="text-xs text-muted">
+          {status.state === "ready"
+            ? "This visual can be found by what it shows."
+            : status.state === "failed"
+              ? `${asSentence(status.message ?? "It could not be analysed")} You can still use it by hand.`
+              : "It can already be used by hand; search by what it shows follows shortly."}
+        </p>
+        {error ? <p className="mt-1 text-xs text-amber-300">{error}</p> : null}
+      </div>
+      {status.state === "failed" && status.can_retry ? (
+        <Button size="sm" variant="secondary" onClick={retry} disabled={busy}>
+          <RotateCcw aria-hidden="true" />
+          {busy ? "Starting…" : "Retry visual analysis"}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function PreviewDialog({
   projectId,
   asset,
   startAt,
   onClose,
   onUpdated,
+  onRetried,
   onDeleted,
 }: {
   projectId: string;
@@ -421,6 +513,7 @@ function PreviewDialog({
   startAt: number | null;
   onClose: () => void;
   onUpdated: (asset: VisualAsset) => void;
+  onRetried: (asset: VisualAsset) => void;
   onDeleted: (id: string) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -506,6 +599,7 @@ function PreviewDialog({
             {asset.kind === "video" && startAt != null ? (
               <p className="text-xs text-muted">Opened at the scene that matched your search ({bestSceneLabel(startAt)?.replace("Best at ", "")}).</p>
             ) : null}
+            <VisualSearchDetails projectId={projectId} asset={asset} onRetried={onRetried} />
             <DetailsForm projectId={projectId} asset={asset} onUpdated={onUpdated} />
             {error ? <InlineAlert title="This visual could not be deleted">{error}</InlineAlert> : null}
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
