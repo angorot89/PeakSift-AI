@@ -256,6 +256,20 @@ class Settings(BaseSettings):
     caption_timing_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     caption_timing_max_attempts: int = Field(default=5, ge=1)
 
+    # --- Semantic visual search (V1.3) ---------------------------------------------------
+    # A local image–text embedding model indexes what each visual asset shows, so search,
+    # B-roll matching and Auto Edit can find a rocket launch in an untagged IMG_1429.mp4.
+    # "clip_onnx" runs OpenAI CLIP ViT-B/32 on onnxruntime (CPU) from SEMANTIC_MODEL_DIR, which
+    # `python scripts/fetch_semantic_model.py` fills once (pinned files, verified sha256); it is
+    # never downloaded automatically. "disabled" turns visual search off (names, descriptions
+    # and tags still match). "fake" is a deterministic stand-in for tests and non-production
+    # stacks (refused in production). Creator media never leaves the server.
+    semantic_provider: Literal["clip_onnx", "disabled", "fake"] = "clip_onnx"
+    semantic_model_dir: str = "./models/clip-vit-b-32"
+    # CPU threads per model session, and images per model call.
+    semantic_threads: int = Field(default=2, ge=1, le=16)
+    semantic_batch_size: int = Field(default=8, ge=1, le=32)
+
     # --- Publishing (V1.0: YouTube) --------------------------------------------------------
     # Off unless explicitly enabled; when on, every setting it needs is validated at startup.
     youtube_publishing_enabled: bool = False
@@ -480,6 +494,8 @@ def production_problems(settings: Settings) -> list[str]:
         problems.append("RATE_LIMIT_ENABLED must be on")
     if settings.publishing_provider != "youtube":
         problems.append("PUBLISHING_PROVIDER must be youtube")
+    if settings.semantic_provider == "fake":
+        problems.append("SEMANTIC_PROVIDER must not be fake")
     if settings.storage_backend == "local" and (
         "media_root" not in explicit or not settings.media_root.is_absolute()
     ):
