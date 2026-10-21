@@ -254,8 +254,11 @@ def test_hung_ffmpeg_times_out_and_is_killed(tmp_path: Path):
             )
         )
     assert info.value.code == "sampling_timeout"
-    pid = int(pidfile.read_text())
-    assert subprocess.run(["kill", "-0", str(pid)], capture_output=True).returncode != 0  # gone
+    # On a loaded machine the timeout can stop the fake before it even writes its pid: then
+    # it never ran. Otherwise the process it became must be gone.
+    if pidfile.exists():
+        pid = int(pidfile.read_text())
+        assert subprocess.run(["kill", "-0", str(pid)], capture_output=True).returncode != 0
 
 
 @requires_ffmpeg

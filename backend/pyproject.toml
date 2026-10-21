@@ -51,6 +51,9 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_model: needs an installed local model (opt-in through an environment variable)",
+]
 filterwarnings = [
     # Starlette's TestClient prefers its own `httpx2` fork, but FastAPI's documented
     # testing stack is official `httpx`. Silence the resulting deprecation notice.
