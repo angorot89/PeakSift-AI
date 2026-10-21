@@ -140,6 +140,16 @@ if visual_project:
         check("visual Range request served", status == 206 and len(part) == 32, f"{status}")
         status, _, body = call("GET", "/api/visual-layout")
         check("visual layout published", status == 200 and b"inset_width_fraction" in body)
+        # Visual search: every asset reports its state, and search answers through the proxy
+        # (the CI stack installs no model, so names, descriptions and tags still match).
+        state = (asset.get("visual_search") or {}).get("state")
+        check("visual search state reported", state in ("queued", "indexing", "ready", "failed",
+              "unavailable"), str(state))  # fmt: skip
+        status, _, body = call("GET", f"{base}/search?q=smoke")
+        found = json.loads(body or b"{}") if status == 200 else {}
+        ids = [hit.get("asset", {}).get("id") for hit in found.get("results", [])]
+        check("visual search answers through the proxy", status == 200 and asset["id"] in ids
+              and b"embedding" not in body, f"{status}")  # fmt: skip
         status, _, body = call("DELETE", f"{base}/{asset['id']}")
         removed = json.loads(body or b"{}").get("media_files_removed")
         check("unused visual deleted with its thumbnail", status == 200 and removed == 2, f"{status} {removed}")

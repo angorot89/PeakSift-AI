@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - name: Unit tests (status sync, captions, audio mix, publishing, security headers, visual assets and elements, Auto Edit display, editor hydration)
+      - name: Unit tests (status sync, captions, audio mix, publishing, security headers, visual assets and elements, Auto Edit display, editor hydration, visual search)
         run: npm test
       - name: Type check
         # Next generates the route types (LayoutProps, PageProps) first; then plain tsc.
@@ -86,6 +86,10 @@ jobs:
       # the provider tests use a mocked transport or an in-process fake server.
       OLLAMA_BASE_URL: http://127.0.0.1:9
       OLLAMA_CONNECT_TIMEOUT_SECONDS: "1"
+      # Semantic visual search: the deterministic fake embedding provider. CI never downloads
+      # the CLIP model (scripts/fetch_semantic_model.py is an operator step); the real model
+      # has opt-in tests (pytest -m real_model with PEAKSIFT_REAL_SEMANTIC_MODEL_DIR).
+      SEMANTIC_PROVIDER: "fake"
     steps:
       - uses: actions/checkout@v4
       - name: No model weights or media are tracked
@@ -175,6 +179,10 @@ jobs:
         # server: fails on any invalid configuration. Descriptive QA, no score. The same check
         # runs against a local model with --planner ollama (never in CI).
         run: python scripts/auto_edit_benchmark.py
+      - name: Semantic match benchmark (deterministic fake provider, no weights)
+        # Safety gates: no false strong match, every negative query quiet, every positive
+        # query's first result relevant. The real-model run is local acceptance (--model-dir).
+        run: python scripts/semantic_benchmark.py --calibrate
       - uses: docker/setup-buildx-action@v3
       - name: Build MinIO from source (MinIO publishes no community images; layers cached)
         uses: docker/build-push-action@v6
@@ -231,6 +239,21 @@ jobs:
           tests/test_auto_edit_pipeline.py tests/test_auto_edit_api.py
           tests/test_auto_edit_hardening.py tests/test_auto_edit_benchmark.py
           tests/test_auto_edit_ci_matrix.py
+      - name: V1.3 semantic asset suites (live S3 required, listed separately for visibility)
+        # pgvector domain and migrations, the embedding contract and CLIP provider (fake ONNX
+        # sessions), image and video indexing, the pipeline and operator command, hybrid search,
+        # B-roll matching, Auto Edit with semantic matches, index management, performance,
+        # hardening, the benchmark and the CI matrix (index/search/match on MinIO).
+        env:
+          REQUIRE_LIVE_S3: "1"
+        run: >-
+          pytest -rs -q tests/test_semantic_domain.py tests/test_semantic_provider.py
+          tests/test_semantic_indexing.py tests/test_semantic_video.py
+          tests/test_semantic_lifecycle.py tests/test_semantic_search.py
+          tests/test_semantic_broll_matching.py tests/test_auto_edit_semantic.py
+          tests/test_semantic_management.py tests/test_semantic_performance.py
+          tests/test_semantic_hardening.py tests/test_semantic_benchmark.py
+          tests/test_semantic_ci_matrix.py
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
 
