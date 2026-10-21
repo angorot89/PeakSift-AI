@@ -308,7 +308,11 @@ Settings: `AUTO_EDIT_PLANNER_PROVIDER` (`ollama` or `fallback`), `AUTO_EDIT_OLLA
 python scripts/fetch_semantic_model.py         # once per server: pinned files, verified sha256
 python -m app.cli.semantic status              # assets per state for the current model
 python -m app.cli.semantic reindex [--stale] [--missing] [--failed] [--project ID] [--limit N] [--dry-run]
+python scripts/semantic_search_probe.py --database-url postgresql+psycopg://…/empty_scratch_db \
+    [--model-dir ./models/clip-vit-b-32]       # text-embedding and vector-scan timings on this machine
 ```
+
+Where the model runs: workers load the image encoder (and the text encoder) on their first indexing job; the API loads only the text encoder, on the first search that needs it, and reuses it for the life of the process — a search never downloads media, it compares the query with stored vectors. Measured on an Apple-silicon laptop (CPU, 2 threads): text encoder load about 0.4 s and about 0.5 GB per process, then about 32 ms per new query (cached repeats are free); a scoped scan of one project's 1,600 vectors among 81,600 stored took a median 7.7 ms; a worker holding both encoders peaked at about 1 GB.
 
 Settings: `SEMANTIC_PROVIDER` (`clip_onnx`, `disabled`, or `fake` outside production), `SEMANTIC_MODEL_DIR`, `SEMANTIC_THREADS`, `SEMANTIC_BATCH_SIZE`, `SEMANTIC_VIDEO_MAX_FRAMES`, `SEMANTIC_FRAME_TIMEOUT_SECONDS`, `SEMANTIC_QUEUE`, `SEMANTIC_STALE_AFTER_SECONDS`, `SEMANTIC_MAX_ATTEMPTS`. A worker process holds one copy of the model (about 600 MB) once it indexes; keep one job per worker process. To keep inference off the default queue, set `SEMANTIC_QUEUE=semantic` and run `celery -A app.workers.celery_app worker -Q semantic --concurrency 1` next to the regular worker.
 

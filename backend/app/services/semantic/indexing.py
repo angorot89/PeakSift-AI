@@ -32,6 +32,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import delete, select
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -148,8 +149,14 @@ def request_index(
             status=SemanticIndexStatus.QUEUED,
             celery_task_id=new_task_id(),
         )
-        db.add(index)
-        db.commit()
+        try:
+            db.add(index)
+            db.commit()
+        except IntegrityError:
+            # Another request created it at the same moment (two uploads of one file, a double
+            # click): that request starts the job; this one has nothing to do.
+            db.rollback()
+            return None
         return index
     if index.status == SemanticIndexStatus.READY:
         return None
