@@ -249,6 +249,7 @@ def rank_assets(
 # --- thresholds (versioned per model) ------------------------------------------------------------
 
 # Calibrated on the semantic benchmark (scripts/semantic_benchmark.py; docs/semantic-assets.md).
+# Similarity cut-offs, not probabilities.
 # They belong to one model identity: a different model gets its own entry, never these numbers.
 THRESHOLDS: dict[tuple[str, str, str, str], Thresholds] = {}
 
@@ -267,7 +268,11 @@ def _register_known() -> None:
 
     register_thresholds(
         CLIP_IDENTITY,
-        Thresholds(strong=0.26, possible=0.225, prompt="a photo of {query}", version="clip-b32-v1"),
+        # Benchmark (25 public-domain / CC0 assets, 20 positive and 5 negative queries): every
+        # relevant asset ranked first; at these cut-offs 0 false strong matches and every
+        # negative query quiet. The nearest wrong match ("driving to work in the morning" → a
+        # snowy mountain photo) scored 0.265, so "strong" starts above it with a margin.
+        Thresholds(strong=0.27, possible=0.23, prompt="a photo of {query}", version="clip-b32-v1"),
     )
     register_thresholds(
         FAKE_IDENTITY, Thresholds(strong=0.6, possible=0.4, prompt="{query}", version="fake-v1")
