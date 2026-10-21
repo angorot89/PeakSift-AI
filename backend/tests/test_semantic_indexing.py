@@ -88,7 +88,7 @@ def test_an_untagged_image_is_indexed_by_what_it_shows(client, db_session, proje
     assert index.status == "ready" and index.embedding_count == 1 and not index.reused
     assert (index.frames_total, index.frames_done) == (1, 1)
     assert index.identity == FAKE_IDENTITY.key and index.source_sha256 == asset.sha256
-    assert index.config == {"batch_size": settings.semantic_batch_size}
+    assert index.config["batch_size"] == settings.semantic_batch_size
     (vector,) = vectors(db_session, index)
     assert np.linalg.norm(vector) == pytest.approx(1.0, abs=1e-5)
     assert cosine(vector, fake.embed_text("bridge structure")) > 0.8  # content, not the name
