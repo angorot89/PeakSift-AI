@@ -302,12 +302,13 @@ Settings: `AUTO_EDIT_PLANNER_PROVIDER` (`ollama` or `fallback`), `AUTO_EDIT_OLLA
 
 ## Semantic visual search
 
-`app/services/semantic/` indexes what each visual asset shows with a local image–text model (OpenAI CLIP ViT-B/32 on onnxruntime; nothing leaves the server): `contract.py` (provider contract), `clip_onnx.py` (pinned ONNX model, lazy per-process sessions), `fake.py` (deterministic stand-in for tests, refused in production), `images.py` (canonical pixels), `sampling.py` (bounded video frames), `indexing.py` (the fenced Celery job `peaksift.index_visual_asset`) and `lifecycle.py` (uploads start indexing in the background; the API reports each asset's `visual_search` state). Vectors are stored in PostgreSQL with pgvector.
+`app/services/semantic/` indexes what each visual asset shows with a local image–text model (OpenAI CLIP ViT-B/32 on onnxruntime; nothing leaves the server): `contract.py` (provider contract), `clip_onnx.py` (pinned ONNX model, lazy per-process sessions), `fake.py` (deterministic stand-in for tests, refused in production), `images.py` (canonical pixels), `sampling.py` (bounded video frames), `indexing.py` (the fenced Celery job `peaksift.index_visual_asset`) `lifecycle.py` (uploads start indexing in the background; the API reports each asset's `visual_search` state; bounded lazy reindex after a model change), `search.py` (hybrid search: bounded query cache, an exact project-scoped pgvector scan keeping each asset's best frame, strong / possible tiers with per-model versioned thresholds), `matching.py` (B-roll matches and safe scene offsets) and `benchmark.py`. Vectors are stored in PostgreSQL with pgvector. Endpoints: `GET /projects/{id}/visual-assets/search?q=` and `POST /projects/{id}/visual-assets/{asset_id}/visual-search/retry`; B-roll suggestions carry `match_details`. Full design: [docs/semantic-assets.md](../docs/semantic-assets.md).
 
 ```bash
 python scripts/fetch_semantic_model.py         # once per server: pinned files, verified sha256
 python -m app.cli.semantic status              # assets per state for the current model
 python -m app.cli.semantic reindex [--stale] [--missing] [--failed] [--project ID] [--limit N] [--dry-run]
+python scripts/semantic_benchmark.py          # fake provider (CI); add --model-dir DIR --media DIR [--calibrate]
 python scripts/semantic_search_probe.py --database-url postgresql+psycopg://…/empty_scratch_db \
     [--model-dir ./models/clip-vit-b-32]       # text-embedding and vector-scan timings on this machine
 ```

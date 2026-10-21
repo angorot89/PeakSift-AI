@@ -230,6 +230,41 @@ Delivered:
 - Hardening, a deterministic quality benchmark (no scores), CI steps and a render matrix,
   real-stack and visual/UX acceptance
 
+## V1.3 — Semantic Asset Intelligence
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests on
+top of the unmerged V1.2 stack (itself on V1.1) wait for GitHub Actions (unavailable because of
+account billing); nothing is merged or tagged. V1.1 and then V1.2 must be merged and released
+first.
+
+PeakSift understands what a creator's own images and videos show, locally: untagged visuals are
+found by content, matched to B-roll suggestions and placed by Auto Edit when the match is
+strong. See [semantic-assets.md](semantic-assets.md).
+
+Delivered:
+
+- A semantic index per asset and model identity (provider, model, revision, representation
+  version, dimension) with pgvector storage (`vector(512)`), stale detection on model change,
+  attempt ownership and honest progress
+- A provider contract and a local OpenAI CLIP ViT-B/32 provider on onnxruntime (pinned,
+  sha256-verified ONNX exports; lazy, one per process; no new ML framework); a deterministic
+  fake for tests (refused in production)
+- Image indexing (safe decode, EXIF, transparency on neutral grey, reuse within one owner) and
+  bounded video frame sampling (black, flat and duplicate frames skipped; per-frame vectors with
+  times)
+- A background pipeline from the upload lifecycle (never blocking an upload), an optional
+  dedicated queue, an operator `status` / `reindex` command, lazy bounded reindexing after a
+  model change, and creator retries
+- Hybrid search (what visuals show + names, descriptions, tags) with strong / possible tiers and
+  versioned, benchmark-calibrated thresholds; "Search your visuals" in the library
+- Semantic B-roll matching with match details and scene offsets; Auto Edit places strong
+  matches only (planner contract v2, server-computed offsets, honest explanations and
+  abstention)
+- Match previews and a pre-filled chooser in the editor; subtle indexing states
+- Performance and memory measurements, hardening, a semantic benchmark with safety gates, CI
+  steps (fake provider, no weights), real-model acceptance (22/22) and visual/UX acceptance at
+  1440, 1024, 768 and 375 px (153/153)
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -245,6 +280,7 @@ Delivered:
 - V1.0 Production & Publishing — COMPLETE (released as v1.0.0 after a live private YouTube upload)
 - V1.1 B-roll & Visual Enrichment — IMPLEMENTATION COMPLETE, pending CI/merge/release
 - V1.2 Auto Edit & Creator Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.3 Semantic Asset Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 

@@ -87,7 +87,7 @@ components/
                    # controls, caption controls + caption layer (live dynamic captions),
                    # audio panel + audio timeline (music, effects, waveforms),
                    # smart-reframe panel + focal-point picker, visuals panel + visuals layer
-                   # (live preview) + asset chooser, versions; visual-library (project page)
+                   # (live preview) + asset chooser, versions; visual-library (project page: Search your visuals, states, retry); use-visual-search (debounced search hook)
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
   ui/              # Design system: Button/ButtonLink (one shape; primary/secondary/ghost/danger,
@@ -111,7 +111,8 @@ lib/
   status-sync.ts   # Status ordering and polling that never moves backwards (unit-tested)
   reframe.ts       # Smart reframing: analysis start/status/path/retry, plain-language copy, crop geometry
                    # and the renderer's path interpolation (used by the live preview)
-  visuals.ts       # Visual assets: list, details, limits, XHR upload with progress, content/thumbnail URLs
+  visuals.ts       # Visual assets: list, details, limits, XHR upload with progress, content/thumbnail URLs, visual search and retry
+  visual-search.ts # Visual search rules: states, strength tiers and reasons, scene labels and offsets (unit-tested)
   visual-rules.ts  # The edit's visuals section: rules shared with the renderer (unit-tested)
   visual-elements.ts # Inset geometry, asset time and fade opacity for the live preview (unit-tested)
   broll.ts         # B-roll suggestions: start/status/retry, decisions, method labels

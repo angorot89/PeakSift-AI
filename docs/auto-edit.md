@@ -268,3 +268,11 @@ No test downloads a model or media; CI runs no model.
   instead).
 - Versions made with an older framing analysis or word timing open with the current ones (the
   editor says so).
+
+## Since V1.3: semantic asset matches
+
+Auto Edit's B-roll matches now include what each asset *shows* (local embeddings), not only its
+words. Planners see each match as **strong** or **possible** (never a number); only strong matches
+may be placed, a video starts at its matched scene (offset computed by the server), and when
+nothing matches strongly no visual is added. The planner contract is `auto_edit_planner_v2`. See
+[semantic-assets.md](semantic-assets.md#auto-edit-integration).
