@@ -27,11 +27,15 @@ from app.schemas.project import MediaDeletionRead
 from app.schemas.visual_asset import (
     VisualAssetRead,
     VisualAssetUpdate,
+    VisualMatchRead,
+    VisualSearchHit,
     VisualSearchRead,
+    VisualSearchResults,
     VisualUploadLimits,
 )
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
 from app.services.semantic.lifecycle import start_indexing_quietly, visual_search_status
+from app.services.semantic.search import clean_query, search_project
 from app.services.video_upload import UploadValidationError, check_declared_size
 from app.services.visual_assets import (
     ACCEPTED_EXTENSIONS,
@@ -47,6 +51,8 @@ limits_router = APIRouter(tags=["visuals"])
 
 MAX_LIST = 200
 MAX_QUERY_LENGTH = 100
+MAX_SEARCH_INPUT = 200  # longer input is refused; the searched text is at most 100 characters
+MAX_SEARCH_RESULTS = 50
 
 
 def get_owned_visual(asset_id: uuid.UUID, project: OwnedProject, db: DbSession) -> VisualAsset:
@@ -163,6 +169,49 @@ def list_visuals(
         )
     statement = statement.order_by(VisualAsset.created_at.desc(), VisualAsset.id).limit(limit)
     return [_read(asset) for asset in db.scalars(statement)]
+
+
+@router.get("/search", response_model=VisualSearchResults, dependencies=[per_user("visual_search")])
+def search_visuals(
+    project: OwnedProject,
+    db: DbSession,
+    q: Annotated[str, Query(max_length=MAX_SEARCH_INPUT)],
+    kind: Annotated[VisualAssetKind | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_SEARCH_RESULTS)] = 20,
+) -> VisualSearchResults:
+    """Search this project's visuals by what they show and by their names, descriptions and
+    tags. Strongest first; only matches are returned (an unrelated asset is never padded in).
+    Without visual search (turned off, still preparing, model unavailable) the words still
+    match, and the response says so."""
+    query = clean_query(q)
+    if not query:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Type what you are looking for",
+        )
+    outcome = search_project(
+        db, project.id, query, get_settings(), kind=kind.value if kind else None, limit=limit
+    )
+    return VisualSearchResults(
+        query=query,
+        visual_search_used=outcome.visual_used,
+        assets_preparing=outcome.preparing,
+        results=[
+            VisualSearchHit(
+                asset=_read(match.asset),
+                match=VisualMatchRead(
+                    strength=match.strength.value,
+                    method=match.method.value,
+                    best_frame_time=(
+                        round(match.best_frame_time, 1)
+                        if match.best_frame_time is not None and match.asset.kind == "video"
+                        else None
+                    ),
+                ),
+            )
+            for match in outcome.matches
+        ],
+    )
 
 
 @router.get("/{asset_id}", response_model=VisualAssetRead)
