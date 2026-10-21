@@ -307,3 +307,16 @@ handles), validates the proposal into a normal `EditConfig` (`validation.py`) an
 `AutoEditPlan` (`app/models/auto_edit.py`) in the fenced Celery job `peaksift.plan_auto_edit`
 (`pipeline.py`, `state.py`). Applying a plan goes through the edit API's own
 `create_or_reuse_edit`, so the renderer is unchanged. Details: [auto-edit.md](auto-edit.md).
+
+## Semantic asset intelligence (V1.3)
+
+`app/services/semantic/` indexes what each visual asset shows with a local image–text model
+(CLIP ViT-B/32 on onnxruntime, `clip_onnx.py`, behind the `contract.py` provider boundary). Uploads
+request an index (`lifecycle.py`, `indexing.py`) that the fenced Celery job
+`peaksift.index_visual_asset` fills: StorageProvider → attempt workspace → canonical pixels
+(`images.py`) or bounded video frames (`sampling.py`) → validated unit vectors in PostgreSQL
+(`visual_semantic_indexes`, `visual_asset_embeddings`, pgvector). `search.py` ranks a project's
+assets for a query (exact scoped scan of the current model's vectors + the V1.1 word matcher, in
+strong / possible tiers); `matching.py` does the same for B-roll suggestions and turns a video's
+best scene into a safe offset. Auto Edit's `sources.py` uses those matches, and only strong ones
+may be placed. Details: [semantic-assets.md](semantic-assets.md).

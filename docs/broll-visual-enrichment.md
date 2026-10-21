@@ -325,6 +325,7 @@ No test downloads media or a model; fixtures are generated at test time.
 ## Known limitations (V1.1)
 
 - Matching is word-based: an untagged `IMG_4021.jpg` will not match anything. Tag assets.
+  *(Since V1.3, assets are also matched by what they show — see [semantic-assets.md](semantic-assets.md).)*
 - A small local model can return few or no suggestions for a clip, and suggestions that fail
   grounding are dropped, not repaired; the keyword fallback finds only proper names.
 - Keyword timing without word timestamps is estimated from text position.

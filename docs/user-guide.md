@@ -33,11 +33,12 @@ the first draft (see below).
     **Punch**, **Minimal** or **Boxed** — a position, and an optional opening hook. The
     **Safe area** guide shows where platform buttons cover the screen.
 13. **Add visuals (optional).** On the project page, upload your own images (JPEG, PNG, WebP)
-    and B-roll videos (MP4, MOV, WebM) to the **Visual assets** library; give them a description and
-    tags that say what they show. In the editor's **Visuals** section, **Suggest B-roll** asks
-    the local AI where a visual would help and what it should show — each suggestion lists
-    your matching assets (by tags, name and description) to use in one click — or **Add
-    visual** to choose any asset. Each visual is a **Cutaway** (replaces the picture; your
+    and B-roll videos (MP4, MOV, WebM) to the **Visual assets** library. PeakSift prepares
+    **visual search** for each one in the background, so you can find it by what it shows
+    (see "Visual search" below); a description and tags still help. In the editor's
+    **Visuals** section, **Suggest B-roll** asks the local AI where a visual would help and
+    what it should show — each suggestion lists your **best matches** (by what they show and by
+    their words) to use in one click — or **Add visual** to choose any asset. Each visual is a **Cutaway** (replaces the picture; your
     voice keeps playing), **Picture-in-picture** or an image **Overlay**, with start/end,
     position, size, opacity, the video's start point, looping and a cut or fade. Captions
     and the hook always stay on top. B-roll sound is never used.
@@ -81,8 +82,45 @@ always review it, and you can change anything before it renders.
    1920 MP4.
 8. **Publish or download.** **Download short**, or **Publish to YouTube** (step 17).
 
-Auto Edit chooses only between options the editor already has, from your own media. It does not
-publish, search for or generate media, or predict how a short will perform.
+Auto Edit chooses only between options the editor already has, from your own media. It places a
+visual only when it strongly matches a suggestion, by what it shows or by its words, and says
+which. It does not publish, search the internet for or generate media, or predict how a short
+will perform.
+
+## Visual search — find your visuals by what they show
+
+1. **Upload your visual assets** to a project's **Visual assets** library, as always. Camera
+   names like `IMG_7834.jpg` are fine; tags are optional.
+2. **PeakSift prepares visual search automatically.** A local model on PeakSift's own server
+   looks at each image (and a few frames of each video); nothing is sent anywhere. A card shows
+   **Preparing visual search** for a moment. You can use the asset right away.
+3. **Search by what appears in the visual.** Type in **Search your visuals**, for example
+   "rocket launch", "bridge", "city skyline" or "microphone". Results show **Strong match** or
+   **Possible match**. A video shows where its best scene is (**Best at 0:08**), and its preview
+   opens there.
+4. **Generate B-roll suggestions** in the editor's **Visuals** section (**Suggest B-roll**).
+5. **Review the visually matched assets.** Each suggestion lists its **Best matches** with
+   *Matched visually to “…”* or *Matched by its name or tags*. **Preview** a match (a video
+   opens at its matched scene). **Use asset** opens a chooser that already searches for the
+   suggestion's words; clear it to browse everything.
+6. **Use them by hand, or through Auto Edit.** **Use** places a match; a video starts at its
+   matched scene. Auto Edit places only **strong** matches and tells you how each was matched.
+   Possible matches stay for you to decide.
+7. **Render** as usual.
+
+If a visual cannot be analysed (for example a video that is completely black), its card shows
+**Visual search unavailable**. You can still use it by hand, and **Retry visual analysis** in
+its preview tries again without re-uploading.
+
+Good to know about visual search:
+
+- It finds pictures that *look* like your words. That is not understanding: a photo of an
+  intact bridge can "match" a sentence about a bridge collapsing. Always review what you use.
+- Long videos are judged by a few sampled frames, so a very brief moment can be missed.
+- It works best for common objects and scenes, and less well for abstract ideas, text inside
+  images, or specific people or places. It never recognises faces.
+- There is no internet or stock search, and nothing is generated: it only searches **your**
+  uploads.
 
 ## Good to know
 
