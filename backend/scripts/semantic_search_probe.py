@@ -51,7 +51,12 @@ def main() -> int:
     from app.core.config import get_settings
     from app.models import EMBEDDING_DIMENSIONS
     from app.services.semantic.registry import configured_identity, get_provider
-    from app.services.semantic.search import QUERY_CACHE, query_vector, thresholds_for, visual_scores
+    from app.services.semantic.search import (
+        QUERY_CACHE,
+        query_vector,
+        thresholds_for,
+        visual_scores,
+    )
 
     backend = Path(__file__).resolve().parents[1]
     config = Config(backend / "alembic.ini")
@@ -94,8 +99,10 @@ def main() -> int:
                     raw = rng.standard_normal((args.frames, EMBEDDING_DIMENSIONS))
                     raw /= np.linalg.norm(raw, axis=1, keepdims=True)
                     for f in range(args.frames):
-                        vectors.append({"id": uuid.uuid4(), "index": index, "frame": f,
-                                        "time": 0.5 + f, "vector": str(raw[f].tolist())})  # fmt: skip
+                        vectors.append(
+                            {"id": uuid.uuid4(), "index": index, "frame": f, "time": 0.5 + f,
+                             "vector": str(raw[f].tolist())}
+                        )  # fmt: skip
                 connection.execute(
                     text("INSERT INTO visual_assets (id, project_id, kind, display_name, "
                          "storage_key, content_type, file_size, sha256, width, height, "
@@ -124,8 +131,11 @@ def main() -> int:
                 )  # fmt: skip
             connection.execute(text("ANALYZE"))
         total = (1 + args.other_projects) * args.assets * args.frames
-        print(f"filled {total} vectors ({1 + args.other_projects} projects × {args.assets} "
-              f"assets × {args.frames} frames) in {time.perf_counter() - started:.1f} s")  # fmt: skip
+        seconds = time.perf_counter() - started
+        print(
+            f"filled {total} vectors ({1 + args.other_projects} projects × {args.assets} assets × "
+            f"{args.frames} frames) in {seconds:.1f} s"
+        )
 
         # --- text embedding ---------------------------------------------------------------
         provider = get_provider(settings)
@@ -157,8 +167,10 @@ def main() -> int:
                 t0 = time.perf_counter()
                 found = visual_scores(db, target, identity, vector)
                 scans.append(time.perf_counter() - t0)
-        print(f"scoped vector scan: {len(found)} assets ({args.assets * args.frames} vectors of "
-              f"{total}) median {_median_ms(scans)} ms, max {max(scans) * 1000:.1f} ms")  # fmt: skip
+        print(
+            f"scoped vector scan: {len(found)} assets ({args.assets * args.frames} vectors of "
+            f"{total}) median {_median_ms(scans)} ms, max {max(scans) * 1000:.1f} ms"
+        )
         return 0
     finally:
         command.downgrade(config, "base")
