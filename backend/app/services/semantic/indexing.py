@@ -34,6 +34,7 @@ from sqlalchemy import delete, select
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError, StaleDataError
 
 from app.core.config import Settings, get_settings
 from app.models import (
@@ -301,7 +302,16 @@ def finish(
     index.frames_total = index.frames_done = len(vectors)
     index.reused = reused
     index.completed_at = index.heartbeat_at = now()
-    db.commit()
+    try:
+        db.commit()
+    except (IntegrityError, StaleDataError):
+        # The asset (or its project) was deleted by another process in the instant between the
+        # ownership check and this commit (the row update finds nothing, or the vectors' index
+        # is gone): the vectors have nothing left to describe. Stop quietly.
+        db.rollback()
+        if not still_owner(index, db, task_id):
+            raise IndexSuperseded() from None
+        raise
 
 
 # --- the work -------------------------------------------------------------------------------
@@ -473,7 +483,10 @@ def run_semantic_index(
 
     try:
         _execute(index, db, settings, storage, provider, task_id)
-    except IndexSuperseded:
+    except (IndexSuperseded, ObjectDeletedError):
+        # ObjectDeletedError: the row vanished (asset or project deleted by another process)
+        # and an expired attribute could not be reloaded — the same as being removed.
+        db.rollback()
         logger.info("Semantic index %s was taken over or removed; stopping", index_id)
     except IndexingFailure as error:
         record(error.code, error.message)
