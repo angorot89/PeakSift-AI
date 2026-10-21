@@ -404,6 +404,7 @@ Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-Aft
 | `register_ip` | 10 per hour | client address | `POST /auth/register` |
 | `video_upload` / `audio_upload` / `visual_upload` | 30 / 100 / 200 per hour | user | video, audio and visual uploads |
 | `broll_suggest` | 60 per hour | user | B-roll suggestions: start and retry |
+| `visual_search` | 600 per hour | user | searching a project's visuals (each new query embeds its text once) |
 | `auto_edit` | 60 per hour | user | Auto Edit plans: create, retry, regenerate (apply counts as `edit_render`) |
 | `transcription`, `clip_detection` | 30 per hour each | user | start and retry |
 | `clip_render`, `edit_render` | 200 per hour each | user | start and retry (an edit request counts even when it returns an existing edit) |

@@ -46,6 +46,26 @@ class VisualAssetRead(BaseModel):
     visual_search: VisualSearchRead | None = None
 
 
+class VisualMatchRead(BaseModel):
+    """Why an asset was found: a strength tier and the signal — never a score or percentage."""
+
+    strength: str  # strong / possible
+    method: str  # visual (what it shows) / metadata (name, description, tags) / both
+    best_frame_time: float | None = None  # videos found by what they show: the best scene (s)
+
+
+class VisualSearchHit(BaseModel):
+    asset: VisualAssetRead
+    match: VisualMatchRead
+
+
+class VisualSearchResults(BaseModel):
+    query: str  # the cleaned query that was searched
+    visual_search_used: bool  # False: names, descriptions and tags only
+    assets_preparing: int  # assets not yet searchable by what they show
+    results: list[VisualSearchHit]
+
+
 class VisualUploadLimits(BaseModel):
     max_bytes: int
     max_video_duration_seconds: float
