@@ -42,7 +42,8 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:16
+        # PostgreSQL 16 with pgvector (the semantic index stores vectors), official image.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

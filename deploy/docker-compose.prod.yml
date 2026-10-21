@@ -110,7 +110,11 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    # postgres:16-alpine plus pgvector (semantic visual search), built from a pinned release.
+    build:
+      context: .
+      dockerfile: postgres.Dockerfile
+    image: peaksift-postgres:${IMAGE_TAG:-local}
     environment:
       POSTGRES_USER: peaksift
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}

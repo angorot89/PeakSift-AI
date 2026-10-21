@@ -7,7 +7,9 @@
 
 services:
   postgres:
-    image: postgres:16
+    # PostgreSQL 16 with pgvector (semantic visual search stores vectors). Same Debian base
+    # as the plain postgres:16 image, so an existing data volume keeps working.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

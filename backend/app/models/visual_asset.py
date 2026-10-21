@@ -25,6 +25,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.project import Project
+    from app.models.semantic import VisualSemanticIndex
 
 
 class VisualAssetKind(StrEnum):
@@ -109,6 +110,10 @@ class VisualAsset(Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="visual_assets")
+    # Visual-search indexes (one per embedding model); never needed to use the asset.
+    semantic_indexes: Mapped[list["VisualSemanticIndex"]] = relationship(
+        back_populates="asset", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     @property
     def has_thumbnail(self) -> bool:

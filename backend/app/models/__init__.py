@@ -59,6 +59,13 @@ from app.models.reframe import (
     ReframeKeyframe,
     ReframeStatus,
 )
+from app.models.semantic import (
+    ACTIVE_SEMANTIC_INDEX_STATUSES,
+    EMBEDDING_DIMENSIONS,
+    AssetEmbedding,
+    SemanticIndexStatus,
+    VisualSemanticIndex,
+)
 from app.models.transcription import (
     ACTIVE_TRANSCRIPTION_STATUSES,
     Transcription,
@@ -118,6 +125,11 @@ __all__ = [
     "ReframeConfidence",
     "ReframeKeyframe",
     "ReframeStatus",
+    "ACTIVE_SEMANTIC_INDEX_STATUSES",
+    "EMBEDDING_DIMENSIONS",
+    "AssetEmbedding",
+    "SemanticIndexStatus",
+    "VisualSemanticIndex",
     "Transcription",
     "TranscriptionStatus",
     "TranscriptSegment",
