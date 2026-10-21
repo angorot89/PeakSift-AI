@@ -269,6 +269,9 @@ class Settings(BaseSettings):
     # CPU threads per model session, and images per model call.
     semantic_threads: int = Field(default=2, ge=1, le=16)
     semantic_batch_size: int = Field(default=8, ge=1, le=32)
+    # Indexing jobs: when a running one counts as stalled, and how often one may be retried.
+    semantic_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    semantic_max_attempts: int = Field(default=5, ge=1)
 
     # --- Publishing (V1.0: YouTube) --------------------------------------------------------
     # Off unless explicitly enabled; when on, every setting it needs is validated at startup.

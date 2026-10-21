@@ -46,6 +46,7 @@ celery_app = Celery(
         "app.workers.caption_tasks",
         "app.workers.broll_tasks",
         "app.workers.auto_edit_tasks",
+        "app.workers.semantic_tasks",
         "app.workers.publish_tasks",
     ],
 )
