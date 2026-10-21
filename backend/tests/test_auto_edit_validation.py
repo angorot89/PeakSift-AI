@@ -44,7 +44,8 @@ LINES = (
 )
 JOINT = BrollOption("suggestion_1", 10.2, 12.7, "bridge joint", "Shows the weak joint",
                     ("visual_asset_1",), ("visual_asset_1",))  # fmt: skip
-LAB = BrollOption("suggestion_2", 3.5, 6.0, "lesson bench", "The lesson", ("visual_asset_2",))
+LAB = BrollOption("suggestion_2", 3.5, 6.0, "lesson bench", "The lesson", ("visual_asset_2",),
+                  ("visual_asset_2",))  # fmt: skip
 BRIDGE = VisualOption("visual_asset_1", "image", "toothpick-bridge.jpg", "Bridge model",
                       ("bridge", "joint"), "landscape")  # fmt: skip
 LAUNCH = VisualOption("visual_asset_2", "video", "launch.mp4", "", ("lesson",), "landscape", 1.0)
@@ -143,7 +144,9 @@ def test_explanations_are_product_copy_without_handles_or_ids():
     sections = plan.explanations["sections"]
     assert sections["layout"]["reason"] == "Strong face tracking is available."
     assert "visual_asset" not in sections["visuals"]["reason"]
-    assert sections["visuals"]["reason"] == "Supports “bridge joint”."
+    assert sections["visuals"]["reason"] == (
+        "Supports “bridge joint” with a visual whose name or tags match it."
+    )
     assert sections["visuals"]["items"][0]["asset_name"] == "toothpick-bridge.jpg"
     assert not UUID.search(json.dumps(plan.explanations))
 

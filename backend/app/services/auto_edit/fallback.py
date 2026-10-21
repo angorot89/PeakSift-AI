@@ -14,7 +14,8 @@ The rules, inside the recipe's bounds:
   recipe's default preset and position (the validator picks word or phrase timing).
 - **Hook:** the clip candidate's own hook when it is concise enough to fit; never new text.
 - **Visuals:** at most one cutaway, and only for a suggestion whose project asset is a
-  *strong* match (it covers nearly the whole query) and that is long enough for the recipe.
+  *strong* match — by what it shows or by its words (``semantic/matching.py``) — and that is
+  long enough for the recipe. A *possible* match is never placed.
 - **Audio:** the source is kept as is (normalized as usual); music only when the creator chose
   a track for this plan, at the recipe's quietest level with its ducking; no sound effects.
 
@@ -91,10 +92,10 @@ def _visuals(context: AutoEditContext) -> tuple[list[dict], str]:
                 continue
             return (
                 [{"suggestion": option.handle, "asset": handle, "mode": "cutaway"}],
-                f"One cutaway where a project asset clearly matches “{option.query}”.",
+                f"One cutaway where a project visual strongly matches “{option.query}”.",
             )
     if context.broll:
-        return [], "No project asset clearly matched a B-roll suggestion, so none was added."
+        return [], "No project visual strongly matched a B-roll suggestion, so none was added."
     return [], "There were no B-roll suggestions for this clip."
 
 

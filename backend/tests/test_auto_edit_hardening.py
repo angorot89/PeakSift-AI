@@ -207,8 +207,10 @@ def test_reapplying_a_plan_whose_version_was_deleted_explains_itself(client, db_
 
 def test_clashing_visuals_are_explained_as_clashes():
     recipe = replace(current_recipe("punchy"), min_gap_seconds=0.0)
-    first = BrollOption("suggestion_1", 10.2, 12.7, "bridge joint", "Joint", ("visual_asset_1",))
-    second = BrollOption("suggestion_2", 11.0, 13.5, "bridge model", "Model", ("visual_asset_2",))
+    first = BrollOption("suggestion_1", 10.2, 12.7, "bridge joint", "Joint", ("visual_asset_1",),
+                        ("visual_asset_1",))  # fmt: skip
+    second = BrollOption("suggestion_2", 11.0, 13.5, "bridge model", "Model", ("visual_asset_2",),
+                         ("visual_asset_2",))  # fmt: skip
     model = VisualOption(
         "visual_asset_2", "image", "model.jpg", "", ("bridge", "model"), "landscape"
     )

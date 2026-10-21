@@ -52,6 +52,7 @@ from app.services.clip_edit.hook import (
     HookConfig,
     normalize_hook_text,
 )
+from app.services.semantic.matching import asset_offset
 from app.services.visuals.assets import VisualsProblem, check_visuals
 from app.services.visuals.config import VisualMode, VisualsConfig
 
@@ -92,6 +93,7 @@ class ValidationReport:
 
     unknown_handles: int = 0  # handles the server never issued (invented by the planner)
     unmatched_assets: int = 0  # real assets attached to a suggestion they do not match
+    possible_matches: int = 0  # matches only "possible": offered to the creator, never placed
     degraded: list[str] = field(default_factory=list)
 
 
@@ -305,7 +307,9 @@ def _hook(proposal, context, recipe, caption_position, notes) -> tuple[dict, dic
     }
 
 
-def _element(option: BrollOption, asset_id: str, mode: str, recipe: Recipe) -> dict[str, Any]:
+def _element(
+    option: BrollOption, asset_id: str, mode: str, recipe: Recipe, offset: float = 0.0
+) -> dict[str, Any]:
     element: dict[str, Any] = {
         "asset_id": asset_id,
         "mode": mode,
@@ -313,6 +317,8 @@ def _element(option: BrollOption, asset_id: str, mode: str, recipe: Recipe) -> d
         "end_seconds": option.end,
         "transition": recipe.transition.value,
     }
+    if offset > 0:  # a video's matched scene, computed by the server (never by a planner)
+        element["asset_offset_seconds"] = offset
     if recipe.transition.value == "fade":
         element["transition_seconds"] = min(
             recipe.transition_seconds, (option.end - option.start) / 2
@@ -361,6 +367,14 @@ def _visuals(proposal, context, recipe, report, notes):
             )
             dropped += 1
             continue
+        if choice.asset not in option.strong_matches:
+            report.possible_matches += 1
+            notes.append(
+                f"A visual for “{option.query}” was left out: the closest asset was only a "
+                "possible match. Review it in the editor if you want it."
+            )
+            dropped += 1
+            continue
         if any(o.handle == option.handle for o in kept_options):
             dropped += 1
             continue
@@ -383,7 +397,12 @@ def _visuals(proposal, context, recipe, report, notes):
             continue
         mode = choice.mode if choice.mode in modes else modes[0]
         asset = assets[choice.asset]
-        element = _element(option, context.visual_ids[choice.asset], mode, recipe)
+        offset = (
+            asset_offset(option.scene(choice.asset), option.end - option.start, asset.duration)
+            if asset.kind == "video"
+            else 0.0
+        )
+        element = _element(option, context.visual_ids[choice.asset], mode, recipe, offset)
         try:
             single = VisualsConfig.create({"elements": [element]})
             stand_in = SimpleNamespace(kind=asset.kind, duration_seconds=asset.duration)
@@ -402,8 +421,10 @@ def _visuals(proposal, context, recipe, report, notes):
             continue
         kept.append(element)
         kept_options.append(option)
+        matched = "visual" if choice.asset in option.visual_matches else "words"
         items.append({"start": option.start, "end": option.end, "mode": mode,
-                      "asset_name": asset.name, "query": option.query})  # fmt: skip
+                      "asset_name": asset.name, "query": option.query, "kind": asset.kind,
+                      "matched": matched})  # fmt: skip
     if paced:
         notes.append(
             f"{paced} suggested visual{'s were' if paced > 1 else ' was'} left out to keep "
@@ -417,10 +438,22 @@ def _visuals(proposal, context, recipe, report, notes):
     label = (
         f"{count} cutaway{'s' if count > 1 else ''}" if kinds == {"cutaway"} else f"{count} visuals"
     )
-    server = "Supports " + "; ".join(f"“{o.query}”" for o in kept_options) + "."
-    reason = _explanation(proposal.explanations.visuals, unchanged, server)
+    reason = _explanation(proposal.explanations.visuals, unchanged, _visuals_reason(items))
     used = [context.suggestion_ids[o.handle] for o in kept_options]
     return kept, used, {"choice": label, "reason": reason, "items": items}
+
+
+def _visuals_reason(items: list[dict[str, Any]]) -> str:
+    """The server's own sentence: what was matched to what, and how — never a score."""
+    if len(items) == 1:
+        item = items[0]
+        if item["matched"] == "visual":
+            return f"Matched this {item['kind']} to “{item['query']}” by what it shows."
+        return f"Supports “{item['query']}” with a visual whose name or tags match it."
+    text = "Supports " + "; ".join(f"“{item['query']}”" for item in items) + "."
+    if any(item["matched"] == "visual" for item in items):
+        text += " Visuals were matched by what they show."
+    return text
 
 
 def _audio(proposal, context, recipe, cutaways, notes) -> tuple[dict | None, dict[str, str]]:

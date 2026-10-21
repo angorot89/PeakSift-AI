@@ -144,7 +144,11 @@ def test_the_planner_view_has_handles_and_facts_but_never_ids():
     text = json.dumps(view)
     assert not UUID.search(text)
     assert "6f1c0a1e" not in text
-    assert view["broll_suggestions"][0]["matching_assets"] == ["visual_asset_1"]
+    # Categories, never scores: a match without the strong tier is only "possible".
+    assert view["broll_suggestions"][0]["matching_assets"] == [
+        {"asset": "visual_asset_1", "strength": "possible"}
+    ]
+    assert "score" not in text and "similarity" not in text
     assert view["available"]["music"] == MUSIC_HANDLE
     assert view["available"]["transition_sounds"] == ["sfx_1"]
     assert view["recipe"]["recipe"] == "punchy"

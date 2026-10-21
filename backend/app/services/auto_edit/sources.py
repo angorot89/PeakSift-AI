@@ -9,7 +9,8 @@ offers those separately, and a plan uses whatever is ready:
 - the completed word-timing track and framing analysis made with the server's *current*
   settings (the same ones the editor shows), and the framing confidence;
 - the current completed B-roll analysis — dismissed suggestions are never planned — with the
-  project's assets that match each suggestion (and which matches are strong);
+  project's assets that match each suggestion by what they show and by their words
+  (``semantic/matching.py``), as strong or possible matches, and a matched video's best scene;
 - the music track the creator explicitly chose for this plan, and the project's sound effects
   whose names mark them as transition sounds ("whoosh", "swoosh", "transition", …);
 - what this server can draw (text overlays, visuals) and the source's orientation.
@@ -26,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings
 from app.models import (
@@ -47,7 +48,6 @@ from app.models import (
 from app.services.auto_edit.config import AutoEditRequest
 from app.services.auto_edit.contract import (
     MUSIC_HANDLE,
-    STRONG_MATCH_SCORE,
     AudioOption,
     AutoEditContext,
     BrollOption,
@@ -64,11 +64,14 @@ from app.services.auto_edit.fingerprint import (
 )
 from app.services.auto_edit.recipes import recipe_version
 from app.services.broll.config import BrollConfig
-from app.services.broll.matching import AssetTerms, likely_matches, match_score
 from app.services.broll.pipeline import PipelineFailure, clip_lines
 from app.services.caption_timing.config import CaptionTimingConfig
 from app.services.clip_edit.composition import supports_captions, supports_visuals
 from app.services.reframe.config import ReframeConfig
+from app.services.semantic.matching import match_queries
+from app.services.semantic.registry import configured_identity
+from app.services.semantic.search import MatchMethod, Strength, thresholds_for
+from app.services.semantic.state import current_index
 from app.services.storage import InvalidStorageKey, StorageProvider
 
 TRANSITION_SOUND = re.compile(
@@ -198,6 +201,7 @@ def gather(
     library = list(
         db.scalars(
             select(VisualAsset)
+            .options(selectinload(VisualAsset.semantic_indexes))
             .where(VisualAsset.project_id == project_id)
             .order_by(VisualAsset.created_at, VisualAsset.id)
         )
@@ -221,23 +225,30 @@ def gather(
     present: dict[str, bool] = {}
     options: list[BrollOption] = []
     suggestion_ids: dict[str, str] = {}
+    found = match_queries(db, project_id, [s.query for s in suggestions], library, settings)
     for index, suggestion in enumerate(suggestions, start=1):
         handle = f"suggestion_{index}"
         suggestion_ids[handle] = str(suggestion.id)
         matched: list[str] = []
         strong: list[str] = []
-        for asset_id in likely_matches(suggestion.query, library):
-            asset = by_id[asset_id]
+        visual: list[str] = []
+        scenes: list[tuple[str, float]] = []
+        for match in found.get(suggestion.query):
+            asset_id = str(match.asset.id)
             if asset_id not in present:
-                present[asset_id] = _present(storage, asset.storage_key)
+                present[asset_id] = _present(storage, match.asset.storage_key)
             if not present[asset_id]:
                 continue
             asset_handle = visual_handles.setdefault(
                 asset_id, f"visual_asset_{len(visual_handles) + 1}"
             )
             matched.append(asset_handle)
-            if match_score(suggestion.query, AssetTerms.of(asset)) >= STRONG_MATCH_SCORE:
+            if match.strength == Strength.STRONG:
                 strong.append(asset_handle)
+            if match.method in (MatchMethod.VISUAL, MatchMethod.BOTH):
+                visual.append(asset_handle)
+            if match.best_frame_time is not None and match.asset.kind == "video":
+                scenes.append((asset_handle, float(match.best_frame_time)))
         options.append(
             BrollOption(
                 handle=handle,
@@ -247,6 +258,8 @@ def gather(
                 reason=suggestion.reason,
                 matches=tuple(matched),
                 strong_matches=tuple(strong),
+                visual_matches=tuple(visual),
+                best_scenes=tuple(scenes),
             )
         )
     visual_options = tuple(
@@ -333,8 +346,20 @@ def gather(
         suggestion_ids=suggestion_ids,
         audio_ids=audio_ids,
     )
+    identity = configured_identity(settings)
+    thresholds = thresholds_for(identity)
+
+    def semantic_fact(asset: VisualAsset) -> str | None:
+        index = current_index(asset.semantic_indexes, identity)
+        return f"{index.status}:{index.id}" if index is not None else None
+
     sources = PlanSources(
         clip_id=str(clip.id),
+        matching=(
+            f"{identity.provider}:{identity.model}:{identity.model_version}:{thresholds.version}"
+            if identity is not None and thresholds is not None
+            else None
+        ),
         clip_artifact=clip.storage_key,
         clip_duration=duration,
         transcript_fingerprint=_transcript_fingerprint(lines),
@@ -357,6 +382,7 @@ def gather(
                 height=asset.height,
                 duration=asset.duration_seconds,
                 has_alpha=bool(asset.has_alpha),
+                semantic=semantic_fact(asset),
             )
             for asset in library
         ),
