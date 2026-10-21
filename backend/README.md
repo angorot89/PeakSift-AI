@@ -289,6 +289,17 @@ python scripts/visual_render_probe.py   # ten generated visual cases through the
 
 The full design and limitations are in [docs/broll-visual-enrichment.md](../docs/broll-visual-enrichment.md).
 
+## Auto Edit
+
+`app/services/auto_edit/` plans an edit for a generated clip: `sources.py` gathers the completed inputs (never starts jobs), `contract.py` defines the planner boundary (symbolic handles, strict `AutoEditProposal`), `ollama.py` asks the local model (JSON schema, per-clip constraints, one corrective attempt, `AUTO_EDIT_TIMEOUT_SECONDS`), `fallback.py` is the deterministic planner, `validation.py` turns any proposal into a normal `EditConfig`, and `pipeline.py` / `state.py` run the fenced Celery job `peaksift.plan_auto_edit`. Recipes live in `recipes.py` (versioned).
+
+```bash
+python scripts/auto_edit_benchmark.py                   # six cases x four recipes, rules (CI)
+python scripts/auto_edit_benchmark.py --planner ollama  # the same with the local model
+```
+
+Settings: `AUTO_EDIT_PLANNER_PROVIDER` (`ollama` or `fallback`), `AUTO_EDIT_OLLAMA_MODEL`, `AUTO_EDIT_FALLBACK_ENABLED`, `AUTO_EDIT_TIMEOUT_SECONDS`, `AUTO_EDIT_STALE_AFTER_SECONDS`, `AUTO_EDIT_MAX_ATTEMPTS`. Details: [docs/auto-edit.md](../docs/auto-edit.md).
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.
@@ -381,6 +392,7 @@ Redis fixed-window budgets, answered with `429 Too Many Requests` and `Retry-Aft
 | `register_ip` | 10 per hour | client address | `POST /auth/register` |
 | `video_upload` / `audio_upload` / `visual_upload` | 30 / 100 / 200 per hour | user | video, audio and visual uploads |
 | `broll_suggest` | 60 per hour | user | B-roll suggestions: start and retry |
+| `auto_edit` | 60 per hour | user | Auto Edit plans: create, retry, regenerate (apply counts as `edit_render`) |
 | `transcription`, `clip_detection` | 30 per hour each | user | start and retry |
 | `clip_render`, `edit_render` | 200 per hour each | user | start and retry (an edit request counts even when it returns an existing edit) |
 | `reframe`, `caption_timing` | 100 per hour each | user | start and retry |

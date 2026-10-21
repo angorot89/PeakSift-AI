@@ -298,3 +298,12 @@ clip's words; matching is computed by the API. An edit's optional `visuals` sect
 (`app/services/visuals/`) is drawn by `compose_short` between framing and captions:
 `[framed]` → visual layers → `[visual]` → captions + hook. Details:
 [broll-visual-enrichment.md](broll-visual-enrichment.md).
+
+## Auto Edit (V1.2)
+
+`app/services/auto_edit/` gathers a clip's completed inputs (`sources.py`), asks a planner
+(`ollama.py` or the deterministic `fallback.py`, behind the `contract.py` boundary with symbolic
+handles), validates the proposal into a normal `EditConfig` (`validation.py`) and stores it on an
+`AutoEditPlan` (`app/models/auto_edit.py`) in the fenced Celery job `peaksift.plan_auto_edit`
+(`pipeline.py`, `state.py`). Applying a plan goes through the edit API's own
+`create_or_reuse_edit`, so the renderer is unchanged. Details: [auto-edit.md](auto-edit.md).

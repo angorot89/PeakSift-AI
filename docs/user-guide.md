@@ -1,6 +1,7 @@
 # PeakSift user guide
 
-From a long recording to a short on YouTube, in seventeen steps.
+From a long recording to a short on YouTube, in seventeen steps — or let **Auto Edit** make
+the first draft (see below).
 
 1. **Create your account.** Open PeakSift, choose **Create account**, and register with your email
    and a password of at least 8 characters. You stay signed in on this browser until you log
@@ -56,6 +57,33 @@ From a long recording to a short on YouTube, in seventeen steps.
     the upload finished, **Retry** continues where it stopped; a published short is never
     uploaded twice.
 
+## Auto Edit — the quick path
+
+Auto Edit proposes a complete, reviewable first draft of a short from a generated clip. You
+always review it, and you can change anything before it renders.
+
+1. **Generate a clip** (steps 1–9 above).
+2. **Choose Auto Edit.** On the clip's card (**Auto Edit**, beside Create short) or in the
+   editor's header. For the best plan, first open the editor and **Analyze framing**,
+   **Generate word sync** and **Suggest B-roll** — Auto Edit uses what is ready and never
+   starts these for you.
+3. **Select a recipe.** **Clean** (professional, little on screen), **Punchy** (high energy),
+   **Story** (explainers and stories) or **Minimal** (speaker first). Optionally choose one of
+   your music tracks — Auto Edit never picks music on its own.
+4. **Review the plan.** Each section — framing, captions, hook, visuals, audio — shows the
+   choice and a short reason, and what was left out and why. It says whether the local AI
+   planned it or PeakSift's built-in rules did (when the local AI was unavailable).
+5. **Apply.** **Use this edit** renders the short with exactly these settings and opens it in
+   the editor. **Try another plan** makes a new plan (earlier ones stay in the list).
+6. **Make optional manual changes.** **Edit choices** opens the plan's settings in the editor
+   without rendering; the editor works as always.
+7. **Render.** **Render short** (or the render started by **Use this edit**) produces the 1080 ×
+   1920 MP4.
+8. **Publish or download.** **Download short**, or **Publish to YouTube** (step 17).
+
+Auto Edit chooses only between options the editor already has, from your own media. It does not
+publish, search for or generate media, or predict how a short will perform.
+
 ## Good to know
 
 - **Visibility:** new uploads are private by default. Google keeps videos uploaded through
@@ -71,6 +99,8 @@ From a long recording to a short on YouTube, in seventeen steps.
 - **Your media is private:** only you can play or download your uploads, visuals, clips and
   shorts. Upload only footage, images and music you own or are allowed to use — PeakSift
   never searches or downloads media for you.
+- **The editor continues where you were:** it opens with your newest version's settings (or
+  the version or plan you came from); **Reset to defaults** starts over.
 - **Visuals in use:** a visual used by a rendered or saved short cannot be deleted until
   those versions are deleted, so a short never loses a picture.
 - **Suggestions are suggestions:** the AI only proposes moments grounded in what was said;
