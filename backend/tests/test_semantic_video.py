@@ -32,6 +32,12 @@ from tests.visual_fixtures import ffmpeg, make_video, rotate_metadata
 BLUE, RED = "0x2d5fbe", "0xd7462d"  # the fake provider's bridge and rocket
 
 
+@pytest.fixture(autouse=True)
+def manual_indexing(monkeypatch):
+    """These tests drive ``request_index`` themselves: uploads here do not start indexing."""
+    monkeypatch.setattr("app.api.visual_assets.start_indexing_quietly", lambda *a: None)
+
+
 # --- planning (pure) ---------------------------------------------------------------------------
 
 

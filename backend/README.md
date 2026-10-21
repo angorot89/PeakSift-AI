@@ -300,6 +300,18 @@ python scripts/auto_edit_benchmark.py --planner ollama  # the same with the loca
 
 Settings: `AUTO_EDIT_PLANNER_PROVIDER` (`ollama` or `fallback`), `AUTO_EDIT_OLLAMA_MODEL`, `AUTO_EDIT_FALLBACK_ENABLED`, `AUTO_EDIT_TIMEOUT_SECONDS`, `AUTO_EDIT_STALE_AFTER_SECONDS`, `AUTO_EDIT_MAX_ATTEMPTS`. Details: [docs/auto-edit.md](../docs/auto-edit.md).
 
+## Semantic visual search
+
+`app/services/semantic/` indexes what each visual asset shows with a local image–text model (OpenAI CLIP ViT-B/32 on onnxruntime; nothing leaves the server): `contract.py` (provider contract), `clip_onnx.py` (pinned ONNX model, lazy per-process sessions), `fake.py` (deterministic stand-in for tests, refused in production), `images.py` (canonical pixels), `sampling.py` (bounded video frames), `indexing.py` (the fenced Celery job `peaksift.index_visual_asset`) and `lifecycle.py` (uploads start indexing in the background; the API reports each asset's `visual_search` state). Vectors are stored in PostgreSQL with pgvector.
+
+```bash
+python scripts/fetch_semantic_model.py         # once per server: pinned files, verified sha256
+python -m app.cli.semantic status              # assets per state for the current model
+python -m app.cli.semantic reindex [--stale] [--missing] [--failed] [--project ID] [--limit N] [--dry-run]
+```
+
+Settings: `SEMANTIC_PROVIDER` (`clip_onnx`, `disabled`, or `fake` outside production), `SEMANTIC_MODEL_DIR`, `SEMANTIC_THREADS`, `SEMANTIC_BATCH_SIZE`, `SEMANTIC_VIDEO_MAX_FRAMES`, `SEMANTIC_FRAME_TIMEOUT_SECONDS`, `SEMANTIC_QUEUE`, `SEMANTIC_STALE_AFTER_SECONDS`, `SEMANTIC_MAX_ATTEMPTS`. A worker process holds one copy of the model (about 600 MB) once it indexes; keep one job per worker process. To keep inference off the default queue, set `SEMANTIC_QUEUE=semantic` and run `celery -A app.workers.celery_app worker -Q semantic --concurrency 1` next to the regular worker.
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.

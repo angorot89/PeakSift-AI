@@ -69,6 +69,11 @@ celery_app.conf.update(
     task_always_eager=settings.celery_task_always_eager,
     task_eager_propagates=True,
 )
+if settings.semantic_queue:
+    # Model inference can get its own workers; everything else stays on the default queue.
+    celery_app.conf.task_routes = {
+        "peaksift.index_visual_asset": {"queue": settings.semantic_queue},
+    }
 
 
 @worker_process_init.connect

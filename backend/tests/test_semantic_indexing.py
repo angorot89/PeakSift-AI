@@ -34,6 +34,12 @@ BLUE = (45, 95, 190)  # the fake provider's "bridge"
 RED = (215, 70, 45)  # its "rocket"
 
 
+@pytest.fixture(autouse=True)
+def manual_indexing(monkeypatch):
+    """These tests drive ``request_index`` themselves: uploads here do not start indexing."""
+    monkeypatch.setattr("app.api.visual_assets.start_indexing_quietly", lambda *a: None)
+
+
 @pytest.fixture
 def settings():
     return get_settings().model_copy(update={"semantic_provider": "fake"})

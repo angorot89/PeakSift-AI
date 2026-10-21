@@ -48,6 +48,15 @@ so the browser talks to one origin. If you publish to YouTube, register
   reframing, install the face model once:
   `docker compose -f deploy/docker-compose.prod.yml exec worker python scripts/fetch_reframe_model.py` (it writes to `REFRAME_MODEL_PATH`, `/models/…` in the image)
   (pinned SHA-256; without it, smart framing reports itself unavailable).
+  For semantic visual search (V1.3), install the local CLIP model once:
+  `docker compose -f deploy/docker-compose.prod.yml exec worker python scripts/fetch_semantic_model.py`
+  (about 600 MB into `SEMANTIC_MODEL_DIR`, `/models/clip-vit-b-32`; pinned revisions, size and
+  SHA-256). Without it, uploads still work and each asset reports "visual search unavailable";
+  after installing, `exec worker python -m app.cli.semantic reindex --failed` indexes them.
+  The worker loads the model on its first indexing job (about 600 MB of memory per worker
+  process; keep `CELERY_CONCURRENCY=1`, or set `SEMANTIC_QUEUE=semantic` and run a dedicated
+  worker with `-Q semantic --concurrency 1`). After changing the model, `python -m app.cli.semantic
+  status` shows stale assets and `reindex` (default: stale and never-indexed) refreshes them.
 - **Scratch:** `/work` volumes hold only in-flight job files. Run
   `docker compose … exec worker python -m app.cli.media cleanup --apply` daily to remove
   leftovers of crashed jobs and orphaned objects.

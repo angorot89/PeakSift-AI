@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Res
 from fastapi import status as http_status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import String, cast, or_, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, Storage
 from app.api.media_streaming import object_present, stream_object
@@ -23,8 +24,14 @@ from app.core.config import get_settings
 from app.core.rate_limit import per_user
 from app.models import VisualAsset, VisualAssetKind
 from app.schemas.project import MediaDeletionRead
-from app.schemas.visual_asset import VisualAssetRead, VisualAssetUpdate, VisualUploadLimits
+from app.schemas.visual_asset import (
+    VisualAssetRead,
+    VisualAssetUpdate,
+    VisualSearchRead,
+    VisualUploadLimits,
+)
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
+from app.services.semantic.lifecycle import start_indexing_quietly, visual_search_status
 from app.services.video_upload import UploadValidationError, check_declared_size
 from app.services.visual_assets import (
     ACCEPTED_EXTENSIONS,
@@ -65,7 +72,16 @@ def reject_oversized_body(request: Request) -> None:
 
 
 def _read(asset: VisualAsset) -> VisualAssetRead:
-    return VisualAssetRead.model_validate(asset)
+    status = visual_search_status(asset, get_settings())
+    read = VisualAssetRead.model_validate(asset)
+    read.visual_search = VisualSearchRead(
+        state=status.state.value,
+        frames_done=status.frames_done,
+        frames_total=status.frames_total,
+        message=status.message,
+        can_retry=status.can_retry,
+    )
+    return read
 
 
 @limits_router.get("/visual-upload-limits", response_model=VisualUploadLimits)
@@ -100,13 +116,18 @@ def upload_visual(
     response: Response,
     file: Annotated[UploadFile, File()],
 ) -> VisualAssetRead:
-    """Upload an image or a video. The same file again returns the existing asset (200)."""
+    """Upload an image or a video. The same file again returns the existing asset (200).
+
+    Visual search indexing starts in the background (never awaited): the asset is usable by
+    hand at once, whatever happens to its indexing."""
+    settings = get_settings()
     try:
-        asset, created = store_visual_upload(db, storage, project, file, get_settings())
+        asset, created = store_visual_upload(db, storage, project, file, settings)
     except UploadValidationError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from None
     if not created:
         response.status_code = http_status.HTTP_200_OK
+    start_indexing_quietly(db, asset, settings)
     return _read(asset)
 
 
@@ -123,7 +144,11 @@ def list_visuals(
     limit: Annotated[int, Query(ge=1, le=MAX_LIST)] = MAX_LIST,
 ) -> list[VisualAssetRead]:
     """The project's visuals, newest first; optionally one kind and a name search."""
-    statement = select(VisualAsset).where(VisualAsset.project_id == project.id)
+    statement = (
+        select(VisualAsset)
+        .options(selectinload(VisualAsset.semantic_indexes))
+        .where(VisualAsset.project_id == project.id)
+    )
     if kind is not None:
         statement = statement.where(VisualAsset.kind == kind.value)
     words = (q or "").split()

@@ -85,6 +85,7 @@ def production_s3(**overrides) -> dict:
         allowed_hosts="api.peaksift.example",
         celery_task_always_eager=False,
         rate_limit_enabled=True,
+        semantic_provider="clip_onnx",
         **overrides,
     )
 

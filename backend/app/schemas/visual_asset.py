@@ -13,6 +13,17 @@ from app.services.visual_assets import (
 )
 
 
+class VisualSearchRead(BaseModel):
+    """Whether the asset can be found by what it shows. Never a model name, path or trace."""
+
+    # unavailable / not_indexed / queued / indexing / ready / failed / stale
+    state: str
+    frames_done: int | None = None  # videos while indexing: real progress
+    frames_total: int | None = None
+    message: str | None = None  # failed only: a safe, creator-facing reason
+    can_retry: bool = False
+
+
 class VisualAssetRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,6 +43,7 @@ class VisualAssetRead(BaseModel):
     description: str
     tags: list[str]
     created_at: datetime
+    visual_search: VisualSearchRead | None = None
 
 
 class VisualUploadLimits(BaseModel):

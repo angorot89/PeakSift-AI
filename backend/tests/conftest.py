@@ -34,6 +34,9 @@ os.environ["CELERY_TASK_ALWAYS_EAGER"] = "1"
 # Rate limits are exercised by their own tests (with an in-memory counter); elsewhere a
 # suite registering hundreds of users from one address must not trip them.
 os.environ["RATE_LIMIT_ENABLED"] = "0"
+# Semantic visual search uses the deterministic fake embedding provider: CI never has model
+# weights (the real model has its own opt-in tests).
+os.environ["SEMANTIC_PROVIDER"] = "fake"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
