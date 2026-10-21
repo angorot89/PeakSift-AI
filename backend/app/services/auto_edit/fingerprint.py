@@ -45,6 +45,9 @@ class VisualAssetFacts:
     height: int
     duration: float | None
     has_alpha: bool
+    # V1.3: the asset's current visual-search index ("ready:<id>"), when one exists — a plan
+    # made before an asset was searchable by what it shows is not reused afterwards.
+    semantic: str | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +72,8 @@ class PlanSources:
     suggestions: tuple[SuggestionFacts, ...] = field(default_factory=tuple)
     visual_assets: tuple[VisualAssetFacts, ...] = field(default_factory=tuple)
     audio_assets: tuple[AudioAssetFacts, ...] = field(default_factory=tuple)
+    # V1.3: the matching model and its thresholds version, when visual search is on.
+    matching: str | None = None
 
     def canonical(self) -> dict[str, Any]:
         """Order-independent, rounded form: equal facts give equal JSON."""
@@ -83,7 +88,10 @@ class PlanSources:
         )
         data["visual_assets"] = sorted(
             (
-                {**asdict(a), "tags": sorted(a.tags), "duration": _round(a.duration)}
+                _without_empty(
+                    {**asdict(a), "tags": sorted(a.tags), "duration": _round(a.duration)},
+                    "semantic",
+                )
                 for a in self.visual_assets
             ),
             key=lambda a: a["id"],
@@ -92,7 +100,14 @@ class PlanSources:
             ({**asdict(a), "duration": _round(a.duration)} for a in self.audio_assets),
             key=lambda a: a["id"],
         )
-        return data
+        return _without_empty(data, "matching")
+
+
+def _without_empty(data: dict[str, Any], key: str) -> dict[str, Any]:
+    """Facts added after V1.2 appear only when present, so earlier fingerprints are unchanged."""
+    if data.get(key) is None:
+        data.pop(key, None)
+    return data
 
 
 def source_fingerprint(sources: PlanSources, request: dict[str, Any]) -> str:

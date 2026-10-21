@@ -81,7 +81,7 @@ def test_the_prompt_states_each_clips_constraints_without_ids():
     by_name = {case.name: case for case in CASES}
     podcast = constraints(by_name["podcast"].context("minimal"))
     assert "Smart Reframe is NOT available: use blur_background or center_crop." in podcast
-    assert "No B-roll suggestion has a matching asset: visuals must be []." in podcast
+    assert "No B-roll suggestion has a strong matching asset: visuals must be []." in podcast
     assert "No music track was chosen: use_music must be false." in podcast
     assert "Transition sounds are not available: transition_sounds must be false." in podcast
     useful = constraints(by_name["useful_broll_with_asset"].context("punchy"))

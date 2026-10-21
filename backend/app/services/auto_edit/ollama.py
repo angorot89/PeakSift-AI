@@ -52,7 +52,8 @@ otherwise blur_background (keeps the whole frame) or center_crop.
 - hook: optional. A short opening line (max 60 characters) built from the speaker's own words \
 or the candidate hook. Never invent facts, numbers, names or claims that were not said. Do \
 not repeat the clip's first sentence word for word. Turn it off if nothing fits.
-- visuals: only a listed broll suggestion together with one of ITS matching_assets. Never \
+- visuals: only a listed broll suggestion together with one of ITS matching_assets whose \
+strength is "strong". A "possible" match is for the creator to review: do not use it. Never \
 invent handles. Add a visual only when it clearly helps the line it covers; none is fine.
 - audio: use_music only if a music handle is available, kept low under the voice. \
 transition_sounds only if the recipe allows them and transition sounds are available.
@@ -83,12 +84,12 @@ def constraints(context: AutoEditContext) -> list[str]:
         f"{recipe.get('hook_styles')}."
     )
     pairs = [
-        f"{option.handle} with {', '.join(option.matches)}"
+        f"{option.handle} with {', '.join(option.strong_matches)}"
         for option in context.broll
-        if option.matches
+        if option.strong_matches
     ]
     if not pairs:
-        rules.append("No B-roll suggestion has a matching asset: visuals must be [].")
+        rules.append("No B-roll suggestion has a strong matching asset: visuals must be [].")
     else:
         rules.append(
             f"Visuals may only use these pairs: {'; '.join(pairs)}. Never invent other handles."

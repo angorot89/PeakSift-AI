@@ -24,7 +24,9 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-PLANNER_VERSION = "auto_edit_planner_v1"
+# v2 (V1.3): assets are matched by what they show as well as by their words, in strong /
+# possible tiers; only strong matches may be placed.
+PLANNER_VERSION = "auto_edit_planner_v2"
 
 SUGGESTION_HANDLE = re.compile(r"^suggestion_[1-9][0-9]?$")
 VISUAL_HANDLE = re.compile(r"^visual_asset_[1-9][0-9]{0,2}$")
@@ -32,7 +34,6 @@ MUSIC_HANDLE = "music_1"
 EXPLANATION_MAX_CHARS = 200
 RAW_HOOK_MAX_CHARS = 120  # the renderer's own limit (60) is enforced by the plan validator
 MAX_PROPOSED_VISUALS = 8
-STRONG_MATCH_SCORE = 0.9  # matching.match_score: (nearly) every subject word covered
 
 
 # --- context ------------------------------------------------------------------------------------
@@ -72,16 +73,41 @@ class VisualOption:
 
 @dataclass(frozen=True)
 class BrollOption:
-    """A validated B-roll suggestion and the project assets that match it (strongest first)."""
+    """A validated B-roll suggestion and the project assets that match it (strongest first).
+
+    Matches come from the hybrid matcher (``semantic/matching.py``): what an asset shows and its
+    name, description and tags. Planners see each match's *category* (strong / possible), never a
+    number; only strong matches may be placed — possible ones are for the creator to review.
+    """
 
     handle: str
     start: float
     end: float
     query: str
     reason: str
-    matches: tuple[str, ...]  # visual handles
-    # The matches whose tags, name or description cover (nearly) the whole query.
-    strong_matches: tuple[str, ...] = ()
+    matches: tuple[str, ...]  # visual handles: every offered match, strongest first
+    strong_matches: tuple[str, ...] = ()  # the matches that may be placed automatically
+    # Matches found by what the asset shows (the rest matched by their words).
+    visual_matches: tuple[str, ...] = ()
+    # Videos matched by what they show: (handle, seconds into the asset of the best scene).
+    best_scenes: tuple[tuple[str, float], ...] = ()
+
+    def scene(self, handle: str) -> float | None:
+        return next((seconds for h, seconds in self.best_scenes if h == handle), None)
+
+    def matching_assets(self) -> list[dict[str, Any]]:
+        """The planner's view of this suggestion's matches: categories, never scores."""
+        listed = []
+        for handle in self.matches:
+            item: dict[str, Any] = {
+                "asset": handle,
+                "strength": "strong" if handle in self.strong_matches else "possible",
+            }
+            scene = self.scene(handle)
+            if scene is not None:
+                item["best_scene_start"] = round(scene, 1)
+            listed.append(item)
+        return listed
 
 
 @dataclass(frozen=True)
@@ -149,8 +175,7 @@ class AutoEditContext:
                     "end": round(option.end, 2),
                     "query": option.query,
                     "reason": option.reason,
-                    "matching_assets": list(option.matches),
-                    "strong_matches": list(option.strong_matches),
+                    "matching_assets": option.matching_assets(),
                 }
                 for option in self.broll
             ],

@@ -130,7 +130,7 @@ def test_visuals_need_a_strong_match():
     weak = replace(JOINT, strong_matches=())
     proposal = fallback(broll=(weak,))
     assert proposal.visuals == []
-    assert "No project asset clearly matched" in proposal.explanations.visuals
+    assert "No project visual strongly matched" in proposal.explanations.visuals
 
 
 def test_visuals_respect_the_recipe_hold_and_the_video_length():
