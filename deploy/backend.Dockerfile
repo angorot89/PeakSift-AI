@@ -43,7 +43,8 @@ COPY scripts ./scripts
 RUN mkdir -p /work /models && chown peaksift:peaksift /work /models
 ENV WORK_ROOT=/work \
     HF_HOME=/models/huggingface \
-    REFRAME_MODEL_PATH=/models/face_detection_yunet_2023mar.onnx
+    REFRAME_MODEL_PATH=/models/face_detection_yunet_2023mar.onnx \
+    SEMANTIC_MODEL_DIR=/models/clip-vit-b-32
 USER peaksift
 
 # The API: gunicorn managing uvicorn workers. Access lines come from the application

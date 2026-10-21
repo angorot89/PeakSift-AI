@@ -326,7 +326,8 @@ def test_importing_the_api_loads_no_model():
 def test_production_refuses_the_fake_provider():
     problems = production_problems(Settings(semantic_provider="fake"))
     assert "SEMANTIC_PROVIDER must not be fake" in problems
-    assert "SEMANTIC_PROVIDER must not be fake" not in production_problems(Settings())
+    real = Settings(semantic_provider="clip_onnx")
+    assert "SEMANTIC_PROVIDER must not be fake" not in production_problems(real)
 
 
 # --- the deterministic fake --------------------------------------------------------------------

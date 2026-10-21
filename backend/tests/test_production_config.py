@@ -23,6 +23,7 @@ def production(**overrides) -> dict:
         "media_root": "/var/lib/peaksift/media",
         "celery_task_always_eager": False,  # the test suite's environment enables it
         "rate_limit_enabled": True,  # and disables this
+        "semantic_provider": "clip_onnx",  # and uses the fake embedding provider
     }
     values.update(overrides)
     return values
