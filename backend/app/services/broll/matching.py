@@ -1,4 +1,8 @@
-"""Matching a B-roll suggestion to the creator's own visual assets — no internet, no embeddings.
+"""The V1.1 word matcher: a B-roll suggestion against an asset's name, description and tags.
+
+Since V1.3 this is one of the two signals of the hybrid matcher
+(``app/services/semantic/matching.py``), which adds what each asset *shows* (local embeddings);
+on its own it still answers when visual search is off or not ready. No internet, ever.
 
 A suggestion says *what* would help ("toothpick bridge model"); the project's library may
 already hold it. Each asset is described by its name (without the extension, split on

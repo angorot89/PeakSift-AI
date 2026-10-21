@@ -37,6 +37,16 @@ class BrollAnalysisRead(BaseModel):
     completed_at: datetime | None
 
 
+class BrollMatchRead(BaseModel):
+    """One offered asset: a strength tier and the signal — never a score or a percentage.
+    Only strong matches may be placed automatically (Auto Edit); possible ones are offered."""
+
+    asset_id: uuid.UUID
+    strength: str  # strong / possible
+    method: str  # visual / metadata / visual_and_metadata
+    best_frame_time: float | None = None  # videos matched by what they show: the best scene
+
+
 class BrollSuggestionRead(BaseModel):
     """What visual would help, and when (clip-local seconds)."""
 
@@ -47,9 +57,10 @@ class BrollSuggestionRead(BaseModel):
     query: str
     reason: str
     status: str
-    # The project's visual assets that likely show it (by name, description and tags),
-    # strongest first. Offered to the creator, never placed automatically.
+    # The project's visual assets that likely show it, strongest first (at most three):
+    # by what they show and by their name, description and tags. Offered to the creator.
     matches: list[uuid.UUID] = []
+    match_details: list[BrollMatchRead] = []
 
 
 class BrollStateRead(BaseModel):
