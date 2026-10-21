@@ -34,8 +34,16 @@ from app.schemas.visual_asset import (
     VisualUploadLimits,
 )
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
-from app.services.semantic.lifecycle import start_indexing_quietly, visual_search_status
+from app.services.semantic.indexing import TooManyAttempts
+from app.services.semantic.lifecycle import (
+    start_indexing,
+    start_indexing_quietly,
+    start_lazy_indexing,
+    visual_search_status,
+)
+from app.services.semantic.registry import configured_identity
 from app.services.semantic.search import clean_query, search_project
+from app.services.semantic.state import SemanticState, semantic_state
 from app.services.video_upload import UploadValidationError, check_declared_size
 from app.services.visual_assets import (
     ACCEPTED_EXTENSIONS,
@@ -168,7 +176,10 @@ def list_visuals(
             )
         )
     statement = statement.order_by(VisualAsset.created_at.desc(), VisualAsset.id).limit(limit)
-    return [_read(asset) for asset in db.scalars(statement)]
+    assets = list(db.scalars(statement))
+    # After a model change, a few stale assets are re-queued per listing (bounded).
+    start_lazy_indexing(db, assets, get_settings())
+    return [_read(asset) for asset in assets]
 
 
 @router.get("/search", response_model=VisualSearchResults, dependencies=[per_user("visual_search")])
@@ -216,6 +227,34 @@ def search_visuals(
 
 @router.get("/{asset_id}", response_model=VisualAssetRead)
 def get_visual(asset: OwnedVisual) -> VisualAssetRead:
+    return _read(asset)
+
+
+@router.post(
+    "/{asset_id}/visual-search/retry",
+    response_model=VisualAssetRead,
+    dependencies=[per_user("visual_analysis")],
+)
+def retry_visual_search(asset: OwnedVisual, db: DbSession) -> VisualAssetRead:
+    """Analyse the asset again for visual search (no re-upload): after a failure, or when it
+    is stale or was never analysed. A ready or running analysis is left as it is."""
+    settings = get_settings()
+    identity = configured_identity(settings)
+    if identity is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="Visual search is turned off on this server",
+        )
+    state = semantic_state(asset.semantic_indexes, identity)
+    if state not in (SemanticState.READY, SemanticState.QUEUED, SemanticState.INDEXING):
+        try:
+            start_indexing(db, asset, settings, retry=state == SemanticState.FAILED)
+        except TooManyAttempts:
+            raise HTTPException(
+                status_code=http_status.HTTP_409_CONFLICT,
+                detail="Visual analysis failed too many times for this file",
+            ) from None
+        db.expire(asset, ["semantic_indexes"])
     return _read(asset)
 
 

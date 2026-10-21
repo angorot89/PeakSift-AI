@@ -5,12 +5,16 @@ it requests the index (``indexing.request_index``: idempotent, fenced) and enque
 It never blocks on the model and never fails the caller: if the broker is unreachable, the
 index is recorded as a retryable failure and the asset is still returned, usable by hand.
 
+``start_lazy_indexing`` is the lazy migration after a model change: listing a library
+re-queues a bounded number of stale or never-indexed assets.
+
 ``visual_search_status`` turns an asset's index rows into what a creator needs: a state
 (``semantic_state``), real progress for videos (embeddings computed of frames selected), and a
 safe message when it failed — never a model name, a path or an error trace.
 """
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -64,6 +68,32 @@ def start_indexing_quietly(db: Session, asset: VisualAsset, settings: Settings) 
     except Exception:
         logger.exception("Could not start semantic indexing for visual asset %s", asset.id)
         db.rollback()
+
+
+def start_lazy_indexing(db: Session, assets: Iterable[VisualAsset], settings: Settings) -> int:
+    """After a model change (or for assets uploaded while visual search was off), listing a
+    library re-queues at most ``SEMANTIC_LAZY_REINDEX_PER_REQUEST`` stale or never-indexed
+    assets — bounded work per request, never failed ones (those wait for a retry), never a
+    second job for an asset already queued. Returns how many were started."""
+    budget = settings.semantic_lazy_reindex_per_request
+    identity = configured_identity(settings)
+    if not budget or identity is None:
+        return 0
+    started = 0
+    for asset in assets:
+        if started >= budget:
+            break
+        state = semantic_state(asset.semantic_indexes, identity)
+        if state not in (SemanticState.STALE, SemanticState.NOT_INDEXED):
+            continue
+        try:
+            if start_indexing(db, asset, settings) is not None:
+                started += 1
+                db.expire(asset, ["semantic_indexes"])
+        except Exception:
+            logger.exception("Could not re-queue visual asset %s for visual search", asset.id)
+            db.rollback()
+    return started
 
 
 def visual_search_status(asset: VisualAsset, settings: Settings) -> VisualSearchStatus:

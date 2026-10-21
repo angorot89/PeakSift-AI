@@ -277,6 +277,9 @@ class Settings(BaseSettings):
     # Set e.g. "semantic" and run a dedicated worker (`celery … worker -Q semantic
     # --concurrency 1`) to keep model inference off the queue that renders and transcribes.
     semantic_queue: str = Field(default="", pattern=r"^[a-z0-9_.-]{0,64}$")
+    # After a model change, listing a project's visuals starts indexing for at most this many
+    # stale or never-indexed assets per request (0: only the operator's reindex command does).
+    semantic_lazy_reindex_per_request: int = Field(default=3, ge=0, le=20)
     # Indexing jobs: when a running one counts as stalled, and how often one may be retried.
     semantic_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     semantic_max_attempts: int = Field(default=5, ge=1)

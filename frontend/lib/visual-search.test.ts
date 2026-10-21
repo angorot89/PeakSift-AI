@@ -2,12 +2,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  asSentence,
   bestSceneLabel,
   isPreparing,
   matchedTo,
   matchReason,
   sceneOffset,
   searchNote,
+  searchStateLabel,
   searchText,
   STRENGTH_LABEL,
 } from "./visual-search.ts";
@@ -62,6 +64,24 @@ describe("visual search rules", () => {
     assert.equal(matchedTo("visual", "bridge joint"), "Matched visually to “bridge joint”");
     assert.equal(matchedTo("visual_and_metadata", "bridge joint"), "Matched visually to “bridge joint”");
     assert.equal(matchedTo("metadata", "bridge joint"), "Matched by its name or tags");
+  });
+
+  it("labels each asset's visual-search state plainly, with real progress", () => {
+    const status = (state: string, done: number | null = null, total: number | null = null) =>
+      ({ state, frames_done: done, frames_total: total }) as Parameters<typeof searchStateLabel>[0];
+    assert.equal(searchStateLabel(status("ready")), "Visual search ready");
+    assert.equal(searchStateLabel(status("failed")), "Visual search unavailable");
+    assert.equal(searchStateLabel(status("indexing", 2, 8)), "Preparing visual search (2 of 8 frames)");
+    assert.equal(searchStateLabel(status("indexing")), "Preparing visual search");
+    for (const state of ["queued", "not_indexed", "stale"]) assert.equal(searchStateLabel(status(state)), "Preparing visual search");
+    assert.equal(searchStateLabel(status("unavailable")), null);
+    assert.equal(searchStateLabel(null), null);
+  });
+
+  it("ends server messages as sentences", () => {
+    assert.equal(asSentence("No usable picture was found in this video"), "No usable picture was found in this video.");
+    assert.equal(asSentence("Visual analysis could not start; try again "), "Visual analysis could not start; try again.");
+    assert.equal(asSentence("Already a sentence."), "Already a sentence.");
   });
 
   it("labels a video's best scene", () => {

@@ -32,6 +32,10 @@ export function searchVisuals(projectId: string, text: string, options: { kind?:
   return apiFetch<VisualSearchResults<VisualAsset>>(`${base(projectId)}/search?${params.toString()}`);
 }
 
+/** Analyse an asset again for visual search (after a failure; no re-upload). */
+export const retryVisualSearch = (projectId: string, assetId: string) =>
+  apiFetch<VisualAsset>(`${base(projectId)}/${assetId}/visual-search/retry`, { method: "POST" });
+
 export const getVisualUploadLimits = () => apiFetch<VisualUploadLimits>("/visual-upload-limits");
 
 export const deleteVisual = (projectId: string, assetId: string) =>

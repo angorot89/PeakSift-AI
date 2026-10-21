@@ -63,6 +63,32 @@ export function isPreparing(state: VisualSearchState | undefined | null): boolea
   return state === "not_indexed" || state === "queued" || state === "indexing" || state === "stale";
 }
 
+/** A short, creator-facing label for an asset's visual-search state (null: nothing to show). */
+export function searchStateLabel(status: Pick<VisualSearchStatus, "state" | "frames_done" | "frames_total"> | null | undefined): string | null {
+  switch (status?.state) {
+    case "ready":
+      return "Visual search ready";
+    case "failed":
+      return "Visual search unavailable";
+    case "indexing":
+      return status.frames_total
+        ? `Preparing visual search (${status.frames_done ?? 0} of ${status.frames_total} frames)`
+        : "Preparing visual search";
+    case "queued":
+    case "not_indexed":
+    case "stale":
+      return "Preparing visual search";
+    default:
+      return null; // turned off on this server: name, description and tag search only
+  }
+}
+
+/** A server message as a sentence ("…in this video" → "…in this video."). */
+export function asSentence(text: string): string {
+  const trimmed = text.trim();
+  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 /** A quiet note under the search box, or null when visual search fully took part. */
 export function searchNote(results: Pick<VisualSearchResults<unknown>, "visual_search_used" | "assets_preparing"> | null): string | null {
   if (!results) return null;
