@@ -253,6 +253,18 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
   );
 }
 
+/** The panel's one-line description follows the plan's state (never "review" while planning). */
+function headerNote(composing: boolean, plan: AutoEditPlan | null): string {
+  if (composing || !plan) return "PeakSift proposes a first draft; you review it and keep full control.";
+  if (plan.status === "failed" || plan.is_stale) return "This plan could not be finished. Retry it, or start a new plan.";
+  if (isPlanActive(plan.status)) return "PeakSift is preparing a first draft. Every choice is checked before you see it.";
+  if (plan.status === "applied")
+    return plan.clip_edit_id
+      ? "This plan is in use as a version. Open it in the editor, or try another plan."
+      : "This plan's version was deleted. Open its settings in the editor, or try another plan.";
+  return "Review the choices, then use them, adjust them in the editor, or try another plan.";
+}
+
 function PlanHistory({
   plans,
   selectedId,
@@ -512,11 +524,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
               <h2 id={`${id}-main`} className="text-[15px] font-semibold text-foreground">
                 {composing || !plan ? "Plan an edit" : `${plan.recipe_label} plan`}
               </h2>
-              <p className="mt-0.5 text-sm text-muted">
-                {composing || !plan
-                  ? "PeakSift proposes a first draft; you review it and keep full control."
-                  : "Review the choices, then use them, adjust them in the editor, or try another plan."}
-              </p>
+              <p className="mt-0.5 text-sm text-muted">{headerNote(composing, plan)}</p>
             </div>
             {!composing && plan ? (
               <StatusPill tone={STATUS_TONES[plan.status]}>{STATUS_LABELS[plan.status]}</StatusPill>
