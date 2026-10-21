@@ -5,16 +5,25 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ProgressBar } from "@/components/ui/progress";
+import { useVisualSearch } from "@/components/app/use-visual-search";
 import { errorMessage } from "@/lib/api";
+import type { BrollMatch } from "@/lib/broll";
 import {
+  bestSceneLabel,
   filterVisuals,
   formatVisualDuration,
+  matchReason,
   orientationLabel,
+  SEARCH_MAX_CHARS,
+  searchNote,
+  searchText,
+  STRENGTH_LABEL,
   uploadVisual,
   VISUAL_ACCEPT,
   visualThumbnailUrl,
   type VisualAsset,
   type VisualFilter,
+  type VisualMatch,
 } from "@/lib/visuals";
 
 /** Pick one of the project's visual assets (or upload one) for a visual element. */
@@ -35,15 +44,16 @@ export function AssetChooser({
   open: boolean;
   title: string;
   assets: VisualAsset[] | null;
-  /** The suggestion being matched, if any (shown for context). */
+  /** The suggestion being matched, if any: the search starts with its words (clearable). */
   query: string | null;
-  /** Assets that likely match the suggestion (ids, strongest first). */
-  matches?: string[];
+  /** The suggestion's offered assets with their tier, strongest first. */
+  matches?: { asset: VisualAsset; match: BrollMatch }[];
   /** Where the filter starts (the panel remounts the chooser on every open, so nothing from a
    * previous open carries over). */
   initialFilter?: VisualFilter;
   hint?: string | null;
-  onPick: (asset: VisualAsset) => void;
+  /** ``scene``: a video found by what it shows starts at its matched scene. */
+  onPick: (asset: VisualAsset, scene?: number | null) => void;
   onUploaded: (asset: VisualAsset) => void;
   onClose: () => void;
 }) {
@@ -51,7 +61,7 @@ export function AssetChooser({
   const titleId = useId();
   const searchId = useId();
   const [filter, setFilter] = useState<VisualFilter>(initialFilter);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(query ?? "");
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,11 +72,18 @@ export function AssetChooser({
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  const shown = useMemo(() => filterVisuals(assets ?? [], filter, search), [assets, filter, search]);
-  const likely = useMemo(
-    () => matches.map((id) => (assets ?? []).find((a) => a.id === id)).filter((a): a is VisualAsset => !!a),
-    [matches, assets],
-  );
+  const text = searchText(search);
+  const found = useVisualSearch(projectId, open ? text : "", filter === "all" ? null : filter, assets?.length ?? 0);
+  const shown: { asset: VisualAsset; match?: VisualMatch }[] = useMemo(() => {
+    const all = assets ?? [];
+    if (!text) return filterVisuals(all, filter, "").map((asset) => ({ asset }));
+    if (found.error) return filterVisuals(all, filter, text).map((asset) => ({ asset }));
+    const latest = new Map(all.map((a) => [a.id, a]));
+    return (found.results?.results ?? [])
+      .filter((hit) => latest.has(hit.asset.id))
+      .map((hit) => ({ asset: latest.get(hit.asset.id) ?? hit.asset, match: hit.match }));
+  }, [assets, filter, text, found.results, found.error]);
+  const note = text && !found.error ? searchNote(found.results) : null;
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -123,49 +140,70 @@ export function AssetChooser({
                   </button>
                 ))}
               </div>
-              <div className="relative w-full sm:w-56">
+              <div className="w-full sm:w-64">
                 <label htmlFor={searchId} className="sr-only">
-                  Search visual assets by name
+                  Search your visuals
                 </label>
-                <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
-                <input
-                  id={searchId}
-                  type="search"
-                  value={search}
-                  maxLength={100}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by name"
-                  className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-3 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
-                />
+                <div className="relative">
+                  <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
+                  <input
+                    id={searchId}
+                    type="search"
+                    value={search}
+                    maxLength={SEARCH_MAX_CHARS}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search your visuals"
+                    aria-describedby={`${searchId}-hint`}
+                    className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-3 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+                  />
+                </div>
+                <p id={`${searchId}-hint`} className="mt-1 text-[11px] text-subtle">
+                  Search by what&apos;s in the image or video.
+                </p>
               </div>
             </div>
+            {note ? <p className="text-xs text-muted">{note}</p> : null}
+            {found.error ? <p className="text-xs text-muted">Visual search is unavailable right now; showing name matches.</p> : null}
 
-            {likely.length && !search ? (
+            {matches.length && !text ? (
               <div className="space-y-2">
-                <p className="text-[12px] font-medium text-muted">Likely matches (from names, descriptions and tags)</p>
-                <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Likely matches">
-                  {likely.map((asset) => (
+                <p className="text-[12px] font-medium text-muted">Best matches</p>
+                <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Best matches">
+                  {matches.map(({ asset, match }) => (
                     <li key={asset.id}>
-                      <AssetButton projectId={projectId} asset={asset} onPick={() => onPick(asset)} />
+                      <AssetButton projectId={projectId} asset={asset} match={match} onPick={() => onPick(asset, match.best_frame_time)} />
                     </li>
                   ))}
                 </ul>
                 <p className="pt-1 text-[12px] font-medium text-muted">All visual assets</p>
               </div>
             ) : null}
+            <p className="sr-only" role="status" aria-live="polite">
+              {found.searching ? "Searching…" : text ? `${shown.length} visual${shown.length === 1 ? "" : "s"} found` : ""}
+            </p>
             {assets === null ? (
               <p className="text-sm text-muted">Loading visual assets…</p>
             ) : shown.length ? (
-              <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Visual assets">
-                {shown.map((asset) => (
+              <ul
+                className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
+                aria-label={text ? "Search results" : "Visual assets"}
+                aria-busy={found.searching}
+              >
+                {shown.map(({ asset, match }) => (
                   <li key={asset.id}>
-                    <AssetButton projectId={projectId} asset={asset} onPick={() => onPick(asset)} />
+                    <AssetButton projectId={projectId} asset={asset} match={match} onPick={() => onPick(asset, match?.best_frame_time ?? null)} />
                   </li>
                 ))}
               </ul>
+            ) : found.searching ? (
+              <p className="text-sm text-muted">Searching…</p>
             ) : (
               <p className="text-sm text-muted">
-                {assets.length ? "No visual assets match these filters." : "This project has no visual assets yet. Upload one below."}
+                {!assets.length
+                  ? "This project has no visual assets yet. Upload one below."
+                  : text
+                    ? `No visuals match “${text}”. Clear the search to see them all.`
+                    : "No visual assets match these filters."}
               </p>
             )}
 
@@ -199,13 +237,25 @@ export function AssetChooser({
   );
 }
 
-export function AssetButton({ projectId, asset, onPick }: { projectId: string; asset: VisualAsset; onPick: () => void }) {
+export function AssetButton({
+  projectId,
+  asset,
+  match,
+  onPick,
+}: {
+  projectId: string;
+  asset: VisualAsset;
+  match?: Pick<VisualMatch, "strength" | "method" | "best_frame_time">;
+  onPick: () => void;
+}) {
   const Icon = asset.kind === "video" ? Film : ImageIcon;
+  const scene = asset.kind === "video" ? bestSceneLabel(match?.best_frame_time) : null;
+  const found = match ? `, ${STRENGTH_LABEL[match.strength].toLowerCase()}, ${matchReason(match).toLowerCase()}${scene ? `, ${scene.toLowerCase()}` : ""}` : "";
   return (
     <button
       type="button"
       onClick={onPick}
-      aria-label={`Use ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})`}
+      aria-label={`Use ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"}${found})`}
       className="block w-full overflow-hidden rounded-lg border border-border bg-surface-2 text-left transition-colors hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       <span className={`relative flex aspect-video items-center justify-center ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
@@ -225,6 +275,18 @@ export function AssetButton({ projectId, asset, onPick }: { projectId: string; a
           {asset.display_name}
         </span>
         <span className="block text-[10px] text-subtle">{orientationLabel(asset)}</span>
+        {match ? (
+          <span className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5" title={matchReason(match)}>
+            <span
+              className={`rounded px-1 py-px text-[10px] font-medium ${
+                match.strength === "strong" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.07] text-muted"
+              }`}
+            >
+              {STRENGTH_LABEL[match.strength]}
+            </span>
+            {scene ? <span className="text-[10px] text-subtle">{scene}</span> : null}
+          </span>
+        ) : null}
       </span>
     </button>
   );

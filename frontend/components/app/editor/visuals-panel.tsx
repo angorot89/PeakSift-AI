@@ -29,6 +29,7 @@ import {
   retryBroll,
   setSuggestionStatus,
   startBroll,
+  type BrollMatch,
   type BrollState,
   type BrollSuggestion,
 } from "@/lib/broll";
@@ -48,7 +49,18 @@ import {
   type VisualMode,
   type VisualPosition,
 } from "@/lib/visual-elements";
-import { chooserFilter, chooserHint, formatVisualDuration, visualThumbnailUrl, type VisualAsset } from "@/lib/visuals";
+import {
+  bestSceneLabel,
+  chooserFilter,
+  chooserHint,
+  formatVisualDuration,
+  matchedTo,
+  sceneOffset,
+  STRENGTH_LABEL,
+  visualContentUrl,
+  visualThumbnailUrl,
+  type VisualAsset,
+} from "@/lib/visuals";
 
 const field =
   "h-9 w-full rounded-lg border border-border bg-white/[0.03] px-2.5 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
@@ -133,13 +145,13 @@ export function VisualsPanel({
     return video ? Math.min(video.currentTime || 0, Math.max(0, duration - 0.5)) : 0;
   }
 
-  function pick(asset: VisualAsset) {
+  function pick(asset: VisualAsset, scene: number | null = null) {
     const context = chooser;
     setChooser(null);
-    if (context) placeAsset(asset, context);
+    if (context) placeAsset(asset, context, scene);
   }
 
-  function placeAsset(asset: VisualAsset, context: NonNullable<Chooser>) {
+  function placeAsset(asset: VisualAsset, context: NonNullable<Chooser>, scene: number | null = null) {
     if (context.replace) {
       const replaced = (e: VisualElementDraft): VisualElementDraft => ({
         ...e,
@@ -153,9 +165,17 @@ export function VisualsPanel({
     }
     if (elements.length >= MAX_ELEMENTS) return;
     const suggestion = context.suggestion;
-    const element = suggestion
+    const created = suggestion
       ? newElement(asset.id, asset, suggestion.start, duration, "cutaway", suggestion.end)
       : newElement(asset.id, asset, playhead(), duration);
+    // A video matched by what it shows starts at its matched scene (never past its end).
+    const element =
+      asset.kind === "video" && scene != null
+        ? {
+            ...created,
+            asset_offset_seconds: sceneOffset(scene, created.end_seconds - created.start_seconds, asset.duration_seconds),
+          }
+        : created;
     onChange([...elements, element].sort((a, b) => a.start_seconds - b.start_seconds));
     setSelected(element.key);
     if (suggestion) void decide(suggestion, "accepted");
@@ -231,8 +251,8 @@ export function VisualsPanel({
                 projectId={projectId}
                 suggestion={s}
                 used={elements.some((e) => fulfills(e, s))}
-                matches={s.matches.map((id) => byId.get(id)).filter((a): a is VisualAsset => !!a)}
-                onUseMatch={(asset) => placeAsset(asset, { suggestion: s, replace: null })}
+                matches={suggestionMatches(s, byId)}
+                onUseMatch={(asset, scene) => placeAsset(asset, { suggestion: s, replace: null }, scene)}
                 onUse={() => setChooser({ suggestion: s, replace: null })}
                 onDismiss={() => void decide(s, "dismissed")}
                 onSeek={() => {
@@ -313,13 +333,27 @@ export function VisualsPanel({
         title={chooser?.suggestion ? `Choose a visual for “${chooser.suggestion.query}”` : "Choose a visual"}
         assets={assets}
         query={chooser?.suggestion?.query ?? null}
-        matches={chooser?.suggestion?.matches ?? []}
+        matches={chooser?.suggestion ? suggestionMatches(chooser.suggestion, byId) : []}
         onPick={pick}
         onUploaded={onUploaded}
         onClose={() => setChooser(null)}
       />
     </section>
   );
+}
+
+type OfferedMatch = { asset: VisualAsset; match: BrollMatch };
+
+/** The suggestion's offered assets that still exist here, with their tier (older answers without
+ * details count as possible matches by name). */
+function suggestionMatches(suggestion: BrollSuggestion, byId: Map<string, VisualAsset>): OfferedMatch[] {
+  const details = new Map((suggestion.match_details ?? []).map((d) => [d.asset_id, d]));
+  return suggestion.matches.flatMap((id) => {
+    const asset = byId.get(id);
+    if (!asset) return [];
+    const match: BrollMatch = details.get(id) ?? { asset_id: id, strength: "possible", method: "metadata", best_frame_time: null };
+    return [{ asset, match }];
+  });
 }
 
 function SuggestionCard({
@@ -337,8 +371,8 @@ function SuggestionCard({
   suggestion: BrollSuggestion;
   /** A current visual element fulfils this suggestion (not "was once used"). */
   used: boolean;
-  matches: VisualAsset[];
-  onUseMatch: (asset: VisualAsset) => void;
+  matches: OfferedMatch[];
+  onUseMatch: (asset: VisualAsset, scene: number | null) => void;
   onUse: () => void;
   onDismiss: () => void;
   onSeek: () => void;
@@ -367,27 +401,18 @@ function SuggestionCard({
       </div>
       {matches.length && !used ? (
         <div className="mt-2">
-          <p className="text-[11px] font-medium text-muted">Suggested assets</p>
-          <ul className="mt-1 flex flex-wrap gap-1.5" aria-label={`Suggested assets for ${suggestion.query}`}>
-            {matches.map((asset) => (
-              <li key={asset.id}>
-                <button
-                  type="button"
-                  onClick={() => onUseMatch(asset)}
-                  disabled={disabled}
-                  aria-label={`Use ${asset.display_name} here`}
-                  title={asset.display_name}
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 py-1 pr-2 pl-1 text-[11px] text-foreground hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
-                >
-                  <span className={`size-7 overflow-hidden rounded ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
-                    {asset.has_thumbnail ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
-                      <img src={visualThumbnailUrl(projectId, asset.id)} alt="" className="size-full object-cover" />
-                    ) : null}
-                  </span>
-                  <span className="max-w-28 truncate">{asset.display_name}</span>
-                </button>
-              </li>
+          <p className="text-[11px] font-medium text-muted">Best matches</p>
+          <ul className="mt-1 space-y-1.5" aria-label={`Best matches for ${suggestion.query}`}>
+            {matches.map(({ asset, match }) => (
+              <MatchRow
+                key={asset.id}
+                projectId={projectId}
+                asset={asset}
+                match={match}
+                query={suggestion.query}
+                disabled={disabled}
+                onUse={() => onUseMatch(asset, match.best_frame_time)}
+              />
             ))}
           </ul>
         </div>
@@ -403,6 +428,150 @@ function SuggestionCard({
         </Button>
       </div>
     </li>
+  );
+}
+
+/** One offered asset: thumbnail, tier, how it matched, a video's best scene; preview and use. */
+function MatchRow({
+  projectId,
+  asset,
+  match,
+  query,
+  disabled,
+  onUse,
+}: {
+  projectId: string;
+  asset: VisualAsset;
+  match: BrollMatch;
+  query: string;
+  disabled: boolean;
+  onUse: () => void;
+}) {
+  const [previewing, setPreviewing] = useState(false);
+  const scene = asset.kind === "video" ? bestSceneLabel(match.best_frame_time) : null;
+  return (
+    <li className="flex items-center gap-2 rounded-md border border-border bg-surface-2 p-1.5">
+      <button
+        type="button"
+        onClick={() => setPreviewing(true)}
+        aria-label={`Preview ${asset.display_name}${scene ? ` at the matched scene (${scene.replace("Best at ", "")})` : ""}`}
+        className={`size-10 shrink-0 overflow-hidden rounded focus-visible:outline-2 focus-visible:outline-accent ${asset.has_alpha ? "checkerboard" : "bg-black"}`}
+      >
+        {asset.has_thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
+          <img src={visualThumbnailUrl(projectId, asset.id)} alt="" className="size-full object-cover" />
+        ) : null}
+      </button>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12px] font-medium text-foreground" title={asset.display_name}>
+          {asset.display_name}
+        </p>
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-subtle">
+          <span
+            className={`rounded px-1.5 py-px font-medium ${
+              match.strength === "strong" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.07] text-muted"
+            }`}
+          >
+            {STRENGTH_LABEL[match.strength]}
+          </span>
+          <span className="min-w-0 text-pretty">{matchedTo(match.method, query)}</span>
+          {scene ? <span>· {scene}</span> : null}
+        </p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={onUse} disabled={disabled} aria-label={`Use ${asset.display_name} here`}>
+        Use
+      </Button>
+      {previewing ? (
+        <MatchPreview
+          projectId={projectId}
+          asset={asset}
+          scene={match.best_frame_time}
+          onClose={() => setPreviewing(false)}
+          onUse={() => {
+            setPreviewing(false);
+            onUse();
+          }}
+          disabled={disabled}
+        />
+      ) : null}
+    </li>
+  );
+}
+
+/** A quick look at an offered asset; a video opens at its matched scene. */
+function MatchPreview({
+  projectId,
+  asset,
+  scene,
+  onClose,
+  onUse,
+  disabled,
+}: {
+  projectId: string;
+  asset: VisualAsset;
+  scene: number | null;
+  onClose: () => void;
+  onUse: () => void;
+  disabled: boolean;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  const label = asset.kind === "video" ? bestSceneLabel(scene) : null;
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      aria-labelledby={titleId}
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70"
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <h2 id={titleId} className="truncate text-[15px] font-semibold tracking-tight" title={asset.display_name}>
+            {asset.display_name}
+          </h2>
+          {label ? <p className="text-xs text-muted">Opened at the scene that matched ({label.replace("Best at ", "")}).</p> : null}
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Close" className="px-2">
+          <X aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="space-y-3 px-4 py-4">
+        <div className={`flex max-h-[55dvh] items-center justify-center overflow-hidden rounded-xl ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
+          {asset.kind === "video" ? (
+            <video
+              src={visualContentUrl(projectId, asset.id)}
+              controls
+              muted
+              playsInline
+              preload="metadata"
+              className="max-h-[55dvh] w-full object-contain"
+              aria-label={`Preview of ${asset.display_name}`}
+              onLoadedMetadata={(event) => {
+                const player = event.currentTarget;
+                if (scene != null && Number.isFinite(player.duration)) {
+                  player.currentTime = Math.min(Math.max(0, scene), player.duration);
+                }
+              }}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
+            <img src={visualContentUrl(projectId, asset.id)} alt={`Preview of ${asset.display_name}`} className="max-h-[55dvh] w-auto object-contain" />
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => ref.current?.close()}>
+            Close
+          </Button>
+          <Button size="sm" onClick={onUse} disabled={disabled}>
+            Use here
+          </Button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 

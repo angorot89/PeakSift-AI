@@ -74,6 +74,23 @@ export function searchNote(results: Pick<VisualSearchResults<unknown>, "visual_s
   return null;
 }
 
+/** Where a video element of ``elementSeconds`` should start inside the video so the matched scene
+ * is in the middle — never before 0, never past the end (no black tail); 0 when unknown. The same
+ * rule as the server's (semantic/matching.py asset_offset). */
+export function sceneOffset(scene: number | null | undefined, elementSeconds: number, videoSeconds: number | null | undefined): number {
+  if (scene == null || videoSeconds == null) return 0;
+  if (![scene, elementSeconds, videoSeconds].every(Number.isFinite)) return 0;
+  if (elementSeconds <= 0 || videoSeconds <= elementSeconds) return 0;
+  const start = Math.min(Math.max(0, scene - elementSeconds / 2), videoSeconds - elementSeconds);
+  return Math.floor(start * 100) / 100;
+}
+
+/** How a suggestion's asset matched, for the match card ("Matched visually to “bridge joint”"). */
+export function matchedTo(method: MatchMethod, query: string): string {
+  if (method === "metadata") return "Matched by its name or tags";
+  return `Matched visually to “${query}”`;
+}
+
 /** "Best at 0:08" for a video's matched scene (seconds rounded down to whole seconds). */
 export function bestSceneLabel(seconds: number | null | undefined): string | null {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;

@@ -33,8 +33,19 @@ export type BrollSuggestion = {
   query: string;
   reason: string;
   status: SuggestionStatus;
-  /** The project's visual assets that likely show it (strongest first); never auto-placed. */
+  /** The project's visual assets that likely show it (strongest first); offered, never placed. */
   matches: string[];
+  /** The same matches with their strength tier and how they matched (absent from older APIs). */
+  match_details?: BrollMatch[];
+};
+
+/** One offered asset: a tier and the signal, never a score. */
+export type BrollMatch = {
+  asset_id: string;
+  strength: "strong" | "possible";
+  method: "visual" | "metadata" | "visual_and_metadata";
+  /** Videos matched by what they show: the best scene, in seconds into the video. */
+  best_frame_time: number | null;
 };
 
 export type BrollState = { analysis: BrollAnalysis | null; suggestions: BrollSuggestion[] };
