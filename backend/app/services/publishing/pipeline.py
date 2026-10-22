@@ -36,6 +36,7 @@ from app.models import (
     PublishJob,
     PublishStatus,
 )
+from app.services.performance.content import link_quietly
 from app.services.publishing import connections
 from app.services.publishing.factory import get_publishing_provider
 from app.services.publishing.provider import (
@@ -300,6 +301,8 @@ def _mark_uploaded(job, db, task_id, video_id, channel_id, channel_title) -> Non
     job.heartbeat_at = job.completed_at
     db.commit()
     logger.info("Publish job %s uploaded to %s", job.id, job.provider)
+    # Performance analytics: remember which PeakSift output became this remote video.
+    link_quietly(db, job)
 
 
 # --- processing checks ---------------------------------------------------------------------
