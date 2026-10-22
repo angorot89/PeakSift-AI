@@ -4,6 +4,7 @@ import { BarChart3, ExternalLink, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { AnalyticsAccessGate } from "@/components/app/analytics/analytics-access";
+import { InsightsPanel } from "@/components/app/analytics/insights-panel";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -198,6 +199,7 @@ export function AnalyticsView() {
           ) : null}
           {accessState(overview.access) !== "ready" ? <AnalyticsAccessGate access={overview.access} /> : null}
           {overview.videos.some((v) => v.source) ? <UsualShort overview={overview} /> : null}
+          {overview.videos.some((v) => v.source) ? <InsightsPanel /> : null}
           {overview.videos.length === 0 ? (
             <EmptyState
               icon={BarChart3}

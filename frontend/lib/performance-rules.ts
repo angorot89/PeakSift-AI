@@ -215,3 +215,49 @@ export function baselineText(b: Baseline | undefined): string {
   const what = b.metric === "average_view_percentage" ? "viewed on average" : "engaged views";
   return `${value} ${what} in the first week (median of your ${b.sample_size} comparable shorts)`;
 }
+
+export type Insight = {
+  id: string;
+  rank: number;
+  feature: string;
+  value: string;
+  metric: "engaged_views" | "average_view_percentage";
+  window: string;
+  direction: "higher" | "lower";
+  group_size: number;
+  comparison_size: number;
+  group_median: number;
+  comparison_median: number;
+  ratio: number | null;
+  consistency: number;
+  confidence: "limited" | "moderate";
+  statement: string;
+  dismissed: boolean;
+  group: { id: string; title: string }[];
+  comparison: { id: string; title: string }[];
+};
+
+export type Insights = {
+  status: "ready" | "insufficient";
+  source: string;
+  simulated: boolean;
+  engine_version: string;
+  computed_at: string;
+  sample_size: number;
+  minimum_sample: number;
+  minimum_group: number;
+  insights: Insight[];
+};
+
+/** What to say when there are no visible patterns (never a fake insight). */
+export function insightsEmptyText(data: Insights): string {
+  if (data.status === "insufficient") {
+    return `No reliable pattern yet: ${data.sample_size} of ${data.minimum_sample} shorts have a complete first week to compare.`;
+  }
+  return `No clear pattern in your recent uploads: nothing passed the checks across ${data.sample_size} comparable shorts.`;
+}
+
+export function confidenceText(insight: Insight): string {
+  const basis = `${insight.group_size} vs ${insight.comparison_size} shorts`;
+  return insight.confidence === "moderate" ? `Moderate confidence · ${basis}` : `Limited evidence · ${basis}`;
+}
