@@ -98,7 +98,11 @@ def _refresh_with_google(
         )
         try:
             credentials.refresh(Request())
-        except RefreshError:
+        except RefreshError as error:
+            if "invalid_scope" in str(error.args[0] if error.args else ""):
+                # The grant is fine but lacks a scope asked for (e.g. analytics on an
+                # upload-only grant): never a reason to make the creator reconnect publishing.
+                raise PublishProviderError(PublishErrorCode.PERMISSION_DENIED) from None
             # invalid_grant and friends: consent revoked or expired.
             raise PublishProviderError(PublishErrorCode.AUTHENTICATION_REQUIRED) from None
         except TransportError:

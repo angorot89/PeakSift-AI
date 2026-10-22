@@ -114,7 +114,12 @@ services:
 
   beat:
     # Celery beat: one per deployment. It only enqueues the analytics scheduler (which does
-    # nothing unless YOUTUBE_ANALYTICS_ENABLED); the workers run the jobs.
+    # nothing unless YOUTUBE_ANALYTICS_ENABLED); the workers run the jobs. Same image as the
+    # worker (built from the same target, so it never depends on build order).
+    build:
+      context: ../backend
+      dockerfile: ../deploy/backend.Dockerfile
+      target: worker
     image: peaksift-worker:${IMAGE_TAG:-local}
     command: ["celery", "-A", "app.workers.celery_app", "beat", "--loglevel=INFO",
               "--schedule", "/tmp/celerybeat-schedule"]

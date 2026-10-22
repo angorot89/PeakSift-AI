@@ -245,6 +245,10 @@ class YouTubeMetricsProvider:
         except PublishProviderError as error:
             if error.code == PublishErrorCode.NETWORK_ERROR:
                 raise PerformanceProviderError(PerformanceErrorCode.NETWORK_ERROR) from None
+            if error.code == PublishErrorCode.PERMISSION_DENIED:  # the read scopes are missing
+                raise PerformanceProviderError(
+                    PerformanceErrorCode.ANALYTICS_NOT_AUTHORIZED
+                ) from None
             raise PerformanceProviderError(PerformanceErrorCode.AUTHENTICATION_REQUIRED) from None
 
     def video_counters(self, auth: ProviderAuth, video_ids: list[str]) -> dict[str, VideoCounters]:

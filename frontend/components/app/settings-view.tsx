@@ -32,7 +32,9 @@ export function SettingsView() {
   const router = useRouter();
   const outcome = useMemo(() => {
     const query = new URLSearchParams(params.toString());
-    return connectionOutcome(query) ?? analyticsOutcome(query);
+    const youtube = connectionOutcome(query);
+    if (youtube) return { ...youtube, title: youtube.ok ? "Connected" : "Not connected" };
+    return analyticsOutcome(query);
   }, [params]);
   const { data, error, loading, reload } = useApi(getYouTubeStatus);
   const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
@@ -87,7 +89,10 @@ export function SettingsView() {
       >
         <div className="space-y-4">
           {outcome ? (
-            <InlineAlert tone={outcome.ok ? "info" : "warning"} title={outcome.ok ? "Connected" : "Not connected"}>
+            <InlineAlert
+              tone={outcome.ok ? "info" : "warning"}
+              title={outcome.title}
+            >
               {outcome.message}
             </InlineAlert>
           ) : null}

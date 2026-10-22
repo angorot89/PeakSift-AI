@@ -150,10 +150,12 @@ export function syncLabel(sync: SyncInfo | null): string | null {
 }
 
 /** What the analytics OAuth callback reported (``?analytics=…``), or null. */
-export function analyticsOutcome(params: URLSearchParams): { ok: boolean; message: string } | null {
+export function analyticsOutcome(
+  params: URLSearchParams,
+): { ok: boolean; title: string; message: string } | null {
   const outcome = params.get("analytics");
   if (outcome === "connected") {
-    return { ok: true, message: "Analytics access is connected. Metrics for your PeakSift uploads will appear as YouTube processes them (usually 2–3 days)." };
+    return { ok: true, title: "Analytics connected", message: "Analytics access is connected. Metrics for your PeakSift uploads will appear as YouTube processes them (usually 2–3 days)." };
   }
   if (outcome !== "error") return null;
   const reasons: Record<string, string> = {
@@ -167,7 +169,11 @@ export function analyticsOutcome(params: URLSearchParams): { ok: boolean; messag
     exchange_failed: "Google could not complete the request. Try again.",
     disabled: "Analytics is not enabled on this server.",
   };
-  return { ok: false, message: reasons[params.get("reason") ?? ""] ?? "Analytics access was not connected. Try again." };
+  return {
+    ok: false,
+    title: "Analytics not connected",
+    message: reasons[params.get("reason") ?? ""] ?? "Analytics access was not connected. Try again.",
+  };
 }
 
 /** Bars for one daily series: missing values stay gaps (never drawn as 0). */
@@ -201,7 +207,8 @@ export function windowSummary(w: PerformanceWindow | undefined): string {
 /** "1.4× your usual" style wording; observational, never a verdict or a prediction. */
 export function positionText(p: Position): string {
   const where = { above: "above your usual", near: "near your usual", below: "below your usual" }[p.label];
-  const ratio = p.ratio === null ? "" : ` (${p.ratio.toFixed(1)}× your median)`;
+  // Two decimals below 2× so a "near" 0.85× never reads as 0.8×.
+  const ratio = p.ratio === null ? "" : ` (${p.ratio.toFixed(p.ratio < 2 ? 2 : 1)}× your median)`;
   return `${where}${ratio}`;
 }
 
