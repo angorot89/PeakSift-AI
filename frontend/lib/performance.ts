@@ -12,3 +12,8 @@ export const startAnalyticsConnection = () =>
 export const getInsights = () => apiFetch<Insights>("/performance/insights");
 export const dismissInsight = (id: string) => postJson<Insight>(`/performance/insights/${id}/dismiss`, {});
 export const restoreInsight = (id: string) => postJson<Insight>(`/performance/insights/${id}/restore`, {});
+/** Delete every metric PeakSift collected (and the insights made from them). */
+export const deleteCollectedMetrics = () =>
+  apiFetch<{ snapshots: number; days: number; syncs: number; insight_sets: number }>("/performance/data", {
+    method: "DELETE",
+  });

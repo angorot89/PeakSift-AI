@@ -14,8 +14,10 @@ the API, the scheduler and the job change them.
   recent days are still being revised — and upserts one row per day and view definition.
   Snapshots and rows record the provider's name as their source, so simulated data is always
   labelled.
-- **Missing videos:** a video the provider no longer returns is marked ``remote_missing``; its
-  history is kept and it is no longer scheduled (a creator's refresh checks again).
+- **Missing videos:** a video the provider does not return is first marked ``unknown`` and
+  checked again a day later; only a second miss in a row marks it ``remote_missing`` (a
+  momentary API inconsistency never hides a creator's video). Its history is kept and it is no
+  longer scheduled (a creator's refresh checks again).
 - **Ownership:** every commit re-reads the token and status, so a stalled worker whose sync was
   replaced never writes again; a video deleted mid-run stops the job.
 - **Failures** record a safe code and message (never Google's words, tokens or paths) and set
@@ -31,7 +33,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -74,6 +76,8 @@ REVISION_DAYS = 3
 SCHEDULE_UNTIL = timedelta(days=180)
 MAX_RANGE_DAYS = 400
 BACKOFF_MAX = timedelta(hours=24)
+# A video the provider did not return is checked once more after this before it counts as gone.
+MISSING_RECHECK = timedelta(hours=24)
 # How many videos a newly granted creator's backfill starts at once (the scheduler does the rest).
 BACKFILL_START_LIMIT = 20
 
@@ -241,10 +245,15 @@ def due_contents(db: Session, settings: Settings, at: datetime) -> list[Publishe
             PublishingConnection.status == ConnectionStatus.CONNECTED,
             PublishingConnection.scopes.contains(ANALYTICS_SCOPE),
             PublishingConnection.scopes.contains(READONLY_SCOPE),
+            # A live sync blocks; a stalled one does not (request_sync replaces it).
             ~select(AnalyticsSync.id)
             .where(
                 AnalyticsSync.content_id == PublishedContent.id,
                 AnalyticsSync.status.in_(ACTIVE_SYNC_STATUSES),
+                func.coalesce(
+                    AnalyticsSync.heartbeat_at, AnalyticsSync.started_at, AnalyticsSync.created_at
+                )
+                > at - timedelta(seconds=settings.performance_sync_stale_after_seconds),
             )
             .exists(),
         )
@@ -389,11 +398,13 @@ def _execute(
     sync.heartbeat_at = now()
     found = counters.get(content.remote_video_id)
     if found is None:
-        content.remote_status = RemoteStatus.REMOTE_MISSING
+        confirmed = content.remote_status == RemoteStatus.UNKNOWN and content.last_synced_at
+        content.remote_status = RemoteStatus.REMOTE_MISSING if confirmed else RemoteStatus.UNKNOWN
         content.last_synced_at = at
-        content.next_sync_at = None
+        content.next_sync_at = None if confirmed else at + MISSING_RECHECK
         _complete(db, sync, task_id, days=0, data_through=None)
-        logger.info("Published content %s is no longer on %s", content.id, content.provider)
+        outcome = "confirmed missing" if confirmed else "checking again"
+        logger.info("Published content %s was not returned (%s)", content.id, outcome)
         return
     content.remote_status = RemoteStatus.ACTIVE
     content.privacy = found.privacy or content.privacy

@@ -12,6 +12,8 @@
   (``services/performance/insights.py``), recomputed only when the data changed; dismissed ones
   are included with ``dismissed: true``.
 - ``POST /performance/insights/{id}/dismiss`` and ``…/restore`` — hide or show one again.
+- ``DELETE /performance/data`` — delete every metric PeakSift collected for this creator (and
+  their insights) and stop scheduled syncs (``services/performance/retention.py``).
 
 Everything is owner-scoped (``404`` for anyone else). Figures are what the platform reported;
 ``null`` is "not reported", never zero. Responses never contain tokens, task ids or provider
@@ -31,6 +33,7 @@ from app.models import AnalyticsSync, PerformanceDailyMetric, PerformanceSnapsho
 from app.schemas.performance import (
     AnalyticsAccessRead,
     BaselineRead,
+    CollectedDataDeletedRead,
     DailyMetricRead,
     EvidenceShortRead,
     InsightRead,
@@ -44,6 +47,7 @@ from app.schemas.performance import (
 from app.services.performance import insights as insight_engine
 from app.services.performance import normalization, summary
 from app.services.performance.lifecycle import start_manual_sync
+from app.services.performance.retention import delete_collected
 from app.services.performance.sync import RefreshTooSoon, has_analytics_grant
 from app.services.publishing import connections
 
@@ -272,3 +276,9 @@ def dismiss_insight(insight_id: uuid.UUID, current_user: CurrentUser, db: DbSess
 @router.post("/insights/{insight_id}/restore", response_model=InsightRead)
 def restore_insight(insight_id: uuid.UUID, current_user: CurrentUser, db: DbSession):
     return _set_dismissed(db, insight_id, current_user.id, False)
+
+
+@router.delete("/data", response_model=CollectedDataDeletedRead)
+def delete_collected_data(current_user: CurrentUser, db: DbSession) -> CollectedDataDeletedRead:
+    deleted = delete_collected(db, current_user.id)
+    return CollectedDataDeletedRead(**vars(deleted))

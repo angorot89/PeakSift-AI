@@ -3,7 +3,11 @@
 import { CheckCircle2, CirclePlay, Unplug } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AnalyticsPermissionNote, ConnectAnalyticsButton } from "@/components/app/analytics/analytics-access";
+import {
+  AnalyticsPermissionNote,
+  ConnectAnalyticsButton,
+  DeleteCollectedMetrics,
+} from "@/components/app/analytics/analytics-access";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -138,9 +142,12 @@ export function SettingsView() {
                 </p>
               </div>
               {connection.analytics_access ? (
-                <p className="text-sm text-muted">
-                  PeakSift reads metrics for the shorts you published from here. Disconnect YouTube above to remove both permissions.
-                </p>
+                <>
+                  <p className="text-sm text-muted">
+                    PeakSift reads metrics for the shorts you published from here. Disconnect YouTube above to remove both permissions.
+                  </p>
+                  <DeleteCollectedMetrics />
+                </>
               ) : (
                 <>
                   <AnalyticsPermissionNote />

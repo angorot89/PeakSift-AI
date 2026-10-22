@@ -171,3 +171,10 @@ class InsightsRead(BaseModel):
     minimum_sample: int
     minimum_group: int
     insights: list[InsightRead]
+
+
+class CollectedDataDeletedRead(BaseModel):
+    snapshots: int
+    days: int
+    syncs: int
+    insight_sets: int
