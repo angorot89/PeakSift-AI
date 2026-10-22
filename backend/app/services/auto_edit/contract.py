@@ -131,6 +131,9 @@ class AutoEditContext:
     visual_assets: tuple[VisualOption, ...] = ()
     music: AudioOption | None = None  # only a track the creator explicitly chose
     sound_effects: tuple[AudioOption, ...] = ()
+    # V1.4, only when the creator asked: patterns from their own published shorts (symbolic
+    # hints from ``performance/profile.py``; weak evidence, never rules).
+    performance_hints: tuple[dict[str, Any], ...] = ()
     # Server-side only (never part of planner_view()): the completed framing analysis and
     # word-timing track a plan may use, and every handle's real id.
     reframe_analysis_id: str | None = None
@@ -191,7 +194,25 @@ class AutoEditContext:
                 }
                 for asset in self.visual_assets
             ],
+            **({"creator_history": self.creator_history()} if self.performance_hints else {}),
         }
+
+    def creator_history(self) -> list[dict[str, Any]]:
+        """The hints as a planner sees them: a choice, a value, what was observed and how much
+        evidence there is. No ids, titles or raw numbers."""
+        return [
+            {
+                "choice": hint["feature"],
+                "value": hint["value"],
+                "observed": (
+                    f"{hint['direction']} first-week "
+                    f"{'engaged views' if hint['metric'] == 'engaged_views' else 'retention'}"
+                ),
+                "evidence": f"{hint['confidence']} ({hint['group_size']} vs "
+                f"{hint['comparison_size']} earlier shorts)",
+            }
+            for hint in self.performance_hints
+        ]
 
 
 def orientation(width: int | None, height: int | None) -> str:

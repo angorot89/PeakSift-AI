@@ -47,7 +47,12 @@ export type AutoEditPlan = {
   started_at: string | null;
   completed_at: string | null;
   applied_at: string | null;
+  /** Patterns from the creator's own shorts this plan was given (only when they asked). */
+  performance_hints?: string[] | null;
 };
+
+/** Whether patterns from the creator's published shorts can inform a plan right now. */
+export type PerformanceContext = { available: boolean; simulated: boolean; sample_size: number; hints: string[] };
 export const ACTIVE_PLAN_STATUSES: PlanStatus[] = ["queued", "analyzing", "planning", "validating"];
 export const isPlanActive = (status: PlanStatus) => ACTIVE_PLAN_STATUSES.includes(status);
 

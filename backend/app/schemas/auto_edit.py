@@ -18,6 +18,9 @@ class AutoEditCreate(BaseModel):
     # Optional: one of this project's music tracks, chosen by the creator for this plan.
     # Auto Edit never picks music on its own.
     music_asset_id: uuid.UUID | None = None
+    # V1.4: let the planner consider patterns from the creator's own published shorts
+    # (weak hints inside the recipe's bounds). Off unless the creator turns it on.
+    use_performance_context: bool = False
 
 
 class AutoEditRecipeRead(BaseModel):
@@ -64,6 +67,17 @@ class AutoEditPlanRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     applied_at: datetime | None
+    # The patterns from the creator's shorts this plan was given (product copy), when used.
+    performance_hints: list[str] | None = None
+
+
+class PerformanceContextRead(BaseModel):
+    """Whether patterns from the creator's own shorts can inform Auto Edit right now."""
+
+    available: bool
+    simulated: bool
+    sample_size: int
+    hints: list[str]
 
 
 class AutoEditPlanPage(BaseModel):

@@ -2,6 +2,7 @@
 
 import {
   ArrowRight,
+  BarChart3,
   BookOpen,
   Check,
   CircleAlert,
@@ -39,6 +40,7 @@ import {
   basedOn,
   createPlan,
   formatSpan,
+  getPerformanceContext,
   getPlan,
   isPlanActive,
   listPlans,
@@ -50,6 +52,7 @@ import {
   regeneratePlan,
   retryPlan,
   type AutoEditPlan,
+  type PerformanceContext,
   type Recipe,
   type RecipeName,
 } from "@/lib/auto-edit";
@@ -223,6 +226,20 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
           </li>
         ))}
       </ul>
+      {plan.performance_hints?.length ? (
+        <section aria-labelledby={`patterns-${plan.id}`} className="rounded-xl border border-border px-4 py-3.5">
+          <h3 id={`patterns-${plan.id}`} className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <BarChart3 aria-hidden="true" className="size-4 text-muted" />
+            Patterns from your shorts this plan considered
+          </h3>
+          <ul className="mt-2 space-y-1 text-[13px] text-pretty text-muted">
+            {plan.performance_hints.map((text) => (
+              <li key={text}>{text}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-subtle">Weak hints inside the recipe’s choices; associations, not causes.</p>
+        </section>
+      ) : null}
       {notes.length ? (
         <section aria-labelledby={`notes-${plan.id}`} className="rounded-xl border border-border px-4 py-3.5">
           <h3 id={`notes-${plan.id}`} className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -317,6 +334,8 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
   const [composing, setComposing] = useState(false);
   const [recipe, setRecipe] = useState<RecipeName>("punchy");
   const [musicId, setMusicId] = useState<string>("");
+  const [patterns, setPatterns] = useState<PerformanceContext | null>(null);
+  const [usePatterns, setUsePatterns] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -335,9 +354,11 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
         listRecipes(),
         listPlans(project.id, clip.video_id, clip.id),
         listAudio(project.id).catch(() => [] as AudioAsset[]),
+        getPerformanceContext().catch(() => null), // optional: Auto Edit works without it
       ])
-        .then(([recipeList, page, audio]) => {
+        .then(([recipeList, page, audio, context]) => {
           setRecipes(recipeList);
+          setPatterns(context);
           setMusic(audio.filter((a) => a.kind === "music"));
           setPlans(page.plans);
           setComposing(page.plans.length === 0);
@@ -393,7 +414,14 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
 
   const start = () =>
     act("create", async () => {
-      const created = await createPlan(project.id, clip.video_id, clip.id, recipe, musicId || null);
+      const created = await createPlan(
+        project.id,
+        clip.video_id,
+        clip.id,
+        recipe,
+        musicId || null,
+        usePatterns && !!patterns?.available,
+      );
       accept(created);
       setSelectedId(created.id);
       setComposing(false);
@@ -480,6 +508,32 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
             Auto Edit never picks music for you. Choose one of your tracks to have it mixed under your voice.
           </p>
         </div>
+        {patterns?.available ? (
+          <div className="space-y-2 rounded-xl border border-border px-4 py-3.5">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={usePatterns}
+                onChange={(e) => setUsePatterns(e.target.checked)}
+                className="mt-1 size-4 accent-[var(--accent)]"
+              />
+              <span>
+                <span className="font-medium text-foreground">Consider patterns from my published shorts</span>
+                <span className="block text-xs text-subtle">
+                  Weak hints from {patterns.sample_size} of your shorts{patterns.simulated ? " (simulated data)" : ""}.
+                  The recipe and this clip come first; nothing here predicts results.
+                </span>
+              </span>
+            </label>
+            {usePatterns ? (
+              <ul className="space-y-1 pl-7 text-xs text-muted">
+                {patterns.hints.map((text) => (
+                  <li key={text}>{text}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button size="lg" onClick={() => void start()} disabled={busy !== null}>
             <Wand2 aria-hidden="true" />
