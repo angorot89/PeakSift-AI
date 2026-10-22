@@ -13,7 +13,6 @@ import pytest
 from app.api import performance as api
 from app.models import InsightSet
 from app.services.performance.insights import (
-    MAX_INSIGHTS,
     MIN_SAMPLE,
     Short,
     features,
@@ -118,32 +117,79 @@ def test_retention_patterns_use_percent_wording():
     assert "median 70% vs 40%" in finding.statement
 
 
-def test_at_most_five_and_the_largest_first_and_deterministic():
+def factorial(strengths=(3.0, 2.5, 2.0, 1.0)) -> list[Short]:
+    """Two replicates of every combination of four binary features; each on-value multiplies
+    engaged views by its strength (1.0: no effect), with ±5% noise."""
     rng = random.Random(7)
+    names = [
+        ("captions", "on", "off"),
+        ("hook", "with_hook", "no_hook"),
+        ("music", "with_music", "no_music"),
+        ("visuals", "with_visuals", "no_visuals"),
+    ]
     shorts = []
-    for n in range(24):
-        flags = {f"f{k}": "on" if (n >> k) & 1 else "off" for k in range(4)}
-        base = 100 * (1.5 ** sum((n >> k) & 1 for k in range(4)))
-        shorts.append(Short(uuid.UUID(int=n), datetime(2026, 9, 1, tzinfo=UTC),
-                            {"captions": flags["f0"],
-                             "hook": "with_hook" if (n >> 1) & 1 else "no_hook",
-                             "music": "with_music" if (n >> 2) & 1 else "no_music",
-                             "visuals": "with_visuals" if (n >> 3) & 1 else "no_visuals"},
-                            {"engaged_views": base * rng.uniform(0.95, 1.05),
+    for n in range(32):
+        bits = [(n >> k) & 1 for k in range(4)]
+        value = 100.0
+        for bit, strength in zip(bits, strengths, strict=True):
+            value *= strength if bit else 1.0
+        found = {name: on if bit else off for (name, on, off), bit in zip(names, bits, strict=True)}
+        shorts.append(Short(uuid.UUID(int=n), datetime(2026, 9, 1, tzinfo=UTC), found,
+                            {"engaged_views": value * rng.uniform(0.95, 1.05),
                              "average_view_percentage": 50.0}))  # fmt: skip
+    return shorts
+
+
+def test_the_largest_first_ranked_capped_and_deterministic(monkeypatch):
+    shorts = factorial()
     found = find_patterns(shorts)
-    assert 1 <= len(found) <= MAX_INSIGHTS
+    # Visuals have no effect: never reported. Music's smaller effect is lost among the larger
+    # ones in a marginal comparison of 32 shorts — an honest miss, not a false pattern.
+    assert [f.feature for f in found] == ["captions", "hook"]
+    assert [f.rank for f in found] == [1, 2]
     effects = [abs(f.effect) for f in found]
     assert effects == sorted(effects, reverse=True)
-    assert [f.rank for f in found] == list(range(1, len(found) + 1))
     shuffled = shorts[:]
     random.Random(1).shuffle(shuffled)
     assert [f.key for f in find_patterns(shuffled)] == [f.key for f in found]
+    monkeypatch.setattr("app.services.performance.insights.MAX_INSIGHTS", 1)
+    assert [f.feature for f in find_patterns(shorts)] == ["captions"]
 
 
 def test_confidence_is_moderate_at_most():
-    found = find_patterns(hooks([200] * 8, [100] * 8))
+    found = find_patterns(hooks([200 + n for n in range(8)], [100 + n for n in range(8)]))
     assert {f.confidence for f in found} == {"moderate"}
+    few = find_patterns(hooks([200 + n for n in range(6)], [100 + n for n in range(6)]))
+    assert {f.confidence for f in few} == {"limited"}
+
+
+def test_patterns_in_noise_are_not_reported():
+    """No real effect anywhere: a deterministic sample of noisy libraries reports (almost)
+    nothing. The full measurement is scripts/insights_benchmark.py."""
+    rng = random.Random(3)
+    features = {"captions": ("on", "off"), "hook": ("with_hook", "no_hook"),
+                "music": ("with_music", "no_music"), "visuals": ("with_visuals", "no_visuals"),
+                "layout": ("fit", "center_crop", "blur_background")}  # fmt: skip
+    noisy = 0
+    for _ in range(60):
+        library = [
+            Short(uuid.UUID(int=rng.getrandbits(128)), datetime(2026, 9, 1, tzinfo=UTC),
+                  {k: rng.choice(v) for k, v in features.items()},
+                  {"engaged_views": 1000 * rng.lognormvariate(0, 0.6),
+                   "average_view_percentage": 50 * rng.lognormvariate(0, 0.2)})
+            for _ in range(20)
+        ]  # fmt: skip
+        noisy += bool(find_patterns(library))
+    assert noisy <= 6  # ≤ 10% of libraries; the family-wise target is 5%
+
+
+def test_the_exact_test_matches_known_values():
+    from app.services.performance.insights import holm, mann_whitney_p
+
+    assert mann_whitney_p([1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12]) == pytest.approx(2 / 924)
+    assert mann_whitney_p([1, 2, 3], [1, 2, 3]) == 1.0  # ties: the normal approximation
+    assert holm([0.01, 0.04, 0.03]) == [0.03, None, None]
+    assert holm([0.001, 0.01, 0.02]) == [0.003, 0.02, 0.02]
 
 
 # --- persisted, through the API ---------------------------------------------------------------

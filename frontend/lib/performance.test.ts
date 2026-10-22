@@ -80,6 +80,7 @@ describe("sync and OAuth outcomes", () => {
     assert.equal(analyticsOutcome(new URLSearchParams("analytics=connected"))?.ok, true);
     const partial = analyticsOutcome(new URLSearchParams("analytics=error&reason=analytics_not_granted"));
     assert.equal(partial?.ok, false);
+    assert.equal(partial?.title, "Analytics not connected");
     assert.match(partial?.message ?? "", /publishing keeps working/);
     assert.match(analyticsOutcome(new URLSearchParams("analytics=error&reason=???"))?.message ?? "", /not connected/);
   });
@@ -99,6 +100,7 @@ describe("windows and baselines", () => {
     const p = { metric: "engaged_views", window: "day_7", value: 300, median: 100 } as const;
     assert.equal(positionText({ ...p, ratio: 3, label: "above" }), "above your usual (3.0× your median)");
     assert.equal(positionText({ ...p, ratio: null, label: "above" }), "above your usual");
+    assert.equal(positionText({ ...p, ratio: 0.85, label: "near" }), "near your usual (0.85× your median)");
   });
   it("says when there is no reliable pattern yet", () => {
     const b = { metric: "engaged_views", window: "day_7", minimum_sample: 5 } as const;

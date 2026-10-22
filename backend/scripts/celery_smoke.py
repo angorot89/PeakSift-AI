@@ -33,6 +33,8 @@ EXPECTED_TASKS = (
     "peaksift.index_visual_asset",
     "peaksift.publish_short",
     "peaksift.check_publish_status",
+    "peaksift.sync_performance",
+    "peaksift.schedule_performance_syncs",
 )
 
 

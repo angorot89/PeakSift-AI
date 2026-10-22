@@ -260,6 +260,7 @@ def test_network_failures_and_garbage_are_normalized():
     [
         (PublishErrorCode.AUTHENTICATION_REQUIRED, "authentication_required"),
         (PublishErrorCode.NETWORK_ERROR, "network_error"),
+        (PublishErrorCode.PERMISSION_DENIED, "analytics_not_authorized"),
     ],
 )
 def test_authorization_failures_are_normalized(publish_code, code):
@@ -344,3 +345,29 @@ def test_analytics_needs_publishing():
     with pytest.raises(ValidationError) as excinfo:
         settings_with(youtube_analytics_enabled=True, youtube_publishing_enabled=False)
     assert "YOUTUBE_ANALYTICS_ENABLED needs YOUTUBE_PUBLISHING_ENABLED" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("google_error", "code"),
+    [
+        ("invalid_scope: Bad Request", "permission_denied"),  # seen live: grant lacks the scope
+        ("invalid_grant: Token has been expired or revoked.", "authentication_required"),
+    ],
+)
+def test_google_refresh_errors_keep_scope_and_grant_problems_apart(monkeypatch, google_error, code):
+    """A missing scope must never look like a revoked grant (that would make the creator
+    reconnect publishing)."""
+    from google.auth.exceptions import RefreshError
+    from google.oauth2.credentials import Credentials
+
+    from app.services.publishing.youtube import _refresh_with_google
+
+    def refuse(self, request):
+        raise RefreshError(google_error, {"error": google_error.split(":")[0]})
+
+    monkeypatch.setattr(Credentials, "refresh", refuse)
+    settings = settings_with(google_client_id="1-x.apps.googleusercontent.com",
+                             google_client_secret="s")  # fmt: skip
+    with pytest.raises(PublishProviderError) as excinfo:
+        _refresh_with_google(settings)("1//0gToken")
+    assert excinfo.value.code == code

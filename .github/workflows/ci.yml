@@ -185,6 +185,11 @@ jobs:
         # Safety gates: no false strong match, every negative query quiet, every positive
         # query's first result relevant. The real-model run is local acceptance (--model-dir).
         run: python scripts/semantic_benchmark.py --calibrate
+      - name: Creator insights benchmark (synthetic, engine only, never stored)
+        # Safety gates: over 1,200 libraries with no real effect the engine reports a pattern in
+        # at most 6% (family-wise α 5%, Holm–Bonferroni); every statement is an observational
+        # template; nothing below the minimum sample. Also prints detection rates.
+        run: python scripts/insights_benchmark.py
       - uses: docker/setup-buildx-action@v3
       - name: Build MinIO from source (MinIO publishes no community images; layers cached)
         uses: docker/build-push-action@v6
@@ -256,6 +261,18 @@ jobs:
           tests/test_semantic_management.py tests/test_semantic_performance.py
           tests/test_semantic_hardening.py tests/test_semantic_benchmark.py
           tests/test_semantic_ci_matrix.py
+      - name: V1.4 performance analytics suites (live S3 required, listed separately for visibility)
+        # Domain and provenance, the analytics permission upgrade (mocked Google), metrics
+        # providers (mocked HTTP and the deterministic fake), sync pipeline, dashboard API,
+        # normalization, insights, Auto Edit context, hardening and the CI matrix. Never Google.
+        env:
+          REQUIRE_LIVE_S3: "1"
+        run: >-
+          pytest -rs -q tests/test_performance_domain.py tests/test_analytics_permission.py
+          tests/test_performance_providers.py tests/test_performance_sync.py
+          tests/test_performance_api.py tests/test_performance_normalization.py
+          tests/test_creator_insights.py tests/test_auto_edit_performance_context.py
+          tests/test_performance_hardening.py tests/test_performance_ci_matrix.py
       - name: Real broker + worker smoke (ping round-trip + task registration, no inference)
         run: python scripts/celery_smoke.py
 
@@ -309,7 +326,7 @@ jobs:
         run: |
           set -euo pipefail
           compose() { docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env "$@"; }
-          for service in api worker frontend; do
+          for service in api worker beat frontend; do
             uid="$(compose exec -T "$service" id -u)"
             echo "$service runs as uid $uid"
             test "$uid" != "0"

@@ -184,6 +184,14 @@ def test_a_refused_grant_marks_the_connection_for_reconnecting(db_session, video
     assert get_connection(db_session, video.user_id).status == "needs_reconnect"
 
 
+def test_a_missing_scope_never_marks_publishing_for_reconnecting(db_session, video, settings,
+                                                                 fake):  # fmt: skip
+    fake.fail("authorize", [PerformanceErrorCode.ANALYTICS_NOT_AUTHORIZED])
+    sync = run(db_session, video, settings, fake)
+    assert sync.error_code == "analytics_not_authorized"
+    assert get_connection(db_session, video.user_id).status == "connected"
+
+
 def test_the_refresh_token_is_used_but_never_recorded(db_session, video, settings, fake, caplog):
     seen = []
     original = fake.authorize
