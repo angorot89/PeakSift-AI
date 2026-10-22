@@ -17,9 +17,16 @@ export type YouTubeConnection = {
   /** Empty until the first upload reports the channel (PeakSift asks for upload access only). */
   account_title: string;
   connected_at: string;
+  /** The creator granted the separate, read-only analytics upgrade. */
+  analytics_access: boolean;
 };
 
-export type YouTubeStatus = { enabled: boolean; connection: YouTubeConnection | null };
+export type YouTubeStatus = {
+  enabled: boolean;
+  /** The server offers performance analytics (each creator still opts in). */
+  analytics_enabled: boolean;
+  connection: YouTubeConnection | null;
+};
 
 export type PublishMetadata = {
   title: string;

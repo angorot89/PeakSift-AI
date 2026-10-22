@@ -3,6 +3,7 @@
 import { CheckCircle2, CirclePlay, Unplug } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { AnalyticsPermissionNote, ConnectAnalyticsButton } from "@/components/app/analytics/analytics-access";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { analyticsOutcome } from "@/lib/performance";
 import {
   connectionOutcome,
   disconnectYouTube,
@@ -24,7 +26,10 @@ import { useApi } from "@/lib/use-api";
 export function SettingsView() {
   const params = useSearchParams();
   const router = useRouter();
-  const outcome = useMemo(() => connectionOutcome(new URLSearchParams(params.toString())), [params]);
+  const outcome = useMemo(() => {
+    const query = new URLSearchParams(params.toString());
+    return connectionOutcome(query) ?? analyticsOutcome(query);
+  }, [params]);
   const { data, error, loading, reload } = useApi(getYouTubeStatus);
   const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -74,7 +79,7 @@ export function SettingsView() {
             YouTube
           </span>
         }
-        description="Publish finished shorts to your channel. PeakSift asks only for permission to upload videos — it cannot read, change or delete anything on your channel."
+        description="Publish finished shorts to your channel. Publishing asks only for permission to upload videos — it cannot read, change or delete anything on your channel. Analytics is a separate, optional, read-only permission."
       >
         <div className="space-y-4">
           {outcome ? (
@@ -123,7 +128,28 @@ export function SettingsView() {
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : null}
+          {data?.enabled && data.analytics_enabled && connection?.status === "connected" ? (
+            <div id="analytics" className="space-y-3 rounded-xl border border-border px-4 py-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-medium text-foreground">Analytics access</p>
+                <p className={`text-sm ${connection.analytics_access ? "text-emerald-300" : "text-muted"}`}>
+                  {connection.analytics_access ? "Connected (read-only)" : "Not connected"}
+                </p>
+              </div>
+              {connection.analytics_access ? (
+                <p className="text-sm text-muted">
+                  PeakSift reads metrics for the shorts you published from here. Disconnect YouTube above to remove both permissions.
+                </p>
+              ) : (
+                <>
+                  <AnalyticsPermissionNote />
+                  <ConnectAnalyticsButton />
+                </>
+              )}
+            </div>
+          ) : null}
+          {!loading && !error && data?.enabled && !connection ? (
             <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted">No YouTube account is connected.</p>
               <Button onClick={connect} disabled={busy !== null}>
@@ -131,7 +157,7 @@ export function SettingsView() {
                 {busy === "connect" ? "Opening Google…" : "Connect YouTube"}
               </Button>
             </div>
-          )}
+          ) : null}
         </div>
       </Panel>
     </>
