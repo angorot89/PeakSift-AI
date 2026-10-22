@@ -80,3 +80,49 @@ def signed_in_creator(db: Session, client, email: str | None = None) -> tuple[Us
     edit.clip.video.project.user_id = user.id
     db.commit()
     return user, edit
+
+
+def with_week(
+    db: Session,
+    content: PublishedContent,
+    engaged_per_day: int,
+    retention: float = 50.0,
+    *,
+    source: str = "fake",
+) -> PublishedContent:
+    """Seven settled, fully reported days and a counter snapshot, with chosen figures."""
+    from datetime import timedelta
+
+    from app.models import PerformanceDailyMetric, PerformanceSnapshot
+    from app.services.performance.metrics import metric_version, reporting_today
+
+    first = reporting_today(content.published_at)
+    for n in range(7):
+        day = first + timedelta(n)
+        db.add(PerformanceDailyMetric(
+            content_id=content.id, source=source, date=day, metric_version=metric_version(day),
+            views=engaged_per_day + 10, engaged_views=engaged_per_day, likes=5, comments=1,
+            watch_time_seconds=600.0, average_view_duration_seconds=10.0,
+            average_view_percentage=retention, subscribers_gained=0,
+        ))  # fmt: skip
+    db.add(PerformanceSnapshot(
+        content_id=content.id, source=source, data_class="counters", observed_at=NOW,
+        metric_version=metric_version(first), views=engaged_per_day * 7,
+    ))  # fmt: skip
+    content.analytics_complete_through = first + timedelta(10)
+    content.remote_status = "active"
+    db.commit()
+    return content
+
+
+def provenance(captions: str | None = "bold", hook: bool = False, auto: bool = False) -> dict:
+    return {
+        "recipe": "punchy" if auto else "manual",
+        "auto_edit": {"used": auto, "planner": "rules" if auto else None},
+        "layout": "center_crop",
+        "captions": {"enabled": captions is not None, "preset": captions, "position": "bottom"},
+        "hook": {"enabled": hook, "length_chars": 20 if hook else 0},
+        "visuals": {"count": 0, "cutaways": 0, "pips": 0, "overlays": 0},
+        "audio": {"music": False, "ducking": None, "sfx_count": 0, "normalized": False},
+        "candidate": {"rank": 1, "score": 70, "category": "story"},
+    }
