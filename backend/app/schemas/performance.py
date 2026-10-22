@@ -28,6 +28,45 @@ class SyncRead(BaseModel):
     completed_at: datetime | None
 
 
+class WindowRead(BaseModel):
+    """One early window in reporting days from publication (day_1 ≈ 24 h, day_3 ≈ 72 h,
+    day_7 ≈ a week). Figures only when the window is complete."""
+
+    key: str
+    days_expected: int
+    days_reported: int
+    status: str  # complete | open | incomplete
+    engaged_views: int | None
+    views: int | None
+    average_view_percentage: float | None
+    watch_time_seconds: float | None
+    likes: int | None
+    comments: int | None
+    subscribers_gained: int | None
+
+
+class PositionRead(BaseModel):
+    """This short against the creator's own median (the short itself left out)."""
+
+    metric: str
+    window: str
+    value: float
+    median: float
+    ratio: float | None
+    label: str  # above | near | below
+
+
+class BaselineRead(BaseModel):
+    """The creator's own median over their comparable shorts; never other creators'."""
+
+    metric: str
+    window: str
+    sample_size: int
+    minimum_sample: int
+    median: float | None
+    reliable: bool
+
+
 class VideoPerformanceRead(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
@@ -54,11 +93,15 @@ class VideoPerformanceRead(BaseModel):
     latest_sync: SyncRead | None
     # The recipe the short was made with ("manual" for hand-made edits).
     recipe: str | None
+    windows: list[WindowRead] = []
+    positions: list[PositionRead] = []
 
 
 class PerformanceOverviewRead(BaseModel):
     access: AnalyticsAccessRead
     videos: list[VideoPerformanceRead]
+    # Medians among shorts with a complete first week of the current source.
+    baselines: list[BaselineRead]
 
 
 class DailyMetricRead(BaseModel):

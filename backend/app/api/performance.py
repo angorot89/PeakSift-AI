@@ -26,6 +26,7 @@ from app.core.rate_limit import per_user
 from app.models import AnalyticsSync, PerformanceDailyMetric, PerformanceSnapshot, PublishedContent
 from app.schemas.performance import (
     AnalyticsAccessRead,
+    BaselineRead,
     DailyMetricRead,
     PerformanceOverviewRead,
     SnapshotRead,
@@ -33,7 +34,7 @@ from app.schemas.performance import (
     VideoPerformanceDetailRead,
     VideoPerformanceRead,
 )
-from app.services.performance import summary
+from app.services.performance import normalization, summary
 from app.services.performance.lifecycle import start_manual_sync
 from app.services.performance.sync import RefreshTooSoon, has_analytics_grant
 from app.services.publishing import connections
@@ -89,15 +90,32 @@ def _video(content, counters, processed, sync) -> dict:
     }  # fmt: skip
 
 
-def _summaries(db, contents: list[PublishedContent]) -> list[dict]:
+def _summaries(db, contents: list[PublishedContent], comparisons=None) -> list[dict]:
     ids = [content.id for content in contents]
     counters = summary.latest_counters(db, ids)
-    processed = summary.processed_totals(db, {i: c.source for i, c in counters.items()})
+    sources = {i: c.source for i, c in counters.items()}
+    processed = summary.processed_totals(db, sources)
     syncs = summary.latest_syncs(db, ids)
-    return [
-        _video(content, counters.get(content.id), processed.get(content.id), syncs.get(content.id))
-        for content in contents
-    ]
+    videos = []
+    for content in contents:
+        video = _video(content, counters.get(content.id), processed.get(content.id),
+                       syncs.get(content.id))  # fmt: skip
+        if comparisons is not None:
+            video["windows"] = [vars(w) for w in comparisons.windows.get(content.id, {}).values()]
+            video["positions"] = [
+                {"metric": metric, "window": normalization.PRIMARY_WINDOW, **vars(placed)}
+                for metric, placed in comparisons.positions.get(content.id, {}).items()
+            ]
+        videos.append(video)
+    return videos
+
+
+def _comparisons(db, user_id: uuid.UUID) -> normalization.Comparisons:
+    """Every comparison is among this creator's own shorts, of the server's current source."""
+    contents = summary.user_contents(db, user_id)
+    counters = summary.latest_counters(db, [content.id for content in contents])
+    source = "fake" if get_settings().performance_provider == "fake" else "youtube"
+    return normalization.compare(db, contents, {i: c.source for i, c in counters.items()}, source)
 
 
 def _owned(db, content_id: uuid.UUID, user_id: uuid.UUID) -> PublishedContent:
@@ -114,9 +132,11 @@ def _owned(db, content_id: uuid.UUID, user_id: uuid.UUID) -> PublishedContent:
 @router.get("", response_model=PerformanceOverviewRead)
 def performance_overview(current_user: CurrentUser, db: DbSession) -> PerformanceOverviewRead:
     contents = summary.user_contents(db, current_user.id)
+    comparisons = _comparisons(db, current_user.id)
     return PerformanceOverviewRead(
         access=_access(db, current_user.id),
-        videos=[VideoPerformanceRead(**video) for video in _summaries(db, contents)],
+        videos=[VideoPerformanceRead(**v) for v in _summaries(db, contents, comparisons)],
+        baselines=[BaselineRead(**vars(b), reliable=b.reliable) for b in comparisons.baselines],
     )
 
 
@@ -125,7 +145,7 @@ def video_performance(
     content_id: uuid.UUID, current_user: CurrentUser, db: DbSession
 ) -> VideoPerformanceDetailRead:
     content = _owned(db, content_id, current_user.id)
-    [video] = _summaries(db, [content])
+    [video] = _summaries(db, [content], _comparisons(db, current_user.id))
     source = video["source"]
     daily = db.scalars(
         select(PerformanceDailyMetric)
