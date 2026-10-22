@@ -38,6 +38,18 @@ from app.models.clip_detection import (
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
 from app.models.oauth_state import OAuthState
+from app.models.performance import (
+    ACTIVE_SYNC_STATUSES,
+    AnalyticsSync,
+    DataSource,
+    PerformanceDailyMetric,
+    PerformanceSnapshot,
+    PublishedContent,
+    RemoteStatus,
+    SnapshotClass,
+    SyncKind,
+    SyncStatus,
+)
 from app.models.project import Project, ProjectStatus
 from app.models.publish_job import (
     ACTIVE_PUBLISH_STATUSES,
@@ -118,6 +130,16 @@ __all__ = [
     "PublishJob",
     "PublishStatus",
     "Project",
+    "ACTIVE_SYNC_STATUSES",
+    "AnalyticsSync",
+    "DataSource",
+    "PerformanceDailyMetric",
+    "PerformanceSnapshot",
+    "PublishedContent",
+    "RemoteStatus",
+    "SnapshotClass",
+    "SyncKind",
+    "SyncStatus",
     "ProjectStatus",
     "PublishingConnection",
     "PublishingProvider",
