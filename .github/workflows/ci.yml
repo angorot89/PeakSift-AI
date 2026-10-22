@@ -90,6 +90,8 @@ jobs:
       # the CLIP model (scripts/fetch_semantic_model.py is an operator step); the real model
       # has opt-in tests (pytest -m real_model with PEAKSIFT_REAL_SEMANTIC_MODEL_DIR).
       SEMANTIC_PROVIDER: "fake"
+      # Performance analytics: the deterministic fake metrics provider. CI never calls Google.
+      PERFORMANCE_PROVIDER: "fake"
     steps:
       - uses: actions/checkout@v4
       - name: No model weights or media are tracked

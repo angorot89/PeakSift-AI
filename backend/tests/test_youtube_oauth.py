@@ -133,7 +133,9 @@ def test_connecting_requires_sign_in_and_an_enabled_server(client, db_session):
     sign_in(client)
     refused = client.post("/publishing/youtube/connect")
     assert refused.status_code == 409 and "not enabled" in refused.json()["detail"]
-    assert client.get("/publishing/youtube").json() == {"enabled": False, "connection": None}
+    assert client.get("/publishing/youtube").json() == {
+        "enabled": False, "analytics_enabled": False, "connection": None,
+    }  # fmt: skip
 
 
 # --- the callback -----
@@ -163,7 +165,9 @@ def test_a_successful_callback_stores_an_encrypted_refresh_token(
     assert opened == REFRESH and row.scopes == oauth.UPLOAD_SCOPE
     status = client.get("/publishing/youtube").json()
     assert status["enabled"] is True and status["connection"]["status"] == "connected"
-    assert set(status["connection"]) == {"provider", "status", "account_title", "connected_at"}
+    assert set(status["connection"]) == {"provider", "status", "account_title", "connected_at",
+                                         "analytics_access"}  # fmt: skip
+    assert status["connection"]["analytics_access"] is False  # never implied by publishing
 
 
 def test_a_state_works_once(client, settings, google):

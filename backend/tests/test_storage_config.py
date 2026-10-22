@@ -86,6 +86,7 @@ def production_s3(**overrides) -> dict:
         celery_task_always_eager=False,
         rate_limit_enabled=True,
         semantic_provider="clip_onnx",
+        performance_provider="youtube",
         **overrides,
     )
 

@@ -3,7 +3,9 @@
 Created when a signed-in user starts connecting a provider, consumed (deleted) by the
 callback in one atomic statement, and valid for ten minutes. It ties the callback to the
 user who started it and carries the PKCE code verifier — encrypted like refresh tokens —
-which never leaves the server. Only a hash of the state value is stored.
+which never leaves the server. Only a hash of the state value is stored. ``purpose`` records
+what the user was asked for — publishing (upload only) or the explicit analytics upgrade — so
+the callback checks the grant against exactly that request.
 """
 
 import uuid
@@ -20,6 +22,7 @@ class OAuthState(Base):
     __table_args__ = (
         CheckConstraint("provider IN ('youtube')", name="ck_oauth_states_provider"),
         CheckConstraint("length(state_hash) = 64", name="ck_oauth_states_state_hash"),
+        CheckConstraint("purpose IN ('publishing', 'analytics')", name="ck_oauth_states_purpose"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -27,6 +30,7 @@ class OAuthState(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     provider: Mapped[str] = mapped_column(String(16))
+    purpose: Mapped[str] = mapped_column(String(16), server_default="publishing")
     state_hash: Mapped[str] = mapped_column(String(64), unique=True)  # sha256 hex of the state
     code_verifier_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     key_version: Mapped[int] = mapped_column()

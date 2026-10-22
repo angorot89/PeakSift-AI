@@ -77,7 +77,12 @@ def _reasons(response: httpx.Response) -> set[str]:
         return set()
 
 
-def _refresh_with_google(settings: Settings) -> Callable[[str], str]:
+def _refresh_with_google(
+    settings: Settings, scopes: tuple[str, ...] = (UPLOAD_SCOPE,)
+) -> Callable[[str], str]:
+    """Access tokens are requested for ``scopes`` only (publishing never gets read scopes,
+    analytics never gets upload), even when the stored grant holds more."""
+
     def refresh(refresh_token: str) -> str:
         from google.auth.exceptions import RefreshError, TransportError
         from google.auth.transport.requests import Request
@@ -89,7 +94,7 @@ def _refresh_with_google(settings: Settings) -> Callable[[str], str]:
             token_uri=TOKEN_URI,
             client_id=settings.google_client_id,
             client_secret=settings.google_client_secret.get_secret_value(),
-            scopes=[UPLOAD_SCOPE],
+            scopes=list(scopes),
         )
         try:
             credentials.refresh(Request())

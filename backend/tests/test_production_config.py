@@ -24,6 +24,7 @@ def production(**overrides) -> dict:
         "celery_task_always_eager": False,  # the test suite's environment enables it
         "rate_limit_enabled": True,  # and disables this
         "semantic_provider": "clip_onnx",  # and uses the fake embedding provider
+        "performance_provider": "youtube",  # and the fake metrics provider
     }
     values.update(overrides)
     return values

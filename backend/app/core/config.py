@@ -310,6 +310,16 @@ class Settings(BaseSettings):
     google_client_secret: SecretStr | None = None
     google_oauth_redirect_uri: str = ""
 
+    # --- Performance analytics (V1.4) -----------------------------------------------------
+    # Off unless enabled (and needs publishing enabled: it reuses the same Google client and
+    # encrypted connection). Creators still opt in one by one with an explicit permission
+    # upgrade that adds read-only scopes (youtube.readonly + yt-analytics.readonly); the
+    # YouTube Data and YouTube Analytics APIs must be enabled on the Google Cloud project.
+    youtube_analytics_enabled: bool = False
+    # Where metrics come from: "youtube", or "fake" — deterministic simulated metrics for tests
+    # and non-production stacks, always labelled simulated (refused in production).
+    performance_provider: Literal["youtube", "fake"] = "youtube"
+
     # Rate limits (Redis). Off only in tests. RATE_LIMITS overrides individual budgets:
     # "login_ip=20/60,edit_render=200/3600" (see app/core/rate_limit.py for the names).
     rate_limit_enabled: bool = True
@@ -406,6 +416,8 @@ def publishing_problems(settings: "Settings") -> list[str]:
                 problems.append(
                     "PUBLISHING_TOKEN_KEY_VERSION must differ from every previous key version"
                 )
+    if settings.youtube_analytics_enabled and not settings.youtube_publishing_enabled:
+        problems.append("YOUTUBE_ANALYTICS_ENABLED needs YOUTUBE_PUBLISHING_ENABLED")
     if settings.youtube_upload_chunk_bytes % (256 * 1024):
         problems.append("YOUTUBE_UPLOAD_CHUNK_BYTES must be a multiple of 262144 (256 KiB)")
     if not settings.youtube_publishing_enabled:
@@ -510,6 +522,8 @@ def production_problems(settings: Settings) -> list[str]:
         problems.append("PUBLISHING_PROVIDER must be youtube")
     if settings.semantic_provider == "fake":
         problems.append("SEMANTIC_PROVIDER must not be fake")
+    if settings.performance_provider != "youtube":
+        problems.append("PERFORMANCE_PROVIDER must be youtube")
     if settings.storage_backend == "local" and (
         "media_root" not in explicit or not settings.media_root.is_absolute()
     ):

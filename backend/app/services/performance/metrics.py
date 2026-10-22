@@ -16,7 +16,7 @@ The reporting day is YouTube's Pacific-Time calendar day (``REPORTING_TIMEZONE``
 analytics arrive day by day, typically 2–3 days late, and never include the current day.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 REPORTING_TIMEZONE = ZoneInfo("America/Los_Angeles")
@@ -44,3 +44,8 @@ def metric_version(day: date) -> str:
     if day >= SHORTS_STARTS_FROM:
         return "youtube_views_2025_03"  # Shorts count starts and replays
     return "youtube_views_legacy"
+
+
+def reporting_today(now: datetime | None = None) -> date:
+    """Today as YouTube's reports count days (Pacific Time)."""
+    return (now or datetime.now(UTC)).astimezone(REPORTING_TIMEZONE).date()
