@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FolderOpen, LayoutGrid, LogOut, Settings } from "lucide-react";
+import { BarChart3, FolderOpen, LayoutGrid, LogOut, Settings } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { href: "/projects", label: "Projects", icon: FolderOpen },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -65,3 +65,18 @@ def make_content(
     db.add(content)
     db.commit()
     return content
+
+
+def signed_in_creator(db: Session, client, email: str | None = None) -> tuple[User, object]:
+    """A creator signed in on ``client``, owning one project with a ready edit."""
+    import uuid
+
+    from tests.test_video_upload import sign_up
+
+    client.cookies.clear()
+    me = sign_up(client, email or f"analytics-{uuid.uuid4().hex[:8]}@example.com")
+    user = db.get(User, uuid.UUID(me["id"]))
+    _, edit = ready_edit(db)
+    edit.clip.video.project.user_id = user.id
+    db.commit()
+    return user, edit

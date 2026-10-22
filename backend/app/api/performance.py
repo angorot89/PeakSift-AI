@@ -1,0 +1,185 @@
+"""Performance analytics for the signed-in creator's published shorts.
+
+- ``GET /performance`` — analytics access (server switch, connection, the read-only grant,
+  simulated or real) and every PeakSift-published video with its latest counters and
+  processed totals, newest first.
+- ``GET /performance/videos/{content_id}`` — one video: daily processed rows (with the view
+  definition of each day), counter history, recent syncs and how the short was made.
+- ``POST /performance/videos/{content_id}/refresh`` — ask for a sync now: ``202`` with the
+  sync; ``409`` without the analytics grant (or with analytics off); ``429`` with
+  ``Retry-After`` right after a sync, or when the per-creator budget is spent.
+
+Everything is owner-scoped (``404`` for anyone else). Figures are what the platform reported;
+``null`` is "not reported", never zero. Responses never contain tokens, task ids or provider
+payloads, and never other creators' data.
+"""
+
+import uuid
+
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+
+from app.api.deps import CurrentUser, DbSession
+from app.core.config import get_settings
+from app.core.rate_limit import per_user
+from app.models import AnalyticsSync, PerformanceDailyMetric, PerformanceSnapshot, PublishedContent
+from app.schemas.performance import (
+    AnalyticsAccessRead,
+    DailyMetricRead,
+    PerformanceOverviewRead,
+    SnapshotRead,
+    SyncRead,
+    VideoPerformanceDetailRead,
+    VideoPerformanceRead,
+)
+from app.services.performance import summary
+from app.services.performance.lifecycle import start_manual_sync
+from app.services.performance.sync import RefreshTooSoon, has_analytics_grant
+from app.services.publishing import connections
+
+router = APIRouter(prefix="/performance", tags=["performance"])
+
+DETAIL_SNAPSHOTS = 60
+DETAIL_SYNCS = 10
+
+
+def _access(db, user_id: uuid.UUID) -> AnalyticsAccessRead:
+    settings = get_settings()
+    connection = connections.get_connection(db, user_id)
+    return AnalyticsAccessRead(
+        enabled=settings.youtube_publishing_enabled and settings.youtube_analytics_enabled,
+        connected=connection is not None,
+        connection_status=connection.status if connection else None,
+        analytics_access=has_analytics_grant(connection),
+        simulated=settings.performance_provider == "fake",
+    )
+
+
+def _sync_read(sync: AnalyticsSync | None) -> SyncRead | None:
+    if sync is None:
+        return None
+    return SyncRead(
+        kind=sync.kind, status=sync.status, error_code=sync.error_code,
+        error_message=sync.error_message, created_at=sync.created_at,
+        completed_at=sync.completed_at,
+    )  # fmt: skip
+
+
+def _video(content, counters, processed, sync) -> dict:
+    source = counters.source if counters else None
+    real = source == "youtube"
+    return {
+        "id": content.id, "project_id": content.project_id, "edit_id": content.edit_id,
+        "title": content.title, "published_at": content.published_at,
+        "duration_seconds": content.duration_seconds, "privacy": content.privacy,
+        "remote_status": content.remote_status, "source": source, "simulated": source == "fake",
+        "video_url": f"https://www.youtube.com/watch?v={content.remote_video_id}"
+        if real and content.remote_status != "remote_missing" else None,
+        "views": counters.views if counters else None,
+        "likes": counters.likes if counters else None,
+        "comments": counters.comments if counters else None,
+        "counters_observed_at": counters.observed_at if counters else None,
+        "engaged_views": processed.engaged_views if processed else None,
+        "average_view_percentage": processed.average_view_percentage if processed else None,
+        "processed_through": processed.processed_through if processed else None,
+        "processed_days": processed.days if processed else 0,
+        "last_synced_at": content.last_synced_at, "next_sync_at": content.next_sync_at,
+        "latest_sync": _sync_read(sync), "recipe": (content.provenance or {}).get("recipe"),
+    }  # fmt: skip
+
+
+def _summaries(db, contents: list[PublishedContent]) -> list[dict]:
+    ids = [content.id for content in contents]
+    counters = summary.latest_counters(db, ids)
+    processed = summary.processed_totals(db, {i: c.source for i, c in counters.items()})
+    syncs = summary.latest_syncs(db, ids)
+    return [
+        _video(content, counters.get(content.id), processed.get(content.id), syncs.get(content.id))
+        for content in contents
+    ]
+
+
+def _owned(db, content_id: uuid.UUID, user_id: uuid.UUID) -> PublishedContent:
+    content = db.scalar(
+        select(PublishedContent).where(
+            PublishedContent.id == content_id, PublishedContent.user_id == user_id
+        )
+    )
+    if content is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+    return content
+
+
+@router.get("", response_model=PerformanceOverviewRead)
+def performance_overview(current_user: CurrentUser, db: DbSession) -> PerformanceOverviewRead:
+    contents = summary.user_contents(db, current_user.id)
+    return PerformanceOverviewRead(
+        access=_access(db, current_user.id),
+        videos=[VideoPerformanceRead(**video) for video in _summaries(db, contents)],
+    )
+
+
+@router.get("/videos/{content_id}", response_model=VideoPerformanceDetailRead)
+def video_performance(
+    content_id: uuid.UUID, current_user: CurrentUser, db: DbSession
+) -> VideoPerformanceDetailRead:
+    content = _owned(db, content_id, current_user.id)
+    [video] = _summaries(db, [content])
+    source = video["source"]
+    daily = db.scalars(
+        select(PerformanceDailyMetric)
+        .where(PerformanceDailyMetric.content_id == content.id,
+               PerformanceDailyMetric.source == source)
+        .order_by(PerformanceDailyMetric.date, PerformanceDailyMetric.metric_version)
+    ).all()  # fmt: skip
+    snapshots = db.scalars(
+        select(PerformanceSnapshot)
+        .where(PerformanceSnapshot.content_id == content.id, PerformanceSnapshot.source == source)
+        .order_by(PerformanceSnapshot.observed_at.desc())
+        .limit(DETAIL_SNAPSHOTS)
+    ).all()
+    syncs = db.scalars(
+        select(AnalyticsSync)
+        .where(AnalyticsSync.content_id == content.id)
+        .order_by(AnalyticsSync.created_at.desc())
+        .limit(DETAIL_SYNCS)
+    ).all()
+    return VideoPerformanceDetailRead(
+        **video,
+        provenance=content.provenance or {},
+        daily=[DailyMetricRead.model_validate(row, from_attributes=True) for row in daily],
+        snapshots=[
+            SnapshotRead.model_validate(s, from_attributes=True) for s in reversed(snapshots)
+        ],
+        syncs=[_sync_read(sync) for sync in syncs],
+    )
+
+
+@router.post(
+    "/videos/{content_id}/refresh",
+    response_model=SyncRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[per_user("analytics_refresh")],
+)
+def refresh_video_performance(content_id: uuid.UUID, current_user: CurrentUser, db: DbSession):
+    content = _owned(db, content_id, current_user.id)
+    settings = get_settings()
+    access = _access(db, current_user.id)
+    if not access.enabled:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Analytics is not enabled on this server"
+        )
+    if not access.analytics_access:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Analytics access is not connected")
+    try:
+        sync = start_manual_sync(db, content, settings)
+    except RefreshTooSoon as wait:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Metrics were refreshed moments ago; try again shortly"},
+            headers={"Retry-After": str(wait.retry_after_seconds)},
+        )
+    if sync is None:  # one is already running: report it
+        sync = summary.latest_syncs(db, [content.id]).get(content.id)
+    return _sync_read(sync)
