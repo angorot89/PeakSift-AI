@@ -5,6 +5,8 @@ import {
   accessState,
   analyticsOutcome,
   baselineText,
+  confidenceText,
+  insightsEmptyText,
   positionText,
   windowSummary,
   metric,
@@ -15,6 +17,7 @@ import {
   syncLabel,
   type AnalyticsAccess,
   type DailyMetric,
+  type Insights,
 } from "./performance-rules.ts";
 
 const access = (overrides: Partial<AnalyticsAccess> = {}): AnalyticsAccess => ({
@@ -104,5 +107,19 @@ describe("windows and baselines", () => {
     for (const text of [baselineText(undefined), positionText({ metric: "engaged_views", window: "", value: 1, median: 1, ratio: 1, label: "near" })]) {
       assert.doesNotMatch(text, /viral|best|guarantee|will /i);
     }
+  });
+});
+
+describe("insights copy", () => {
+  const data: Insights = { status: "insufficient", source: "youtube", simulated: false, engine_version: "insights_v1",
+    computed_at: "", sample_size: 4, minimum_sample: 10, minimum_group: 5, insights: [] };
+  it("never invents a pattern", () => {
+    assert.match(insightsEmptyText(data), /No reliable pattern yet: 4 of 10/);
+    assert.match(insightsEmptyText({ ...data, status: "ready", sample_size: 14 }), /No clear pattern .* 14 comparable/);
+  });
+  it("states the evidence behind each insight", () => {
+    const insight = { group_size: 6, comparison_size: 7, confidence: "limited" } as Parameters<typeof confidenceText>[0];
+    assert.equal(confidenceText(insight), "Limited evidence · 6 vs 7 shorts");
+    assert.equal(confidenceText({ ...insight, confidence: "moderate" }), "Moderate confidence · 6 vs 7 shorts");
   });
 });
