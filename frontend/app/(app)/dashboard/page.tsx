@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { DashboardView } from "@/components/app/dashboard-view";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Dashboard" };
-
+/** The dashboard is now Home; old links and bookmarks keep working. */
 export default function DashboardPage() {
-  return <DashboardView />;
+  redirect("/home");
 }

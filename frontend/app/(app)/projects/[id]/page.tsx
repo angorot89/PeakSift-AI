@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ProjectDetailView } from "@/components/app/project-detail-view";
+import { ProjectOverviewPage } from "@/components/app/project/project-sections";
 
 export const metadata: Metadata = { title: "Project" };
 
-export default function ProjectDetailPage() {
-  return <ProjectDetailView />;
+export default function Page() {
+  return <ProjectOverviewPage />;
 }

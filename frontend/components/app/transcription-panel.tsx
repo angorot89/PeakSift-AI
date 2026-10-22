@@ -208,7 +208,7 @@ export function TranscriptionPanel({ projectId, videoId, onTranscriptionChange }
   return (
     <Panel
       id="transcript"
-      step="2"
+     
       title="Transcript"
       description={description}
       status={transcription ? <StatusBadge status={transcription.status} stale={isActive(transcription.status) && transcription.is_stale} /> : undefined}

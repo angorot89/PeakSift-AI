@@ -9,7 +9,7 @@ export type User = {
 export type Credentials = { email: string; password: string };
 
 /** Where to send people once they are signed in. */
-export const AFTER_AUTH_PATH = "/dashboard";
+export const AFTER_AUTH_PATH = "/home";
 
 export const getCurrentUser = () => apiFetch<User>("/auth/me");
 export const register = (credentials: Credentials) => postJson<User>("/auth/register", credentials);

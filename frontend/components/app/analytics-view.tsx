@@ -169,20 +169,34 @@ function UsualShort({ overview }: { overview: PerformanceOverview }) {
 }
 
 /** The creator's published shorts and what YouTube reported for them. */
-export function AnalyticsView() {
+export function AnalyticsView({ projectId }: { projectId?: string } = {}) {
   const { data, error, loading, reload } = useApi(getPerformance);
   // Polled updates while a refresh runs; the first load comes from useApi.
   const [live, setLive] = useState<PerformanceOverview | null>(null);
-  const overview = live ?? data;
+  const all = live ?? data;
+  // Inside a project: only the shorts published from it (comparisons stay creator-wide).
+  const overview = all && projectId ? { ...all, videos: all.videos.filter((v) => v.project_id === projectId) } : all;
   const poll = useCallback(async () => setLive(await getPerformance()), []);
   usePolling(Boolean(overview?.videos.some(isRefreshing)), poll);
 
   return (
     <>
-      <PageHeader
-        title="Analytics"
-        description="How your published shorts are doing on YouTube: observed figures, not predictions. YouTube processes analytics with a delay of about 2–3 days."
-      />
+      {projectId ? (
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-section">Published shorts from this project</h2>
+            <p className="mt-1 text-sm text-muted">Observed figures, not predictions. YouTube processes analytics with a delay of about 2–3 days.</p>
+          </div>
+          <Link href="/analytics" className="inline-flex min-h-11 items-center text-sm text-accent-soft hover:underline">
+            All your analytics and patterns
+          </Link>
+        </div>
+      ) : (
+        <PageHeader
+          title="Analytics"
+          description="How your published shorts are doing on YouTube: observed figures, not predictions. YouTube processes analytics with a delay of about 2–3 days."
+        />
+      )}
       {loading && !overview ? (
         <div role="status" aria-label="Loading analytics" className="space-y-3">
           <Skeleton className="h-28 w-full rounded-xl" />
@@ -198,13 +212,17 @@ export function AnalyticsView() {
             </InlineAlert>
           ) : null}
           {accessState(overview.access) !== "ready" ? <AnalyticsAccessGate access={overview.access} /> : null}
-          {overview.videos.some((v) => v.source) ? <UsualShort overview={overview} /> : null}
-          {overview.videos.some((v) => v.source) ? <InsightsPanel /> : null}
+          {!projectId && overview.videos.some((v) => v.source) ? <UsualShort overview={overview} /> : null}
+          {!projectId && overview.videos.some((v) => v.source) ? <InsightsPanel /> : null}
           {overview.videos.length === 0 ? (
             <EmptyState
               icon={BarChart3}
               title="No published shorts yet"
-              description="Shorts you publish to YouTube from PeakSift appear here. Other videos on your channel are never tracked."
+              description={
+                projectId
+                  ? "Shorts you publish to YouTube from this project appear here, with how they are doing."
+                  : "Shorts you publish to YouTube from PeakSift appear here. Other videos on your channel are never tracked."
+              }
             />
           ) : (
             <section aria-labelledby="published-heading">

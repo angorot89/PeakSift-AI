@@ -674,7 +674,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     }).notes;
   }, [loadedFrom, analysis, track]);
 
-  const backToProject = `/projects/${project.id}#generated`;
+  const backToProject = `/projects/${project.id}/clips`;
   const renderedName = selected ? describeEdit(selected) : "";
   const audioLabel = audioSummary(audioRequest);
   const settingsSummary = `${layoutLabel(request.layout)} · ${captionSummary({
@@ -788,7 +788,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   return (
     <>
       <PageHeader
-        back={{ href: backToProject, label: project.name }}
+        back={{ href: backToProject, label: "Clips" }}
         title="Short-form editor"
         action={
           <ButtonLink href={autoEditHref(project.id, clip.id)} variant="secondary">
@@ -887,7 +887,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   </Button>
                   <Link href={backToProject} className={buttonClasses("ghost", "md")}>
                     <ArrowLeft aria-hidden="true" />
-                    Back to clip
+                    Back to clips
                   </Link>
                 </div>
               </div>
@@ -1144,7 +1144,7 @@ export function ShortEditorView() {
     const notFound = error === "Clip not found" || error === "Project not found";
     return (
       <>
-        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}` : "/projects", label: "Project" }} title="Short-form editor" />
+        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Short-form editor" />
         {notFound ? (
           <EmptyState
             icon={Clapperboard}
@@ -1161,12 +1161,12 @@ export function ShortEditorView() {
   if (data.clip.status !== "ready") {
     return (
       <>
-        <PageHeader back={{ href: `/projects/${id}#generated`, label: data.project.name }} title="Short-form editor" />
+        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Short-form editor" />
         <EmptyState
           icon={Clapperboard}
           title="This clip isn't ready yet"
           description="Short-form edits start from a rendered clip. Come back once it shows Ready."
-          action={<ButtonLink href={`/projects/${id}#generated`} variant="secondary">Back to the project</ButtonLink>}
+          action={<ButtonLink href={`/projects/${id}/clips`} variant="secondary">Back to clips</ButtonLink>}
         />
       </>
     );

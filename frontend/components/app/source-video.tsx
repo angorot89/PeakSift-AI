@@ -5,12 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { CandidateReview } from "@/components/app/candidate-review";
 import { ClipDetectionPanel } from "@/components/app/clip-detection-panel";
 import { GeneratedClipsPanel } from "@/components/app/generated-clips-panel";
-import { useWorkflowReport, useWorkflowReporter, type StepState } from "@/components/app/project-workflow";
-import { ErrorState } from "@/components/app/states";
+import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
+import { EmptyState, ErrorState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TranscriptionPanel } from "@/components/app/transcription-panel";
 import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { MediaFrame } from "@/components/ui/media-frame";
 import { Panel } from "@/components/ui/panel";
@@ -18,7 +19,8 @@ import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytes, formatDate, formatDuration, formatFps } from "@/lib/format";
 import { listVideoClips, type GeneratedClip } from "@/lib/clips";
-import type { Transcription } from "@/lib/transcription";
+import { projectHref } from "@/lib/navigation";
+import { getTranscription, type Transcription } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
 import { listProjectVideos, videoContentUrl, type Video } from "@/lib/videos";
 
@@ -74,57 +76,20 @@ function uploadState(video: Video | null, loading: boolean): StepState {
   return "active";
 }
 
-/**
- * The project workspace: one numbered section per workflow stage. Owns the state that
- * several sections share (the video, its transcription, and its generated clips).
- */
-export function ProjectWorkspace({ projectId }: { projectId: string }) {
+/** The project's current source video (the newest upload) and how to reload it. */
+export function useLatestVideo(projectId: string) {
   const load = useCallback(() => listProjectVideos(projectId), [projectId]);
   const { data: videos, error, loading, reload } = useApi(load);
-  const [replacing, setReplacing] = useState(false);
   const latest = videos?.[0] ?? null;
+  return { latest, ready: latest?.status === "ready", error, loading, reload };
+}
+
+/** Source: the long recording (upload, replace, preview, details) and its transcript. */
+export function SourceSection({ projectId }: { projectId: string }) {
+  const { latest, error, loading, reload } = useLatestVideo(projectId);
+  const [replacing, setReplacing] = useState(false);
   const ready = latest?.status === "ready" && !replacing;
-
   useWorkflowReport("upload", uploadState(latest, loading));
-  // Later stages only report from their own sections; without a usable video they have not started.
-  const report = useWorkflowReporter();
-  useEffect(() => {
-    if (loading || ready) return;
-    for (const key of ["transcribe", "detect", "generate", "edit"] as const) report?.(key, "todo");
-  }, [loading, ready, report]);
-
-  const [transcriptState, setTranscriptState] = useState<{ transcription: Transcription | null; loaded: boolean }>({
-    transcription: null,
-    loaded: false,
-  });
-  const onTranscriptionChange = useCallback(
-    (transcription: Transcription | null, loaded: boolean) => setTranscriptState({ transcription, loaded }),
-    [],
-  );
-
-  // candidate_id → clip, shared by the candidate cards and the Generated clips section.
-  const [clips, setClips] = useState<Map<string, GeneratedClip> | null>(null);
-  const [clipsKnown, setClipsKnown] = useState(false);
-  const videoId = ready ? latest.id : null;
-  useEffect(() => {
-    if (!videoId) return;
-    let cancelled = false;
-    listVideoClips(projectId, videoId)
-      .then((page) => {
-        if (cancelled) return;
-        setClips(new Map(page.clips.map((clip) => [clip.candidate_id, clip])));
-        setClipsKnown(true);
-      })
-      .catch(() => {
-        if (!cancelled) setClips(new Map()); // each card then fetches its own clip state
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, videoId]);
-  const rememberClip = useCallback((clip: GeneratedClip) => {
-    setClips((previous) => new Map(previous ?? []).set(clip.candidate_id, clip));
-  }, []);
 
   let body;
   if (loading) {
@@ -193,7 +158,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     <div className="space-y-6">
       <Panel
         id="source"
-        step="1"
         title="Source video"
         description="The long recording this project is built from."
         status={latest && !replacing ? <StatusBadge status={latest.status} /> : undefined}
@@ -208,33 +172,94 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       >
         {body}
       </Panel>
+      {ready ? <TranscriptionPanel projectId={projectId} videoId={latest.id} /> : null}
+    </div>
+  );
+}
 
-      {ready ? (
-        <>
-          <TranscriptionPanel
+/**
+ * Clips: finding moments in the transcript, reviewing candidates, and the clips generated from
+ * them. Owns the state they share (the transcription and candidate → clip).
+ */
+export function ClipsSection({ projectId }: { projectId: string }) {
+  const { latest, ready, error, loading, reload } = useLatestVideo(projectId);
+  const videoId = ready && latest ? latest.id : null;
+  const [transcript, setTranscript] = useState<{ transcription: Transcription | null; loaded: boolean }>({
+    transcription: null,
+    loaded: false,
+  });
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+    getTranscription(projectId, videoId)
+      .then((transcription) => !cancelled && setTranscript({ transcription, loaded: true }))
+      .catch(() => !cancelled && setTranscript({ transcription: null, loaded: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, videoId]);
+
+  // candidate_id → clip, shared by the candidate cards and the Generated clips section.
+  const [clips, setClips] = useState<Map<string, GeneratedClip> | null>(null);
+  const [clipsKnown, setClipsKnown] = useState(false);
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+    listVideoClips(projectId, videoId)
+      .then((page) => {
+        if (cancelled) return;
+        setClips(new Map(page.clips.map((clip) => [clip.candidate_id, clip])));
+        setClipsKnown(true);
+      })
+      .catch(() => {
+        if (!cancelled) setClips(new Map()); // each card then fetches its own clip state
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, videoId]);
+  const rememberClip = useCallback((clip: GeneratedClip) => {
+    setClips((previous) => new Map(previous ?? []).set(clip.candidate_id, clip));
+  }, []);
+
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading clips" className="space-y-4">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
+  if (error) return <ErrorState title="Clips could not be loaded" message={error} onRetry={reload} />;
+  if (!latest || !videoId) {
+    return (
+      <EmptyState
+        icon={Film}
+        title={latest ? "The source video is still being prepared" : "Add a source video first"}
+        description="Clips come from the long recording in this project. Upload it in Source, then find its best moments here."
+        action={<ButtonLink href={projectHref(projectId, "source")}>Go to Source</ButtonLink>}
+      />
+    );
+  }
+  return (
+    <div className="space-y-6">
+      <ClipDetectionPanel
+        projectId={projectId}
+        videoId={videoId}
+        transcription={transcript.transcription}
+        transcriptionLoaded={transcript.loaded}
+        renderResults={(run) => (
+          <CandidateReview
             projectId={projectId}
-            videoId={latest.id}
-            onTranscriptionChange={onTranscriptionChange}
+            videoId={videoId}
+            run={run}
+            clips={clips}
+            clipsKnown={clipsKnown}
+            onClipChange={rememberClip}
           />
-          <ClipDetectionPanel
-            projectId={projectId}
-            videoId={latest.id}
-            transcription={transcriptState.transcription}
-            transcriptionLoaded={transcriptState.loaded}
-            renderResults={(run) => (
-              <CandidateReview
-                projectId={projectId}
-                videoId={latest.id}
-                run={run}
-                clips={clips}
-                clipsKnown={clipsKnown}
-                onClipChange={rememberClip}
-              />
-            )}
-          />
-          <GeneratedClipsPanel projectId={projectId} clips={clips} />
-        </>
-      ) : null}
+        )}
+      />
+      <GeneratedClipsPanel projectId={projectId} clips={clips} />
     </div>
   );
 }

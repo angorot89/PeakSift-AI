@@ -162,7 +162,7 @@ export function GeneratedClipsPanel({
   return (
     <Panel
       id="generated"
-      step="4"
+     
       title="Generated clips"
       description="Rendered clips from your candidates, and their vertical shorts."
     >
