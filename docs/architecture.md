@@ -320,3 +320,14 @@ assets for a query (exact scoped scan of the current model's vectors + the V1.1 
 strong / possible tiers); `matching.py` does the same for B-roll suggestions and turns a video's
 best scene into a safe offset. Auto Edit's `sources.py` uses those matches, and only strong ones
 may be placed. Details: [semantic-assets.md](semantic-assets.md).
+
+## Performance analytics (V1.4)
+
+Published shorts are linked to the PeakSift output that made them (publish job → edit, plan,
+candidate) with an immutable provenance snapshot. After a creator's explicit read-only grant,
+a fenced Celery job reads live counters (YouTube Data API) and processed daily analytics
+(YouTube Analytics API) through a provider contract (a deterministic fake in tests), upserting
+one row per reporting day and view definition; Celery beat schedules syncs by age. Comparisons
+use fixed early windows and the creator's own median; a deterministic insights engine
+(Mann–Whitney + Holm–Bonferroni) reports associations among the creator's own shorts, which
+Auto Edit may consider as weak hints. See [performance-analytics.md](performance-analytics.md).

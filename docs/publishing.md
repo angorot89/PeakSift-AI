@@ -22,7 +22,10 @@ creates the same video twice, and reports only what actually happened. Operator 
 - **Least privilege.** The only scope is `https://www.googleapis.com/auth/youtube.upload`: it
   can upload videos and nothing else — not read, edit or delete them, not see the channel.
   No OpenID, profile or email scope is requested; the only cost is that the channel's name
-  is learned from the first upload's response instead of up front.
+  is learned from the first upload's response instead of up front. Since V1.4 a creator can
+  separately grant read-only analytics access (`youtube.readonly` + `yt-analytics.readonly`);
+  publishing still requests upload-only access tokens, and a partial grant never changes the
+  connection — see [performance-analytics.md](performance-analytics.md#permission-an-explicit-read-only-upgrade).
 - **Authorization code flow with PKCE (S256)**, `access_type=offline` and `prompt=consent`
   so Google issues a refresh token; Google's official `google-auth-oauthlib` builds the
   request and performs the exchange.

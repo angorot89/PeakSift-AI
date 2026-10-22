@@ -73,9 +73,28 @@ To rotate, set a new key with a higher `PUBLISHING_TOKEN_KEY_VERSION` and move t
 - **Quota.** A project starts with 10,000 units a day and each upload (`videos.insert`) costs
   about 1,600, so roughly six uploads a day per project until Google grants more. When it is
   spent, jobs fail with `quota_exceeded` and can be retried the next day.
-- **Processing status.** Reading a video's processing state needs a read scope PeakSift
+- **Processing status.** Reading a video's processing state needs a read scope that publishing
   deliberately does not request, so a YouTube job ends at **Uploaded**; the dialog links to
   YouTube Studio for processing and visibility.
+
+## Analytics (optional, V1.4)
+
+Performance analytics reads each creator's metrics for the shorts they published from PeakSift,
+only after they grant a separate, read-only permission. To offer it:
+
+1. **APIs & Services → Library:** enable **YouTube Analytics API** (the YouTube Data API v3 is
+   already enabled for publishing).
+2. **OAuth consent screen → Data access:** add `https://www.googleapis.com/auth/youtube.readonly`
+   and `https://www.googleapis.com/auth/yt-analytics.readonly` (both read-only; Google may ask
+   for verification of these scopes before the app leaves Testing).
+3. Set `YOUTUBE_ANALYTICS_ENABLED=true` (it requires publishing) and run one Celery **beat**
+   process (`celery -A app.workers.celery_app beat`; the Compose stack's `beat` service) — or
+   `python -m app.cli.performance sync-due` from cron.
+
+Creators then see **Connect analytics (read-only)** in Settings. Publishing tokens keep asking
+for upload access only; analytics tokens ask for the two read scopes only. Quota: a sync uses
+one Data API unit (`videos.list`) and one Analytics query per video; scheduled syncs slow down
+as a short ages and stop after 180 days. Details: [performance-analytics.md](performance-analytics.md).
 
 ## Verifying a deployment
 

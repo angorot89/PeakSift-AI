@@ -317,6 +317,20 @@ Where the model runs: workers load the image encoder (and the text encoder) on t
 
 Settings: `SEMANTIC_PROVIDER` (`clip_onnx`, `disabled`, or `fake` outside production), `SEMANTIC_MODEL_DIR`, `SEMANTIC_THREADS`, `SEMANTIC_BATCH_SIZE`, `SEMANTIC_VIDEO_MAX_FRAMES`, `SEMANTIC_FRAME_TIMEOUT_SECONDS`, `SEMANTIC_QUEUE`, `SEMANTIC_STALE_AFTER_SECONDS`, `SEMANTIC_MAX_ATTEMPTS`. A worker process holds one copy of the model (about 600 MB) once it indexes; keep one job per worker process. To keep inference off the default queue, set `SEMANTIC_QUEUE=semantic` and run `celery -A app.workers.celery_app worker -Q semantic --concurrency 1` next to the regular worker.
 
+## Performance analytics
+
+`app/services/performance/` (V1.4): `content.py` links each upload to the PeakSift output that made it (with `provenance.py`'s immutable snapshot); `provider.py` / `youtube.py` / `fake.py` / `factory.py` read counters (YouTube Data API) and processed daily rows (YouTube Analytics API, columns by name, everything validated); `sync.py` + `lifecycle.py` run the fenced Celery jobs `peaksift.sync_performance` and `peaksift.schedule_performance_syncs` (Celery beat); `summary.py` and `normalization.py` compute totals, early windows and the creator's own baseline; `insights.py` is the deterministic insights engine (Mann–Whitney + Holm–Bonferroni); `profile.py` feeds Auto Edit; `retention.py` deletes collected metrics. The read-only permission upgrade is in `app/services/publishing/youtube_oauth.py` (`POST /publishing/youtube/analytics/connect`). Endpoints: `GET /performance`, `GET /performance/videos/{id}`, `POST /performance/videos/{id}/refresh`, `GET /performance/insights`, `POST /performance/insights/{id}/dismiss|restore`, `DELETE /performance/data`, `GET /auto-edit/performance-context`. Full design: [docs/performance-analytics.md](../docs/performance-analytics.md).
+
+```bash
+celery -A app.workers.celery_app beat --loglevel=info   # one per deployment: the sync scheduler
+python -m app.cli.performance status                     # published videos and syncs by status
+python -m app.cli.performance sync-due                   # start due syncs (cron alternative to beat)
+python -m app.cli.performance backfill --user USER_ID    # link and sync a granted creator's uploads
+python scripts/insights_benchmark.py                     # false-pattern and detection rates (CI gate)
+```
+
+Settings: `YOUTUBE_ANALYTICS_ENABLED`, `PERFORMANCE_PROVIDER` (`youtube`, or `fake` outside production), `PERFORMANCE_SYNC_STALE_AFTER_SECONDS`, `PERFORMANCE_MANUAL_COOLDOWN_SECONDS`, `PERFORMANCE_SCHEDULE_BATCH`, `PERFORMANCE_SCHEDULE_INTERVAL_SECONDS`.
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.

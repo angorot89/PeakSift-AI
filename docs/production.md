@@ -86,6 +86,14 @@ temporary database and bucket that proves the backup before removing everything.
 Off until configured: [youtube-setup.md](youtube-setup.md). Design and OAuth security:
 [publishing.md](publishing.md).
 
+## Performance analytics (V1.4)
+
+Off unless `YOUTUBE_ANALYTICS_ENABLED=true` (requires publishing, the YouTube Analytics API and
+the two read-only scopes on the consent screen; see [youtube-setup.md](youtube-setup.md)).
+Production refuses `PERFORMANCE_PROVIDER=fake`. Run exactly one Celery **beat** process for the
+scheduler (the Compose `beat` service); `python -m app.cli.performance status` shows synced
+videos and syncs by status (counts only). Creators can delete collected metrics themselves.
+
 ## Known limitations (V1.0)
 
 - Single host with Docker Compose; no Kubernetes, multi-region, CDN, GPU autoscaling or

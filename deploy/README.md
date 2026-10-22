@@ -65,3 +65,10 @@ so the browser talks to one origin. If you publish to YouTube, register
 - **Backups:** `docker compose -f deploy/docker-compose.prod.yml exec api python -m app.cli.backup create /work/backup-$(date +%F) --copy-media`, then `verify` and `restore-test` on it (a temporary database is created and dropped; media is restored to a temporary directory because the application key cannot create buckets). Copy the directory off the host — or set `BACKUP_S3_*` and add `--upload` — and run `restore-test` regularly. See backend/README.md "Backups and restore tests".
 - **Upgrades:** rebuild and `up -d`; `migrate` applies new migrations before the API and
   worker start.
+
+## Performance analytics (V1.4)
+
+The stack includes a `beat` service (the worker image running `celery … beat`; one per
+deployment) that starts due analytics syncs. It does nothing unless
+`YOUTUBE_ANALYTICS_ENABLED=true` in `deploy/.env` (see `docs/youtube-setup.md`). Check with
+`docker compose exec api python -m app.cli.performance status`.
