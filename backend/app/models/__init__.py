@@ -37,6 +37,7 @@ from app.models.clip_detection import (
     ClipDetectionStatus,
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
+from app.models.insight import CreatorInsight, InsightConfidence, InsightSet, InsightSetStatus
 from app.models.oauth_state import OAuthState
 from app.models.performance import (
     ACTIVE_SYNC_STATUSES,
@@ -89,6 +90,10 @@ from app.models.video import Video, VideoStatus
 from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
+    "CreatorInsight",
+    "InsightConfidence",
+    "InsightSet",
+    "InsightSetStatus",
     "ACTIVE_AUTO_EDIT_STATUSES",
     "FINISHED_AUTO_EDIT_STATUSES",
     "AutoEditPlan",

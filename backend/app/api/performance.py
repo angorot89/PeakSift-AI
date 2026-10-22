@@ -8,6 +8,10 @@
 - ``POST /performance/videos/{content_id}/refresh`` — ask for a sync now: ``202`` with the
   sync; ``409`` without the analytics grant (or with analytics off); ``429`` with
   ``Retry-After`` right after a sync, or when the per-creator budget is spent.
+- ``GET /performance/insights`` — observed patterns among the creator's own comparable shorts
+  (``services/performance/insights.py``), recomputed only when the data changed; dismissed ones
+  are included with ``dismissed: true``.
+- ``POST /performance/insights/{id}/dismiss`` and ``…/restore`` — hide or show one again.
 
 Everything is owner-scoped (``404`` for anyone else). Figures are what the platform reported;
 ``null`` is "not reported", never zero. Responses never contain tokens, task ids or provider
@@ -28,12 +32,16 @@ from app.schemas.performance import (
     AnalyticsAccessRead,
     BaselineRead,
     DailyMetricRead,
+    EvidenceShortRead,
+    InsightRead,
+    InsightsRead,
     PerformanceOverviewRead,
     SnapshotRead,
     SyncRead,
     VideoPerformanceDetailRead,
     VideoPerformanceRead,
 )
+from app.services.performance import insights as insight_engine
 from app.services.performance import normalization, summary
 from app.services.performance.lifecycle import start_manual_sync
 from app.services.performance.sync import RefreshTooSoon, has_analytics_grant
@@ -203,3 +211,64 @@ def refresh_video_performance(content_id: uuid.UUID, current_user: CurrentUser, 
     if sync is None:  # one is already running: report it
         sync = summary.latest_syncs(db, [content.id]).get(content.id)
     return _sync_read(sync)
+
+
+# --- insights ----------------------------------------------------------------------------------
+
+
+def _current_source() -> str:
+    return "fake" if get_settings().performance_provider == "fake" else "youtube"
+
+
+def _insight_read(insight, titles: dict[str, str]) -> InsightRead:
+    def shorts(ids: list[str]) -> list[EvidenceShortRead]:
+        # Only the creator's own shorts that still exist are named.
+        return [EvidenceShortRead(id=uuid.UUID(i), title=titles[i]) for i in ids if i in titles]
+
+    return InsightRead(
+        id=insight.id, rank=insight.rank, feature=insight.feature, value=insight.value,
+        metric=insight.metric, window=insight.window, direction=insight.direction,
+        group_size=insight.group_size, comparison_size=insight.comparison_size,
+        group_median=insight.group_median, comparison_median=insight.comparison_median,
+        ratio=insight.ratio, consistency=insight.consistency, confidence=insight.confidence,
+        statement=insight.statement, dismissed=insight.dismissed_at is not None,
+        group=shorts(insight.evidence.get("group", [])),
+        comparison=shorts(insight.evidence.get("comparison", [])),
+    )  # fmt: skip
+
+
+def _insights_read(db, user_id: uuid.UUID, insight_set) -> InsightsRead:
+    titles = {str(c.id): c.title for c in summary.user_contents(db, user_id)}
+    return InsightsRead(
+        status=insight_set.status, source=insight_set.source,
+        simulated=insight_set.source == "fake", engine_version=insight_set.engine_version,
+        computed_at=insight_set.computed_at, sample_size=insight_set.sample_size,
+        minimum_sample=insight_engine.MIN_SAMPLE, minimum_group=insight_engine.MIN_GROUP,
+        insights=[_insight_read(i, titles) for i in insight_set.insights],
+    )  # fmt: skip
+
+
+@router.get("/insights", response_model=InsightsRead)
+def creator_insights(current_user: CurrentUser, db: DbSession) -> InsightsRead:
+    insight_set = insight_engine.ensure_insights(db, current_user.id, _current_source())
+    return _insights_read(db, current_user.id, insight_set)
+
+
+def _set_dismissed(db, insight_id: uuid.UUID, user_id: uuid.UUID, dismissed: bool):
+    insight = insight_engine.owned_insight(db, insight_id, user_id)
+    if insight is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Insight not found")
+    insight.dismissed_at = insight_engine.now() if dismissed else None
+    db.commit()
+    titles = {str(c.id): c.title for c in summary.user_contents(db, user_id)}
+    return _insight_read(insight, titles)
+
+
+@router.post("/insights/{insight_id}/dismiss", response_model=InsightRead)
+def dismiss_insight(insight_id: uuid.UUID, current_user: CurrentUser, db: DbSession):
+    return _set_dismissed(db, insight_id, current_user.id, True)
+
+
+@router.post("/insights/{insight_id}/restore", response_model=InsightRead)
+def restore_insight(insight_id: uuid.UUID, current_user: CurrentUser, db: DbSession):
+    return _set_dismissed(db, insight_id, current_user.id, False)

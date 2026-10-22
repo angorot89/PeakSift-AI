@@ -130,3 +130,44 @@ class VideoPerformanceDetailRead(VideoPerformanceRead):
     daily: list[DailyMetricRead]
     snapshots: list[SnapshotRead]
     syncs: list[SyncRead]
+
+
+class EvidenceShortRead(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
+class InsightRead(BaseModel):
+    """One observed pattern among the creator's own shorts: never a cause or a prediction."""
+
+    id: uuid.UUID
+    rank: int
+    feature: str
+    value: str
+    metric: str
+    window: str
+    direction: str  # higher | lower
+    group_size: int
+    comparison_size: int
+    group_median: float
+    comparison_median: float
+    ratio: float | None
+    consistency: float
+    confidence: str  # limited | moderate
+    statement: str
+    dismissed: bool
+    group: list[EvidenceShortRead]
+    comparison: list[EvidenceShortRead]
+
+
+class InsightsRead(BaseModel):
+    # ready: computed (possibly with no pattern); insufficient: too few comparable shorts.
+    status: str
+    source: str
+    simulated: bool
+    engine_version: str
+    computed_at: datetime
+    sample_size: int
+    minimum_sample: int
+    minimum_group: int
+    insights: list[InsightRead]
