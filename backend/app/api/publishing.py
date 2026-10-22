@@ -29,6 +29,7 @@ from app.schemas.publishing import (
     PublishingConnectionRead,
     YouTubeStatusRead,
 )
+from app.services.performance.lifecycle import start_backfill_quietly
 from app.services.publishing import connections
 from app.services.publishing import youtube_oauth as oauth
 from app.services.publishing.tokens import TokenCipher, TokenDecryptionError
@@ -137,6 +138,8 @@ def youtube_callback(
         scopes=grant.scopes,
     )  # fmt: skip
     logger.info("YouTube %s authorization completed", key)
+    if key == "analytics":  # sync PeakSift's own uploads (only those) from now on
+        start_backfill_quietly(db, user.id, settings)
     return _back_to_settings("connected", key=key)
 
 

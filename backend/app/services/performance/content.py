@@ -12,7 +12,7 @@ were uploaded before V1.4 are linked later by ``link_existing``.
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,8 @@ from app.models import (
 from app.services.performance.provenance import PROVENANCE_VERSION, build_provenance
 
 logger = logging.getLogger(__name__)
+
+FIRST_SYNC_AFTER = timedelta(hours=6)
 
 
 def content_for_job(db: Session, job: PublishJob) -> PublishedContent | None:
@@ -81,6 +83,8 @@ def link_published_content(db: Session, job: PublishJob) -> PublishedContent | N
         remote_status=RemoteStatus.ACTIVE,
         provenance=build_provenance(edit, plan, clip.candidate),
         provenance_version=PROVENANCE_VERSION,
+        # First metrics a few hours in; synced only once the creator granted analytics access.
+        next_sync_at=(job.completed_at or datetime.now(UTC)) + FIRST_SYNC_AFTER,
     )
     db.add(content)
     try:

@@ -10,6 +10,7 @@ from app.workers.caption_tasks import generate_caption_track_task
 from app.workers.clip_detection_tasks import detect_clips
 from app.workers.clip_edit_tasks import render_clip_edit_task
 from app.workers.clip_render_tasks import render_clip_task
+from app.workers.performance_tasks import sync_performance_task
 from app.workers.publish_tasks import publish_short_task
 from app.workers.reframe_tasks import analyze_reframe_task
 from app.workers.semantic_tasks import index_visual_asset_task
@@ -118,6 +119,15 @@ def enqueue_publish(publish_job_id: uuid.UUID, *, task_id: str) -> str:
     """Queue `publish_short` under a pre-chosen task id (the job's fencing token)."""
     try:
         publish_short_task.apply_async(args=[str(publish_job_id)], task_id=task_id, retry=False)
+    except OperationalError as error:
+        raise JobQueueUnavailable("The job queue is unavailable") from error
+    return task_id
+
+
+def enqueue_performance_sync(sync_id: uuid.UUID, *, task_id: str) -> str:
+    """Queue `sync_performance` under a pre-chosen task id and return it."""
+    try:
+        sync_performance_task.apply_async(args=[str(sync_id)], task_id=task_id, retry=False)
     except OperationalError as error:
         raise JobQueueUnavailable("The job queue is unavailable") from error
     return task_id
