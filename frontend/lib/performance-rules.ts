@@ -18,6 +18,38 @@ export type SyncInfo = {
   completed_at: string | null;
 };
 
+export type PerformanceWindow = {
+  key: "day_1" | "day_3" | "day_7";
+  days_expected: number;
+  days_reported: number;
+  status: "complete" | "open" | "incomplete";
+  engaged_views: number | null;
+  views: number | null;
+  average_view_percentage: number | null;
+  watch_time_seconds: number | null;
+  likes: number | null;
+  comments: number | null;
+  subscribers_gained: number | null;
+};
+
+export type Position = {
+  metric: "engaged_views" | "average_view_percentage";
+  window: string;
+  value: number;
+  median: number;
+  ratio: number | null;
+  label: "above" | "near" | "below";
+};
+
+export type Baseline = {
+  metric: "engaged_views" | "average_view_percentage";
+  window: string;
+  sample_size: number;
+  minimum_sample: number;
+  median: number | null;
+  reliable: boolean;
+};
+
 export type VideoPerformance = {
   id: string;
   project_id: string;
@@ -42,9 +74,11 @@ export type VideoPerformance = {
   next_sync_at: string | null;
   latest_sync: SyncInfo | null;
   recipe: string | null;
+  windows: PerformanceWindow[];
+  positions: Position[];
 };
 
-export type PerformanceOverview = { access: AnalyticsAccess; videos: VideoPerformance[] };
+export type PerformanceOverview = { access: AnalyticsAccess; videos: VideoPerformance[]; baselines: Baseline[] };
 
 export type DailyMetric = {
   date: string;
@@ -148,4 +182,36 @@ export function niceMax(values: (number | null)[]): number {
   const exponent = 10 ** Math.floor(Math.log10(max));
   for (const step of [1, 2, 2.5, 5, 10]) if (step * exponent >= max) return step * exponent;
   return 10 * exponent;
+}
+
+export const WINDOW_LABELS: Record<PerformanceWindow["key"], string> = {
+  day_1: "Day of publication",
+  day_3: "First 3 days",
+  day_7: "First 7 days",
+};
+
+/** A window in words: its figure when complete, otherwise why there is none (never 0). */
+export function windowSummary(w: PerformanceWindow | undefined): string {
+  if (!w) return "Not synced yet";
+  if (w.status === "open") return `Still being processed (${w.days_reported} of ${w.days_expected} days so far)`;
+  if (w.status === "incomplete") return "Not every day was reported, so it is not compared";
+  return `${metric(w.engaged_views)} engaged views`;
+}
+
+/** "1.4× your usual" style wording; observational, never a verdict or a prediction. */
+export function positionText(p: Position): string {
+  const where = { above: "above your usual", near: "near your usual", below: "below your usual" }[p.label];
+  const ratio = p.ratio === null ? "" : ` (${p.ratio.toFixed(1)}× your median)`;
+  return `${where}${ratio}`;
+}
+
+/** The creator's own usual short, or why there is no reliable pattern yet. */
+export function baselineText(b: Baseline | undefined): string {
+  if (!b) return "No reliable pattern yet.";
+  if (!b.reliable) {
+    return `No reliable pattern yet: ${b.sample_size} of ${b.minimum_sample} shorts have a complete first week.`;
+  }
+  const value = b.metric === "average_view_percentage" ? percent(b.median) : metric(b.median);
+  const what = b.metric === "average_view_percentage" ? "viewed on average" : "engaged views";
+  return `${value} ${what} in the first week (median of your ${b.sample_size} comparable shorts)`;
 }

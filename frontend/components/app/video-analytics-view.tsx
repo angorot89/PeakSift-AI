@@ -16,6 +16,8 @@ import {
   getVideoPerformance,
   metric,
   percent,
+  positionText,
+  WINDOW_LABELS,
   reportingDay,
   seconds,
   seriesOf,
@@ -126,6 +128,51 @@ export function VideoAnalyticsView() {
           <Tile label="Likes" value={metric(video.likes)} />
           <Tile label="Comments" value={metric(video.comments)} />
         </dl>
+
+        <Panel
+          title="Early windows"
+          description="The same early windows for every short, in YouTube's reporting days from the day of publication (so “day of publication” is roughly the first 24 hours). Only complete windows are compared with your other shorts."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <caption className="sr-only">Early windows</caption>
+              <thead className="text-xs text-subtle">
+                <tr>
+                  {["Window", "Engaged views", "Avg. % viewed", "Likes", "Comments", "Status"].map((h) => (
+                    <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="tabular">
+                {video.windows.map((w) => (
+                  <tr key={w.key} className="border-t border-border">
+                    <th scope="row" className="px-2 py-1.5 font-normal text-muted">{WINDOW_LABELS[w.key]}</th>
+                    <td className="px-2 py-1.5">{metric(w.engaged_views)}</td>
+                    <td className="px-2 py-1.5">{percent(w.average_view_percentage)}</td>
+                    <td className="px-2 py-1.5">{metric(w.likes)}</td>
+                    <td className="px-2 py-1.5">{metric(w.comments)}</td>
+                    <td className="px-2 py-1.5 text-muted">
+                      {w.status === "complete" ? "Complete" : w.status === "open" ? `Processing (${w.days_reported}/${w.days_expected} days)` : "Days missing"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {video.positions.length ? (
+            <ul className="mt-4 space-y-1 text-sm text-muted">
+              {video.positions.map((p) => (
+                <li key={p.metric}>
+                  First-week {p.metric === "engaged_views" ? "engaged views" : "average % viewed"}: {positionText(p)}.
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-muted">
+              No comparison yet: a short is compared with your usual once its first week is complete and at least five of your shorts have a complete first week.
+            </p>
+          )}
+        </Panel>
 
         <Panel
           title="Daily"

@@ -4,6 +4,9 @@ import { describe, it } from "node:test";
 import {
   accessState,
   analyticsOutcome,
+  baselineText,
+  positionText,
+  windowSummary,
   metric,
   niceMax,
   percent,
@@ -76,5 +79,30 @@ describe("sync and OAuth outcomes", () => {
     assert.equal(partial?.ok, false);
     assert.match(partial?.message ?? "", /publishing keeps working/);
     assert.match(analyticsOutcome(new URLSearchParams("analytics=error&reason=???"))?.message ?? "", /not connected/);
+  });
+});
+
+describe("windows and baselines", () => {
+  const w = { key: "day_7", days_expected: 7, days_reported: 4, engaged_views: null, views: null,
+    average_view_percentage: null, watch_time_seconds: null, likes: null, comments: null,
+    subscribers_gained: null } as const;
+  it("explains open and incomplete windows instead of showing zero", () => {
+    assert.equal(windowSummary(undefined), "Not synced yet");
+    assert.match(windowSummary({ ...w, status: "open" }), /4 of 7 days/);
+    assert.match(windowSummary({ ...w, status: "incomplete" }), /not compared/);
+    assert.equal(windowSummary({ ...w, status: "complete", engaged_views: 1200 }), "1,200 engaged views");
+  });
+  it("words positions observationally", () => {
+    const p = { metric: "engaged_views", window: "day_7", value: 300, median: 100 } as const;
+    assert.equal(positionText({ ...p, ratio: 3, label: "above" }), "above your usual (3.0× your median)");
+    assert.equal(positionText({ ...p, ratio: null, label: "above" }), "above your usual");
+  });
+  it("says when there is no reliable pattern yet", () => {
+    const b = { metric: "engaged_views", window: "day_7", minimum_sample: 5 } as const;
+    assert.match(baselineText({ ...b, sample_size: 3, median: 10, reliable: false }), /No reliable pattern yet: 3 of 5/);
+    assert.match(baselineText({ ...b, sample_size: 6, median: 1500, reliable: true }), /1,500 engaged views .* 6 comparable/);
+    for (const text of [baselineText(undefined), positionText({ metric: "engaged_views", window: "", value: 1, median: 1, ratio: 1, label: "near" })]) {
+      assert.doesNotMatch(text, /viral|best|guarantee|will /i);
+    }
   });
 });

@@ -14,7 +14,10 @@ import { ApiError, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import {
   accessState,
+  baselineText,
   getPerformance,
+  positionText,
+  windowSummary,
   metric,
   percent,
   refreshVideoPerformance,
@@ -124,6 +127,7 @@ function VideoRow({ video, canRefresh, onQueued }: { video: VideoPerformance; ca
         <Figure label="Likes" value={metric(video.likes)} />
         <Figure label="Comments" value={metric(video.comments)} />
       </dl>
+      <FirstWeek video={video} />
       <p className="mt-3 text-xs text-subtle">
         {video.last_synced_at
           ? `Updated ${formatDate(video.last_synced_at)}. ${video.processed_through ? `Processed analytics through ${reportingDay(video.processed_through)} (Pacific Time).` : "YouTube has not processed analytics for this short yet."}`
@@ -131,6 +135,35 @@ function VideoRow({ video, canRefresh, onQueued }: { video: VideoPerformance; ca
       </p>
       {message ? <p className="mt-2 text-xs text-warning">{message}</p> : null}
     </li>
+  );
+}
+
+function FirstWeek({ video }: { video: VideoPerformance }) {
+  if (!video.source) return null;
+  const week = video.windows.find((w) => w.key === "day_7");
+  const placed = video.positions.find((p) => p.metric === "engaged_views");
+  return (
+    <p className="mt-3 text-sm text-muted">
+      <span className="text-foreground">First 7 days:</span> {windowSummary(week)}
+      {placed ? <> · {positionText(placed)}</> : null}
+    </p>
+  );
+}
+
+function UsualShort({ overview }: { overview: PerformanceOverview }) {
+  const engaged = overview.baselines.find((b) => b.metric === "engaged_views");
+  const retention = overview.baselines.find((b) => b.metric === "average_view_percentage");
+  return (
+    <section aria-labelledby="usual-heading" className="rounded-xl border border-border bg-surface-2 px-4 py-4">
+      <h2 id="usual-heading" className="text-sm font-medium text-foreground">Your usual short</h2>
+      <p className="mt-1 text-sm text-muted">{baselineText(engaged)}</p>
+      {engaged?.reliable && retention?.reliable ? (
+        <p className="mt-0.5 text-sm text-muted">{baselineText(retention)}</p>
+      ) : null}
+      <p className="mt-2 text-xs text-subtle">
+        Compared only with your own shorts, over the same first week. Other creators&apos; data is never used.
+      </p>
+    </section>
   );
 }
 
@@ -164,6 +197,7 @@ export function AnalyticsView() {
             </InlineAlert>
           ) : null}
           {accessState(overview.access) !== "ready" ? <AnalyticsAccessGate access={overview.access} /> : null}
+          {overview.videos.some((v) => v.source) ? <UsualShort overview={overview} /> : null}
           {overview.videos.length === 0 ? (
             <EmptyState
               icon={BarChart3}
