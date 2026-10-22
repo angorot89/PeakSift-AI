@@ -131,11 +131,27 @@ def test_a_video_gone_from_the_platform_is_marked_and_its_history_kept(db_sessio
                                                                        settings, fake):  # fmt: skip
     run(db_session, video, settings, fake)
     fake.delete(video.remote_video_id)
-    sync = run(db_session, video, settings, fake, at=NOW + timedelta(hours=1), kind="manual")
-    assert sync.status == "completed" and sync.days_upserted == 0
+    first = run(db_session, video, settings, fake, at=NOW + timedelta(hours=1), kind="manual")
+    # One miss could be a momentary inconsistency: checked again a day later.
+    assert first.status == "completed" and first.days_upserted == 0
+    assert video.remote_status == "unknown"
+    assert video.next_sync_at == NOW + timedelta(hours=25)
+    run(db_session, video, settings, fake, at=NOW + timedelta(hours=25))
     assert video.remote_status == "remote_missing" and video.next_sync_at is None
     assert len(days_of(db_session, video)) == 11  # nothing deleted, nothing zeroed
     assert len(video.snapshots) == 1  # no "0 views" snapshot for a missing video
+
+
+def test_a_video_that_comes_back_after_one_miss_is_active_again(db_session, video, settings,
+                                                                fake):  # fmt: skip
+    run(db_session, video, settings, fake)
+    original = fake.video_counters
+    fake.video_counters = lambda auth, ids: {}
+    run(db_session, video, settings, fake, at=NOW + timedelta(hours=1), kind="manual")
+    assert video.remote_status == "unknown"
+    fake.video_counters = original
+    run(db_session, video, settings, fake, at=NOW + timedelta(hours=25))
+    assert video.remote_status == "active" and video.next_sync_at is not None
 
 
 # --- the grant ---------------------------------------------------------------------------------

@@ -61,7 +61,14 @@ def link_published_content(db: Session, job: PublishJob) -> PublishedContent | N
         )
     )
     if existing is not None:
-        return existing
+        if existing.publish_job_id == job.id:
+            return existing
+        # The remote id is already linked to another job: YouTube never gives two uploads one
+        # id, so this is a simulated id reused across processes. Never borrow another job's
+        # (let alone another creator's) row.
+        logger.warning("Publish job %s: remote id already linked to another job; not linked",
+                       job.id)  # fmt: skip
+        return None
     edit = db.get(ClipEdit, job.edit_id)
     if edit is None:
         return None
