@@ -319,6 +319,13 @@ class Settings(BaseSettings):
     # Where metrics come from: "youtube", or "fake" — deterministic simulated metrics for tests
     # and non-production stacks, always labelled simulated (refused in production).
     performance_provider: Literal["youtube", "fake"] = "youtube"
+    # Syncs: when a queued or running one counts as stalled; the shortest gap between two
+    # creator-requested refreshes of one video; how many due videos one scheduler run starts.
+    performance_sync_stale_after_seconds: int = Field(default=15 * 60, gt=0)
+    performance_manual_cooldown_seconds: int = Field(default=15 * 60, ge=0)
+    performance_schedule_batch: int = Field(default=100, ge=1, le=1000)
+    # How often Celery beat runs the scheduler (it only starts syncs that are due).
+    performance_schedule_interval_seconds: int = Field(default=30 * 60, ge=60)
 
     # Rate limits (Redis). Off only in tests. RATE_LIMITS overrides individual budgets:
     # "login_ip=20/60,edit_render=200/3600" (see app/core/rate_limit.py for the names).

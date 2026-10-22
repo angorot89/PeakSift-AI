@@ -48,6 +48,7 @@ celery_app = Celery(
         "app.workers.auto_edit_tasks",
         "app.workers.semantic_tasks",
         "app.workers.publish_tasks",
+        "app.workers.performance_tasks",
     ],
 )
 
@@ -69,6 +70,14 @@ celery_app.conf.update(
     task_always_eager=settings.celery_task_always_eager,
     task_eager_propagates=True,
 )
+# Celery beat (one `celery -A app.workers.celery_app beat` process per deployment) runs the
+# analytics scheduler; the task itself does nothing unless analytics is enabled.
+celery_app.conf.beat_schedule = {
+    "schedule-performance-syncs": {
+        "task": "peaksift.schedule_performance_syncs",
+        "schedule": float(settings.performance_schedule_interval_seconds),
+    },
+}
 if settings.semantic_queue:
     # Model inference can get its own workers; everything else stays on the default queue.
     celery_app.conf.task_routes = {
