@@ -382,7 +382,7 @@ export function ClipDetectionPanel({
   return (
     <Panel
       id="clips"
-      step="3"
+     
       title="Clip moments"
       description={
         completed

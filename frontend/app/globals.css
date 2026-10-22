@@ -38,6 +38,25 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  /* Type scale: page title, section, card title, body (default), small, caption. */
+  --text-page: 1.625rem;
+  --text-page--line-height: 2rem;
+  --text-page--font-weight: 600;
+  --text-page--letter-spacing: -0.02em;
+  --text-section: 1.0625rem;
+  --text-section--line-height: 1.5rem;
+  --text-section--font-weight: 600;
+  --text-section--letter-spacing: -0.01em;
+  --text-title: 0.9375rem;
+  --text-title--line-height: 1.375rem;
+  --text-title--font-weight: 600;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+
+  --animate-dialog-in: dialog-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-sheet-left: sheet-left 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-sheet-up: sheet-up 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.25s ease-out both;
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
@@ -49,6 +68,35 @@
     }
     to {
       opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes sheet-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
       transform: none;
     }
   }

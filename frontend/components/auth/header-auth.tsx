@@ -28,7 +28,7 @@ export function HeaderAuth() {
 
     return (
       <div className="flex items-center gap-3">
-        <ButtonLink href="/dashboard">Dashboard</ButtonLink>
+        <ButtonLink href="/home">Open PeakSift</ButtonLink>
         <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
           {loggingOut ? "Logging out…" : "Log out"}
         </Button>
