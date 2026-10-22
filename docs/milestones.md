@@ -265,6 +265,34 @@ Delivered:
   steps (fake provider, no weights), real-model acceptance (22/22) and visual/UX acceptance at
   1440, 1024, 768 and 375 px (153/153)
 
+## V1.4 — Performance Analytics & Learning
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests on
+top of the unmerged V1.3 stack wait for GitHub Actions (unavailable because of account billing);
+nothing is merged or tagged. V1.1, V1.2 and V1.3 must be merged and released first.
+
+Creators see how the shorts they published from PeakSift are doing, and which of their own
+editing choices have tended to go with stronger first weeks — observed, never predicted. See
+[performance-analytics.md](performance-analytics.md).
+
+Delivered:
+
+- Published content linked from the publish job with an immutable provenance snapshot;
+  snapshots and daily metrics with NULL ≠ 0, per-day view definitions and labelled sources
+- An explicit, read-only analytics permission upgrade (purpose-bound OAuth state, checked
+  grants, partial grants change nothing, per-use token scopes); publishing stays upload-only
+- A provider contract with YouTube Data + Analytics (validated, columns by name) and a
+  deterministic fake refused in production
+- A fenced sync pipeline with an age-based schedule (Celery beat), creator refresh with a
+  cooldown, backfill of PeakSift's own uploads, missing videos confirmed on a second check,
+  and creator deletion of collected metrics
+- The Analytics page and per-short page; early windows, completeness and the creator's own
+  median baseline with a minimum sample
+- A deterministic insights engine with a corrected significance test (measured false-pattern
+  rate 2.7%), evidence and caveats; Auto Edit can consider insights as weak, in-recipe hints
+- CI steps (fake provider, no Google credentials, insights benchmark gate), synthetic acceptance
+  (170/170 browser checks at four widths) and real-account checks with upload-only grants
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -281,6 +309,7 @@ Delivered:
 - V1.1 B-roll & Visual Enrichment — IMPLEMENTATION COMPLETE, pending CI/merge/release
 - V1.2 Auto Edit & Creator Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.3 Semantic Asset Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.4 Performance Analytics & Learning — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 

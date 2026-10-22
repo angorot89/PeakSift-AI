@@ -276,3 +276,14 @@ words. Planners see each match as **strong** or **possible** (never a number); o
 may be placed, a video starts at its matched scene (offset computed by the server), and when
 nothing matches strongly no visual is added. The planner contract is `auto_edit_planner_v2`. See
 [semantic-assets.md](semantic-assets.md#auto-edit-integration).
+
+## Since V1.4: patterns from the creator's own shorts
+
+A creator can tick **Consider patterns from my published shorts** (off by default). The plan
+request then stores a profile snapshot: the creator's visible insights about choices a planner
+makes (caption style, captions, hook, added visuals, framing) as symbolic hints — never music,
+ids, titles or raw metrics — so the plan's fingerprint changes with the profile and requests
+without it are exactly as before. The local model sees `creator_history` as weak evidence below
+the recipe and the clip; the rules planner applies only safe, in-bounds hints (a preset the
+recipe offers; leaving out the hook or a cutaway) and names each in its explanation. The server
+validator is unchanged. See [performance-analytics.md](performance-analytics.md#auto-edit-performance-context).

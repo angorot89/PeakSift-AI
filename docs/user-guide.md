@@ -122,6 +122,31 @@ Good to know about visual search:
 - There is no internet or stock search, and nothing is generated: it only searches **your**
   uploads.
 
+## Analytics — how your published shorts are doing
+
+1. **Connect analytics (read-only).** In **Settings → YouTube** (or on the **Analytics** page),
+   choose **Connect analytics (read-only)** and approve in Google. This is separate from
+   publishing: PeakSift can then *read* your videos' figures and YouTube Analytics, nothing
+   more. If you untick a permission, nothing changes and publishing keeps working.
+2. **Open Analytics** (top bar). Every short you published from PeakSift is listed — never
+   other videos on your channel — with live views, likes and comments, engaged views and
+   average % viewed as YouTube processes them (about 2–3 days later, in Pacific Time days).
+   "—" means YouTube has not reported that figure yet; it is never shown as 0.
+3. **Compare fairly.** Each short gets the same early windows: the day of publication, the
+   first 3 days and the first 7 days. **Your usual short** is the median of your own shorts
+   with a complete first week (at least 5), and each short says whether it is above, near or
+   below your usual.
+4. **Patterns in your shorts.** With at least 10 comparable shorts, PeakSift looks for choices
+   (an opening hook, a caption style, music, visuals…) that have tended to go with stronger or
+   weaker first weeks **in your own uploads**, and shows one only when it passes a statistical
+   check — with how many shorts are on each side and which ones. They are associations, not
+   causes, and they never predict how a short will do. Hide any you don't find useful.
+5. **Use them in Auto Edit (optional).** Tick **Consider patterns from my published shorts**
+   when creating a plan. They are weak hints inside the recipe: for example a caption style
+   the recipe offers. The plan lists the patterns it considered.
+6. **Refresh** a short to update it now (at most every few minutes). **Delete collected
+   metrics** in Settings removes everything PeakSift collected and stops updates.
+
 ## Good to know
 
 - **Visibility:** new uploads are private by default. Google keeps videos uploaded through
