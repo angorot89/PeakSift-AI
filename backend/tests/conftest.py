@@ -37,6 +37,8 @@ os.environ["RATE_LIMIT_ENABLED"] = "0"
 # Semantic visual search uses the deterministic fake embedding provider: CI never has model
 # weights (the real model has its own opt-in tests).
 os.environ["SEMANTIC_PROVIDER"] = "fake"
+# Performance analytics uses the deterministic fake metrics provider: tests never call Google.
+os.environ["PERFORMANCE_PROVIDER"] = "fake"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 

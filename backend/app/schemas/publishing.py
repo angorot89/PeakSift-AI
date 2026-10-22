@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from app.services.publishing.youtube_oauth import has_analytics_access
 
 
 class PublishingConnectionRead(BaseModel):
@@ -14,10 +16,19 @@ class PublishingConnectionRead(BaseModel):
     # Empty until the first upload reports the channel (no read scope is requested).
     account_title: str
     connected_at: datetime
+    scopes: str = Field(exclude=True)
+
+    @computed_field
+    @property
+    def analytics_access(self) -> bool:
+        """Whether the creator granted the read-only analytics upgrade."""
+        return has_analytics_access(self.scopes)
 
 
 class YouTubeStatusRead(BaseModel):
     enabled: bool
+    # Whether this server offers performance analytics (the creator still opts in).
+    analytics_enabled: bool = False
     connection: PublishingConnectionRead | None
 
 

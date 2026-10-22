@@ -3,6 +3,12 @@
 - **Scope:** ``youtube.upload`` only — enough to upload a video, nothing else (it cannot
   read, edit or delete the user's videos). No OpenID scopes are requested, so the
   connection shows the channel's name only once the first upload reports it.
+- **Analytics upgrade (V1.4):** never implied by publishing. Only when the creator asks for
+  it does a second consent request ``youtube.upload`` + ``youtube.readonly`` +
+  ``yt-analytics.readonly`` (all read-only besides the upload they already granted). Google
+  lets the user untick scopes, so the grant is checked: without upload nothing is saved (the
+  existing connection keeps working); without both read scopes nothing is saved either and
+  the creator is told analytics was not granted.
 - **Flow:** server-side authorization code with PKCE (S256) and ``access_type=offline`` +
   ``prompt=consent`` so Google returns a refresh token. The ``state`` is random, single-use,
   bound to the user who started and valid for ten minutes (``OAuthState``).
@@ -16,7 +22,7 @@ import logging
 import os
 import secrets
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete
@@ -29,6 +35,10 @@ from app.services.publishing.tokens import EncryptedToken, TokenCipher
 logger = logging.getLogger(__name__)
 
 UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
+ANALYTICS_SCOPES = (READONLY_SCOPE, ANALYTICS_SCOPE)
+PURPOSES = {"publishing": (UPLOAD_SCOPE,), "analytics": (UPLOAD_SCOPE, *ANALYTICS_SCOPES)}
 AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 REVOKE_URI = "https://oauth2.googleapis.com/revoke"
@@ -39,7 +49,7 @@ _VERIFIER_PURPOSE = "youtube-pkce"
 # Codes the callback may report to the frontend (nothing else ever reaches the URL).
 ERROR_CODES = frozenset(
     {"denied", "invalid_state", "expired", "signin_required", "missing_refresh_token",
-     "insufficient_scope", "exchange_failed", "disabled"}
+     "insufficient_scope", "exchange_failed", "disabled", "analytics_not_granted"}
 )  # fmt: skip
 
 
@@ -56,6 +66,19 @@ class Grant:
     scopes: list[str]
 
 
+@dataclass(frozen=True)
+class Pending:
+    """A consumed state: the PKCE verifier and what the user was asked for."""
+
+    code_verifier: str = field(repr=False)
+    purpose: str
+
+
+def has_analytics_access(scopes: str | list[str]) -> bool:
+    granted = set(scopes.split() if isinstance(scopes, str) else scopes)
+    return all(scope in granted for scope in ANALYTICS_SCOPES)
+
+
 def _client_config(settings: Settings) -> dict:
     return {
         "web": {
@@ -68,14 +91,14 @@ def _client_config(settings: Settings) -> dict:
     }
 
 
-def _flow(settings: Settings, *, code_verifier: str | None = None):
+def _flow(settings: Settings, *, purpose: str = "publishing", code_verifier: str | None = None):
     from google_auth_oauthlib.flow import Flow
 
     # Google may report scopes in another order or form; our own check below decides.
     os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
     return Flow.from_client_config(
         _client_config(settings),
-        scopes=[UPLOAD_SCOPE],
+        scopes=list(PURPOSES[purpose]),
         redirect_uri=settings.google_oauth_redirect_uri,
         code_verifier=code_verifier,
         autogenerate_code_verifier=code_verifier is None,
@@ -86,10 +109,19 @@ def _hash(state: str) -> str:
     return hashlib.sha256(state.encode()).hexdigest()
 
 
-def start(db: Session, settings: Settings, cipher: TokenCipher, user_id: uuid.UUID) -> str:
-    """Record a fresh single-use state for ``user_id`` and return Google's consent URL."""
+def start(
+    db: Session,
+    settings: Settings,
+    cipher: TokenCipher,
+    user_id: uuid.UUID,
+    purpose: str = "publishing",
+) -> str:
+    """Record a fresh single-use state for ``user_id`` and return Google's consent URL for
+    ``purpose`` (``publishing``: upload only; ``analytics``: the explicit upgrade)."""
+    if purpose not in PURPOSES:
+        raise ValueError("unknown authorization purpose")
     state = secrets.token_urlsafe(32)
-    flow = _flow(settings)
+    flow = _flow(settings, purpose=purpose)
     url, _ = flow.authorization_url(
         access_type="offline",
         prompt="consent",
@@ -103,7 +135,7 @@ def start(db: Session, settings: Settings, cipher: TokenCipher, user_id: uuid.UU
     db.execute(delete(OAuthState).where(OAuthState.expires_at < now))
     db.add(
         OAuthState(
-            user_id=user_id, provider=PROVIDER, state_hash=_hash(state),
+            user_id=user_id, provider=PROVIDER, purpose=purpose, state_hash=_hash(state),
             code_verifier_ciphertext=sealed.ciphertext, key_version=sealed.key_version,
             expires_at=now + STATE_TTL,
         )
@@ -112,8 +144,8 @@ def start(db: Session, settings: Settings, cipher: TokenCipher, user_id: uuid.UU
     return url
 
 
-def consume_state(db: Session, cipher: TokenCipher, state: str, user_id: uuid.UUID) -> str:
-    """Delete the state (single use, atomically) and return its PKCE verifier."""
+def consume_state(db: Session, cipher: TokenCipher, state: str, user_id: uuid.UUID) -> Pending:
+    """Delete the state (single use, atomically); return its PKCE verifier and purpose."""
     if not state or len(state) > 256:
         raise OAuthError("invalid_state")
     row = db.execute(
@@ -121,6 +153,7 @@ def consume_state(db: Session, cipher: TokenCipher, state: str, user_id: uuid.UU
         .where(OAuthState.state_hash == _hash(state))
         .returning(
             OAuthState.user_id,
+            OAuthState.purpose,
             OAuthState.expires_at,
             OAuthState.code_verifier_ciphertext,
             OAuthState.key_version,
@@ -131,11 +164,12 @@ def consume_state(db: Session, cipher: TokenCipher, state: str, user_id: uuid.UU
         raise OAuthError("invalid_state")
     if row.expires_at < datetime.now(UTC):
         raise OAuthError("expired")
-    return cipher.decrypt(
+    verifier = cipher.decrypt(
         EncryptedToken(row.code_verifier_ciphertext, row.key_version),
         user_id=user_id,
         provider=_VERIFIER_PURPOSE,
     )
+    return Pending(verifier, row.purpose)
 
 
 def _fetch_token(flow, code: str) -> None:
@@ -143,11 +177,14 @@ def _fetch_token(flow, code: str) -> None:
     flow.fetch_token(code=code)
 
 
-def exchange_code(settings: Settings, code: str, code_verifier: str) -> Grant:
-    """Trade the authorization code for a refresh token; check what was granted."""
+def exchange_code(
+    settings: Settings, code: str, code_verifier: str, purpose: str = "publishing"
+) -> Grant:
+    """Trade the authorization code for a refresh token; check what was granted against
+    what ``purpose`` asked for."""
     if not code or len(code) > 2048:
         raise OAuthError("exchange_failed")
-    flow = _flow(settings, code_verifier=code_verifier)
+    flow = _flow(settings, purpose=purpose, code_verifier=code_verifier)
     try:
         _fetch_token(flow, code)
     except Exception as error:  # noqa: BLE001 — any failure of the exchange
@@ -157,6 +194,8 @@ def exchange_code(settings: Settings, code: str, code_verifier: str) -> Grant:
     granted = list(getattr(credentials, "granted_scopes", None) or credentials.scopes or [])
     if UPLOAD_SCOPE not in granted:
         raise OAuthError("insufficient_scope")
+    if purpose == "analytics" and not has_analytics_access(granted):
+        raise OAuthError("analytics_not_granted")
     if not credentials.refresh_token:
         raise OAuthError("missing_refresh_token")
     return Grant(credentials.refresh_token, granted)
