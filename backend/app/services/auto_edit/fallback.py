@@ -19,6 +19,13 @@ The rules, inside the recipe's bounds:
 - **Audio:** the source is kept as is (normalized as usual); music only when the creator chose
   a track for this plan, at the recipe's quietest level with its ducking; no sound effects.
 
+With patterns from the creator's own shorts (V1.4, only when they asked for it), the rules stay
+conservative and inside the recipe: a caption style the recipe offers that the creator's shorts
+have tended to do better with is preferred; a hook or a cutaway is left out when their shorts
+without one have tended to do better. Captions are never turned off and framing never changes
+because of a hint (both keep the speaker clear), music is never added, and every hint used is
+named in the explanation.
+
 It is a sensible first draft, not a feature demo.
 """
 
@@ -28,6 +35,7 @@ from app.services.auto_edit.contract import (
     PlannerResult,
 )
 from app.services.clip_edit.hook import MAX_HOOK_CHARS, normalize_hook_text
+from app.services.performance.profile import favours
 
 FALLBACK_PROVIDER = "fallback"
 FALLBACK_MODEL = "auto_edit_rules_v1"
@@ -53,11 +61,22 @@ def _layout(context: AutoEditContext) -> tuple[str, str]:
     return "blur_background", reason
 
 
+def _evidence(hint: dict) -> str:
+    return f"{hint['confidence']} evidence"
+
+
 def _hook(context: AutoEditContext) -> tuple[dict, str]:
     recipe = context.recipe
     text = normalize_hook_text(context.candidate_hook or "")
     style = recipe["hook_styles"][0] if recipe.get("hook_styles") else "headline"
     seconds = float(recipe.get("hook_seconds", 2.0))
+    without = favours(context.performance_hints, "hook", "no_hook")
+    if without is not None and recipe.get("hook_allowed"):
+        return (
+            {"enabled": False, "text": "", "style": style, "duration_seconds": seconds},
+            "No opening hook: your shorts without one have tended to do better "
+            f"({_evidence(without)}).",
+        )
     if not recipe.get("hook_allowed") or not context.capabilities.text_overlays:
         return (
             {"enabled": False, "text": "", "style": style, "duration_seconds": seconds},
@@ -80,6 +99,12 @@ def _visuals(context: AutoEditContext) -> tuple[list[dict], str]:
         return [], "No visuals for this recipe."
     if not recipe.get("max_visuals"):
         return [], "No visuals for this recipe."
+    without = favours(context.performance_hints, "visuals", "no_visuals")
+    if without is not None:
+        return [], (
+            "No cutaway: your shorts without added visuals have tended to do better "
+            f"({_evidence(without)})."
+        )
     assets = {asset.handle: asset for asset in context.visual_assets}
     for option in context.broll:
         if option.end - option.start < float(recipe.get("min_visual_seconds", 0)):
@@ -121,6 +146,16 @@ def _audio(context: AutoEditContext) -> tuple[dict, str]:
     )  # fmt: skip
 
 
+def _caption_preset(context: AutoEditContext) -> tuple[str, dict | None]:
+    """The recipe's default preset, or one it offers that the creator's shorts favour."""
+    presets = context.recipe["caption_presets"]
+    for preset in presets:
+        hint = favours(context.performance_hints, "caption_style", preset)
+        if hint is not None:
+            return preset, hint
+    return presets[0], None
+
+
 class FallbackAutoEditPlanner:
     name = FALLBACK_PROVIDER
     model = FALLBACK_MODEL
@@ -137,6 +172,12 @@ class FallbackAutoEditPlanner:
             if captions_on
             else "No captions: this clip has no transcript timing yet."
         )
+        preset, preset_hint = _caption_preset(context)
+        if captions_on and preset_hint is not None:
+            captions_reason += (
+                f" The “{preset}” style is one your shorts have tended to do better with "
+                f"({_evidence(preset_hint)})."
+            )
         hook, hook_reason = _hook(context)
         visuals, visual_reason = _visuals(context)
         audio, audio_reason = _audio(context)
@@ -145,7 +186,7 @@ class FallbackAutoEditPlanner:
                 "layout": {"mode": layout},
                 "captions": {
                     "enabled": captions_on,
-                    "preset": recipe["caption_presets"][0],
+                    "preset": preset,
                     "position": recipe["caption_positions"][0],
                 },
                 "hook": hook,

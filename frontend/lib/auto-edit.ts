@@ -1,5 +1,11 @@
 import { apiFetch, postJson } from "@/lib/api";
-import { ACTIVE_PLAN_STATUSES, type AutoEditPlan, type Recipe, type RecipeName } from "@/lib/auto-edit-rules";
+import {
+  ACTIVE_PLAN_STATUSES,
+  type AutoEditPlan,
+  type PerformanceContext,
+  type Recipe,
+  type RecipeName,
+} from "@/lib/auto-edit-rules";
 import type { ClipEdit } from "@/lib/edits";
 import { stageRanks } from "@/lib/status-sync";
 
@@ -9,8 +15,20 @@ const base = (projectId: string, videoId: string, clipId: string) =>
   `/projects/${projectId}/videos/${videoId}/clips/${clipId}/auto-edits`;
 
 export const listRecipes = () => apiFetch<Recipe[]>("/auto-edit/recipes");
-export const createPlan = (p: string, v: string, c: string, recipe: RecipeName, musicAssetId: string | null) =>
-  postJson<AutoEditPlan>(base(p, v, c), { recipe, ...(musicAssetId ? { music_asset_id: musicAssetId } : {}) });
+export const getPerformanceContext = () => apiFetch<PerformanceContext>("/auto-edit/performance-context");
+export const createPlan = (
+  p: string,
+  v: string,
+  c: string,
+  recipe: RecipeName,
+  musicAssetId: string | null,
+  usePerformanceContext = false,
+) =>
+  postJson<AutoEditPlan>(base(p, v, c), {
+    recipe,
+    ...(musicAssetId ? { music_asset_id: musicAssetId } : {}),
+    ...(usePerformanceContext ? { use_performance_context: true } : {}),
+  });
 export const listPlans = (p: string, v: string, c: string) => apiFetch<{ plans: AutoEditPlan[] }>(base(p, v, c));
 export const getPlan = (p: string, v: string, c: string, id: string) => apiFetch<AutoEditPlan>(`${base(p, v, c)}/${id}`);
 export const retryPlan = (p: string, v: string, c: string, id: string) =>

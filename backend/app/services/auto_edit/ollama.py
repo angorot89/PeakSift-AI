@@ -102,6 +102,13 @@ def constraints(context: AutoEditContext) -> list[str]:
     rules.append(
         "hook.text: at most 60 characters, from the speaker's words or the candidate hook."
     )
+    if context.performance_hints:
+        rules.append(
+            "creator_history lists patterns observed in this creator's own earlier shorts. "
+            "They are weak evidence, not rules: the recipe and this clip come first. Use one "
+            "only to choose between options the recipe already allows, and only when it suits "
+            "this clip."
+        )
     return rules
 
 

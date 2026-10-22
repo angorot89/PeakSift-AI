@@ -47,6 +47,7 @@ from app.schemas.auto_edit import (
     AutoEditPlanPage,
     AutoEditPlanRead,
     AutoEditRecipeRead,
+    PerformanceContextRead,
 )
 from app.services.auto_edit import state
 from app.services.auto_edit.config import AutoEditRequest
@@ -54,6 +55,7 @@ from app.services.auto_edit.fingerprint import source_fingerprint
 from app.services.auto_edit.recipes import RECIPE_ORDER, current_recipe, recipe_version
 from app.services.auto_edit.sources import SourcesUnavailable, gather
 from app.services.clip_edit.config import EditConfig
+from app.services.performance.profile import creator_profile
 from app.services.storage import StorageProvider, StorageUnavailable
 from app.workers.dispatch import JobQueueUnavailable, enqueue_auto_edit_plan, new_task_id
 
@@ -127,7 +129,21 @@ def read_plan(plan: AutoEditPlan) -> AutoEditPlanRead:
         started_at=plan.started_at,
         completed_at=plan.completed_at,
         applied_at=plan.applied_at,
+        performance_hints=_hint_texts((plan.config or {}).get("performance_context")),
     )
+
+
+def _hint_texts(profile: dict | None) -> list[str] | None:
+    return [hint["text"] for hint in profile["hints"]] if profile else None
+
+
+def _performance_source() -> str:
+    return "fake" if get_settings().performance_provider == "fake" else "youtube"
+
+
+def _profile_for(db, user_id: uuid.UUID, wanted: bool) -> dict | None:
+    """The creator's profile snapshot when they asked for it (None: none to use)."""
+    return creator_profile(db, user_id, _performance_source()) if wanted else None
 
 
 def _require_plannable(clip: Clip, storage: StorageProvider) -> None:
@@ -266,6 +282,19 @@ def list_recipes(_: CurrentUser) -> list[AutoEditRecipeRead]:
     ]
 
 
+@recipes_router.get("/auto-edit/performance-context", response_model=PerformanceContextRead)
+def performance_context(current_user: CurrentUser, db: DbSession) -> PerformanceContextRead:
+    """The patterns from the creator's own shorts Auto Edit could consider (if they ask)."""
+    source = _performance_source()
+    profile = creator_profile(db, current_user.id, source)
+    return PerformanceContextRead(
+        available=profile is not None,
+        simulated=source == "fake",
+        sample_size=profile["sample_size"] if profile else 0,
+        hints=_hint_texts(profile) or [],
+    )
+
+
 # --- plans --------------------------------------------------------------------------------------
 
 
@@ -282,14 +311,16 @@ def create_plan(
     db: DbSession,
     storage: Storage,
     response: Response,
+    current_user: CurrentUser,
 ) -> AutoEditPlanRead:
     """Plan an edit with this recipe. The same recipe and inputs return the existing plan
     (200); changed inputs (a new caption track, a tagged asset…) make a new one."""
     _require_plannable(clip, storage)
     music = _owned_music(db, video, body.music_asset_id)
     request = AutoEditRequest.from_settings(
-        get_settings(), recipe=body.recipe.value, music_asset_id=music
-    )
+        get_settings(), recipe=body.recipe.value, music_asset_id=music,
+        performance_context=_profile_for(db, current_user.id, body.use_performance_context),
+    )  # fmt: skip
     return _start(db, clip, storage, request, response)
 
 
@@ -354,6 +385,7 @@ def regenerate_plan(
     db: DbSession,
     storage: Storage,
     response: Response,
+    current_user: CurrentUser,
 ) -> AutoEditPlanRead:
     """Try another plan with the same recipe and music: a new generation; this one is kept."""
     if plan.status in ACTIVE_AUTO_EDIT_STATUSES:
@@ -373,6 +405,10 @@ def regenerate_plan(
         recipe=plan.recipe,
         music_asset_id=previous.music_asset_id,
         generation=(newest or plan.generation) + 1,
+        # Same choice as before, with the creator's current patterns.
+        performance_context=_profile_for(
+            db, current_user.id, previous.performance_context is not None
+        ),
     )
     return _start(db, clip, storage, request, response)
 

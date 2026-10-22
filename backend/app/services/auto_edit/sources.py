@@ -340,6 +340,7 @@ def gather(
         visual_assets=visual_options,
         music=music,
         sound_effects=tuple(effects),
+        performance_hints=tuple((request.performance_context or {}).get("hints", ())),
         reframe_analysis_id=str(framing.id) if framing is not None else None,
         caption_track_id=str(track.id) if track is not None else None,
         visual_ids={handle: asset_id for asset_id, handle in visual_handles.items()},
