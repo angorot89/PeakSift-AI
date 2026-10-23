@@ -108,7 +108,7 @@ function VideoRow({
         <div className="min-w-0">
           <Link
             href={`/analytics/${video.id}`}
-            className="block truncate font-medium text-foreground hover:text-accent-soft focus-visible:outline-2 focus-visible:outline-accent"
+            className="block truncate font-medium text-foreground hover:text-accent-soft focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:-my-2.5 pointer-coarse:py-2.5"
           >
             {video.title}
           </Link>

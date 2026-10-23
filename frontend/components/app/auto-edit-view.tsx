@@ -327,7 +327,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
       {missing.length ? (
         <p className="text-xs text-pretty text-subtle">
           To give Auto Edit more to work with, open the{" "}
-          <Link href={editorLink} className="text-accent-soft underline-offset-2 hover:underline">
+          <Link href={editorLink} className="text-accent-soft underline underline-offset-2">
             editor
           </Link>{" "}
           and {missing.map((m) => m.charAt(0).toLowerCase() + m.slice(1)).join("; ")}. Auto Edit never starts these for

@@ -236,7 +236,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <Menu aria-hidden="true" />
           </IconButton>
-          <Link href="/home" className="flex min-h-10 items-center gap-2 rounded-md px-1 font-semibold tracking-tight">
+          <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-semibold tracking-tight">
             <LogoMark className="size-6" />
             PeakSift <span className="text-muted">AI</span>
           </Link>

@@ -93,6 +93,7 @@ Alembic reads `DATABASE_URL` from the application settings, so it always targets
 | POST   | `/auth/login`    | no   | `200` + sets the auth cookie. `401` with a generic message on bad credentials. |
 | POST   | `/auth/logout`   | no   | `204`; clears the auth cookie.                           |
 | GET    | `/auth/me`       | yes  | The current user: `id`, `email`, `created_at`.           |
+| GET    | `/auth/session`  | no   | `{"user": …}` or `{"user": null}`, always `200` (the app's start-up check). |
 | GET    | `/projects`      | yes  | The current user's projects, newest first.               |
 | POST   | `/projects`      | yes  | Create a project from `{"name": "..."}`; `201`. Status starts as `created`. |
 | GET    | `/projects/{id}` | yes  | One of the current user's projects; `404` if it does not exist or belongs to someone else. |

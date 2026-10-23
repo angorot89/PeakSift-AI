@@ -266,7 +266,7 @@ export function VisualsPanel({
         ) : null}
         {dismissed.length ? (
           <details className="text-xs text-muted">
-            <summary className="cursor-pointer select-none text-subtle hover:text-foreground">
+            <summary className="inline-flex min-h-6 cursor-pointer items-center select-none text-subtle hover:text-foreground pointer-coarse:min-h-11">
               Dismissed ({dismissed.length})
             </summary>
             <ul className="mt-2 space-y-1.5">

@@ -145,6 +145,21 @@ def test_me_when_unauthenticated(client: TestClient):
     assert response.status_code == 401
 
 
+def test_session_answers_without_an_error(client: TestClient):
+    """The app's start-up check: the user when signed in, null when not — never a 401."""
+    signed_out = client.get("/auth/session")
+    assert signed_out.status_code == 200 and signed_out.json() == {"user": None}
+
+    registered = register(client).json()
+    signed_in = client.get("/auth/session")
+    assert signed_in.status_code == 200 and signed_in.json() == {"user": registered}
+    assert "password" not in signed_in.text
+
+    client.cookies.set(COOKIE, "not-a-token")
+    assert client.get("/auth/session").json() == {"user": None}
+    assert client.get("/auth/me").status_code == 401  # /me keeps its contract
+
+
 def test_me_rejects_expired_token(client: TestClient):
     user_id = register(client).json()["id"]
     now = datetime.now(UTC)
