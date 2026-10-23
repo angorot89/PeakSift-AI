@@ -29,6 +29,7 @@ mirror the render's proportions.
 | `Dialog` | modal dialogs and sheets (`placement` center, left, bottom) on the native `<dialog>`: inert page, Escape closes, focus returns to the trigger, backdrop closes |
 | `Menu` | a menu button: arrow keys, Home/End, Escape and Tab close, focus returns |
 | `SegmentedControl` | a few mutually exclusive views or filters (pressed buttons) |
+| `ToolTabs` | tool groups that swap one panel (WAI-ARIA tabs: Left/Right/Home/End; panels stay mounted; a dot marks "in use" or "needs attention") |
 | `Tooltip` | hover/focus description for icon-only controls; never the only way to information |
 | `useToast` | brief confirmation of a small completed action; problems stay inline |
 | `StatusPill` / `StatusBadge` | state in words plus a shape (never colour alone) |
