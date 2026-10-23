@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { DashboardView } from "@/components/app/dashboard-view";
+import { HomeView } from "@/components/app/home-view";
 
 export const metadata: Metadata = { title: "Home" };
 
 export default function HomePage() {
-  return <DashboardView />;
+  return <HomeView />;
 }

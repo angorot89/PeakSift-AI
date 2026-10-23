@@ -30,6 +30,7 @@ from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
 from app.api.visual_assets import limits_router as visual_limits_router
 from app.api.visual_assets import router as visual_assets_router
+from app.api.workspace import router as workspace_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.observability import RequestContextMiddleware, configure_logging
@@ -63,6 +64,7 @@ ROUTERS = (
     publish_edit_router,
     publish_job_router,
     performance_router,
+    workspace_router,
 )
 
 
