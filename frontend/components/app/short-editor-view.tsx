@@ -1,6 +1,23 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Clapperboard, Download, Eye, History, Plus, RotateCcw, ScanFace, Smartphone, Wand2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Captions,
+  CheckCircle2,
+  Clapperboard,
+  Crop,
+  Download,
+  Eye,
+  History,
+  ImageIcon,
+  Music,
+  Plus,
+  RotateCcw,
+  ScanFace,
+  Smartphone,
+  Type,
+  Wand2,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -23,6 +40,7 @@ import { buttonClasses } from "@/components/ui/button-styles";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToolTabs, toolPanelProps } from "@/components/ui/tool-tabs";
 import { ApiError, errorMessage } from "@/lib/api";
 import { audioContentUrl, getAudioUploadLimits, getWaveform, listAudio, type AudioAsset, type AudioUploadLimits } from "@/lib/audio";
 import {
@@ -74,6 +92,7 @@ import {
   type PickableLayout,
 } from "@/lib/edits";
 import { DEFAULT_DRAFT, draftFromConfiguration, type EditorDraft } from "@/lib/edit-draft";
+import { TOOLS, toolFromParam, toolMarks, type ToolKey } from "@/lib/editor-tools";
 import { formatDuration } from "@/lib/format";
 import { loadProjectClip } from "@/lib/project-clip";
 import { isProjectId, type Project } from "@/lib/projects";
@@ -103,6 +122,14 @@ import {
   type VisualLayout,
 } from "@/lib/visual-elements";
 import { listVisuals, type VisualAsset } from "@/lib/visuals";
+
+const TOOL_ICONS: Record<ToolKey, typeof Crop> = {
+  style: Crop,
+  captions: Captions,
+  opening: Type,
+  visuals: ImageIcon,
+  sound: Music,
+};
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
@@ -158,6 +185,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const search = useSearchParams();
   const planParam = search.get("plan");
   const editParam = search.get("edit");
+  // Which tool group is open; links from an Auto Edit review open the one they name.
+  const [tool, setTool] = useState<ToolKey>(() => toolFromParam(search.get("tool")));
   // Any change by the creator wins over settings that arrive later from the network.
   const touched = useRef(false);
   const hydrated = useRef(false);
@@ -208,6 +237,16 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   );
 
   const stageRef = useRef<HTMLDivElement>(null);
+  // Phones: a compact bar keeps the render action in reach while the settings' own footer is off screen.
+  const footerRef = useRef<HTMLDivElement>(null);
+  const [footerVisible, setFooterVisible] = useState(true);
+  useEffect(() => {
+    const node = footerRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => setFooterVisible(entry.isIntersecting));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   // The version just started; read through a ref so polling does not restart on change.
   const pendingRef = useRef<string | null>(null);
   pendingRef.current = pendingId;
@@ -685,6 +724,46 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     hook_enabled: hookOn,
   })}${audioLabel ? ` · ${audioLabel}` : ""}${visuals.length ? ` · ${visualsSummary(visuals.length)}` : ""}`;
 
+  const marks = toolMarks({
+    awaitingAnalysis,
+    awaitingWords,
+    hookOn,
+    hookInvalid,
+    visuals: visuals.length,
+    visualsInvalid,
+    audioActive,
+  });
+  const timingPanel = (
+    <CaptionTimingPanel
+      timing={timing}
+      onTimingChange={edit(setTiming)}
+      track={track}
+      phraseAvailable={phraseAvailable}
+      busy={trackBusy}
+      error={trackError}
+      onGenerate={() => void generateWordSync(false)}
+      onRetry={() => void generateWordSync(true)}
+    />
+  );
+  // Settings are kept only by rendering: say so plainly (there is no autosave).
+  const saveNote =
+    match?.status === "ready"
+      ? "These settings are saved as a version."
+      : matchActive
+        ? "This version is saved once the render finishes."
+        : "Not rendered yet. Rendering saves these settings as a new version; earlier versions are kept.";
+
+  const canRender = !blocked && !matchActive && !matchStuck && match?.status !== "ready";
+  const barText = matchActive
+    ? "Rendering your Short…"
+    : match?.status === "ready"
+      ? "These settings are already rendered."
+      : matchStuck
+        ? "This render needs attention."
+        : blocked
+          ? "Something in the settings needs attention."
+          : settingsSummary;
+
   // ---- primary action area -------------------------------------------------------------
   let action;
   if (matchActive && match) {
@@ -694,7 +773,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           label={editStageLabel(match).replace("…", "")}
           progress={match.status === "queued" ? null : match.progress_percent}
           progressLabel="Render progress"
-          detail="Rendering short on the server. You can keep adjusting settings or leave this page."
+          detail="Rendering your Short. You can keep adjusting settings or leave this page."
         />
       </div>
     );
@@ -712,9 +791,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     action = (
       <div className="space-y-3">
         <InlineAlert title={match.status === "failed" ? "Render failed" : "Render stalled"}>
-          We couldn&apos;t generate this version of your short.
+          We couldn&apos;t render this version of your Short.
           <span className="block text-xs text-subtle">
-            {match.status === "failed" ? friendlyEditError(match) : "The worker stopped reporting progress."}
+            {match.status === "failed" ? friendlyEditError(match) : "The render stopped responding."}
           </span>
         </InlineAlert>
         <Button size="lg" className="w-full" onClick={() => void retry(match)} disabled={retryingId === match.id}>
@@ -728,12 +807,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <div className="space-y-2">
         <Button size="lg" className="w-full" disabled>
           <Wand2 aria-hidden="true" />
-          Render short
+          Render Short
         </Button>
         <p className="text-center text-xs text-subtle">
           {analysis && isAnalysisActive(analysis.status) && !analysis.is_stale
             ? "Available when the framing analysis finishes."
-            : "Analyze the framing first, or set a focal point."}
+            : "Analyze the framing in Style first, or set a focal point."}
         </p>
       </div>
     );
@@ -742,10 +821,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <div className="space-y-2">
         <Button size="lg" className="w-full" disabled>
           <Wand2 aria-hidden="true" />
-          Render short
+          Render Short
         </Button>
         <p className="text-center text-xs text-subtle">
-          {trackRunning ? "Available when word sync finishes." : "Generate word sync first, or use phrase timing."}
+          {trackRunning ? "Available when word sync finishes." : "Generate word sync in Captions first, or use phrase timing."}
         </p>
         {phraseAvailable ? (
           <Button variant="ghost" className="w-full" onClick={() => edit(setTiming)("phrase_fallback")}>
@@ -759,10 +838,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <div className="space-y-2">
         <Button size="lg" className="w-full" disabled>
           <Wand2 aria-hidden="true" />
-          Render short
+          Render Short
         </Button>
         <p className="text-center text-xs text-subtle">
-          {hookLength === 0 ? "Add hook text, or turn the hook off." : "Shorten the hook text to render."}
+          {hookLength === 0 ? "Add opening text, or turn the opening off." : "Shorten the opening text to render."}
         </p>
       </div>
     );
@@ -771,16 +850,16 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <div className="space-y-2">
         <Button size="lg" className="w-full" disabled>
           <Wand2 aria-hidden="true" />
-          Render short
+          Render Short
         </Button>
-        <p className="text-center text-xs text-subtle">Fix the highlighted visuals to render.</p>
+        <p className="text-center text-xs text-subtle">Fix the highlighted items in Visuals to render.</p>
       </div>
     );
   } else {
     action = (
       <Button size="lg" className="w-full" onClick={() => void render()} disabled={busy || edits === null}>
         <Wand2 aria-hidden="true" />
-        {busy ? "Starting…" : "Render short"}
+        {busy ? "Starting…" : "Render Short"}
       </Button>
     );
   }
@@ -789,9 +868,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     <>
       <PageHeader
         back={{ href: backToProject, label: "Clips" }}
-        title="Short-form editor"
+        title="Edit Short"
         action={
-          <ButtonLink href={autoEditHref(project.id, clip.id)} variant="secondary">
+          <ButtonLink href={autoEditHref(project.id, clip.id)} variant="ghost">
             <Wand2 aria-hidden="true" />
             Auto Edit
           </ButtonLink>
@@ -804,7 +883,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8">
+      <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8">
         {/* Stage: the video is the focal point. */}
         <section aria-label="Stage" ref={stageRef} className="min-w-0 scroll-mt-20 lg:col-start-1 lg:row-start-1">
           <div className="rounded-2xl border border-border bg-[radial-gradient(ellipse_at_top,rgb(255_255_255/0.04),transparent_60%)] bg-surface p-4 sm:p-6">
@@ -920,33 +999,30 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     />
                   )}
                 </div>
-                <p className="mx-auto max-w-sm text-center text-xs text-pretty text-subtle">
-                  Preview — captions use the renderer&apos;s own lines and timing; sizes are close, not pixel-exact. The rendered
-                  MP4 is the final result.
+                <p className="mx-auto max-w-sm text-center text-caption text-pretty text-subtle">
+                  Live preview with the renderer&apos;s own caption lines and timing; sizes are close, not pixel-exact. The
+                  rendered Short is the final result.
                 </p>
               </div>
             )}
           </div>
         </section>
 
-        {/* Settings: everything the server accepts, nothing it does not. */}
+        {/* Settings: everything the server accepts, nothing it does not, in five tool groups. */}
         <aside
           aria-label="Edit settings"
-          className="self-start rounded-2xl border border-border bg-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+          className="flex flex-col self-start rounded-2xl border border-border bg-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
         >
-          <div className="border-b border-border px-4 py-4 sm:px-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-title text-foreground">Edit settings</h2>
-                <p className="mt-0.5 text-sm text-muted">Choose how this clip becomes a vertical short.</p>
-              </div>
+          <div className="space-y-3 border-b border-border px-4 pt-4 pb-3 sm:px-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-title text-foreground">Settings</h2>
               <Button variant="ghost" size="sm" className="shrink-0" onClick={resetToDefaults}>
                 <RotateCcw aria-hidden="true" />
-                Reset to defaults
+                Reset
               </Button>
             </div>
             {loadedFrom ? (
-              <div role="status" className="mt-3 space-y-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-xs">
+              <div role="status" className="space-y-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-xs">
                 <p className="flex items-start gap-2 text-muted">
                   <History aria-hidden="true" className="mt-px size-3.5 shrink-0" />
                   <span>
@@ -955,7 +1031,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                       <>
                         {" "}
                         <Link href={loadedFrom.href} className="text-accent-soft underline-offset-2 hover:underline">
-                          Back to the plan
+                          Back to the draft
                         </Link>
                       </>
                     ) : null}
@@ -968,9 +1044,16 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 ))}
               </div>
             ) : null}
+            <ToolTabs
+              label="Tools"
+              idBase={`${id}-tool`}
+              value={tool}
+              onChange={setTool}
+              items={TOOLS.map((t) => ({ ...t, icon: TOOL_ICONS[t.key], mark: marks[t.key] }))}
+            />
           </div>
-          <div className="space-y-6 px-4 py-5 sm:px-5">
-            <div className="space-y-3">
+          <div className="min-h-0 flex-1 px-4 py-5 sm:px-5 lg:overflow-y-auto">
+            <div {...toolPanelProps(`${id}-tool`, "style", tool === "style")} className="space-y-3 focus-visible:outline-none">
               <LayoutPicker value={layout} onChange={edit(setLayout)} name={`${id}-layout`} />
               {smart ? (
                 <div className="animate-fade-in space-y-2">
@@ -995,20 +1078,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 </div>
               ) : null}
             </div>
-            <div className="space-y-4">
+            <div {...toolPanelProps(`${id}-tool`, "captions", tool === "captions")} className="space-y-4 focus-visible:outline-none">
               <CaptionSwitch checked={captions} onChange={edit(setCaptions)} />
               {captions ? (
                 <div className="animate-fade-in space-y-4">
-                  <CaptionTimingPanel
-                    timing={timing}
-                    onTimingChange={edit(setTiming)}
-                    track={track}
-                    phraseAvailable={phraseAvailable}
-                    busy={trackBusy}
-                    error={trackError}
-                    onGenerate={() => void generateWordSync(false)}
-                    onRetry={() => void generateWordSync(true)}
-                  />
+                  {/* Word sync must exist before word-synced captions can render, so it is never tucked away then. */}
+                  {awaitingWords ? timingPanel : null}
                   {spec ? (
                     <PresetCards spec={spec} value={preset} onChange={edit(setPreset)} name={`${id}-preset`} disabled={!captions} />
                   ) : null}
@@ -1019,32 +1094,52 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     disabled={!captions}
                     taken={hookOn ? hookPosition : null}
                   />
+                  {awaitingWords ? null : (
+                    <details className="group rounded-xl border border-border">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                        <span>
+                          Advanced
+                          <span className="ml-2 text-caption text-subtle">
+                            Timing · {timing === "aligned_word" ? "word synced" : "phrase timed"}
+                          </span>
+                        </span>
+                        <span aria-hidden="true" className="text-subtle transition-transform group-open:rotate-180">
+                          ▾
+                        </span>
+                      </summary>
+                      <div className="border-t border-border p-3">{timingPanel}</div>
+                    </details>
+                  )}
                 </div>
               ) : null}
             </div>
-            {spec ? (
-              <HookPanel
-                spec={spec}
-                enabled={hookOn}
-                onEnabled={(on) => {
-                  touched.current = true;
-                  // The hook never shares the captions' position: start it somewhere free.
-                  if (on && captions && hookPosition === position) setHookPosition(position === "top" ? "center" : "top");
-                  setHookOn(on);
-                }}
-                text={hookText}
-                onText={edit(setHookText)}
-                style={hookStyle}
-                onStyle={edit(setHookStyle)}
-                position={hookPosition}
-                onPosition={edit(setHookPosition)}
-                duration={hookDuration}
-                onDuration={edit(setHookDuration)}
-                captionPosition={captions ? position : null}
-                emojiOmitted={spec.emoji === "omitted"}
-              />
-            ) : null}
-            <div className="border-t border-border pt-5">
+            <div {...toolPanelProps(`${id}-tool`, "opening", tool === "opening")} className="focus-visible:outline-none">
+              {spec ? (
+                <HookPanel
+                  spec={spec}
+                  enabled={hookOn}
+                  onEnabled={(on) => {
+                    touched.current = true;
+                    // The hook never shares the captions' position: start it somewhere free.
+                    if (on && captions && hookPosition === position) setHookPosition(position === "top" ? "center" : "top");
+                    setHookOn(on);
+                  }}
+                  text={hookText}
+                  onText={edit(setHookText)}
+                  style={hookStyle}
+                  onStyle={edit(setHookStyle)}
+                  position={hookPosition}
+                  onPosition={edit(setHookPosition)}
+                  duration={hookDuration}
+                  onDuration={edit(setHookDuration)}
+                  captionPosition={captions ? position : null}
+                  emojiOmitted={spec.emoji === "omitted"}
+                />
+              ) : (
+                <Skeleton className="h-24 rounded-xl" />
+              )}
+            </div>
+            <div {...toolPanelProps(`${id}-tool`, "visuals", tool === "visuals")} className="focus-visible:outline-none">
               <VisualsPanel
                 projectId={project.id}
                 videoId={clip.video_id}
@@ -1057,7 +1152,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 onChange={edit(setVisuals)}
               />
             </div>
-            <div className="border-t border-border pt-5">
+            <div {...toolPanelProps(`${id}-tool`, "sound", tool === "sound")} className="focus-visible:outline-none">
               <AudioPanel
                 projectId={project.id}
                 value={audio}
@@ -1074,12 +1169,14 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               />
             </div>
           </div>
-          <div className="space-y-3 border-t border-border px-4 py-4 sm:px-5">
+          {/* Always reachable: sticks to the bottom of the screen on phones, of the panel on desktop. */}
+          <div ref={footerRef} className="sticky bottom-0 z-10 space-y-3 rounded-b-2xl border-t border-border bg-surface px-4 py-4 sm:px-5">
             <p className="text-xs text-muted">
               <span className="text-subtle">Output: </span>
               {settingsSummary}
             </p>
             {action}
+            <p className="text-caption text-pretty text-subtle">{saveNote}</p>
             {actionError ? (
               <InlineAlert title="The render could not start">{actionError}</InlineAlert>
             ) : null}
@@ -1118,6 +1215,23 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           )}
         </section>
       </div>
+      {!footerVisible && mode === "preview" ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 truncate text-small text-muted">{barText}</p>
+            {canRender ? (
+              <Button size="sm" onClick={() => void render()} disabled={busy || edits === null}>
+                <Wand2 aria-hidden="true" />
+                {busy ? "Starting…" : "Render Short"}
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={() => footerRef.current?.scrollIntoView({ block: "end" })}>
+                Settings
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -1144,7 +1258,7 @@ export function ShortEditorView() {
     const notFound = error === "Clip not found" || error === "Project not found";
     return (
       <>
-        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Short-form editor" />
+        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Edit Short" />
         {notFound ? (
           <EmptyState
             icon={Clapperboard}
@@ -1153,7 +1267,7 @@ export function ShortEditorView() {
             action={<ButtonLink href="/projects" variant="secondary">Back to projects</ButtonLink>}
           />
         ) : (
-          <ErrorState title="The editor could not be loaded" message={error ?? "Unavailable."} onRetry={reload} />
+          <ErrorState title="The editor couldn't be loaded" message={error ?? "Try again."} onRetry={reload} />
         )}
       </>
     );
@@ -1161,11 +1275,11 @@ export function ShortEditorView() {
   if (data.clip.status !== "ready") {
     return (
       <>
-        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Short-form editor" />
+        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Edit Short" />
         <EmptyState
           icon={Clapperboard}
           title="This clip isn't ready yet"
-          description="Short-form edits start from a rendered clip. Come back once it shows Ready."
+          description="Editing starts once the clip has been prepared."
           action={<ButtonLink href={`/projects/${id}/clips`} variant="secondary">Back to clips</ButtonLink>}
         />
       </>

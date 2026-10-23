@@ -9,3 +9,9 @@ export function menuIndex(key: string, current: number, count: number): number |
   if (key === "ArrowUp") return current < 0 ? count - 1 : (current - 1 + count) % count;
   return null;
 }
+
+/** The tab index for a key in a horizontal tab list (Left/Right, Home/End), wrapping; else null. */
+export function tabKeyIndex(key: string, current: number, count: number): number | null {
+  const vertical = key === "ArrowRight" ? "ArrowDown" : key === "ArrowLeft" ? "ArrowUp" : key;
+  return key === "ArrowDown" || key === "ArrowUp" ? null : menuIndex(vertical, current, count);
+}

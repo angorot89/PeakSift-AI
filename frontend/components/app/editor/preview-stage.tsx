@@ -1,20 +1,21 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { VideoClockContext } from "@/components/app/editor/caption-layer";
+import { PreviewControls } from "@/components/app/editor/preview-controls";
 import type { Layout } from "@/lib/edits";
 import { clampedCenter, cropCenterAt, cropGeometry, type CropKeyframe } from "@/lib/reframe";
 
-/** The 9:16 device-like frame both the live preview and the rendered short sit in. */
+/** The 9:16 frame both the live preview and the rendered short sit in. */
 export function NineBySixteenFrame({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div
       role="group"
       aria-label={label}
       // Sized by width with a locked 9:16 ratio, capped so the frame never exceeds
-      // min(64vh, 600px) in height: it stays exactly 9:16 at every screen width.
-      className="relative mx-auto aspect-[9/16] w-full max-w-[calc(min(64vh,600px)*0.5625)] overflow-hidden rounded-[22px] border border-white/12 bg-black shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-black"
+      // min(64vh, 600px) in height (on desktop, what is left below the header, so the controls
+      // stay on screen): it stays exactly 9:16 at every width, and fills the screen in full screen.
+      className="relative mx-auto aspect-[9/16] w-full max-w-[calc(min(64vh,600px)*0.5625)] overflow-hidden lg:max-w-[calc(min(max(100dvh-25rem,22rem),600px)*0.5625)] rounded-[22px] border border-white/12 bg-black shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-black [:fullscreen_&]:max-w-[calc((100dvh-5rem)*0.5625)]"
       style={{ containerType: "size" }}
     >
       {children}
@@ -36,9 +37,34 @@ type PreviewProps = {
  * It shows layout and caption placement; it is labelled as a preview because the server's
  * FFmpeg render (blur strength, exact glyph shapes) is the authoritative result.
  */
+/** The frame plus its controls; this is what goes full screen, so overlays come along. */
+function PreviewShell({ video, children }: { video: HTMLVideoElement | null; children: ReactNode }) {
+  const [shell, setShell] = useState<HTMLDivElement | null>(null);
+  return (
+    <div
+      ref={setShell}
+      className="space-y-2 [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:items-center [&:fullscreen]:justify-center [&:fullscreen]:bg-black [&:fullscreen]:p-4"
+    >
+      {children}
+      <PreviewControls video={video} fullscreenTarget={shell} />
+    </div>
+  );
+}
+
+function togglePlayback(element: HTMLVideoElement | null) {
+  if (!element) return;
+  if (element.paused || element.ended) void element.play().catch(() => {});
+  else element.pause();
+}
+
 export function PreviewStage({ clipSrc, layout, overlay, onVideo }: PreviewProps) {
-  const front = useRef<HTMLVideoElement>(null);
+  const front = useRef<HTMLVideoElement | null>(null);
   const back = useRef<HTMLVideoElement>(null);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const frontRef = useCallback((node: HTMLVideoElement | null) => {
+    front.current = node;
+    setVideo(node);
+  }, []);
   useEffect(() => {
     onVideo?.(front.current);
     return () => onVideo?.(null);
@@ -70,6 +96,7 @@ export function PreviewStage({ clipSrc, layout, overlay, onVideo }: PreviewProps
   }, [layout]);
 
   return (
+    <PreviewShell video={video}>
     <NineBySixteenFrame label="Live preview of the edit settings">
       {layout === "blur_background" ? (
         <video
@@ -85,16 +112,17 @@ export function PreviewStage({ clipSrc, layout, overlay, onVideo }: PreviewProps
       ) : null}
       {layout === "fit" ? <div aria-hidden="true" className="absolute inset-0 bg-[#111113]" /> : null}
       <video
-        ref={front}
-        controls
+        ref={frontRef}
         playsInline
         preload="metadata"
         src={`${clipSrc}#t=0.1`}
         aria-label="Preview playback"
-        className={`absolute inset-0 size-full ${layout === "center_crop" ? "object-cover" : "object-contain"}`}
+        onClick={() => togglePlayback(front.current)}
+        className={`absolute inset-0 size-full cursor-pointer ${layout === "center_crop" ? "object-cover" : "object-contain"}`}
       />
       <VideoClockContext.Provider value={front}>{overlay}</VideoClockContext.Provider>
     </NineBySixteenFrame>
+    </PreviewShell>
   );
 }
 
@@ -102,11 +130,6 @@ export type Framing =
   | { kind: "path"; keyframes: CropKeyframe[] }
   | { kind: "focus"; x: number; y: number }
   | { kind: "center" };
-
-function formatClock(seconds: number) {
-  const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
 
 type VideoWithFrameCallback = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
@@ -137,14 +160,16 @@ export function ReframedPreview({
   badge?: ReactNode;
   onVideo?: (video: HTMLVideoElement | null) => void;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
+  const video = useRef<HTMLVideoElement | null>(null);
+  const [element, setElement] = useState<HTMLVideoElement | null>(null);
+  const videoRef = useCallback((node: HTMLVideoElement | null) => {
+    video.current = node;
+    setElement(node);
+  }, []);
   useEffect(() => {
     onVideo?.(video.current);
     return () => onVideo?.(null);
   }, [onVideo]);
-  const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const geometry = cropGeometry(sourceWidth, sourceHeight);
   const horizontal = geometry.axis !== "y";
 
@@ -191,27 +216,16 @@ export function ReframedPreview({
     };
   }, [centerAt, horizontal]);
 
-  function toggle() {
-    const element = video.current;
-    if (!element) return;
-    if (element.paused) void element.play().catch(() => {});
-    else element.pause();
-  }
-
   return (
-    <div className="space-y-2">
+    <PreviewShell video={element}>
       <NineBySixteenFrame label="Live preview of the edit settings">
         <video
-          ref={video}
+          ref={videoRef}
           playsInline
           preload="metadata"
           src={`${clipSrc}#t=0.1`}
           aria-label="Preview playback"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-          onClick={toggle}
+          onClick={() => togglePlayback(video.current)}
           className="absolute max-w-none cursor-pointer"
           style={
             horizontal
@@ -222,33 +236,6 @@ export function ReframedPreview({
         <VideoClockContext.Provider value={video}>{overlay}</VideoClockContext.Provider>
         {badge ? <div className="absolute top-2.5 left-2.5 max-w-[calc(100%-1.25rem)]">{badge}</div> : null}
       </NineBySixteenFrame>
-      <div className="mx-auto flex max-w-[calc(min(64vh,600px)*0.5625)] items-center gap-2.5">
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={playing ? "Pause preview" : "Play preview"}
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-foreground transition-colors hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          {playing ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={duration || 0}
-          step={0.05}
-          value={Math.min(time, duration || 0)}
-          aria-label="Seek preview"
-          onChange={(e) => {
-            const element = video.current;
-            if (element) element.currentTime = Number(e.target.value);
-            setTime(Number(e.target.value));
-          }}
-          className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
-        />
-        <span className="tabular shrink-0 text-xs text-subtle">
-          {formatClock(time)} / {formatClock(duration)}
-        </span>
-      </div>
-    </div>
+    </PreviewShell>
   );
 }

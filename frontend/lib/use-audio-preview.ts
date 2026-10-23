@@ -24,6 +24,9 @@ export function setMediaVolume(element: HTMLMediaElement, value: number) {
 export function setMediaTime(element: HTMLMediaElement, seconds: number) {
   element.currentTime = seconds;
 }
+export function setMediaMuted(element: HTMLMediaElement, muted: boolean) {
+  element.muted = muted;
+}
 
 function unload(element: HTMLAudioElement) {
   element.pause();
@@ -65,6 +68,11 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     const syncLevels = () => {
       const current = latest.current;
       setMediaVolume(video, level(dbToGain(current?.sourceGainDb ?? 0)));
+    };
+    // Muting the preview mutes everything in it, music and effects included.
+    const syncMuted = () => {
+      if (music) setMediaMuted(music, video.muted);
+      effects.forEach((effect) => setMediaMuted(effect, video.muted));
     };
     const syncMusic = (force: boolean) => {
       const current = latest.current;
@@ -130,6 +138,8 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     };
 
     syncLevels();
+    syncMuted();
+    video.addEventListener("volumechange", syncMuted);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onPause);
@@ -139,6 +149,7 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     if (!video.paused) onPlay();
     return () => {
       cancelAnimationFrame(frame);
+      video.removeEventListener("volumechange", syncMuted);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onPause);
