@@ -83,7 +83,7 @@ export function VideoAnalyticsView() {
       </div>
     );
   }
-  if (error || !video) return <ErrorState title="Analytics unavailable" message={error ?? "Try again."} onRetry={reload} />;
+  if (error || !video) return <ErrorState title="Analytics couldn't be loaded" message={error ?? "Try again."} onRetry={reload} />;
 
   const sync = syncLabel(video.latest_sync);
   return (
@@ -228,7 +228,7 @@ export function VideoAnalyticsView() {
           )}
         </Panel>
 
-        <Panel title="How this short was made" description="Recorded when it was published. Used later to compare your own shorts with each other.">
+        <Panel title="How this Short was made" description="Recorded when it was published. Used later to compare your own Shorts with each other.">
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             {provenanceRows(video.provenance).map(([label, value]) => (
               <div key={label} className="flex justify-between gap-3 border-b border-border py-1.5">

@@ -268,3 +268,31 @@ export function confidenceText(insight: Insight): string {
   const basis = `${insight.group_size} vs ${insight.comparison_size} shorts`;
   return insight.confidence === "moderate" ? `Moderate confidence · ${basis}` : `Limited evidence · ${basis}`;
 }
+
+export type Total = { value: number | null; reported: number; of: number };
+
+/** A sum over the Shorts that reported the figure; null (shown "—") when none did — never 0. */
+function total(videos: VideoPerformance[], pick: (video: VideoPerformance) => number | null): Total {
+  const values = videos.map(pick).filter((v): v is number => v !== null && v !== undefined);
+  return { value: values.length ? values.reduce((sum, v) => sum + v, 0) : null, reported: values.length, of: videos.length };
+}
+
+/** The summary cards: only figures YouTube reported, with how many Shorts they cover. */
+export function summaryTotals(videos: VideoPerformance[]) {
+  return {
+    views: total(videos, (v) => v.views),
+    engaged: total(videos, (v) => v.engaged_views),
+    likes: total(videos, (v) => v.likes),
+  };
+}
+
+/** "from 3 of 5 Shorts" when a total does not cover every Short; null when it does (or none). */
+export function coverage(t: Total): string | null {
+  return t.reported > 0 && t.reported < t.of ? `from ${t.reported} of ${t.of} Shorts` : null;
+}
+
+/** "Analytics updated through Oct 20": the newest day YouTube has processed for any Short. */
+export function freshness(videos: VideoPerformance[]): string | null {
+  const days = videos.map((v) => v.processed_through).filter((d): d is string => !!d).sort();
+  return days.length ? `Analytics updated through ${reportingDay(days[days.length - 1])}` : null;
+}
