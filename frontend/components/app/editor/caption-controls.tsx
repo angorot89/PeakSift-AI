@@ -385,7 +385,7 @@ export function HookPanel({
 /** "Show safe area" — a real checkbox; the guide itself is labelled, never colour-only. */
 export function SafeAreaToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-small font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
+    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-small pointer-coarse:h-11 font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="size-3.5 accent-[var(--accent)]" />
       Safe area
     </label>

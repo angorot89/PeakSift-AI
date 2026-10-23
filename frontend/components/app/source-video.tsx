@@ -53,7 +53,7 @@ function SourceDetails({ video }: { video: Video }) {
         ))}
       </dl>
       <details className="group rounded-lg border border-border">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs text-muted transition-colors select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-8 cursor-pointer list-none items-center px-3 py-2 text-xs pointer-coarse:min-h-11 text-muted transition-colors select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">Show technical details</span>
           <span className="hidden group-open:inline">Hide technical details</span>
         </summary>

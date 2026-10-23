@@ -8,9 +8,9 @@ type IconButtonProps = ComponentProps<"button"> & {
   size?: "sm" | "md";
 };
 
-/** A square button holding only an icon (36 px; 40 px on touch screens). */
+/** A square button holding only an icon (32 or 36 px; 44 px on touch screens). */
 export function IconButton({ variant = "ghost", size = "md", className = "", type = "button", ...props }: IconButtonProps) {
-  const square = size === "sm" ? "size-8 px-0 pointer-coarse:size-10" : "size-9 px-0 pointer-coarse:size-11";
+  const square = size === "sm" ? "size-8 px-0 pointer-coarse:size-11" : "size-9 px-0 pointer-coarse:size-11";
   return (
     <button
       type={type}

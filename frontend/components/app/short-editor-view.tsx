@@ -893,7 +893,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   type="button"
                   aria-pressed={mode === "preview"}
                   onClick={() => setMode("preview")}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
                     mode === "preview" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -908,7 +908,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     const target = selected ?? readyEdits[0];
                     if (target) showRendered(target);
                   }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 disabled:cursor-not-allowed disabled:opacity-40 ${
                     mode === "rendered" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >

@@ -28,7 +28,7 @@ function Evidence({ insight }: { insight: Insight }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1 rounded-md text-xs text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+        className="inline-flex min-h-6 items-center gap-1 rounded-md text-xs text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
       >
         <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
         See the evidence

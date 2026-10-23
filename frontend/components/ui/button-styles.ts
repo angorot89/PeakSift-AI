@@ -14,8 +14,8 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  // Touch screens get taller targets (40 / 44 px) without changing desktop density.
-  sm: "h-8 px-3 text-small pointer-coarse:h-10",
+  // Touch screens get 44 px targets without changing desktop density.
+  sm: "h-8 px-3 text-small pointer-coarse:h-11 pointer-coarse:min-w-11",
   md: "h-10 px-4 text-sm pointer-coarse:h-11",
   lg: "h-12 px-6 text-lead",
 };

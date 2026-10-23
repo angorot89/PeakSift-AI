@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, OptionalUser
 from app.core.config import get_settings
 from app.core.rate_limit import enforce, per_ip
 from app.core.security import (
@@ -12,7 +12,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
-from app.schemas.user import UserCreate, UserLogin, UserRead
+from app.schemas.user import SessionRead, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -89,3 +89,9 @@ def logout(response: Response) -> None:
 @router.get("/me", response_model=UserRead)
 def me(current_user: CurrentUser) -> User:
     return current_user
+
+
+@router.get("/session", response_model=SessionRead)
+def session(user: OptionalUser) -> SessionRead:
+    """The signed-in user or null, always 200 (the app's start-up check; ``/me`` keeps its 401)."""
+    return SessionRead(user=UserRead.model_validate(user) if user else None)

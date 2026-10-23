@@ -288,7 +288,7 @@ function MomentCard({
             {candidate.rationale}
           </p>
           <details className="group mt-2">
-            <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1 rounded text-xs text-accent-soft select-none hover:underline [&::-webkit-details-marker]:hidden">
+            <summary className="inline-flex min-h-8 cursor-pointer pointer-coarse:min-h-11 list-none items-center gap-1 rounded text-xs text-accent-soft select-none hover:underline [&::-webkit-details-marker]:hidden">
               <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-open:rotate-180" />
               <span className="group-open:hidden">Details</span>
               <span className="hidden group-open:inline">Less</span>

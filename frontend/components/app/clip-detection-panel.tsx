@@ -154,7 +154,7 @@ function RunHistory({
   if (runs.length < 2) return null;
   return (
     <details className="rounded-xl border border-border">
-      <summary className="cursor-pointer px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground">
+      <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground">
         Earlier searches ({runs.length})
       </summary>
       <ul className="divide-y divide-border border-t border-border">

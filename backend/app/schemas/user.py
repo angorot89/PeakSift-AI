@@ -36,3 +36,9 @@ class UserRead(BaseModel):
     id: uuid.UUID
     email: str
     created_at: datetime
+
+
+class SessionRead(BaseModel):
+    """Who is signed in, if anyone: answered without a 401 so a signed-out visit is not an error."""
+
+    user: UserRead | None

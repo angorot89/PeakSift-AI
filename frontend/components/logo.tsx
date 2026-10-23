@@ -46,7 +46,7 @@ export function Logo() {
   return (
     <Link
       href="/"
-      className="flex items-center gap-2.5 rounded-md font-semibold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+      className="flex min-h-11 items-center gap-2.5 rounded-md font-semibold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
     >
       <LogoMark />
       <span>

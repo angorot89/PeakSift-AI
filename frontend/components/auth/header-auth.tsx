@@ -40,7 +40,7 @@ export function HeaderAuth() {
     <div className="flex items-center gap-4">
       <Link
         href="/login"
-        className="rounded-sm text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
       >
         Log in
       </Link>

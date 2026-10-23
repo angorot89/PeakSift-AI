@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { getCurrentUser, logout as logoutRequest, type User } from "@/lib/auth";
+import { getSession, logout as logoutRequest, type User } from "@/lib/auth";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -29,7 +29,7 @@ const AuthContext = createContext<AuthContextValue>(noProvider);
 
 /**
  * Holds the signed-in user for the whole app. The backend is the source of truth:
- * on load we call GET /auth/me (the HttpOnly cookie travels with it) and never
+ * on load we call GET /auth/session (the HttpOnly cookie travels with it) and never
  * keep tokens in JavaScript-accessible storage.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -43,9 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      setUser(await getCurrentUser());
+      setUser(await getSession());
     } catch {
-      // 401 (not signed in) and network failures both mean "no usable session".
+      // A network failure means "no usable session".
       setUser(null);
     }
   }, [setUser]);
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // cancelled flag ignores a result that arrives after the effect was cleaned up.
   useEffect(() => {
     let cancelled = false;
-    getCurrentUser()
+    getSession()
       .then((me) => {
         if (!cancelled) setUser(me);
       })
