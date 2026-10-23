@@ -1,86 +1,82 @@
 # PeakSift user guide
 
-From a long recording to a short on YouTube, in seventeen steps — or let **Auto Edit** make
-the first draft (see below).
+From a long recording to a Short on YouTube. Every screen tells you where you are, what is
+happening and what to do next; **Home** and each project's **Overview** always show the next
+step.
 
-1. **Create your account.** Open PeakSift, choose **Create account**, and register with your email
+## Your first Short
+
+1. **Create your account.** Open PeakSift, choose **Get Started**, and register with your email
    and a password of at least 8 characters. You stay signed in on this browser until you log
-   out.
-2. **Create a project.** **Projects → New project**, give it a name (for example the stream or
-   episode). Everything for one recording lives in its project.
-3. **Upload your video.** On the project page, drop an MP4, MOV or WebM file into **Source
-   video** (up to 2 GB by default). The progress bar is the real upload.
-4. **Check the source.** PeakSift reads the file and shows its duration, resolution and frame
-   rate with a preview player. An unreadable file says so clearly — upload another.
-5. **Transcribe it.** In **Transcript**, start the transcription. It runs in the background
-   (you can leave the page); progress is real, and a failed or stalled job offers **Retry**.
-6. **Read the transcript.** Every line has its timestamp; copy it if you need it elsewhere.
-7. **Find clip moments.** In **Clip moments**, choose the AI provider and model your server
-   offers and start the analysis. PeakSift reads the transcript in sections and proposes
-   moments with a title, hook and reason.
-8. **Review the candidates.** Candidates are ranked by a 0–100 editorial score (a judgement of
-   the moment, not a prediction of views). Preview each range of your video, **Save** the
-   good ones and **Dismiss** the rest.
-9. **Generate a clip.** **Generate clip** renders exactly that moment from your original
-   video. When it is ready you can play it and **Download MP4**.
-10. **Open the editor.** **Create vertical short** opens the short-form editor for that clip.
-    Pick a layout: **Center crop**, **Blur background** or **Fit**.
-11. **Frame it.** **Smart reframe → Analyze framing** follows visible faces with a smooth
-    moving crop (it stays centred when no face is clear); or choose **Focal point** and place
-    the crop yourself. PeakSift tells you how confident the framing is.
-12. **Add captions and a hook.** Turn captions on; **Generate word sync** times every word so
-    the spoken word is highlighted (or use **Phrase timed**). Pick a preset — **Focus**,
-    **Punch**, **Minimal** or **Boxed** — a position, and an optional opening hook. The
-    **Safe area** guide shows where platform buttons cover the screen.
-13. **Add visuals (optional).** On the project page, upload your own images (JPEG, PNG, WebP)
-    and B-roll videos (MP4, MOV, WebM) to the **Visual assets** library. PeakSift prepares
-    **visual search** for each one in the background, so you can find it by what it shows
-    (see "Visual search" below); a description and tags still help. In the editor's
-    **Visuals** section, **Suggest B-roll** asks the local AI where a visual would help and
-    what it should show — each suggestion lists your **best matches** (by what they show and by
-    their words) to use in one click — or **Add visual** to choose any asset. Each visual is a **Cutaway** (replaces the picture; your
-    voice keeps playing), **Picture-in-picture** or an image **Overlay**, with start/end,
-    position, size, opacity, the video's start point, looping and a cut or fade. Captions
-    and the hook always stay on top. B-roll sound is never used.
-14. **Finish the audio.** In **Audio**, adjust the original level, add music you own (start
-    point, loop, fades, volume) with automatic ducking under speech, place sound effects on
-    the timeline, and keep loudness normalization on. Preview plays them with the video.
-15. **Render and download.** **Render short** produces a 1080 × 1920 MP4 in the background.
-    Each combination of settings is its own version; play any version and **Download short**.
-16. **Connect YouTube.** **Settings → YouTube → Connect YouTube** opens Google's consent page.
-    PeakSift asks only to upload videos — it cannot read, change or delete anything on your
-    channel. You can **Disconnect** at any time.
-17. **Publish.** In the editor, **Publish to YouTube** (beside Download short) opens the
-    publish dialog. Review the title, description and tags (the counters show YouTube's
-    limits), keep **Private** or choose Unlisted/Public, answer whether it is made for kids,
-    and publish. The dialog shows the real progress — preparing, uploading, uploaded — with
-    links to the video and YouTube Studio once YouTube has it. If something goes wrong before
-    the upload finished, **Retry** continues where it stopped; a published short is never
-    uploaded twice.
+   out. **Home** welcomes you and offers **Create your first project**.
+2. **Create a project.** Give it a name (for example the stream or episode). Everything for one
+   recording lives in its project, with five tabs: **Overview · Source · Clips · Assets ·
+   Analytics**.
+3. **Upload your video.** The project's Overview asks for it right away: drop an MP4, MOV or
+   WebM file (up to 2 GB by default) and choose **Upload**. The progress bar is the real
+   upload. PeakSift then reads the file (duration, resolution, frame rate) and shows a preview
+   in **Source**; an unreadable file says so clearly.
+4. **Transcribe it.** **Start transcription** (on the Overview or in Source). It runs in the
+   background — you can leave the page; the progress is real and a failed or stalled
+   transcription offers **Try again**. Every line of the transcript has its timestamp.
+5. **Find moments.** In **Clips**, **Find moments**: PeakSift reads the transcript and ranks the
+   moments worth clipping. Each moment shows a still, its times, the hook, one line of **why**,
+   and a label grounded in its rank and editorial score — **Top pick**, **Strong moment** or
+   **Worth reviewing**. These are editorial judgements, never predictions of views. **Details**
+   shows the score breakdown and the transcript excerpt.
+6. **Review them.** Filter **All · Top picks · Saved · Dismissed**. **Preview** plays exactly
+   that range of your video; **Save** the good ones; **Dismiss** the rest (dismissed moments
+   are kept under **Dismissed** — **Restore** any of them).
+7. **Create a Short.** **Create Short** on a moment cuts it from your original video and opens
+   **Create a Short** — four steps: **Start → Style → Review → Render**.
+8. **Start with Auto Edit (recommended)** — "PeakSift will prepare framing, captions, visuals
+   and sound. You can change everything before rendering." — or **Start manually** in the
+   editor.
+9. **Choose a style.** **Clean** (balanced, clean captions), **Punchy** (bold captions, a sharp
+   opening, quick cutaways and sound effects), **Story** (calm captions, meaningful cutaways)
+   or **Minimal** (speaker first). Optionally pick one of your own music tracks — Auto Edit
+   never picks music on its own. **Prepare my edit**; the steps you see are the real ones.
+10. **Review the draft.** **Framing · Captions · Opening · Visuals · Sound**: each shows the
+    choice and a one-line reason, with **Edit** to open that tool in the editor. Then **Use this
+    edit** (renders it), **Continue to editor** (change things first) or **Try another**.
+11. **Fine-tune in the editor.** The preview is the centre of the screen (play, seek, mute, full
+    screen). Five tools: **Style** (layout and framing — Smart reframe follows visible faces,
+    or set a focal point), **Captions** (on/off, Focus · Punch · Minimal · Boxed, position;
+    word-synced captions need **Generate word sync** once), **Opening** (a short hook line),
+    **Visuals** (your images and B-roll as cutaways, picture-in-picture or overlays) and
+    **Sound** (levels, music with ducking, sound effects). A dot on a tool means it adds
+    something, or needs attention before rendering.
+12. **Render.** **Render Short** produces a 1080 × 1920 MP4. Nothing is saved until you render:
+    each render is kept as its own **version**, and earlier versions stay. When it is ready,
+    play it and **Download short**.
+13. **Publish (optional).** **Settings → YouTube → Connect YouTube** opens Google's consent page;
+    PeakSift asks only to upload videos. Then **Publish to YouTube** beside Download: review the
+    title, description and tags (YouTube's limits are shown), keep **Private** or choose
+    Unlisted/Public, and publish. The dialog shows the real progress; **Retry** continues where
+    it stopped, and a Short is never uploaded twice.
+14. **See how it does.** **Analytics** answers *How are my Shorts doing?* — see below.
 
-## Auto Edit — the quick path
+Coming back later, **Home** shows **Continue working** (one card per project with its next
+step), your recent Shorts and projects. A short **Getting started** checklist appears until your
+first Short is ready (dismiss it any time; it does not come back).
 
-Auto Edit proposes a complete, reviewable first draft of a short from a generated clip. You
-always review it, and you can change anything before it renders.
+## Auto Edit — what it does
 
-1. **Generate a clip** (steps 1–9 above).
-2. **Choose Auto Edit.** On the clip's card (**Auto Edit**, beside Create short) or in the
-   editor's header. For the best plan, first open the editor and **Analyze framing**,
-   **Generate word sync** and **Suggest B-roll** — Auto Edit uses what is ready and never
-   starts these for you.
-3. **Select a recipe.** **Clean** (professional, little on screen), **Punchy** (high energy),
-   **Story** (explainers and stories) or **Minimal** (speaker first). Optionally choose one of
-   your music tracks — Auto Edit never picks music on its own.
-4. **Review the plan.** Each section — framing, captions, hook, visuals, audio — shows the
-   choice and a short reason, and what was left out and why. It says whether the local AI
-   planned it or PeakSift's built-in rules did (when the local AI was unavailable).
-5. **Apply.** **Use this edit** renders the short with exactly these settings and opens it in
-   the editor. **Try another plan** makes a new plan (earlier ones stay in the list).
-6. **Make optional manual changes.** **Edit choices** opens the plan's settings in the editor
-   without rendering; the editor works as always.
-7. **Render.** **Render short** (or the render started by **Use this edit**) produces the 1080 ×
-   1920 MP4.
-8. **Publish or download.** **Download short**, or **Publish to YouTube** (step 17).
+Auto Edit proposes a complete, reviewable first draft of a Short from a moment's clip. You
+always review it, and you can change anything before it renders (steps 7–12 above).
+
+- **It uses what is ready and never starts other work for you.** For a richer draft, open the
+  editor first and **Analyze framing** (Style), **Generate word sync** (Captions) and **Suggest
+  B-roll** (Visuals); without them Auto Edit picks a layout that needs no face analysis,
+  phrase-timed captions and no visuals — and says so in the review.
+- **Music is always your choice**: pick one of your own tracks on the Style step, or none.
+- **Every section explains itself** — Framing, Captions, Opening, Visuals, Sound — and the review
+  lists what was left out and why, and whether the local AI planned it or PeakSift's built-in
+  rules did (when the local AI was unavailable).
+- **Try another** prepares a new draft; earlier drafts stay under **All drafts for this clip**.
+- **Patterns (optional):** with enough published Shorts, tick **Consider patterns from my
+  published shorts** on the Style step; they are weak hints inside the recipe, never
+  predictions.
 
 Auto Edit chooses only between options the editor already has, from your own media. It places a
 visual only when it strongly matches a suggestion, by what it shows or by its words, and says
@@ -89,16 +85,18 @@ will perform.
 
 ## Visual search — find your visuals by what they show
 
-1. **Upload your visual assets** to a project's **Visual assets** library, as always. Camera
+1. **Upload your visuals** in the project's **Assets** tab (**Upload files**, or drop them anywhere
+   on the library; one summary shows the progress and anything that could not be added). Camera
    names like `IMG_7834.jpg` are fine; tags are optional.
 2. **PeakSift prepares visual search automatically.** A local model on PeakSift's own server
    looks at each image (and a few frames of each video); nothing is sent anywhere. A card shows
    **Preparing visual search** for a moment. You can use the asset right away.
-3. **Search by what appears in the visual.** Type in **Search your visuals**, for example
+3. **Search by what appears in the visual.** Type in **Search your visuals** (the hint under it
+   says when search by content is ready), for example
    "rocket launch", "bridge", "city skyline" or "microphone". Results show **Strong match** or
-   **Possible match**. A video shows where its best scene is (**Best at 0:08**), and its preview
+   **Possible match**, under **Best matches** and **More results**. A video shows where its best scene is (**Best at 0:08**), and its preview
    opens there.
-4. **Generate B-roll suggestions** in the editor's **Visuals** section (**Suggest B-roll**).
+4. **Generate B-roll suggestions** in the editor's **Visuals** tool (**Suggest B-roll**).
 5. **Review the visually matched assets.** Each suggestion lists its **Best matches** with
    *Matched visually to “…”* or *Matched by its name or tags*. **Preview** a match (a video
    opens at its matched scene). **Use asset** opens a chooser that already searches for the
@@ -128,7 +126,9 @@ Good to know about visual search:
    choose **Connect analytics (read-only)** and approve in Google. This is separate from
    publishing: PeakSift can then *read* your videos' figures and YouTube Analytics, nothing
    more. If you untick a permission, nothing changes and publishing keeps working.
-2. **Open Analytics** (top bar). Every short you published from PeakSift is listed — never
+2. **Open Analytics** (sidebar). It answers *How are my Shorts doing?*: when the figures were
+   last updated, totals of what YouTube reported, *What seems to be working*, then every Short you
+   published from PeakSift — never
    other videos on your channel — with live views, likes and comments, engaged views and
    average % viewed as YouTube processes them (about 2–3 days later, in Pacific Time days).
    "—" means YouTube has not reported that figure yet; it is never shown as 0.
@@ -136,10 +136,10 @@ Good to know about visual search:
    first 3 days and the first 7 days. **Your usual short** is the median of your own shorts
    with a complete first week (at least 5), and each short says whether it is above, near or
    below your usual.
-4. **Patterns in your shorts.** With at least 10 comparable shorts, PeakSift looks for choices
+4. **What seems to be working.** With at least 10 comparable Shorts, PeakSift looks for choices
    (an opening hook, a caption style, music, visuals…) that have tended to go with stronger or
    weaker first weeks **in your own uploads**, and shows one only when it passes a statistical
-   check — with how many shorts are on each side and which ones. They are associations, not
+   check — with how many Shorts are on each side (**See the evidence**). They are associations, not
    causes, and they never predict how a short will do. Hide any you don't find useful.
 5. **Use them in Auto Edit (optional).** Tick **Consider patterns from my published shorts**
    when creating a plan. They are weak hints inside the recipe: for example a caption style
@@ -156,14 +156,16 @@ Good to know about visual search:
   Studio.
 - **Reconnect:** if you remove PeakSift's access in your Google account (or it expires),
   Settings shows **Reconnect** and publishing asks you to reconnect first.
-- **Deleting a project** (bottom of the project page, confirmed by typing its exact name)
+- **Deleting a project** (the **⋯ Project actions** menu at the top of the project, confirmed by
+  typing its exact name)
   permanently removes it with all its videos, clips, shorts, audio and files. It does not
   touch anything already published to YouTube.
 - **Your media is private:** only you can play or download your uploads, visuals, clips and
   shorts. Upload only footage, images and music you own or are allowed to use — PeakSift
   never searches or downloads media for you.
 - **The editor continues where you were:** it opens with your newest version's settings (or
-  the version or plan you came from); **Reset to defaults** starts over.
+  the version or draft you came from); **Reset** starts over. Settings are kept only by
+  rendering — each render is a new version.
 - **Visuals in use:** a visual used by a rendered or saved short cannot be deleted until
   those versions are deleted, so a short never loses a picture.
 - **Suggestions are suggestions:** the AI only proposes moments grounded in what was said;

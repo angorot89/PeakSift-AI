@@ -889,7 +889,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         }
       />
 
-      <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8">
+      <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
         {/* Stage: the video is the focal point. */}
         <section aria-label="Stage" ref={stageRef} className="min-w-0 scroll-mt-20 lg:col-start-1 lg:row-start-1">
           <div className="rounded-2xl border border-border bg-[radial-gradient(ellipse_at_top,rgb(255_255_255/0.04),transparent_60%)] bg-surface p-4 sm:p-6">
@@ -899,7 +899,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   type="button"
                   aria-pressed={mode === "preview"}
                   onClick={() => setMode("preview")}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
                     mode === "preview" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -914,7 +914,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     const target = selected ?? readyEdits[0];
                     if (target) showRendered(target);
                   }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 disabled:cursor-not-allowed disabled:opacity-40 ${
                     mode === "rendered" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >

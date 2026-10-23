@@ -112,7 +112,8 @@ def test_verify_passes_then_catches_tampering(tmp_path, library, media):
     assert backup.verify(target, get_settings()).ok
 
     copy = target / "media" / library["keys"]["video"]
-    copy.write_bytes(b"x" + copy.read_bytes()[1:])
+    data = copy.read_bytes()
+    copy.write_bytes(bytes([data[0] ^ 0xFF]) + data[1:])  # always a change (the bytes are random)
     report = backup.verify(target, get_settings())
     assert (
         not report.ok

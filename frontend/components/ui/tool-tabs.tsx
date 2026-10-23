@@ -33,7 +33,7 @@ export function ToolTabs<K extends string>({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 rounded-xl border border-border bg-surface-2 p-1">
+    <div role="tablist" aria-label={label} className="flex gap-0.5 rounded-xl border border-border bg-surface-2 p-1">
       {items.map((item, index) => {
         const selected = item.key === value;
         const Icon = item.icon;

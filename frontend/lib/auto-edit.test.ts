@@ -7,6 +7,9 @@ import {
   isPlanActive,
   missingInputs,
   planSections,
+  RECIPE_TRAITS,
+  STEP_LABELS,
+  planEditorLink,
   planSteps,
   plannerNote,
   type AutoEditPlan,
@@ -84,3 +87,21 @@ describe("Auto Edit plan display", () => {
     assert.equal(formatSpan(65, 71.5), "1:05.0–1:11.5");
   });
 });
+
+describe("guided creation", () => {
+  it("describes every recipe with three traits", () => {
+    for (const recipe of ["clean", "punchy", "story", "minimal"] as const) {
+      assert.equal(RECIPE_TRAITS[recipe].length, 3);
+      assert.ok(RECIPE_TRAITS[recipe].every((trait) => trait.trim().length > 0));
+    }
+    assert.equal(STEP_LABELS.length, 4);
+  });
+
+  it("links each review section into the editor on the draft, or on the version made from it", () => {
+    const editor = "/projects/p/clips/c";
+    assert.equal(planEditorLink(editor, { id: "d1", status: "ready", clip_edit_id: null }, "captions"), `${editor}?plan=d1&tool=captions`);
+    assert.equal(planEditorLink(editor, { id: "d1", status: "applied", clip_edit_id: "e9" }, "hook"), `${editor}?edit=e9&tool=hook`);
+    assert.equal(planEditorLink(editor, { id: "d1", status: "applied", clip_edit_id: null }), `${editor}?plan=d1`);
+  });
+});
+

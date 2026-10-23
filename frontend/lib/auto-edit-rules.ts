@@ -80,7 +80,7 @@ export type StepState = "done" | "current" | "todo" | "failed";
 export type PlanStep = { label: string; state: StepState };
 
 // One label per stage the job really reports (queued/analyzing → planning → validating → ready).
-const STEP_LABELS = [
+export const STEP_LABELS = [
   "Understanding the clip",
   "Choosing framing, captions, visuals and sound",
   "Checking every choice",
@@ -151,4 +151,14 @@ export function missingInputs(confidence: PlanConfidence | null): string[] {
 export function formatSpan(start: number, end: number): string {
   const f = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
   return `${f(start)}–${f(end)}`;
+}
+
+/** The editor opened on this plan (or the version made from it), at one tool group. */
+export function planEditorLink(
+  editorLink: string,
+  plan: Pick<AutoEditPlan, "id" | "status" | "clip_edit_id">,
+  tool?: SectionKey,
+): string {
+  const from = plan.status === "applied" && plan.clip_edit_id ? `edit=${plan.clip_edit_id}` : `plan=${plan.id}`;
+  return `${editorLink}?${from}${tool ? `&tool=${tool}` : ""}`;
 }
