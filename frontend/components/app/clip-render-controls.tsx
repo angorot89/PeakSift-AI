@@ -1,8 +1,9 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Clapperboard, Download, Smartphone } from "lucide-react";
+import { CheckCircle2, Clapperboard, Download, Wand2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { MediaFrame } from "@/components/ui/media-frame";
 import { LoadingState } from "@/components/app/states";
@@ -24,7 +25,7 @@ import {
   type GeneratedClip,
 } from "@/lib/clips";
 import type { ClipCandidate } from "@/lib/clip-detection";
-import { editorHref } from "@/lib/edits";
+import { createHref } from "@/lib/edits";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { newer } from "@/lib/status-sync";
 import { usePolling } from "@/lib/use-polling";
@@ -47,6 +48,7 @@ type Props = {
  */
 export function ClipRenderControls({ projectId, videoId, runId, candidate, initialClip, onChange }: Props) {
   const { setUser } = useAuth();
+  const router = useRouter();
   const [clip, setClip] = useState<GeneratedClip | null>(initialClip ?? null);
   const [known, setKnown] = useState(initialClip !== undefined);
   const [busy, setBusy] = useState(false);
@@ -107,12 +109,14 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
     clipId,
   );
 
-  async function act(action: () => Promise<GeneratedClip>) {
+  async function act(action: () => Promise<GeneratedClip>, then?: (clip: GeneratedClip) => void) {
     if (busy) return; // a second click while the first request is in flight does nothing
     setBusy(true);
     setError(null);
     try {
-      update(await action());
+      const next = await action();
+      update(next);
+      then?.(next);
     } catch (err) {
       setError(handleError(err));
     } finally {
@@ -121,6 +125,12 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
   }
 
   const generate = () => act(() => generateClip(projectId, videoId, runId, candidate.id));
+  // Cutting the clip starts at once; the next step shows its progress and opens when it is ready.
+  const createShort = () =>
+    act(
+      () => generateClip(projectId, videoId, runId, candidate.id),
+      (next) => router.push(createHref(projectId, next.id)),
+    );
   const retry = () => act(() => retryClip(projectId, videoId, runId, candidate.id));
   const dismissed = candidate.decision === "dismissed";
 
@@ -131,28 +141,32 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
     body = (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">
-          {dismissed
-            ? "Restore this candidate to generate a clip."
-            : "Render this moment from the original video as an MP4."}
+          {dismissed ? "Restore this moment to make a Short from it." : "Turn this moment into a vertical Short."}
         </p>
-        <Button onClick={generate} disabled={busy || dismissed}>
-          <Clapperboard aria-hidden="true" />
-          {busy ? "Starting…" : "Generate clip"}
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row-reverse">
+          <Button onClick={createShort} disabled={busy || dismissed}>
+            <Wand2 aria-hidden="true" />
+            {busy ? "Starting…" : "Create Short"}
+          </Button>
+          <Button variant="ghost" onClick={generate} disabled={busy || dismissed}>
+            <Clapperboard aria-hidden="true" />
+            Only cut the clip
+          </Button>
+        </div>
       </div>
     );
   } else if (isClipActive(clip.status) && clip.is_stale) {
     body = (
       <InlineAlert
         tone="warning"
-        title="Clip render stalled"
+        title="Preparing the clip stalled"
         action={
           <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
-            {busy ? "Restarting…" : "Retry render"}
+            {busy ? "Restarting…" : "Try again"}
           </Button>
         }
       >
-        The worker stopped reporting progress. Start it again to continue.
+        The work stopped responding. Start it again to continue.
       </InlineAlert>
     );
   } else if (isClipActive(clip.status)) {
@@ -160,17 +174,17 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
       <WorkingState
         label={clipStageLabel(clip).replace("…", "")}
         progress={clip.status === "queued" ? null : clip.progress_percent}
-        progressLabel="Clip render progress"
-        detail="Rendering clip from the original video."
+        progressLabel="Clip progress"
+        detail="Cutting this moment from the original video."
       />
     );
   } else if (clip.status === "failed") {
     body = (
       <InlineAlert
-        title="Render failed"
+        title="This clip couldn't be prepared"
         action={
           <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
-            {busy ? "Retrying…" : "Retry render"}
+            {busy ? "Retrying…" : "Try again"}
           </Button>
         }
       >
@@ -225,9 +239,9 @@ export function RenderedClip({ clip, projectId }: { clip: GeneratedClip; project
         </div>
         <p className="text-sm text-muted">Make a 9:16 version with captions for Shorts, TikTok and Reels.</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
-            <Smartphone aria-hidden="true" />
-            Create vertical short
+          <Link href={createHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
+            <Wand2 aria-hidden="true" />
+            Create Short
           </Link>
           <a
             href={clipDownloadUrl(clip.id)}

@@ -42,7 +42,7 @@ describe("next best action", () => {
     ["finding", { ...transcribed, detection: { ...detected(0).detection, status: "analyzing" } }, "finding", `/projects/${P}/clips`],
     ["nothing found", detected(0), "no-moments", `/projects/${P}/clips`],
     ["candidates", detected(3), "review-clips", `/projects/${P}/clips`],
-    ["clip ready", { ...detected(3), clips: { total: 1, ready: 1, working: 0, failed: 0, latest_ready_id: CLIP } }, "create-short", `/projects/${P}/clips/${CLIP}/auto-edit`],
+    ["clip ready", { ...detected(3), clips: { total: 1, ready: 1, working: 0, failed: 0, latest_ready_id: CLIP } }, "create-short", `/projects/${P}/clips/${CLIP}/create`],
     ["plan ready", { ...detected(3), plans: { ready: 1, latest_ready: { plan_id: "x", clip_id: CLIP, recipe: "punchy" } } }, "plan-ready", `/projects/${P}/clips/${CLIP}/auto-edit`],
     ["rendering", { ...detected(3), shorts: { total: 1, ready: 0, working: 1, failed: 0, recent: [short("rendering")] } }, "rendering", `/projects/${P}/clips/${CLIP}`],
     ["short ready", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] } }, "short-ready", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],

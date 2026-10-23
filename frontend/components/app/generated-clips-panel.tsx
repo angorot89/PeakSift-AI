@@ -7,9 +7,8 @@ import { EmptyState, LoadingState } from "@/components/app/states";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { Panel } from "@/components/ui/panel";
 import { StatusPill } from "@/components/ui/status-pill";
-import { autoEditHref } from "@/lib/auto-edit";
 import { clipContentUrl, clipDownloadUrl, type GeneratedClip } from "@/lib/clips";
-import { editorHref, isEditActive, listEdits } from "@/lib/edits";
+import { createHref, editorHref, isEditActive, listEdits } from "@/lib/edits";
 import { formatDuration, formatTimestamp } from "@/lib/format";
 
 type ShortCounts = { ready: number; active: number };
@@ -71,18 +70,31 @@ function ClipRow({ clip, shorts, projectId }: { clip: GeneratedClip; shorts: Sho
             <Download aria-hidden="true" />
             Download
           </a>
-          <Link
-            href={autoEditHref(projectId, clip.id)}
-            className={buttonClasses("secondary", "sm")}
-            aria-label={`Auto Edit — ${clip.title}`}
-          >
-            <Wand2 aria-hidden="true" />
-            Auto Edit
-          </Link>
-          <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "sm")}>
-            <Smartphone aria-hidden="true" />
-            {shorts && shorts.ready > 0 ? "Open editor" : "Create short"}
-          </Link>
+          {shorts && shorts.ready > 0 ? (
+            <>
+              <Link
+                href={createHref(projectId, clip.id)}
+                className={buttonClasses("secondary", "sm")}
+                aria-label={`Create another Short — ${clip.title}`}
+              >
+                <Wand2 aria-hidden="true" />
+                New Short
+              </Link>
+              <Link href={editorHref(projectId, clip.id)} className={buttonClasses("primary", "sm")}>
+                <Smartphone aria-hidden="true" />
+                Open editor
+              </Link>
+            </>
+          ) : (
+            <Link
+              href={createHref(projectId, clip.id)}
+              className={buttonClasses("primary", "sm")}
+              aria-label={`Create Short — ${clip.title}`}
+            >
+              <Wand2 aria-hidden="true" />
+              Create Short
+            </Link>
+          )}
         </div>
       ) : null}
     </li>
