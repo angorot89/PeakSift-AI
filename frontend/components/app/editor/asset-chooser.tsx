@@ -1,9 +1,11 @@
 "use client";
 
-import { Film, Image as ImageIcon, Search, Upload, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Film, Image as ImageIcon, Search, Upload } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { inputBase } from "@/components/ui/input-styles";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ProgressBar } from "@/components/ui/progress";
 import { useVisualSearch } from "@/components/app/use-visual-search";
 import { errorMessage } from "@/lib/api";
@@ -57,20 +59,11 @@ export function AssetChooser({
   onUploaded: (asset: VisualAsset) => void;
   onClose: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
   const searchId = useId();
   const [filter, setFilter] = useState<VisualFilter>(initialFilter);
   const [search, setSearch] = useState(query ?? "");
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
 
   const text = searchText(search);
   const found = useVisualSearch(projectId, open ? text : "", filter === "all" ? null : filter, assets?.length ?? 0);
@@ -101,45 +94,30 @@ export function AssetChooser({
   }
 
   return (
-    <dialog
-      ref={ref}
+    <Dialog
+      open={open}
       onClose={onClose}
-      aria-labelledby={titleId}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(40rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70"
-    >
-      {open ? (
+      title={title}
+      width="40rem"
+      description={
         <>
-          <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
-            <div className="min-w-0">
-              <h2 id={titleId} className="text-[15px] font-semibold tracking-tight text-pretty">
-                {title}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted">
-                {query ? "Pick something that shows this, or upload it." : "From this project's visual assets."}
-              </p>
-              {hint ? <p className="mt-1 text-xs text-subtle">{hint}</p> : null}
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Close" className="px-2">
-              <X aria-hidden="true" />
-            </Button>
-          </div>
-          <div className="space-y-4 px-4 py-5 sm:px-6">
+          {query ? "Pick something that shows this, or upload it." : "From this project's visual assets."}
+          {hint ? <span className="mt-1 block text-xs text-subtle">{hint}</span> : null}
+        </>
+      }
+    >
+          <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div role="group" aria-label="Show" className="inline-flex w-fit rounded-lg border border-border bg-surface-2 p-0.5">
-                {(["all", "image", "video"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={filter === value}
-                    onClick={() => setFilter(value)}
-                    className={`h-8 rounded-md px-3 text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-accent ${
-                      filter === value ? "bg-surface-3 text-foreground" : "text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {value === "all" ? "All" : value === "image" ? "Images" : "Videos"}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="Show"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "image", label: "Images" },
+                  { value: "video", label: "Videos" },
+                ]}
+              />
               <div className="w-full sm:w-64">
                 <label htmlFor={searchId} className="sr-only">
                   Search your visuals
@@ -154,10 +132,10 @@ export function AssetChooser({
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search your visuals"
                     aria-describedby={`${searchId}-hint`}
-                    className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-3 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+                    className={`${inputBase} h-10 pr-3 pl-9 text-sm pointer-coarse:h-11`}
                   />
                 </div>
-                <p id={`${searchId}-hint`} className="mt-1 text-[11px] text-subtle">
+                <p id={`${searchId}-hint`} className="mt-1 text-caption text-subtle">
                   Search by what&apos;s in the image or video.
                 </p>
               </div>
@@ -167,7 +145,7 @@ export function AssetChooser({
 
             {matches.length && !text ? (
               <div className="space-y-2">
-                <p className="text-[12px] font-medium text-muted">Best matches</p>
+                <p className="text-caption font-medium text-muted">Best matches</p>
                 <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Best matches">
                   {matches.map(({ asset, match }) => (
                     <li key={asset.id}>
@@ -175,7 +153,7 @@ export function AssetChooser({
                     </li>
                   ))}
                 </ul>
-                <p className="pt-1 text-[12px] font-medium text-muted">All visual assets</p>
+                <p className="pt-1 text-caption font-medium text-muted">All visual assets</p>
               </div>
             ) : null}
             <p className="sr-only" role="status" aria-live="polite">
@@ -209,7 +187,7 @@ export function AssetChooser({
 
             <div className="space-y-2 border-t border-border pt-4">
               <label
-                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                   progress !== null ? "pointer-events-none opacity-60" : ""
                 }`}
               >
@@ -226,14 +204,12 @@ export function AssetChooser({
                   }}
                 />
               </label>
-              <p className="text-[11px] text-subtle">Only media you own or have permission to use. Video sound is not used.</p>
+              <p className="text-caption text-subtle">Only media you own or have permission to use. Video sound is not used.</p>
               {progress !== null ? <ProgressBar value={progress} label="Upload progress" /> : null}
               {error ? <InlineAlert title="That file couldn't be added">{error}</InlineAlert> : null}
             </div>
           </div>
-        </>
-      ) : null}
-    </dialog>
+    </Dialog>
   );
 }
 
@@ -271,7 +247,7 @@ export function AssetButton({
         </span>
       </span>
       <span className="block px-2 py-1.5">
-        <span className="block truncate text-[12px] font-medium text-foreground" title={asset.display_name}>
+        <span className="block truncate text-caption font-medium text-foreground" title={asset.display_name}>
           {asset.display_name}
         </span>
         <span className="block text-[10px] text-subtle">{orientationLabel(asset)}</span>

@@ -143,8 +143,8 @@ export function LayoutPicker({
           >
             <LayoutDiagram layout={option.value} />
             <span className="min-w-0 pr-3">
-              <span className="block text-[13px] leading-tight font-medium text-foreground">{option.label}</span>
-              <span className="mt-0.5 block text-[11px] leading-snug text-subtle">{option.hint}</span>
+              <span className="block text-small leading-tight font-medium text-foreground">{option.label}</span>
+              <span className="mt-0.5 block text-caption leading-snug text-subtle">{option.hint}</span>
             </span>
           </OptionCard>
         ))}
@@ -234,7 +234,7 @@ export function PositionPicker({
             badge={false}
           >
             <PositionGlyph position={option.value} />
-            <span className="text-[13px] font-medium text-foreground">{option.label}</span>
+            <span className="text-small font-medium text-foreground">{option.label}</span>
             <InlineCheck on={value === option.value} />
           </OptionCard>
         ))}

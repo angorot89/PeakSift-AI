@@ -32,7 +32,7 @@ export function Panel({ id, step, title, description, status, actions, children,
             </span>
           ) : null}
           <div className="min-w-0">
-            <h2 id={headingId} className="text-[15px] font-semibold tracking-tight text-foreground">
+            <h2 id={headingId} className="text-title text-foreground">
               {title}
             </h2>
             {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}

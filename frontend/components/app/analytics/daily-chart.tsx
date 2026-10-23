@@ -45,7 +45,7 @@ export function DailyChart({
         </span>
       </figcaption>
       <div className="flex gap-2">
-        <div aria-hidden="true" className="tabular flex w-10 shrink-0 flex-col justify-between text-right text-[11px] text-subtle" style={{ height: HEIGHT }}>
+        <div aria-hidden="true" className="tabular flex w-10 shrink-0 flex-col justify-between text-right text-caption text-subtle" style={{ height: HEIGHT }}>
           {ticks.map((tick) => (
             <span key={tick} className="-my-1.5">{format(tick)}</span>
           ))}
@@ -88,7 +88,7 @@ export function DailyChart({
             })}
           </div>
           {points.length ? (
-            <div aria-hidden="true" className="tabular mt-1.5 flex justify-between text-[11px] text-subtle">
+            <div aria-hidden="true" className="tabular mt-1.5 flex justify-between text-caption text-subtle">
               <span>{reportingDay(points[0].date)}</span>
               {points.length > 1 ? <span>{reportingDay(points[points.length - 1].date)}</span> : null}
             </div>

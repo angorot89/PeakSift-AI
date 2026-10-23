@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { useId } from "react";
 
 export function LogoMark({ className = "size-7" }: { className?: string }) {
+  // Unique per instance: a gradient defined inside a hidden copy (e.g. the desktop sidebar on a
+  // phone) would otherwise leave every other copy without its stroke.
+  const gradient = `peaksift-logo-${useId().replace(/:/g, "")}`;
   return (
     <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
       <defs>
         <linearGradient
-          id="peaksift-logo-gradient"
+          id={gradient}
           x1="0"
           y1="32"
           x2="32"
@@ -28,7 +32,7 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
       />
       <path
         d="M6 23l6.5-9 4 5 3.5-6.5L26 23"
-        stroke="url(#peaksift-logo-gradient)"
+        stroke={`url(#${gradient})`}
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"

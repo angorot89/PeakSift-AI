@@ -17,6 +17,7 @@ const PLACEMENT: Record<Placement, string> = {
 /**
  * A modal dialog or sheet on the native <dialog>: the page behind is inert, Escape closes it,
  * and the browser returns focus to the control that opened it. Clicking the backdrop closes it.
+ * Mark the control that should receive focus first with `data-autofocus`.
  */
 export function Dialog({
   open,
@@ -48,7 +49,11 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // The first control a dialog is for (e.g. a confirmation field), rather than Close.
+      dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 

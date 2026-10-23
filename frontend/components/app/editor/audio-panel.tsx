@@ -95,7 +95,7 @@ function LevelSlider({ label, value, min, max, step, onChange, hint }: { label: 
         className="h-6 w-full cursor-pointer accent-[var(--accent)]"
       />
       {hint ? (
-        <p id={`${id}-hint`} className="text-[11px] text-subtle">
+        <p id={`${id}-hint`} className="text-caption text-subtle">
           {hint}
         </p>
       ) : null}
@@ -122,7 +122,7 @@ function UploadButton({ kind, projectId, onUploaded }: { kind: AudioKind; projec
   return (
     <div className="space-y-2">
       <label
-        className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+        className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
           progress !== null ? "pointer-events-none opacity-60" : ""
         }`}
       >
@@ -215,7 +215,7 @@ export function AudioPanel({
   return (
     <section aria-labelledby={`${id}-heading`} className="space-y-5">
       <div className="space-y-1">
-        <h3 id={`${id}-heading`} className="flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+        <h3 id={`${id}-heading`} className="flex items-center gap-1.5 text-title text-foreground">
           <Volume2 aria-hidden="true" className="size-4 text-accent-soft" />
           Audio
         </h3>
@@ -238,7 +238,7 @@ export function AudioPanel({
       <ControlGroup legend="Background music" hint={chosen ? formatAudioDuration(chosen.duration_seconds) : undefined}>
         <div className="space-y-2">
           <OptionCard name={`${id}-music`} value="none" label="No music" checked={!value.music} onChange={() => set({ music: null })} className="flex-row items-center justify-between px-3 py-2.5" badge={false}>
-            <span className="text-[13px] font-medium text-foreground">No music</span>
+            <span className="text-small font-medium text-foreground">No music</span>
             <InlineCheck on={!value.music} />
           </OptionCard>
           {music.map((asset) => {
@@ -256,8 +256,8 @@ export function AudioPanel({
                 >
                   <Music2 aria-hidden="true" className="size-4 shrink-0 text-muted" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-foreground">{asset.display_name}</span>
-                    <span className="tabular block text-[11px] text-subtle">Music · {formatAudioDuration(asset.duration_seconds)}</span>
+                    <span className="block truncate text-small font-medium text-foreground">{asset.display_name}</span>
+                    <span className="tabular block text-caption text-subtle">Music · {formatAudioDuration(asset.duration_seconds)}</span>
                   </span>
                   <span className="hidden h-6 w-20 shrink-0 text-muted min-[400px]:block">{waveforms[asset.id] ? <Waveform peaks={waveforms[asset.id]} /> : null}</span>
                   <InlineCheck on={on} />
@@ -310,7 +310,7 @@ export function AudioPanel({
                 style={{ left: `${(value.music.source_start_seconds / chosen.duration_seconds) * 100}%` }}
               />
             </div>
-            <p id={`${id}-start-hint`} className="text-[11px] text-subtle">
+            <p id={`${id}-start-hint`} className="text-caption text-subtle">
               {musicSpan}
             </p>
           </div>
@@ -351,18 +351,18 @@ export function AudioPanel({
                       className="flex-row items-center justify-center gap-1.5 px-2 py-2"
                       badge={false}
                     >
-                      <span className="text-[13px] font-medium text-foreground">{DUCKING_LABELS[strength]}</span>
+                      <span className="text-small font-medium text-foreground">{DUCKING_LABELS[strength]}</span>
                       <InlineCheck on={ducking === strength} />
                     </OptionCard>
                   ))}
                 </div>
-                <p role="status" className="text-[11px] text-subtle">
+                <p role="status" className="text-caption text-subtle">
                   <span className="font-medium text-muted">Ducking: {DUCKING_LABELS[ducking]}.</span> Music dips by {DUCKING_DEPTH[ducking]} while the clip&apos;s audio
                   is active (it follows overall loudness, not a separated voice).
                 </p>
               </div>
             ) : (
-              <p role="status" className="text-[11px] text-subtle">
+              <p role="status" className="text-caption text-subtle">
                 <span className="font-medium text-muted">Ducking off.</span> Music stays at its volume.
               </p>
             )}
@@ -378,7 +378,7 @@ export function AudioPanel({
               return (
                 <li key={index} className="space-y-2 rounded-xl border border-border bg-surface-2/50 p-3">
                   <div className="flex items-center gap-2">
-                    <span aria-hidden="true" className="tabular flex size-6 shrink-0 items-center justify-center rounded-md border border-emerald-300/60 bg-emerald-400/15 text-[11px] font-semibold text-emerald-100">
+                    <span aria-hidden="true" className="tabular flex size-6 shrink-0 items-center justify-center rounded-md border border-emerald-300/60 bg-emerald-400/15 text-caption font-semibold text-emerald-100">
                       {index + 1}
                     </span>
                     <label className="min-w-0 flex-1">
@@ -438,14 +438,14 @@ export function AudioPanel({
                 ],
               })
             }
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus aria-hidden="true" className="size-3.5" />
             Add sound effect
           </button>
           <UploadButton kind="sfx" projectId={projectId} onUploaded={onUploaded} />
         </div>
-        {!effects.length ? <p className="text-[11px] text-subtle">Upload a short sound to place it. {effectLimitHint}</p> : null}
+        {!effects.length ? <p className="text-caption text-subtle">Upload a short sound to place it. {effectLimitHint}</p> : null}
       </ControlGroup>
 
       {value.music || value.sfx.length ? (
@@ -458,7 +458,7 @@ export function AudioPanel({
             cues={value.sfx.map((cue, index) => ({ key: `${index}`, label: byId.get(cue.asset_id)?.display_name ?? "Sound effect", at: cue.at_seconds }))}
             onMoveCue={(index, at) => setCue(index, { at_seconds: Math.min(Math.max(0, at), duration) })}
           />
-          <p className="text-[11px] text-subtle">Drag a numbered marker or use the arrow keys to move an effect. Click the strip to jump the preview.</p>
+          <p className="text-caption text-subtle">Drag a numbered marker or use the arrow keys to move an effect. Click the strip to jump the preview.</p>
         </div>
       ) : null}
 
@@ -468,7 +468,7 @@ export function AudioPanel({
         checked={value.normalize}
         onChange={(v) => set({ normalize: v })}
       />
-      <p className="text-[11px] text-subtle">
+      <p className="text-caption text-subtle">
         The preview plays your music and effects with the video. Ducking and loudness normalization are applied in the render, which is the final
         result.
       </p>

@@ -1,8 +1,10 @@
 "use client";
 
-import { CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send, X } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { inputClasses, textareaClasses } from "@/components/ui/input-styles";
 import { ButtonLink } from "@/components/ui/button-link";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { FormError } from "@/components/ui/form-error";
@@ -44,42 +46,16 @@ const STEP_INDEX: Record<string, number> = {
 
 /** "Publish to YouTube" beside Download: the reviewed metadata, then the real job state. */
 export function PublishToYouTube({ editId, editName }: { editId: string; editName: string }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
-
-  function show() {
-    setOpen(true);
-    dialogRef.current?.showModal();
-  }
-  function hide() {
-    dialogRef.current?.close();
-  }
-
   return (
     <>
-      <Button variant="secondary" onClick={show} aria-haspopup="dialog">
+      <Button variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog">
         <CirclePlay aria-hidden="true" />
         Publish to YouTube
       </Button>
-      <dialog
-        ref={dialogRef}
-        onClose={() => setOpen(false)}
-        aria-labelledby={`publish-title-${editId}`}
-        className="m-auto max-h-[calc(100dvh-2rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70"
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
-          <div className="min-w-0">
-            <h2 id={`publish-title-${editId}`} className="text-[15px] font-semibold tracking-tight">
-              Publish to YouTube
-            </h2>
-            <p className="mt-0.5 truncate text-sm text-muted">{editName}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={hide} aria-label="Close" className="px-2">
-            <X aria-hidden="true" />
-          </Button>
-        </div>
-        <div className="px-4 py-5 sm:px-6">{open ? <PublishBody editId={editId} onClose={hide} /> : null}</div>
-      </dialog>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Publish to YouTube" description={editName}>
+        <PublishBody editId={editId} onClose={() => setOpen(false)} />
+      </Dialog>
     </>
   );
 }
@@ -183,8 +159,6 @@ function PublishForm({
   const counter = (text: string, ok: boolean) => (
     <span className={`tabular text-xs ${ok ? "text-subtle" : "text-rose-300"}`}>{text}</span>
   );
-  const fieldClass =
-    "w-full rounded-lg border border-border bg-white/[0.03] px-3.5 text-[15px] text-foreground outline-none transition-colors focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40 aria-[invalid=true]:border-rose-500/60";
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
@@ -199,7 +173,7 @@ function PublishForm({
           onChange={(event) => setTitle(event.target.value)}
           aria-invalid={problems.title ? true : undefined}
           aria-describedby={problems.title ? `${id}-title-error` : undefined}
-          className={`h-11 ${fieldClass}`}
+          className={inputClasses}
         />
         {problems.title ? <p id={`${id}-title-error`} className="text-sm text-rose-300">{problems.title}</p> : null}
       </div>
@@ -216,7 +190,7 @@ function PublishForm({
           onChange={(event) => setDescription(event.target.value)}
           aria-invalid={problems.description ? true : undefined}
           aria-describedby={problems.description ? `${id}-description-error` : undefined}
-          className={`py-2.5 ${fieldClass}`}
+          className={textareaClasses}
         />
         {problems.description ? (
           <p id={`${id}-description-error`} className="text-sm text-rose-300">{problems.description}</p>
@@ -236,7 +210,7 @@ function PublishForm({
           onChange={(event) => setTagText(event.target.value)}
           aria-invalid={problems.tags ? true : undefined}
           aria-describedby={problems.tags ? `${id}-tags-error` : undefined}
-          className={`h-11 ${fieldClass}`}
+          className={inputClasses}
         />
         {problems.tags ? <p id={`${id}-tags-error`} className="text-sm text-rose-300">{problems.tags}</p> : null}
       </div>

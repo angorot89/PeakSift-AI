@@ -177,23 +177,23 @@ function CandidateCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-muted">
+            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
               {CATEGORY_LABELS[candidate.category] ?? candidate.category}
             </span>
             {saved ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5 text-caption font-medium text-emerald-200">
                 <BookmarkCheck aria-hidden="true" className="size-3" />
                 Saved
               </span>
             ) : null}
             {dismissed ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-subtle">
+              <span className="inline-flex items-center gap-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-subtle">
                 <EyeOff aria-hidden="true" className="size-3" />
                 Dismissed
               </span>
             ) : null}
           </div>
-          <h4 className="mt-1.5 text-base leading-snug font-semibold text-balance break-words text-foreground sm:text-[17px]">
+          <h4 className="mt-1.5 text-base leading-snug font-semibold text-balance break-words text-foreground sm:text-section">
             {candidate.title}
           </h4>
           <p className="tabular mt-1 text-xs text-muted">
@@ -206,7 +206,7 @@ function CandidateCard({
         <ScoreBadge score={candidate.overall_score} />
       </div>
 
-      <blockquote className="mt-4 border-l-2 border-accent/60 pl-3 text-[15px] leading-relaxed text-pretty text-foreground">
+      <blockquote className="mt-4 border-l-2 border-accent/60 pl-3 text-lead leading-relaxed text-pretty text-foreground">
         {candidate.hook}
       </blockquote>
 
@@ -374,7 +374,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
                 setFilter(option.value);
                 setPreviewId(null);
               }}
-              className={`inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+              className={`inline-flex h-8 items-center rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
                 filter === option.value
                   ? "bg-surface-3 text-foreground shadow-sm"
                   : "text-muted hover:text-foreground"

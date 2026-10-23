@@ -1,11 +1,13 @@
 "use client";
 
-import { FolderX } from "lucide-react";
+import { FolderX, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { createContext, type ReactNode, useCallback, useContext } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
+import { DeleteProjectDialog } from "@/components/app/delete-project";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { ButtonLink } from "@/components/ui/button-link";
+import { Menu } from "@/components/ui/menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
 import { PROJECT_SECTIONS, projectHref, projectLocation } from "@/lib/navigation";
@@ -68,6 +70,7 @@ export function ProjectFrame({ children }: { children: ReactNode }) {
   }, [id, validId]);
   const { data: project, error, loading, reload } = useApi(load);
   const inClip = !!projectLocation(pathname)?.clipId;
+  const [deleting, setDeleting] = useState(false);
 
   if (loading && !project) {
     return (
@@ -110,9 +113,19 @@ export function ProjectFrame({ children }: { children: ReactNode }) {
         </div>
       ) : (
         <div className="mb-8">
-          <p className="text-caption font-medium tracking-wide text-subtle uppercase">Project</p>
-          <h1 className="mt-1 mb-4 text-page text-balance break-words">{project.name}</h1>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-caption font-medium tracking-wide text-subtle uppercase">Project</p>
+              <h1 className="mt-1 text-page text-balance break-words">{project.name}</h1>
+            </div>
+            <Menu
+              label="Project actions"
+              trigger={<MoreHorizontal aria-hidden="true" />}
+              items={[{ label: "Delete project…", icon: Trash2, tone: "danger", onSelect: () => setDeleting(true) }]}
+            />
+          </div>
           <ProjectTabs projectId={project.id} compact={false} />
+          <DeleteProjectDialog project={project} open={deleting} onClose={() => setDeleting(false)} />
         </div>
       )}
       {children}

@@ -29,7 +29,7 @@ function ModeSwitch({ mode, onChange, name }: { mode: FramingMode; onChange: (m:
       {options.map((option) => (
         <label
           key={option.value}
-          className={`flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+          className={`flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md text-small font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
             mode === option.value ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
           }`}
         >

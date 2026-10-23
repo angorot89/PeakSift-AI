@@ -58,7 +58,7 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
     <div className="rounded-xl border border-border bg-surface px-4 py-3">
       <dt className="text-xs text-subtle">{label}</dt>
       <dd className="tabular mt-1 text-xl font-semibold text-foreground">{value}</dd>
-      {note ? <p className="mt-0.5 text-[11px] text-subtle">{note}</p> : null}
+      {note ? <p className="mt-0.5 text-caption text-subtle">{note}</p> : null}
     </div>
   );
 }

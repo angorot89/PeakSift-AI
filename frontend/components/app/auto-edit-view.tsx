@@ -208,9 +208,9 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
               key === "layout" || key === "captions" ? "" : "sm:col-span-2"
             }`}
           >
-            <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">{title}</p>
+            <p className="text-caption font-medium tracking-wide text-subtle uppercase">{title}</p>
             <p className="mt-1 text-sm font-medium break-words text-foreground">{section.choice}</p>
-            <p className="mt-0.5 text-[13px] text-pretty text-muted">{section.reason}</p>
+            <p className="mt-0.5 text-small text-pretty text-muted">{section.reason}</p>
             {section.items?.length ? (
               <ul className="mt-2.5 space-y-1.5">
                 {section.items.map((item) => (
@@ -232,7 +232,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
             <BarChart3 aria-hidden="true" className="size-4 text-muted" />
             Patterns from your shorts this plan considered
           </h3>
-          <ul className="mt-2 space-y-1 text-[13px] text-pretty text-muted">
+          <ul className="mt-2 space-y-1 text-small text-pretty text-muted">
             {plan.performance_hints.map((text) => (
               <li key={text}>{text}</li>
             ))}
@@ -246,7 +246,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
             <Info aria-hidden="true" className="size-4 text-muted" />
             What Auto Edit left out or changed
           </h3>
-          <ul className="mt-2 space-y-1 text-[13px] text-pretty text-muted">
+          <ul className="mt-2 space-y-1 text-small text-pretty text-muted">
             {notes.map((text) => (
               <li key={text} className="flex gap-2">
                 <span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-white/30" />
@@ -575,7 +575,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
         <section aria-labelledby={`${id}-main`} className="min-w-0 rounded-2xl border border-border bg-surface">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
             <div className="min-w-0">
-              <h2 id={`${id}-main`} className="text-[15px] font-semibold text-foreground">
+              <h2 id={`${id}-main`} className="text-title text-foreground">
                 {composing || !plan ? "Plan an edit" : `${plan.recipe_label} plan`}
               </h2>
               <p className="mt-0.5 text-sm text-muted">{headerNote(composing, plan)}</p>
