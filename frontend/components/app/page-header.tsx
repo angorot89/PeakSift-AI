@@ -19,7 +19,7 @@ export function PageHeader({ title, description, action, back, children }: PageH
       {back ? (
         <Link
           href={back.href}
-          className="mb-3 inline-flex items-center gap-1 rounded-md text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="-ml-1 mb-2 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <ChevronLeft aria-hidden="true" className="size-4" />
           {back.label}
@@ -27,7 +27,7 @@ export function PageHeader({ title, description, action, back, children }: PageH
       ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-balance break-words sm:text-[28px]">{title}</h1>
+          <h1 className="text-page text-balance break-words">{title}</h1>
           {description ? <p className="mt-1.5 text-sm text-muted">{description}</p> : null}
         </div>
         {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}

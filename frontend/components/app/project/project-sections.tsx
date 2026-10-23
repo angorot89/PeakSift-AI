@@ -3,7 +3,6 @@
 import { BarChart3, Clapperboard, Film, Images, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { AnalyticsView } from "@/components/app/analytics-view";
-import { DeleteProject } from "@/components/app/delete-project";
 import { useProject } from "@/components/app/project/project-frame";
 import { ClipsSection, SourceSection } from "@/components/app/source-video";
 import { VisualLibrary } from "@/components/app/visual-library";
@@ -19,7 +18,7 @@ const HUB: { section: ProjectSection; title: string; description: string; icon: 
 export function ProjectOverviewPage() {
   const { project } = useProject();
   return (
-    <div className="space-y-10">
+    <div>
       <ul className="grid gap-3 sm:grid-cols-2">
         {HUB.map((item) => (
           <li key={item.section}>
@@ -38,7 +37,6 @@ export function ProjectOverviewPage() {
           </li>
         ))}
       </ul>
-      <DeleteProject project={project} />
     </div>
   );
 }

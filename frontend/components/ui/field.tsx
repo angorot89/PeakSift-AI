@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { inputBase } from "@/components/ui/input-styles";
 
 type FieldProps = ComponentProps<"input"> & {
   id: string;
@@ -18,7 +19,7 @@ export function Field({ id, label, error, className = "", ...inputProps }: Field
         id={id}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`h-11 w-full rounded-lg border border-border bg-white/[0.03] px-3.5 text-[15px] text-foreground outline-none transition-colors placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40 aria-[invalid=true]:border-rose-500/60 ${className}`}
+        className={`${inputBase} h-11 px-3.5 text-lead ${className}`}
         {...inputProps}
       />
       {error ? (

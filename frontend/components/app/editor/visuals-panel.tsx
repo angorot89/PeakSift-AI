@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AssetChooser } from "@/components/app/editor/asset-chooser";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Spinner } from "@/components/ui/progress";
 import { errorMessage } from "@/lib/api";
@@ -210,7 +211,7 @@ export function VisualsPanel({
       {/* --- AI suggestions --------------------------------------------------------------- */}
       <div className="space-y-3 rounded-xl border border-border bg-surface-2/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
+          <p className="flex items-center gap-1.5 text-small font-medium text-foreground">
             <Sparkles aria-hidden="true" className="size-3.5 text-accent-soft" />
             B-roll suggestions
           </p>
@@ -385,7 +386,7 @@ function SuggestionCard({
           <button
             type="button"
             onClick={onSeek}
-            className="tabular -my-1 py-1 text-[11px] text-subtle underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+            className="tabular -my-1 py-1 text-caption text-subtle underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-accent"
           >
             Suggested at {formatSeconds(suggestion.start)}–{formatSeconds(suggestion.end)}
           </button>
@@ -393,7 +394,7 @@ function SuggestionCard({
           <p className="mt-0.5 text-xs text-pretty text-muted">{suggestion.reason}</p>
         </div>
         {used ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-200">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-caption font-medium text-emerald-200">
             <CheckCircle2 aria-hidden="true" className="size-3" />
             Used
           </span>
@@ -401,7 +402,7 @@ function SuggestionCard({
       </div>
       {matches.length && !used ? (
         <div className="mt-2">
-          <p className="text-[11px] font-medium text-muted">Best matches</p>
+          <p className="text-caption font-medium text-muted">Best matches</p>
           <ul className="mt-1 space-y-1.5" aria-label={`Best matches for ${suggestion.query}`}>
             {matches.map(({ asset, match }) => (
               <MatchRow
@@ -463,10 +464,10 @@ function MatchRow({
         ) : null}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[12px] font-medium text-foreground" title={asset.display_name}>
+        <p className="truncate text-caption font-medium text-foreground" title={asset.display_name}>
           {asset.display_name}
         </p>
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-subtle">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-caption text-subtle">
           <span
             className={`rounded px-1.5 py-px font-medium ${
               match.strength === "strong" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.07] text-muted"
@@ -514,32 +515,26 @@ function MatchPreview({
   onUse: () => void;
   disabled: boolean;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  useEffect(() => {
-    const dialog = ref.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
+
   const label = asset.kind === "video" ? bestSceneLabel(scene) : null;
   return (
-    <dialog
-      ref={ref}
+    <Dialog
+      open
       onClose={onClose}
-      aria-labelledby={titleId}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70"
+      title={asset.display_name}
+      description={label ? `Opened at the scene that matched (${label.replace("Best at ", "")}).` : undefined}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={onUse} disabled={disabled}>
+            Use here
+          </Button>
+        </>
+      }
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <h2 id={titleId} className="truncate text-[15px] font-semibold tracking-tight" title={asset.display_name}>
-            {asset.display_name}
-          </h2>
-          {label ? <p className="text-xs text-muted">Opened at the scene that matched ({label.replace("Best at ", "")}).</p> : null}
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Close" className="px-2">
-          <X aria-hidden="true" />
-        </Button>
-      </div>
-      <div className="space-y-3 px-4 py-4">
+      <div className="space-y-3">
         <div className={`flex max-h-[55dvh] items-center justify-center overflow-hidden rounded-xl ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
           {asset.kind === "video" ? (
             <video
@@ -562,16 +557,8 @@ function MatchPreview({
             <img src={visualContentUrl(projectId, asset.id)} alt={`Preview of ${asset.display_name}`} className="max-h-[55dvh] w-auto object-contain" />
           )}
         </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => ref.current?.close()}>
-            Close
-          </Button>
-          <Button size="sm" onClick={onUse} disabled={disabled}>
-            Use here
-          </Button>
-        </div>
       </div>
-    </dialog>
+    </Dialog>
   );
 }
 
@@ -601,7 +588,7 @@ function Segmented<T extends string>({
           type="button"
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`h-8 flex-1 rounded-md px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent sm:flex-none ${
+          className={`h-8 flex-1 rounded-md px-2.5 text-caption font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent sm:flex-none ${
             value === option.value ? "bg-surface-3 text-foreground" : "text-muted hover:text-foreground"
           }`}
         >
@@ -636,7 +623,7 @@ function NumberField({
   const shown = focused ? text : String(Math.round(value * 100) / 100);
   return (
     <div className="min-w-0 space-y-1">
-      <label htmlFor={id} className="block text-[11px] font-medium text-muted">
+      <label htmlFor={id} className="block text-caption font-medium text-muted">
         {label}
       </label>
       <div className="relative">
@@ -660,7 +647,7 @@ function NumberField({
           }}
           className={`${field} tabular pr-7`}
         />
-        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[11px] text-subtle">
+        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-caption text-subtle">
           {suffix}
         </span>
       </div>
@@ -725,7 +712,7 @@ function ElementEditor({
           <p className="truncate text-sm font-medium text-foreground" title={asset?.display_name}>
             {asset?.display_name ?? "Missing visual"}
           </p>
-          <p className="tabular text-[11px] text-subtle">
+          <p className="tabular text-caption text-subtle">
             {MODE_LABELS[element.mode]} · {formatSeconds(element.start_seconds)}–{formatSeconds(element.end_seconds)}
             {isVideo && asset?.duration_seconds ? ` · video ${formatVisualDuration(asset.duration_seconds)}` : ""}
           </p>
@@ -739,7 +726,7 @@ function ElementEditor({
       </div>
 
       <fieldset className="space-y-1.5">
-        <legend className="text-[11px] font-medium text-muted">How it appears</legend>
+        <legend className="text-caption font-medium text-muted">How it appears</legend>
         <div className="grid grid-cols-3 gap-1.5">
           {(Object.keys(MODE_LABELS) as VisualMode[]).map((mode) => {
             const Icon = MODE_ICONS[mode];
@@ -747,7 +734,7 @@ function ElementEditor({
             return (
               <label
                 key={mode}
-                className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-[11px] leading-tight has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-caption leading-tight has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                   unavailable ? "cursor-not-allowed border-border opacity-50" : "border-border hover:border-border-strong"
                 }`}
                 title={unavailable ? "Overlays use images" : MODE_HINTS[mode]}
@@ -777,7 +764,7 @@ function ElementEditor({
         <NumberField id={`${id}-start`} label="Start" value={element.start_seconds} min={0} max={duration} onChange={(v) => set({ start_seconds: v })} />
         <NumberField id={`${id}-end`} label="End" value={element.end_seconds} min={0} max={duration} onChange={(v) => set({ end_seconds: v })} />
         <div className="col-span-2 flex items-end gap-2 sm:col-span-1">
-          <p className="tabular pb-2 text-[11px] text-subtle">
+          <p className="tabular pb-2 text-caption text-subtle">
             Lasts {Math.max(0, element.end_seconds - element.start_seconds).toFixed(1)} s
           </p>
         </div>
@@ -809,7 +796,7 @@ function ElementEditor({
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
-            <label htmlFor={`${id}-position`} className="block text-[11px] font-medium text-muted">
+            <label htmlFor={`${id}-position`} className="block text-caption font-medium text-muted">
               Position
             </label>
             <select
@@ -826,7 +813,7 @@ function ElementEditor({
             </select>
           </div>
           <div className="space-y-1">
-            <span className="block text-[11px] font-medium text-muted">Size</span>
+            <span className="block text-caption font-medium text-muted">Size</span>
             <Segmented
               label="Size"
               value={element.size}
@@ -843,7 +830,7 @@ function ElementEditor({
 
       {element.mode === "overlay" ? (
         <div className="space-y-1">
-          <label htmlFor={`${id}-opacity`} className="flex justify-between text-[11px] font-medium text-muted">
+          <label htmlFor={`${id}-opacity`} className="flex justify-between text-caption font-medium text-muted">
             <span>Opacity</span>
             <span className="tabular">{Math.round(element.opacity * 100)} %</span>
           </label>
@@ -870,7 +857,7 @@ function ElementEditor({
             max={asset?.duration_seconds ?? undefined}
             onChange={(v) => set({ asset_offset_seconds: v })}
           />
-          <label className="flex h-9 cursor-pointer items-center gap-2 text-[12px] text-foreground">
+          <label className="flex h-9 cursor-pointer items-center gap-2 text-caption text-foreground">
             <input type="checkbox" checked={element.loop} onChange={(event) => set({ loop: event.target.checked })} className="size-4 accent-[var(--accent)]" />
             Loop the video
           </label>
@@ -879,7 +866,7 @@ function ElementEditor({
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="space-y-1">
-          <span className="block text-[11px] font-medium text-muted">Transition</span>
+          <span className="block text-caption font-medium text-muted">Transition</span>
           <Segmented
             label="Transition"
             value={element.transition}
@@ -906,7 +893,7 @@ function ElementEditor({
       </div>
 
       {problems.length ? (
-        <ul role="alert" className="space-y-0.5 text-[12px] text-rose-300">
+        <ul role="alert" className="space-y-0.5 text-caption text-rose-300">
           {problems.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}

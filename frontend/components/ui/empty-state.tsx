@@ -26,7 +26,7 @@ export function EmptyState({
           <Icon aria-hidden="true" className="size-5" />
         </span>
       ) : null}
-      <h3 className="text-[15px] font-medium text-foreground">{title}</h3>
+      <h3 className="text-title font-medium text-foreground">{title}</h3>
       <p className="mt-1 max-w-sm text-sm text-pretty text-muted">{description}</p>
       {action ? <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div> : null}
     </div>

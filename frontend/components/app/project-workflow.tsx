@@ -112,7 +112,7 @@ export function WorkflowStepper() {
                   )}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-[11px] font-medium text-foreground sm:text-sm">
+                  <span className="block truncate text-caption font-medium text-foreground sm:text-sm">
                     <span className="sr-only">Step {index + 1}: </span>
                     {step.label}
                   </span>

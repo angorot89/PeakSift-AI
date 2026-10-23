@@ -814,7 +814,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   type="button"
                   aria-pressed={mode === "preview"}
                   onClick={() => setMode("preview")}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
                     mode === "preview" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -829,7 +829,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     const target = selected ?? readyEdits[0];
                     if (target) showRendered(target);
                   }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
                     mode === "rendered" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -904,7 +904,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                       onVideo={setPreviewVideo}
                       badge={
                         framing.kind === "center" ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-caption font-medium text-white backdrop-blur-sm">
                             <ScanFace aria-hidden="true" className="size-3" />
                             Centered until framing is analyzed
                           </span>
@@ -937,7 +937,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           <div className="border-b border-border px-4 py-4 sm:px-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-[15px] font-semibold text-foreground">Edit settings</h2>
+                <h2 className="text-title text-foreground">Edit settings</h2>
                 <p className="mt-0.5 text-sm text-muted">Choose how this clip becomes a vertical short.</p>
               </div>
               <Button variant="ghost" size="sm" className="shrink-0" onClick={resetToDefaults}>

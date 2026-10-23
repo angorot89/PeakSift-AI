@@ -1,9 +1,12 @@
 "use client";
 
 import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, UploadCloud, X } from "lucide-react";
-import { type DragEvent, type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type DragEvent, type FormEvent, useCallback, useId, useMemo, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { inputClasses, textareaClasses } from "@/components/ui/input-styles";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
 import { ProgressBar, Spinner } from "@/components/ui/progress";
@@ -327,21 +330,7 @@ function Toolbar({
   const searchId = useId();
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div role="group" aria-label="Show" className="inline-flex w-fit rounded-lg border border-border bg-surface-2 p-0.5">
-        {FILTERS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={filter === option.value}
-            onClick={() => onFilter(option.value)}
-            className={`h-8 rounded-md px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
-              filter === option.value ? "bg-surface-3 text-foreground" : "text-muted hover:text-foreground"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl label="Show" value={filter} onChange={onFilter} options={FILTERS} />
       <div className="w-full sm:w-72">
         <label htmlFor={searchId} className="sr-only">
           Search your visuals
@@ -360,7 +349,7 @@ function Toolbar({
           />
           {searching ? <Spinner className="absolute top-1/2 right-3 size-4 -translate-y-1/2" /> : null}
         </div>
-        <p id={`${searchId}-hint`} className="mt-1 text-[11px] text-subtle">
+        <p id={`${searchId}-hint`} className="mt-1 text-caption text-subtle">
           Search by what&apos;s in the image or video.
         </p>
       </div>
@@ -401,30 +390,30 @@ function AssetCard({
         ) : (
           <Icon aria-hidden="true" className="size-6 text-subtle" />
         )}
-        <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
+        <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-caption font-medium text-white">
           <Icon aria-hidden="true" className="size-3" />
           {asset.kind === "video" ? formatVisualDuration(asset.duration_seconds ?? 0) : "Image"}
         </span>
         <SearchStateMark asset={asset} />
       </span>
       <span className="block px-2.5 py-2">
-        <span className="block truncate text-[13px] font-medium text-foreground" title={asset.display_name}>
+        <span className="block truncate text-small font-medium text-foreground" title={asset.display_name}>
           {asset.display_name}
         </span>
-        <span className="block text-[11px] text-subtle">
+        <span className="block text-caption text-subtle">
           {orientationLabel(asset)}
           {asset.has_alpha ? " · Transparent" : ""}
         </span>
         {match ? (
           <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1" title={matchReason(match)}>
             <span
-              className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+              className={`rounded-md px-1.5 py-0.5 text-caption font-medium ${
                 match.strength === "strong" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/[0.07] text-muted"
               }`}
             >
               {STRENGTH_LABEL[match.strength]}
             </span>
-            {scene ? <span className="text-[11px] text-subtle">{scene}</span> : null}
+            {scene ? <span className="text-caption text-subtle">{scene}</span> : null}
           </span>
         ) : null}
       </span>
@@ -476,7 +465,7 @@ function VisualSearchDetails({ projectId, asset, onRetried }: { projectId: strin
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3 py-2">
       <div className="min-w-0">
-        <p className="text-[13px] font-medium text-foreground" role="status">
+        <p className="text-small font-medium text-foreground" role="status">
           {label}
         </p>
         <p className="text-xs text-muted">
@@ -516,18 +505,10 @@ function PreviewDialog({
   onRetried: (asset: VisualAsset) => void;
   onDeleted: (id: string) => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (asset && !dialog.open) dialog.showModal();
-    if (!asset && dialog.open) dialog.close();
-  }, [asset]);
 
   async function remove() {
     if (!asset) return;
@@ -545,30 +526,23 @@ function PreviewDialog({
   }
 
   return (
-    <dialog
-      ref={ref}
+    <Dialog
+      open={!!asset}
       onClose={onClose}
-      aria-labelledby={titleId}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(44rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70"
+      width="44rem"
+      title={asset?.display_name ?? "Visual"}
+      description={
+        asset ? (
+          <>
+            {asset.kind === "video" ? `Video · ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "Image"} ·{" "}
+            {asset.width} × {asset.height} · {formatBytes(asset.file_size)}
+            {asset.kind === "video" && asset.has_audio ? " · Sound is not used" : ""}
+          </>
+        ) : undefined
+      }
     >
       {asset ? (
-        <>
-          <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
-            <div className="min-w-0">
-              <h2 id={titleId} className="truncate text-[15px] font-semibold tracking-tight" title={asset.display_name}>
-                {asset.display_name}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted">
-                {asset.kind === "video" ? `Video · ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "Image"} ·{" "}
-                {asset.width} × {asset.height} · {formatBytes(asset.file_size)}
-                {asset.kind === "video" && asset.has_audio ? " · Sound is not used" : ""}
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => ref.current?.close()} aria-label="Close" className="px-2">
-              <X aria-hidden="true" />
-            </Button>
-          </div>
-          <div className="space-y-4 px-4 py-5 sm:px-6">
+          <div className="space-y-4">
             <div className={`flex max-h-[60dvh] items-center justify-center overflow-hidden rounded-xl ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
               {asset.kind === "video" ? (
                 <video
@@ -619,14 +593,10 @@ function PreviewDialog({
                   Delete
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => ref.current?.close()}>
-                Close
-              </Button>
             </div>
           </div>
-        </>
       ) : null}
-    </dialog>
+    </Dialog>
   );
 }
 
@@ -666,23 +636,21 @@ function DetailsForm({
     }
   }
 
-  const input =
-    "w-full rounded-lg border border-border bg-white/[0.03] px-3 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
   return (
     <form onSubmit={save} className="space-y-3 rounded-xl border border-border p-3">
-      <p className="text-[13px] font-medium text-foreground">Details</p>
+      <p className="text-small font-medium text-foreground">Details</p>
       <p className="text-xs text-muted">A description and tags help match B-roll suggestions to this asset.</p>
       <div className="space-y-1">
         <label htmlFor={`${id}-name`} className="text-xs font-medium text-muted">Name</label>
-        <input id={`${id}-name`} value={name} maxLength={255} onChange={(e) => { setName(e.target.value); setState("idle"); }} className={`${input} h-9`} />
+        <input id={`${id}-name`} value={name} maxLength={255} onChange={(e) => { setName(e.target.value); setState("idle"); }} className={inputClasses} />
       </div>
       <div className="space-y-1">
         <label htmlFor={`${id}-description`} className="text-xs font-medium text-muted">Description</label>
-        <textarea id={`${id}-description`} value={description} maxLength={500} rows={2} onChange={(e) => { setDescription(e.target.value); setState("idle"); }} className={`${input} py-2`} />
+        <textarea id={`${id}-description`} value={description} maxLength={500} rows={2} onChange={(e) => { setDescription(e.target.value); setState("idle"); }} className={textareaClasses} />
       </div>
       <div className="space-y-1">
         <label htmlFor={`${id}-tags`} className="text-xs font-medium text-muted">Tags <span className="font-normal">(comma-separated)</span></label>
-        <input id={`${id}-tags`} value={tags} onChange={(e) => { setTags(e.target.value); setState("idle"); }} placeholder="rocket, space, launch" className={`${input} h-9`} />
+        <input id={`${id}-tags`} value={tags} onChange={(e) => { setTags(e.target.value); setState("idle"); }} placeholder="rocket, space, launch" className={inputClasses} />
       </div>
       {error ? <InlineAlert title="The details could not be saved">{error}</InlineAlert> : null}
       <div className="flex items-center gap-2">

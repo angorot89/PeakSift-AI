@@ -193,7 +193,7 @@ export function AudioTimeline({
           {musicPeaks && musicPeaks.length ? (
             <Waveform peaks={musicPeaks} />
           ) : (
-            <div className="flex h-full items-center px-2 text-[11px] text-subtle">No music</div>
+            <div className="flex h-full items-center px-2 text-caption text-subtle">No music</div>
           )}
         </div>
         <div className="absolute inset-x-0 bottom-0 h-7 border-t border-border/70">
@@ -224,7 +224,7 @@ export function AudioTimeline({
           style={{ left: "0%" }}
         />
       </div>
-      <div className="tabular flex justify-between text-[11px] text-subtle">
+      <div className="tabular flex justify-between text-caption text-subtle">
         <span>0:00.0</span>
         <span>{formatClock(safeDuration)}</span>
       </div>

@@ -83,7 +83,7 @@ function NavLink({
       title={collapsed ? label : undefined}
       className={`group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
         collapsed ? "justify-center" : ""
-      } ${nested ? "min-h-9 pl-9 text-[13px]" : ""} ${
+      } ${nested ? "min-h-9 pl-9 text-small" : ""} ${
         active ? "bg-white/[0.08] font-medium text-foreground" : "text-muted hover:bg-white/[0.04] hover:text-foreground"
       }`}
     >
@@ -205,7 +205,7 @@ function SidebarContent({
             </span>
           ) : null}
           {user && !collapsed ? (
-            <span className="min-w-0 flex-1 truncate text-[13px] text-muted" title={user.email}>
+            <span className="min-w-0 flex-1 truncate text-small text-muted" title={user.email}>
               {user.email}
             </span>
           ) : null}

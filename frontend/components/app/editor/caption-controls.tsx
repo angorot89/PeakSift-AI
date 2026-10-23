@@ -61,11 +61,11 @@ export function PresetCards({
               <PresetSample spec={spec} preset={preset.name} />
             </span>
             <span className="px-2.5 py-2">
-              <span className="flex items-center justify-between gap-1.5 text-[13px] font-medium text-foreground">
+              <span className="flex items-center justify-between gap-1.5 text-small font-medium text-foreground">
                 {preset.label}
                 <InlineCheck on={value === preset.name} />
               </span>
-              <span className="block text-[11px] leading-snug text-subtle">{PRESET_HINTS[preset.name]}</span>
+              <span className="block text-caption leading-snug text-subtle">{PRESET_HINTS[preset.name]}</span>
             </span>
           </OptionCard>
         ))}
@@ -187,7 +187,7 @@ export function CaptionTimingPanel({
           return (
             <label
               key={option.value}
-              className={`flex h-8 items-center justify-center rounded-md text-[13px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+              className={`flex h-8 items-center justify-center rounded-md text-small font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                 off ? "cursor-not-allowed opacity-40" : "cursor-pointer"
               } ${timing === option.value ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"}`}
             >
@@ -295,7 +295,7 @@ export function HookPanel({
               aria-describedby={`${id}-text-hint`}
               className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-foreground placeholder:text-subtle focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/40"
             />
-            <span id={`${id}-text-hint`} className="block text-[11px] text-subtle">
+            <span id={`${id}-text-hint`} className="block text-caption text-subtle">
               {tooLong
                 ? `Keep it to ${spec.hook.max_chars} characters.`
                 : length === 0
@@ -320,7 +320,7 @@ export function HookPanel({
                 >
                   <span
                     aria-hidden="true"
-                    className="rounded-[3px] px-1.5 py-0.5 text-[11px] leading-none"
+                    className="rounded-[3px] px-1.5 py-0.5 text-caption leading-none"
                     style={{
                       fontWeight: look.bold ? 700 : 400,
                       color: look.text,
@@ -330,7 +330,7 @@ export function HookPanel({
                   >
                     Aa
                   </span>
-                  <span className="flex items-center gap-1 text-[12px] font-medium text-foreground">
+                  <span className="flex items-center gap-1 text-caption font-medium text-foreground">
                     {look.label}
                     <InlineCheck on={style === look.name} />
                   </span>
@@ -353,7 +353,7 @@ export function HookPanel({
                     className="flex-row items-center justify-center gap-1.5 px-2 py-2"
                     badge={false}
                   >
-                    <span className="text-[13px] font-medium text-foreground">{value === "top" ? "Top" : "Center"}</span>
+                    <span className="text-small font-medium text-foreground">{value === "top" ? "Top" : "Center"}</span>
                     <InlineCheck on={position === value} />
                   </OptionCard>
                 ))}
@@ -385,7 +385,7 @@ export function HookPanel({
 /** "Show safe area" — a real checkbox; the guide itself is labelled, never colour-only. */
 export function SafeAreaToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
+    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-small font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="size-3.5 accent-[var(--accent)]" />
       Safe area
     </label>

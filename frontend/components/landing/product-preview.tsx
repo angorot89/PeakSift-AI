@@ -79,7 +79,7 @@ export function ProductPreview() {
                       <span className="mx-auto block h-1.5 w-2/3 rounded-full bg-accent-soft/80" />
                     </div>
                   </div>
-                  <span className="text-center text-[11px] leading-tight text-subtle">
+                  <span className="text-center text-caption leading-tight text-subtle">
                     {platform}
                   </span>
                 </div>
