@@ -1,7 +1,7 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { continueItems, nextAction, projectStage, relativeTime, type ProjectSummary } from "./workspace-rules.ts";
+import { clock, continueItems, momentLabel, nextAction, projectStage, relativeTime, shortLabel, type ProjectSummary } from "./workspace-rules.ts";
 
 const P = "3f1c0a1e-0000-4000-8000-000000000001";
 const CLIP = "3f1c0a1e-0000-4000-8000-000000000002";
@@ -26,6 +26,7 @@ const detected = (candidates: number, undecided = candidates) => ({
 });
 const short = (status: string) => ({
   edit_id: EDIT, clip_id: CLIP, clip_title: "The joint", status, duration_seconds: 20,
+  layout: "blur_background", captions_enabled: true, caption_style: "punch",
   created_at: "2026-10-22T09:00:00Z", updated_at: "2026-10-22T09:00:00Z",
 });
 
@@ -104,5 +105,26 @@ describe("relative time", () => {
     assert.equal(relativeTime("2026-10-21T08:00:00Z", now), "yesterday");
     assert.equal(relativeTime("2026-10-18T12:00:00Z", now), "4 days ago");
     assert.equal(relativeTime("2026-09-01T12:00:00Z", now), "Sep 1");
+  });
+});
+
+describe("moment labels and times", () => {
+  it("names the ranking in creator words, grounded in rank and editorial score", () => {
+    assert.equal(momentLabel(1, 40), "Top pick");
+    assert.equal(momentLabel(2, 80), "Strong moment");
+    assert.equal(momentLabel(3, 60), "Worth reviewing");
+  });
+  it("formats clip times like a player", () => {
+    assert.equal(clock(112), "1:52");
+    assert.equal(clock(9), "0:09");
+    assert.equal(clock(3725), "1:02:05");
+  });
+});
+
+describe("short labels", () => {
+  it("tells versions of one clip apart in plain words", () => {
+    assert.equal(shortLabel({ layout: "blur_background", captions_enabled: true, caption_style: "minimal" }), "Blur background · Minimal captions");
+    assert.equal(shortLabel({ layout: "smart_reframe", captions_enabled: false, caption_style: null }), "Smart reframe · No captions");
+    assert.equal(shortLabel({ layout: "new_layout", captions_enabled: true, caption_style: null }), "Vertical · Captions");
   });
 });

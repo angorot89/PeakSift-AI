@@ -53,6 +53,10 @@ class ShortSummary(BaseModel):
     clip_id: uuid.UUID
     clip_title: str
     status: str
+    # What tells two versions of one clip apart (never configuration internals).
+    layout: str
+    captions_enabled: bool
+    caption_style: str | None
     duration_seconds: float | None
     created_at: datetime
     updated_at: datetime

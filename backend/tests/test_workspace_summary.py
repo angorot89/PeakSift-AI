@@ -90,6 +90,8 @@ def test_a_worked_project_reports_each_stage(client, db_session):
     assert (shorts["total"], shorts["ready"], shorts["working"]) == (2, 1, 1)
     assert {s["status"] for s in shorts["recent"]} == {"ready", "rendering"}
     assert shorts["recent"][0]["clip_title"] in ("That Was Crazy!",)
+    assert {s["layout"] for s in shorts["recent"]} == {"blur_background"}
+    assert {s["caption_style"] for s in shorts["recent"]} == {"bold"}
     assert body["plans"]["ready"] == 1 and body["plans"]["latest_ready"]["clip_id"] == str(clip.id)
     assert body["published"]["uploads"] == 1 and body["published"]["with_analytics"] == 1
     for internal in INTERNAL:
