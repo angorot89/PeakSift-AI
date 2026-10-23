@@ -69,13 +69,13 @@ function StartForm({
       }}
     >
       <p className="text-sm text-muted">
-        Run AI clip detection to find moments worth clipping. Results are ranked editorial
+        PeakSift reads the transcript and ranks the moments worth clipping. Rankings are editorial
         suggestions, not predictions of views.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="clip-provider" className="block text-sm font-medium text-foreground">
-            AI provider
+            AI service
           </label>
           <select
             id="clip-provider"
@@ -123,7 +123,7 @@ function StartForm({
       <div className="flex justify-end">
         <Button type="submit" disabled={busy || !canStart}>
           <Sparkles aria-hidden="true" />
-          {busy ? "Starting…" : "Find clip moments"}
+          {busy ? "Starting…" : "Find moments"}
         </Button>
       </div>
     </form>
@@ -135,8 +135,8 @@ function RunProgress({ run }: { run: DetectionRun }) {
     <WorkingState
       label={detectionStageLabel(run)}
       progress={run.progress_percent}
-      progressLabel="Clip detection progress"
-      detail={`Analyzing the transcript with ${run.model}${run.attempt > 1 ? ` · attempt ${run.attempt}` : ""}`}
+      progressLabel="Finding moments progress"
+      detail="Reading the transcript and ranking moments. You can leave this page; it keeps going."
     />
   );
 }
@@ -154,7 +154,7 @@ function RunHistory({
   return (
     <details className="rounded-xl border border-border">
       <summary className="cursor-pointer px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground">
-        Previous runs ({runs.length})
+        Earlier searches ({runs.length})
       </summary>
       <ul className="divide-y divide-border border-t border-border">
         {runs.map((run) => (
@@ -168,11 +168,11 @@ function RunHistory({
               }`}
             >
               <span className="min-w-0 truncate text-foreground">
-                {run.provider} / {run.model}
+                {run.model}
                 <span className="text-muted"> · {formatDate(run.created_at)}</span>
               </span>
               <span className="flex items-center gap-2 text-muted">
-                {run.status === "completed" ? `${run.candidate_count} candidates` : null}
+                {run.status === "completed" ? `${run.candidate_count} ${run.candidate_count === 1 ? "moment" : "moments"}` : null}
                 <StatusBadge status={run.status} />
               </span>
             </button>
@@ -290,7 +290,7 @@ export function ClipDetectionPanel({
   } else if (loadError) {
     body = (
       <ErrorState
-        title="Clip detection is unavailable"
+        title="Finding moments is unavailable"
         message={loadError}
         onRetry={() => {
           setLoadError(null);
@@ -299,7 +299,7 @@ export function ClipDetectionPanel({
       />
     );
   } else if (providers === null || runs === null) {
-    body = <LoadingState label="Loading clip detection…" />;
+    body = <LoadingState label="Loading moments…" />;
   } else if (selected === null || startingNew) {
     body = (
       <div className="space-y-4">
@@ -317,14 +317,14 @@ export function ClipDetectionPanel({
     body = (
       <InlineAlert
         tone="warning"
-        title="Clip detection stalled"
+        title="Finding moments stalled"
         action={
           <Button variant="secondary" size="sm" onClick={() => run(() => retryRun(projectId, videoId, selected.id))} disabled={busy}>
-            {busy ? "Restarting…" : "Retry detection"}
+            {busy ? "Restarting…" : "Try again"}
           </Button>
         }
       >
-        The worker stopped reporting progress. Start it again to continue.
+        The search stopped responding. Start it again to continue.
       </InlineAlert>
     );
   } else if (isDetectionActive(selected.status)) {
@@ -332,16 +332,16 @@ export function ClipDetectionPanel({
   } else if (selected.status === "failed") {
     body = (
       <InlineAlert
-        title="Clip detection failed"
+        title="Finding moments failed"
         action={
           <div className="flex flex-wrap gap-2">
             {selected.transcript_current !== false ? (
               <Button variant="secondary" size="sm" onClick={() => run(() => retryRun(projectId, videoId, selected.id))} disabled={busy}>
-                {busy ? "Retrying…" : "Retry"}
+                {busy ? "Retrying…" : "Try again"}
               </Button>
             ) : null}
             <Button size="sm" onClick={() => setStartingNew(true)} disabled={busy}>
-              New detection
+              Start a new search
             </Button>
           </div>
         }
@@ -354,8 +354,8 @@ export function ClipDetectionPanel({
       <div className="space-y-4">
         {selected.transcript_current === false ? (
           <InlineAlert tone="warning" title="The transcript changed">
-            These candidates come from an earlier transcript. Run detection again for suggestions
-            that match the current one.
+            These moments come from an earlier transcript. Find moments again for ones that match
+            the current one.
           </InlineAlert>
         ) : null}
         {renderResults ? renderResults(selected) : null}
@@ -368,20 +368,20 @@ export function ClipDetectionPanel({
     <Panel
       id="clips"
      
-      title="Clip moments"
+      title="Moments"
       description={
         completed
-          ? `${completed.candidate_count} candidate${completed.candidate_count === 1 ? "" : "s"} · ${completed.model}${
+          ? `${completed.candidate_count} ${completed.candidate_count === 1 ? "moment" : "moments"} found${
               completed.completed_at ? ` · ${formatDate(completed.completed_at)}` : ""
             }`
-          : "AI ranks the moments in the transcript worth clipping."
+          : "PeakSift reads the transcript and ranks the moments worth clipping."
       }
       status={selected && !startingNew ? <StatusBadge status={selected.status} stale={isDetectionActive(selected.status) && selected.is_stale} /> : undefined}
       actions={
         completed ? (
           <Button variant="ghost" size="sm" onClick={() => setStartingNew(true)} disabled={busy}>
             <RotateCcw aria-hidden="true" />
-            Run again
+            Find again
           </Button>
         ) : undefined
       }

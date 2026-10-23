@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api import clip_detection as api
@@ -625,3 +626,32 @@ def test_retries_are_bounded_per_run(client, db_session, settings):
     run.attempt = settings.clip_detection_max_attempts - 1
     db_session.commit()
     assert client.post(f"{base(project_id, video_id)}/{run_id}/retry").status_code == 200
+
+
+def test_candidate_views_and_counts(client, db_session, settings):
+    """ "Active" hides dismissed moments; "top" keeps rank 1 and strong editorial scores; every
+    page reports how many moments each review filter holds."""
+    sign_up(client)
+    project_id, video_id = transcribed_video(client, db_session)
+    run_id = start(client, project_id, video_id).json()["id"]
+    complete_run(db_session, run_id, candidates=5)
+    for candidate in db_session.scalars(
+        select(ClipCandidate).where(ClipCandidate.run_id == uuid.UUID(run_id))
+    ):
+        candidate.overall_score = {1: 60, 2: 90, 3: 75, 4: 74, 5: 95}[candidate.rank]
+    db_session.commit()
+    url = f"{base(project_id, video_id)}/{run_id}/candidates"
+    ids = [c["id"] for c in client.get(url).json()["candidates"]]
+    client.post(f"{url}/{ids[4]}/dismiss")  # rank 5, the highest score
+    client.post(f"{url}/{ids[3]}/save")
+
+    def ranks(**params):
+        return [c["rank"] for c in client.get(url, params=params).json()["candidates"]]
+
+    assert ranks(view="active") == [1, 2, 3, 4]
+    assert ranks(view="top") == [1, 2, 3]  # rank 1 always; 90 and 75 are strong; 74 is not
+    assert ranks(view="top", limit=2, offset=1) == [2, 3]
+    page = client.get(url, params={"view": "top"}).json()
+    assert page["total"] == 3
+    assert page["counts"] == {"active": 4, "top": 3, "saved": 1, "dismissed": 1}
+    assert client.get(url, params={"view": "best"}).status_code == 422

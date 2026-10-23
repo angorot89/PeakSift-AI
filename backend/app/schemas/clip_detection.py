@@ -86,9 +86,19 @@ class ClipCandidateRead(BaseModel):
     created_at: datetime
 
 
+class CandidateCounts(BaseModel):
+    """How many of the run's candidates each review filter holds."""
+
+    active: int  # everything not dismissed
+    top: int  # not dismissed, and rank 1 or a strong editorial score
+    saved: int
+    dismissed: int
+
+
 class CandidatePage(BaseModel):
     run_id: uuid.UUID
     total: int
     offset: int
     limit: int
     candidates: list[ClipCandidateRead]
+    counts: CandidateCounts

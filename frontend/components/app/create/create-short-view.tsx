@@ -12,7 +12,7 @@ import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api";
 import { autoEditHref } from "@/lib/auto-edit";
-import { clipContentUrl, clipStageLabel, friendlyClipError, isClipActive, retryClip, type GeneratedClip } from "@/lib/clips";
+import { clipContentUrl, friendlyClipError, isClipActive, retryClip, type GeneratedClip } from "@/lib/clips";
 import { editorHref } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { projectHref } from "@/lib/navigation";
@@ -160,7 +160,7 @@ export function CreateShortView() {
           {preparing ? (
             <div className="rounded-2xl border border-border bg-surface p-4">
               <WorkingState
-                label={`${clipStageLabel(current).replace("…", "")} your clip`}
+                label={current.status === "queued" ? "Waiting to start" : "Cutting your clip"}
                 progress={current.status === "queued" ? null : current.progress_percent}
                 progressLabel="Clip progress"
                 detail="Cutting this moment from your video. Both options open as soon as it is ready."

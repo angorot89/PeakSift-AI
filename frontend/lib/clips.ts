@@ -43,7 +43,7 @@ export const CLIP_STAGES = stageRanks(ACTIVE_CLIP_STATUSES, ["ready", "failed"])
 export function clipStageLabel(clip: GeneratedClip): string {
   switch (clip.status) {
     case "queued":
-      return "Queued — waiting for a worker";
+      return "Waiting to start";
     case "rendering":
       return "Rendering…";
     case "validating":

@@ -32,7 +32,7 @@ type Props = {
 function statusCopy(transcription: Transcription): string {
   switch (transcription.status) {
     case "queued":
-      return "Queued — waiting for a worker";
+      return "Waiting to start";
     case "extracting_audio":
       return "Preparing audio";
     case "transcribing":

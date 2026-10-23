@@ -151,8 +151,8 @@ export function GeneratedClipsPanel({
     <Panel
       id="generated"
      
-      title="Generated clips"
-      description="Rendered clips from your candidates, and their vertical shorts."
+      title="Your clips"
+      description="Moments cut from the source video, and the Shorts made from them."
     >
       {clips === null ? (
         <LoadingState label="Loading generated clips…" />

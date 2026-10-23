@@ -79,12 +79,16 @@ export type ClipCandidate = {
   created_at: string;
 };
 
+/** How many moments each review filter holds ("active" = not dismissed). */
+export type CandidateCounts = { active: number; top: number; saved: number; dismissed: number };
+
 export type CandidatePage = {
   run_id: string;
   total: number;
   offset: number;
   limit: number;
   candidates: ClipCandidate[];
+  counts: CandidateCounts;
 };
 
 export const ACTIVE_DETECTION_STATUSES: DetectionStatus[] = [
@@ -101,7 +105,7 @@ export const isDetectionActive = (status: DetectionStatus) =>
 export function detectionStageLabel(run: DetectionRun): string {
   switch (run.status) {
     case "queued":
-      return "Queued — waiting for a worker";
+      return "Waiting to start";
     case "preparing_transcript":
       return "Preparing transcript";
     case "analyzing":
@@ -155,9 +159,11 @@ export function listCandidates(
   offset = 0,
   limit = CANDIDATE_PAGE_SIZE,
   decision?: CandidateDecision,
+  view?: "active" | "top",
 ) {
   const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (decision) params.set("decision", decision);
+  if (view) params.set("view", view);
   return apiFetch<CandidatePage>(`${base(projectId, videoId)}/${runId}/candidates?${params}`);
 }
 
