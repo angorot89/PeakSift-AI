@@ -48,7 +48,7 @@ export function provenanceRows(p: Provenance): [string, string][] {
   rows.push(["Audio", [audio.music ? `music${audio.ducking ? `, ${audio.ducking} ducking` : ""}` : "no music", `${audio.sfx_count ?? 0} sound effects`].join(" · ")]);
   const candidate = section(p, "candidate");
   if (candidate.rank) {
-    rows.push(["Clip candidate", `#${candidate.rank}${candidate.category ? `, ${candidate.category}` : ""}${candidate.score !== undefined && candidate.score !== null ? ` (editorial score ${candidate.score}/100)` : ""}`]);
+    rows.push(["Moment", `#${candidate.rank}${candidate.category ? `, ${candidate.category}` : ""}${candidate.score !== undefined && candidate.score !== null ? ` (editorial score ${candidate.score}/100)` : ""}`]);
   }
   return rows;
 }

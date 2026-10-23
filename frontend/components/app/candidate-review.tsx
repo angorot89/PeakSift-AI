@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/api";
 import {
   CANDIDATE_PAGE_SIZE,
@@ -346,6 +347,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const toast = useToast();
 
   const query = momentQuery(filter);
   const { view, decision } = query;
@@ -402,6 +404,8 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
       setCandidates((previous) => previous.map((item) => (item.id === updated.id ? updated : item)).filter(belongs));
       if (!belongs(updated)) setTotal((t) => Math.max(0, t - 1));
       setCounts((current) => (current ? recount(current, before, updated) : current));
+      if (action === "dismiss") toast("Moment dismissed. It's kept under Dismissed.");
+      else if (action === "save") toast("Moment saved");
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {

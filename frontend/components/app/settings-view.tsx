@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,6 +41,7 @@ export function SettingsView() {
   const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   async function connect() {
     setBusy("connect");
@@ -55,6 +57,7 @@ export function SettingsView() {
   }
 
   async function disconnect() {
+    setConfirming(false);
     setBusy("disconnect");
     setActionError(null);
     try {
@@ -77,6 +80,26 @@ export function SettingsView() {
   return (
     <>
       <PageHeader title="Settings" description="Accounts PeakSift can publish to." />
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Disconnect YouTube?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(false)} data-autofocus>
+              Keep connected
+            </Button>
+            <Button variant="danger" onClick={() => void disconnect()}>
+              Disconnect
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-pretty text-muted">
+          PeakSift will stop publishing to this channel and remove its access. Shorts already on YouTube stay there, and
+          you can connect again at any time.
+        </p>
+      </Dialog>
       <Panel
         id="youtube"
         title={
@@ -132,7 +155,7 @@ export function SettingsView() {
                     {busy === "connect" ? "Opening Google…" : "Reconnect"}
                   </Button>
                 ) : null}
-                <Button variant="secondary" onClick={disconnect} disabled={busy !== null}>
+                <Button variant="secondary" onClick={() => setConfirming(true)} disabled={busy !== null}>
                   {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
                 </Button>
               </div>

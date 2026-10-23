@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { StatusPill } from "@/components/ui/status-pill";
 import { errorMessage } from "@/lib/api";
 import {
@@ -55,11 +56,13 @@ function Evidence({ insight }: { insight: Insight }) {
 function InsightCard({ insight, onChange }: { insight: Insight; onChange: (next: Insight) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   async function toggle() {
     setBusy(true);
     setError(null);
     try {
       onChange(await (insight.dismissed ? restoreInsight(insight.id) : dismissInsight(insight.id)));
+      toast(insight.dismissed ? "Insight shown again" : "Insight hidden");
     } catch (failure) {
       setError(errorMessage(failure));
     } finally {

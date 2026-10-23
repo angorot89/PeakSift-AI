@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { WorkingState } from "@/components/ui/progress";
 import { selectClasses } from "@/components/ui/select-styles";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -117,7 +118,7 @@ function StartForm({
       </div>
       {current && (!current.configured || current.available === false) ? (
         <p role="status" className="text-sm text-amber-200">
-          {current.detail ?? "This provider is not available right now."}
+          {current.detail ?? "This AI service isn't available right now."}
         </p>
       ) : null}
       <div className="flex justify-end">
@@ -299,7 +300,12 @@ export function ClipDetectionPanel({
       />
     );
   } else if (providers === null || runs === null) {
-    body = <LoadingState label="Loading moments…" />;
+    body = (
+      <div role="status" aria-label="Loading moments" className="space-y-3">
+        <Skeleton className="h-9 w-80 max-w-full rounded-lg" />
+        <Skeleton className="h-40 rounded-2xl" />
+      </div>
+    );
   } else if (selected === null || startingNew) {
     body = (
       <div className="space-y-4">
