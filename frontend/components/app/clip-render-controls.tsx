@@ -1,22 +1,18 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Clapperboard, Download, Wand2 } from "lucide-react";
-import Link from "next/link";
+import { CheckCircle2, Clapperboard, Download, MoreHorizontal, RotateCcw, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
-import { MediaFrame } from "@/components/ui/media-frame";
-import { LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { Menu, type MenuItem } from "@/components/ui/menu";
+import { ButtonLink } from "@/components/ui/button-link";
 import { WorkingState } from "@/components/ui/progress";
-import { buttonClasses } from "@/components/ui/button-styles";
 import { ApiError, errorMessage } from "@/lib/api";
 import {
   CLIP_STAGES,
-  clipContentUrl,
   clipDownloadUrl,
-  clipStageLabel,
   friendlyClipError,
   generateClip,
   getClip,
@@ -26,7 +22,7 @@ import {
 } from "@/lib/clips";
 import type { ClipCandidate } from "@/lib/clip-detection";
 import { createHref } from "@/lib/edits";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import { newer } from "@/lib/status-sync";
 import { usePolling } from "@/lib/use-polling";
 
@@ -38,6 +34,8 @@ type Props = {
   /** The clip known from the page's listing; `undefined` means "not known, fetch it". */
   initialClip: GeneratedClip | null | undefined;
   onChange?: (clip: GeneratedClip) => void;
+  /** The card's other actions (preview, save, dismiss), shown in one row after Create Short. */
+  secondary?: ReactNode;
 };
 
 /**
@@ -46,7 +44,7 @@ type Props = {
  * one timer per clip, cleared on unmount or when it finishes. Responses older than the state
  * on screen (e.g. a poll that started before Retry) are ignored.
  */
-export function ClipRenderControls({ projectId, videoId, runId, candidate, initialClip, onChange }: Props) {
+export function ClipRenderControls({ projectId, videoId, runId, candidate, initialClip, onChange, secondary }: Props) {
   const { setUser } = useAuth();
   const router = useRouter();
   const [clip, setClip] = useState<GeneratedClip | null>(initialClip ?? null);
@@ -134,126 +132,95 @@ export function ClipRenderControls({ projectId, videoId, runId, candidate, initi
   const retry = () => act(() => retryClip(projectId, videoId, runId, candidate.id));
   const dismissed = candidate.decision === "dismissed";
 
-  let body: ReactNode;
+  // One action row in every state: Create Short first, the card's own actions after it, and the
+  // rarely needed ones in a menu.
+  let primary: ReactNode;
+  let cutOnly = false;
+  let downloadUrl: string | null = null;
+  let status: ReactNode = null;
   if (!known) {
-    body = <LoadingState label="Checking clip…" />;
+    primary = (
+      <Button size="sm" disabled>
+        <Wand2 aria-hidden="true" />
+        Create Short
+      </Button>
+    );
   } else if (clip === null) {
-    body = (
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted">
-          {dismissed ? "Restore this moment to make a Short from it." : "Turn this moment into a vertical Short."}
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row-reverse">
-          <Button onClick={createShort} disabled={busy || dismissed}>
-            <Wand2 aria-hidden="true" />
-            {busy ? "Starting…" : "Create Short"}
-          </Button>
-          <Button variant="ghost" onClick={generate} disabled={busy || dismissed}>
-            <Clapperboard aria-hidden="true" />
-            Only cut the clip
-          </Button>
-        </div>
-      </div>
+    primary = (
+      <Button size="sm" onClick={createShort} disabled={busy || dismissed}>
+        <Wand2 aria-hidden="true" />
+        {busy ? "Starting…" : "Create Short"}
+      </Button>
     );
-  } else if (isClipActive(clip.status) && clip.is_stale) {
-    body = (
+    cutOnly = !dismissed && !busy;
+  } else if (clip.status === "failed" || (isClipActive(clip.status) && clip.is_stale)) {
+    primary = (
+      <Button size="sm" onClick={retry} disabled={busy}>
+        <RotateCcw aria-hidden="true" />
+        {busy ? "Retrying…" : "Try again"}
+      </Button>
+    );
+    status = (
       <InlineAlert
-        tone="warning"
-        title="Preparing the clip stalled"
-        action={
-          <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
-            {busy ? "Restarting…" : "Try again"}
-          </Button>
-        }
+        tone={clip.status === "failed" ? "danger" : "warning"}
+        title={clip.status === "failed" ? "This clip couldn't be prepared" : "Preparing the clip stalled"}
       >
-        The work stopped responding. Start it again to continue.
-      </InlineAlert>
-    );
-  } else if (isClipActive(clip.status)) {
-    body = (
-      <WorkingState
-        label={clipStageLabel(clip).replace("…", "")}
-        progress={clip.status === "queued" ? null : clip.progress_percent}
-        progressLabel="Clip progress"
-        detail="Cutting this moment from the original video."
-      />
-    );
-  } else if (clip.status === "failed") {
-    body = (
-      <InlineAlert
-        title="This clip couldn't be prepared"
-        action={
-          <Button variant="secondary" size="sm" onClick={retry} disabled={busy}>
-            {busy ? "Retrying…" : "Try again"}
-          </Button>
-        }
-      >
-        We couldn&apos;t render this clip.
-        <span className="block text-xs text-subtle">{friendlyClipError(clip)}</span>
+        {clip.status === "failed" ? friendlyClipError(clip) : "The work stopped responding. Try again to continue."}
       </InlineAlert>
     );
   } else {
-    body = <RenderedClip clip={clip} projectId={projectId} />;
+    // Cutting or ready: the Start step shows the progress and opens as soon as the clip is ready.
+    primary = (
+      <ButtonLink href={createHref(projectId, clip.id)} size="sm">
+        <Wand2 aria-hidden="true" />
+        Create Short
+      </ButtonLink>
+    );
+    if (isClipActive(clip.status)) {
+      status = (
+        <WorkingState
+          label={clip.status === "queued" ? "Waiting to start" : "Cutting the clip"}
+          progress={clip.status === "queued" ? null : clip.progress_percent}
+          progressLabel="Clip progress"
+        />
+      );
+    } else {
+      downloadUrl = clipDownloadUrl(clip.id);
+      status = (
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <CheckCircle2 aria-hidden="true" className="size-3.5 text-success" />
+          Clip ready · {formatDuration(clip.duration_seconds)}
+        </p>
+      );
+    }
   }
 
   return (
-    <div className="mt-4 border-t border-border pt-4" aria-label="Generated clip" role="group">
-      {body}
-      {error ? (
-        <div className="mt-3">
-          <InlineAlert title="That didn't work">{error}</InlineAlert>
-        </div>
-      ) : null}
+    <div className="mt-4 space-y-3" role="group" aria-label={`Actions for ${candidate.title}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        {primary}
+        {secondary}
+        {cutOnly || downloadUrl ? (
+          <MoreActions onCutOnly={cutOnly ? generate : undefined} downloadUrl={downloadUrl ?? undefined} />
+        ) : null}
+      </div>
+      {status}
+      {error ? <InlineAlert title="That didn't work">{error}</InlineAlert> : null}
     </div>
   );
 }
 
-/** The rendered clip: a compact labelled player beside what a creator needs next. */
-export function RenderedClip({ clip, projectId }: { clip: GeneratedClip; projectId: string }) {
-  const meta = [
-    formatDuration(clip.duration_seconds),
-    clip.width && clip.height ? `${clip.width} × ${clip.height}` : null,
-    clip.file_size != null ? formatBytes(clip.file_size) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,420px)_1fr] sm:gap-6">
-      <MediaFrame icon={Clapperboard} label="Generated clip">
-        {/* The browser sends the HttpOnly session cookie (same-site); the API checks ownership. */}
-        <video
-          controls
-          preload="metadata"
-          src={`${clipContentUrl(clip.id)}#t=0.1`}
-          className="aspect-video w-full bg-black object-contain"
-          aria-label={`Rendered clip: ${clip.title}`}
-        />
-      </MediaFrame>
-      <div className="flex min-w-0 flex-col gap-3 sm:pt-6">
-        <div>
-          <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <CheckCircle2 aria-hidden="true" className="size-4 text-success" />
-            Clip ready
-          </p>
-          <p className="tabular mt-0.5 text-xs text-subtle">{meta} · original aspect ratio</p>
-        </div>
-        <p className="text-sm text-muted">Make a 9:16 version with captions for Shorts, TikTok and Reels.</p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Link href={createHref(projectId, clip.id)} className={buttonClasses("primary", "md")}>
-            <Wand2 aria-hidden="true" />
-            Create Short
-          </Link>
-          <a
-            href={clipDownloadUrl(clip.id)}
-            className={buttonClasses("secondary", "md")}
-            download
-            aria-label={`Download MP4 — ${clip.title}`}
-          >
-            <Download aria-hidden="true" />
-            Download MP4
-          </a>
-        </div>
-      </div>
-    </div>
-  );
+function MoreActions({ onCutOnly, downloadUrl }: { onCutOnly?: () => void; downloadUrl?: string }) {
+  const items: MenuItem[] = [];
+  if (onCutOnly) items.push({ label: "Only cut the clip", icon: Clapperboard, onSelect: onCutOnly });
+  if (downloadUrl) items.push({ label: "Download the clip (MP4)", icon: Download, onSelect: () => download(downloadUrl) });
+  return <Menu label="More actions" trigger={<MoreHorizontal aria-hidden="true" />} items={items} />;
+}
+
+/** Starts a download of an owner-only file (the session cookie goes with it). */
+function download(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "";
+  link.click();
 }

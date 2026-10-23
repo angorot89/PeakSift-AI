@@ -7,11 +7,12 @@ validated against server allow-lists; endpoints and keys never leave the server.
 
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 from types import EllipsisType
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, DbSession
@@ -30,6 +31,7 @@ from app.models import (
     VideoStatus,
 )
 from app.schemas.clip_detection import (
+    CandidateCounts,
     CandidatePage,
     CandidateScores,
     ClipCandidateRead,
@@ -405,6 +407,38 @@ def _require_completed(run: ClipDetectionRun) -> None:
         )
 
 
+class CandidateView(StrEnum):
+    ACTIVE = "active"
+    TOP = "top"
+
+
+# A strong editorial score: the same threshold as the "Strong moment" label in the frontend
+# (lib/workspace-rules.ts `momentLabel`). It describes the model's judgement, never views.
+STRONG_MOMENT_SCORE = 75
+_NOT_DISMISSED = ClipCandidate.decision != CandidateDecision.DISMISSED.value
+_VIEW_FILTERS = {
+    CandidateView.ACTIVE: _NOT_DISMISSED,
+    CandidateView.TOP: and_(
+        _NOT_DISMISSED,
+        or_(ClipCandidate.rank == 1, ClipCandidate.overall_score >= STRONG_MOMENT_SCORE),
+    ),
+}
+
+
+def _candidate_counts(db: DbSession, run_id: uuid.UUID) -> CandidateCounts:
+    """All four filter counts in one query."""
+    dismissed = ClipCandidate.decision == CandidateDecision.DISMISSED.value
+    row = db.execute(
+        select(
+            func.count().filter(~dismissed),
+            func.count().filter(_VIEW_FILTERS[CandidateView.TOP]),
+            func.count().filter(ClipCandidate.decision == CandidateDecision.SAVED.value),
+            func.count().filter(dismissed),
+        ).where(ClipCandidate.run_id == run_id)
+    ).one()
+    return CandidateCounts(active=row[0], top=row[1], saved=row[2], dismissed=row[3])
+
+
 @router.get("/{run_id}/candidates", response_model=CandidatePage)
 def list_candidates(
     run: OwnedRun,
@@ -412,12 +446,16 @@ def list_candidates(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 50,
     decision: CandidateDecision | None = None,
+    view: CandidateView | None = None,
 ) -> CandidatePage:
-    """Ranked candidates of a completed run, optionally filtered by the user's decision."""
+    """Ranked candidates of a completed run, optionally filtered by the user's decision or by a
+    review view ("active": not dismissed; "top": not dismissed and rank 1 or a strong score)."""
     _require_completed(run)
     where = [ClipCandidate.run_id == run.id]
     if decision is not None:
         where.append(ClipCandidate.decision == decision.value)
+    if view is not None:
+        where.append(_VIEW_FILTERS[view])
     total = db.scalar(select(func.count()).select_from(ClipCandidate).where(*where)) or 0
     candidates = db.scalars(
         select(ClipCandidate).where(*where).order_by(ClipCandidate.rank).offset(offset).limit(limit)
@@ -428,6 +466,7 @@ def list_candidates(
         offset=offset,
         limit=limit,
         candidates=[_read_candidate(c) for c in candidates],
+        counts=_candidate_counts(db, run.id),
     )
 
 

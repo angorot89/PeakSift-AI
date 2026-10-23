@@ -136,7 +136,7 @@ export const EDIT_STAGES = stageRanks(ACTIVE_EDIT_STATUSES, ["ready", "failed"])
 export function editStageLabel(edit: ClipEdit): string {
   switch (edit.status) {
     case "queued":
-      return "Queued — waiting for a worker";
+      return "Waiting to start";
     case "rendering":
       return "Rendering…";
     case "validating":

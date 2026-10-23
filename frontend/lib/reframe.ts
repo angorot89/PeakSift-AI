@@ -85,7 +85,7 @@ export const retryAnalysis = (projectId: string, videoId: string, clipId: string
 export function analysisStageLabel(analysis: ReframeAnalysis): string {
   switch (analysis.status) {
     case "queued":
-      return "Waiting for a worker";
+      return "Waiting to start";
     case "sampling":
       return "Reading frames";
     case "detecting":

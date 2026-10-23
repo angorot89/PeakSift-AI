@@ -1,32 +1,28 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, ChevronDown, EyeOff, Film, Play, SearchX, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronDown, EyeOff, Film, Play, SearchX, Star, Undo2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { MediaFrame } from "@/components/ui/media-frame";
 import { ClipRenderControls } from "@/components/app/clip-render-controls";
-import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
+import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/ui/form-error";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api";
 import {
   CANDIDATE_PAGE_SIZE,
   decideCandidate,
   listCandidates,
-  type CandidateDecision,
+  type CandidateCounts,
   type ClipCandidate,
   type DetectionRun,
 } from "@/lib/clip-detection";
 import type { GeneratedClip } from "@/lib/clips";
 import { formatDuration, formatTimestamp } from "@/lib/format";
+import { MOMENT_FILTERS, emptyMoments, momentCount, momentQuery, type MomentFilter } from "@/lib/moments";
 import { videoContentUrl } from "@/lib/videos";
-
-type Filter = "all" | CandidateDecision;
-
-const FILTERS: Array<{ value: Filter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "saved", label: "Saved" },
-  { value: "dismissed", label: "Dismissed" },
-];
+import { momentLabel } from "@/lib/workspace";
 
 const CATEGORY_LABELS: Record<string, string> = {
   humor: "Humor",
@@ -47,6 +43,12 @@ const DIMENSIONS: Array<{ key: keyof ClipCandidate["scores"]; label: string }> =
   { key: "payoff", label: "Payoff" },
   { key: "completeness", label: "Completeness" },
 ];
+
+const LABEL_STYLES = {
+  "Top pick": "bg-accent/15 text-accent-soft",
+  "Strong moment": "bg-sky-400/10 text-sky-200",
+  "Worth reviewing": "bg-surface-3 text-muted",
+} as const;
 
 /** Plays only [start, end] of the owner-only source stream; pauses at the end. */
 function ClipPreview({
@@ -100,6 +102,68 @@ function ClipPreview({
   );
 }
 
+/** A still from the moment, loaded only once the card scrolls into view; pressing it previews. */
+function MomentThumbnail({
+  videoId,
+  start,
+  title,
+  previewing,
+  onPreview,
+}: {
+  videoId: string;
+  start: number;
+  title: string;
+  previewing: boolean;
+  onPreview: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [painted, setPainted] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onPreview}
+      aria-pressed={previewing}
+      aria-label={`${previewing ? "Close the preview of" : "Preview"} “${title}”`}
+      className="group relative block aspect-video w-28 shrink-0 self-start overflow-hidden rounded-xl border border-border bg-[linear-gradient(160deg,var(--surface-3),var(--background))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-44"
+    >
+      <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-subtle">
+        <Film className="size-5" />
+      </span>
+      {visible ? (
+        <video
+          src={`${videoContentUrl(videoId)}#t=${(start + 0.5).toFixed(2)}`}
+          preload="metadata"
+          muted
+          playsInline
+          aria-hidden="true"
+          tabIndex={-1}
+          onLoadedData={() => setPainted(true)}
+          className={`relative size-full object-cover transition-opacity ${painted ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
+      <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+        <span className="flex size-9 items-center justify-center rounded-full bg-black/70 text-white">
+          {previewing ? <X aria-hidden="true" className="size-4" /> : <Play aria-hidden="true" className="size-4" />}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <li className="flex items-center gap-2 text-xs">
@@ -119,25 +183,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** The overall score is the one number that matters at a glance; the breakdown is secondary. */
-function ScoreBadge({ score }: { score: number }) {
-  return (
-    <div
-      className="flex shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-surface-2 px-3 py-2"
-      title="Overall editorial score, 0–100. A weighted judgement, not a prediction of views."
-    >
-      <span className="tabular text-2xl leading-none font-semibold text-foreground" aria-hidden="true">
-        {score}
-      </span>
-      <span className="mt-1 text-[10px] font-medium tracking-wide text-subtle uppercase" aria-hidden="true">
-        Score
-      </span>
-      <span className="sr-only">Overall score {score} out of 100</span>
-    </div>
-  );
-}
-
-function CandidateCard({
+function MomentCard({
   candidate,
   videoId,
   previewing,
@@ -152,106 +198,47 @@ function CandidateCard({
   onPreview: () => void;
   busy: boolean;
   onDecide: (action: "save" | "dismiss" | "reset") => void;
-  clipControls: ReactNode;
+  clipControls: (secondary: ReactNode) => ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const dismissed = candidate.decision === "dismissed";
   const saved = candidate.decision === "saved";
-  const top = candidate.rank === 1;
+  const label = momentLabel(candidate.rank, candidate.overall_score);
+  const times = (
+    <p className="tabular text-xs text-muted">
+      <time dateTime={`PT${Math.floor(candidate.start)}S`}>{formatTimestamp(candidate.start)}</time>
+      {" – "}
+      <time dateTime={`PT${Math.floor(candidate.end)}S`}>{formatTimestamp(candidate.end)}</time>
+      <span className="text-subtle"> · {formatDuration(candidate.duration)}</span>
+    </p>
+  );
 
-  return (
-    <li
-      className={`rounded-2xl border bg-surface-2/40 p-4 transition-[border-color,opacity] duration-200 sm:p-5 ${
-        saved ? "border-success/40" : "border-border"
-      } ${dismissed ? "opacity-60 hover:opacity-90" : ""}`}
-      aria-label={`Candidate ${candidate.rank}: ${candidate.title}`}
-    >
-      <div className="flex gap-3 sm:gap-4">
-        <span
-          aria-hidden="true"
-          className={`tabular flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold sm:size-10 ${
-            top ? "bg-accent/15 text-accent-soft" : "bg-surface-3 text-muted"
-          }`}
-        >
-          #{candidate.rank}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
-              {CATEGORY_LABELS[candidate.category] ?? candidate.category}
-            </span>
-            {saved ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5 text-caption font-medium text-emerald-200">
-                <BookmarkCheck aria-hidden="true" className="size-3" />
-                Saved
-              </span>
-            ) : null}
-            {dismissed ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-subtle">
-                <EyeOff aria-hidden="true" className="size-3" />
-                Dismissed
-              </span>
-            ) : null}
-          </div>
-          <h4 className="mt-1.5 text-base leading-snug font-semibold text-balance break-words text-foreground sm:text-section">
-            {candidate.title}
-          </h4>
-          <p className="tabular mt-1 text-xs text-muted">
-            <time dateTime={`PT${Math.floor(candidate.start)}S`}>{formatTimestamp(candidate.start)}</time>
-            {" – "}
-            <time dateTime={`PT${Math.floor(candidate.end)}S`}>{formatTimestamp(candidate.end)}</time>
-            <span className="text-subtle"> · {formatDuration(candidate.duration)}</span>
-          </p>
+  // A dismissed moment stays out of the way: one line and Restore.
+  if (dismissed) {
+    return (
+      <li className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3" aria-label={`Dismissed moment: ${candidate.title}`}>
+        <div className="min-w-0">
+          <p className="truncate text-sm text-muted">{candidate.title}</p>
+          {times}
         </div>
-        <ScoreBadge score={candidate.overall_score} />
-      </div>
-
-      <blockquote className="mt-4 border-l-2 border-accent/60 pl-3 text-lead leading-relaxed text-pretty text-foreground">
-        {candidate.hook}
-      </blockquote>
-
-      <div className="mt-3">
-        <p className="text-xs font-medium text-subtle">Why it was selected</p>
-        <p className={`mt-1 text-sm leading-relaxed text-pretty text-muted ${expanded ? "" : "line-clamp-2"}`}>
-          {candidate.rationale}
-        </p>
-      </div>
-
-      <details className="group mt-3" onToggle={(e) => setExpanded((e.target as HTMLDetailsElement).open)}>
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded text-xs text-accent-soft select-none hover:underline [&::-webkit-details-marker]:hidden">
-          <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-open:rotate-180" />
-          <span className="group-open:hidden">More: score breakdown{candidate.transcript_excerpt ? " and transcript" : ""}</span>
-          <span className="hidden group-open:inline">Less</span>
-        </summary>
-        <div className="mt-3 space-y-3 animate-fade-in">
-          <ul className="grid gap-1.5 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
-            {DIMENSIONS.map(({ key, label }) => (
-              <ScoreBar key={key} label={label} value={candidate.scores[key]} />
-            ))}
-          </ul>
-          {candidate.transcript_excerpt ? (
-            <blockquote className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
-              {candidate.transcript_excerpt}
-            </blockquote>
-          ) : null}
-        </div>
-      </details>
-
-      {previewing ? (
-        <div className="mt-4">
-          <ClipPreview videoId={videoId} start={candidate.start} end={candidate.end} title={candidate.title} />
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button variant="secondary" size="sm" onClick={onPreview} aria-pressed={previewing}>
-          {previewing ? <X aria-hidden="true" /> : <Play aria-hidden="true" />}
-          {previewing ? "Close source preview" : "Preview source"}
+        <Button variant="ghost" size="sm" onClick={() => onDecide("reset")} disabled={busy}>
+          <Undo2 aria-hidden="true" />
+          Restore
         </Button>
+      </li>
+    );
+  }
+
+  const secondary = (
+    <>
+      <Button variant="secondary" size="sm" onClick={onPreview} aria-pressed={previewing}>
+        {previewing ? <X aria-hidden="true" /> : <Play aria-hidden="true" />}
+        {previewing ? "Close preview" : "Preview"}
+      </Button>
+      <span className="ml-auto flex items-center gap-1">
         {saved ? (
           <Button variant="ghost" size="sm" onClick={() => onDecide("reset")} disabled={busy} aria-pressed="true">
             <BookmarkCheck aria-hidden="true" className="text-success" />
-            Unsave
+            Saved
           </Button>
         ) : (
           <Button variant="ghost" size="sm" onClick={() => onDecide("save")} disabled={busy} aria-pressed="false">
@@ -259,20 +246,80 @@ function CandidateCard({
             Save
           </Button>
         )}
-        {dismissed ? (
-          <Button variant="ghost" size="sm" onClick={() => onDecide("reset")} disabled={busy}>
-            <Undo2 aria-hidden="true" />
-            Restore
-          </Button>
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => onDecide("dismiss")} disabled={busy}>
-            <EyeOff aria-hidden="true" />
-            Dismiss
-          </Button>
-        )}
+        <Button variant="ghost" size="sm" onClick={() => onDecide("dismiss")} disabled={busy}>
+          <EyeOff aria-hidden="true" />
+          Dismiss
+        </Button>
+      </span>
+    </>
+  );
+
+  return (
+    <li
+      className={`rounded-2xl border bg-surface p-4 transition-colors sm:p-5 ${saved ? "border-success/40" : "border-border"}`}
+      aria-label={`${label}: ${candidate.title}`}
+    >
+      <div className="flex gap-3 sm:gap-4">
+        <MomentThumbnail
+          videoId={videoId}
+          start={candidate.start}
+          title={candidate.title}
+          previewing={previewing}
+          onPreview={onPreview}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium ${LABEL_STYLES[label]}`}>
+              {label === "Top pick" ? <Star aria-hidden="true" className="size-3" /> : null}
+              {label}
+            </span>
+            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
+              {CATEGORY_LABELS[candidate.category] ?? candidate.category}
+            </span>
+          </div>
+          <h3 className="mt-1.5 text-section text-balance break-words text-foreground">{candidate.title}</h3>
+          <div className="mt-0.5">{times}</div>
+          <blockquote className="mt-3 border-l-2 border-accent/60 pl-3 text-sm leading-relaxed text-pretty text-foreground">
+            {candidate.hook}
+          </blockquote>
+          <p className="mt-2 line-clamp-2 text-small text-pretty text-muted">
+            <span className="text-subtle">Why: </span>
+            {candidate.rationale}
+          </p>
+          <details className="group mt-2">
+            <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1 rounded text-xs text-accent-soft select-none hover:underline [&::-webkit-details-marker]:hidden">
+              <ChevronDown aria-hidden="true" className="size-3.5 transition-transform group-open:rotate-180" />
+              <span className="group-open:hidden">Details</span>
+              <span className="hidden group-open:inline">Less</span>
+            </summary>
+            <div className="mt-2 animate-fade-in space-y-3">
+              <p className="text-small text-pretty text-muted">{candidate.rationale}</p>
+              <p className="text-xs text-subtle">
+                Editorial score <span className="tabular text-muted">{candidate.overall_score}</span> of 100 — the model&apos;s
+                judgement, not a prediction of views.
+              </p>
+              <ul className="grid gap-1.5 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
+                {DIMENSIONS.map(({ key, label: name }) => (
+                  <ScoreBar key={key} label={name} value={candidate.scores[key]} />
+                ))}
+              </ul>
+              {candidate.transcript_excerpt ? (
+                <blockquote className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
+                  {candidate.transcript_excerpt}
+                </blockquote>
+              ) : null}
+            </div>
+          </details>
+        </div>
       </div>
 
-      {clipControls}
+      {previewing ? (
+        <div className="mt-4">
+          <ClipPreview videoId={videoId} start={candidate.start} end={candidate.end} title={candidate.title} />
+        </div>
+      ) : null}
+
+      {clipControls(secondary)}
     </li>
   );
 }
@@ -288,29 +335,30 @@ type Props = {
   onClipChange: (clip: GeneratedClip) => void;
 };
 
-/** Ranked candidates of a completed run: filter, page, preview, save/dismiss. */
+/** The moments of a completed search, best first: filter, page, preview, save/dismiss, create. */
 export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, onClipChange }: Props) {
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<MomentFilter>("all");
   const [candidates, setCandidates] = useState<ClipCandidate[]>([]);
   const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<CandidateCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
 
-  const decision = filter === "all" ? undefined : filter;
+  const query = momentQuery(filter);
+  const { view, decision } = query;
 
   const load = useCallback(
     (offset: number) => {
       setLoading(true);
       setError(null);
-      return listCandidates(projectId, videoId, run.id, offset, CANDIDATE_PAGE_SIZE, decision)
+      return listCandidates(projectId, videoId, run.id, offset, CANDIDATE_PAGE_SIZE, decision, view)
         .then((page) => {
-          setCandidates((previous) =>
-            offset === 0 ? page.candidates : [...previous, ...page.candidates],
-          );
+          setCandidates((previous) => (offset === 0 ? page.candidates : [...previous, ...page.candidates]));
           setTotal(page.total);
+          setCounts(page.counts);
           setLoading(false);
         })
         .catch((err: unknown) => {
@@ -318,17 +366,18 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
           setLoading(false);
         });
     },
-    [projectId, videoId, run.id, decision],
+    [projectId, videoId, run.id, decision, view],
   );
 
   // First page whenever the run or the filter changes.
   useEffect(() => {
     let cancelled = false;
-    listCandidates(projectId, videoId, run.id, 0, CANDIDATE_PAGE_SIZE, decision)
+    listCandidates(projectId, videoId, run.id, 0, CANDIDATE_PAGE_SIZE, decision, view)
       .then((page) => {
         if (cancelled) return;
         setCandidates(page.candidates);
         setTotal(page.total);
+        setCounts(page.counts);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -339,20 +388,20 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
     return () => {
       cancelled = true;
     };
-  }, [projectId, videoId, run.id, decision]);
+  }, [projectId, videoId, run.id, decision, view]);
 
   async function decide(candidate: ClipCandidate, action: "save" | "dismiss" | "reset") {
     setBusyId(candidate.id);
     setActionError(null);
     try {
       const updated = await decideCandidate(projectId, videoId, run.id, candidate.id, action);
-      setCandidates((previous) =>
-        previous
-          .map((item) => (item.id === updated.id ? updated : item))
-          // Under a decision filter the card leaves the list once it no longer matches.
-          .filter((item) => decision === undefined || item.decision === decision),
-      );
-      if (decision !== undefined && updated.decision !== decision) setTotal((t) => Math.max(0, t - 1));
+      const before = candidate.decision;
+      // A card leaves the list once it no longer belongs to the filter (e.g. dismissed from All).
+      const belongs = (item: ClipCandidate) =>
+        filter === "all" || filter === "top" ? item.decision !== "dismissed" : item.decision === filter;
+      setCandidates((previous) => previous.map((item) => (item.id === updated.id ? updated : item)).filter(belongs));
+      if (!belongs(updated)) setTotal((t) => Math.max(0, t - 1));
+      setCounts((current) => (current ? recount(current, before, updated) : current));
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {
@@ -360,54 +409,59 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
     }
   }
 
+  function changeFilter(next: MomentFilter) {
+    setFilter(next);
+    setPreviewId(null);
+    setCandidates([]);
+    setLoading(true);
+  }
+
+  const firstLoad = (loading && candidates.length === 0) || clips === null;
+  const empty = counts ? emptyMoments(filter, counts) : null;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div role="tablist" aria-label="Filter candidates" className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
-          {FILTERS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={filter === option.value}
-              onClick={() => {
-                setFilter(option.value);
-                setPreviewId(null);
-              }}
-              className={`inline-flex h-8 items-center rounded-md px-3 text-small font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
-                filter === option.value
-                  ? "bg-surface-3 text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <p className="tabular text-xs text-subtle">
-          {loading && candidates.length === 0 ? "" : `${candidates.length} of ${total}`}
-        </p>
+        <SegmentedControl
+          label="Show moments"
+          value={filter}
+          onChange={changeFilter}
+          options={MOMENT_FILTERS.map((option) => ({
+            ...option,
+            count: counts ? momentCount(counts, option.value) : undefined,
+          }))}
+        />
+        {!firstLoad && total > 0 ? (
+          <p className="tabular text-xs text-subtle">
+            {candidates.length < total ? `${candidates.length} of ${total}` : `${total} ${total === 1 ? "moment" : "moments"}`}
+          </p>
+        ) : null}
       </div>
 
-      {(loading && candidates.length === 0) || clips === null ? (
-        <LoadingState label="Loading candidates…" />
+      {firstLoad ? (
+        <div role="status" aria-label="Loading moments" className="space-y-3">
+          <Skeleton className="h-40 rounded-2xl" />
+          <Skeleton className="h-40 rounded-2xl" />
+        </div>
       ) : error && candidates.length === 0 ? (
-        <ErrorState title="Candidates could not be loaded" message={error} onRetry={() => void load(0)} />
-      ) : candidates.length === 0 ? (
+        <ErrorState title="Moments couldn't be loaded" message={error} onRetry={() => void load(0)} />
+      ) : candidates.length === 0 && empty ? (
         <EmptyState
           compact
           icon={SearchX}
-          title={filter === "all" ? "No clip-worthy moments found" : `No ${filter} candidates`}
-          description={
-            filter === "all"
-              ? "The analysis finished but nothing met the clip criteria. Try another model, or run again after the transcript changes."
-              : "Candidates you mark will appear here."
+          title={empty.title}
+          description={empty.description}
+          action={
+            empty.offer ? (
+              <Button variant="secondary" size="sm" onClick={() => changeFilter(empty.offer!)}>
+                Show {MOMENT_FILTERS.find((f) => f.value === empty.offer)?.label.toLowerCase()}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
         <ol className="space-y-3">
           {candidates.map((candidate) => (
-            <CandidateCard
+            <MomentCard
               key={candidate.id}
               candidate={candidate}
               videoId={videoId}
@@ -415,7 +469,7 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
               onPreview={() => setPreviewId((id) => (id === candidate.id ? null : candidate.id))}
               busy={busyId === candidate.id}
               onDecide={(action) => void decide(candidate, action)}
-              clipControls={
+              clipControls={(secondary) => (
                 <ClipRenderControls
                   projectId={projectId}
                   videoId={videoId}
@@ -423,21 +477,20 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
                   candidate={candidate}
                   initialClip={clipsKnown ? (clips.get(candidate.id) ?? null) : undefined}
                   onChange={onClipChange}
+                  secondary={secondary}
                 />
-              }
+              )}
             />
           ))}
         </ol>
       )}
 
-      {error && candidates.length > 0 ? (
-        <ErrorState message={error} onRetry={() => void load(candidates.length)} />
-      ) : null}
+      {error && candidates.length > 0 ? <ErrorState message={error} onRetry={() => void load(candidates.length)} /> : null}
 
       {candidates.length < total ? (
         <div className="flex justify-center">
           <Button variant="secondary" onClick={() => void load(candidates.length)} disabled={loading}>
-            {loading ? "Loading…" : `Load more (${Math.min(CANDIDATE_PAGE_SIZE, total - candidates.length)})`}
+            {loading ? "Loading…" : `Show ${Math.min(CANDIDATE_PAGE_SIZE, total - candidates.length)} more`}
           </Button>
         </div>
       ) : null}
@@ -445,9 +498,26 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
       <FormError>{actionError}</FormError>
 
       <p className="text-xs text-subtle">
-        Scores are the model&apos;s editorial judgement on a 0–100 scale, normalised across
-        providers. They are not predictions of views or engagement.
+        Moments are ranked by editorial judgement (Top pick, Strong moment, Worth reviewing). They are not predictions of
+        views or engagement.
       </p>
     </div>
   );
+}
+
+/** The filter counts after one decision changed (the next page load brings the server's). */
+function recount(counts: CandidateCounts, before: ClipCandidate["decision"], after: ClipCandidate): CandidateCounts {
+  const next = { ...counts };
+  const strong = after.rank === 1 || momentLabel(after.rank, after.overall_score) !== "Worth reviewing";
+  const move = (decision: ClipCandidate["decision"], by: number) => {
+    if (decision === "dismissed") next.dismissed += by;
+    else {
+      next.active += by;
+      if (strong) next.top += by;
+    }
+    if (decision === "saved") next.saved += by;
+  };
+  move(before, -1);
+  move(after.decision, 1);
+  return next;
 }

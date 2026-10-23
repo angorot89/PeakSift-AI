@@ -137,7 +137,7 @@ export async function getCaptionPreview(
 export function timingStageLabel(track: CaptionTrack): string {
   switch (track.status) {
     case "queued":
-      return "Waiting for a worker";
+      return "Waiting to start";
     case "preparing_audio":
       return "Reading the clip's audio";
     case "aligning":

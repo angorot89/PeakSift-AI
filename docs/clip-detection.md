@@ -84,7 +84,7 @@ All routes require the session cookie and are owner-scoped (anything else is `40
 | GET | `…/clip-detection?offset&limit(1–100)` | Runs, newest first. |
 | GET | `…/clip-detection/{run_id}` | Status: `status`, `progress_percent`, `windows_total/done`, `attempt`, `candidate_count`, `is_stale`, `transcript_current` (null while active), `config`, safe `error_code`/`error_message`, timestamps. |
 | POST | `…/clip-detection/{run_id}/retry` | Failed or stalled runs only; `409` if the transcript changed, another run is active, or the attempt limit is reached. |
-| GET | `…/clip-detection/{run_id}/candidates?offset&limit(1–100)&decision=` | Ranked candidates of a completed run (`409` before). |
+| GET | `…/clip-detection/{run_id}/candidates?offset&limit(1–100)&decision=&view=` | Ranked candidates of a completed run (`409` before). `view=active` leaves dismissed ones out; `view=top` keeps the undismissed ones ranked first or scoring at least 75 (the "Strong moment" threshold). Every page carries `counts` (`active`, `top`, `saved`, `dismissed`) for the review filters. |
 | GET | `…/candidates/{candidate_id}` | One candidate. |
 | POST | `…/candidates/{candidate_id}/save` · `/dismiss` · `/reset` | Record the user's decision. |
 
