@@ -37,6 +37,7 @@ class FakePublishingProvider:
         confirm_at_most: int | None = None,
         processing_polls: int = 1,
         final_state: UploadState = UploadState.PROCESSED,
+        id_prefix: str = "",
     ) -> None:
         self.confirm_at_most = confirm_at_most  # simulate partial acceptance of a chunk
         self.processing_polls = processing_polls
@@ -47,6 +48,9 @@ class FakePublishingProvider:
         self.calls: list[str] = []
         self._failures: dict[str, list[PublishErrorCode | None]] = defaultdict(list)
         self._ids = itertools.count(1)
+        # Tests use plain "fake-000001"; a long-lived process sets a prefix so ids stay unique
+        # after a restart (the database still holds earlier simulated uploads).
+        self._id_prefix = f"{id_prefix}-" if id_prefix else ""
 
     # --- scripting ------------------------------------------------------------------------
 
@@ -100,7 +104,7 @@ class FakePublishingProvider:
         accepted = data if self.confirm_at_most is None else data[: self.confirm_at_most]
         session["received"].extend(accepted)
         if len(session["received"]) == session["total"] and session["video_id"] is None:
-            video_id = f"fake-{next(self._ids):06d}"
+            video_id = f"fake-{self._id_prefix}{next(self._ids):06d}"
             session["video_id"] = video_id
             self.videos[video_id] = {"request": session["request"],
                                      "data": bytes(session["received"]), "polls": 0}  # fmt: skip

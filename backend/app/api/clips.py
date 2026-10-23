@@ -188,10 +188,20 @@ def generate_clip(
     return _read(clip, candidate.title, candidate.run_id)
 
 
-@router.get("/clip", response_model=ClipRead)
-def get_clip(candidate: OwnedCandidate, db: DbSession, storage: Storage) -> ClipRead:
+@router.get("/clip", response_model=ClipRead | None)
+def get_clip(
+    candidate: OwnedCandidate,
+    db: DbSession,
+    storage: Storage,
+    optional: Annotated[
+        bool, Query(description="Answer 200 with null instead of 404 when there is none yet")
+    ] = False,
+) -> ClipRead | None:
+    """The moment's clip (404 if none yet, or null with ``optional=true``)."""
     clip = _reconcile(db, _existing_clip(db, candidate), storage)
     if clip is None:
+        if optional:
+            return None
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No clip generated yet")
     return _read(clip, candidate.title, candidate.run_id)
 

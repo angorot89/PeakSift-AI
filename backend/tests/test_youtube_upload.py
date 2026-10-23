@@ -213,6 +213,21 @@ def test_the_factory_builds_youtube_or_the_fake_outside_production():
     assert get_publishing_provider(Settings(**base)).name == "youtube"
     fake = Settings(**{**base, "publishing_provider": "fake"})
     assert get_publishing_provider(fake) is get_publishing_provider(fake)  # one per process
+
     production = Settings.model_construct(**{**fake.model_dump(), "app_env": "production"})
     with pytest.raises(RuntimeError):
         get_publishing_provider(production)
+
+
+def test_simulated_ids_stay_unique_across_processes():
+    """A restarted worker must not hand out an id an earlier simulated upload already has."""
+    from app.services.publishing.fake import FakePublishingProvider
+
+    def upload(provider):
+        auth = provider.authorize("refresh")
+        uri = provider.start_upload(auth, request(size_bytes=4))
+        return provider.upload_chunk(auth, uri, b"data", 0, 4).video_id
+
+    assert upload(FakePublishingProvider()) == "fake-000001"  # tests stay deterministic
+    first, second = (upload(FakePublishingProvider(id_prefix=p)) for p in ("a1b2", "c3d4"))
+    assert first == "fake-a1b2-000001" and first != second

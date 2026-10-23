@@ -117,6 +117,8 @@ def test_other_user_cannot_reach_a_video(client: TestClient, db_session: Session
     url = base(project_id, video_id)
     assert client.post(f"{url}/transcription").status_code == 404
     assert client.get(f"{url}/transcription").status_code == 404
+    # optional=true never turns another user's resource into a null answer
+    assert client.get(f"{url}/transcription", params={"optional": "true"}).status_code == 404
     assert client.post(f"{url}/transcription/retry").status_code == 404
     assert client.get(f"{url}/transcript").status_code == 404
 
@@ -462,3 +464,14 @@ def test_retry_when_queue_is_down_marks_the_job_failed(client, db_session, monke
     assert client.post(f"{base(project_id, video_id)}/transcription/retry").status_code == 503
     body = client.get(f"{base(project_id, video_id)}/transcription").json()
     assert body["status"] == "failed" and body["error_code"] == "queue_unavailable"
+
+
+def test_no_transcription_yet_is_null_when_optional(client: TestClient, db_session: Session):
+    sign_up(client)
+    project_id, video_id = ready_video(client, db_session)
+    url = f"{base(project_id, video_id)}/transcription"
+    assert client.get(url).status_code == 404
+    response = client.get(url, params={"optional": "true"})
+    assert response.status_code == 200 and response.json() is None
+    client.post(url)
+    assert client.get(url, params={"optional": "true"}).json()["status"] == "queued"

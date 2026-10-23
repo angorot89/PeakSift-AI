@@ -1,4 +1,4 @@
-import { API_URL, ApiError, apiFetch, postJson } from "@/lib/api";
+import { API_URL, apiFetch, postJson } from "@/lib/api";
 import { stageRanks } from "@/lib/status-sync";
 
 export type ClipStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
@@ -64,20 +64,10 @@ export const generateClip = (projectId: string, videoId: string, runId: string, 
 export const retryClip = (projectId: string, videoId: string, runId: string, candidateId: string) =>
   postJson<GeneratedClip>(`${candidateBase(projectId, videoId, runId, candidateId)}/retry`, undefined);
 
-/** The candidate's clip, or null when none has been generated (404). */
-export async function getClip(
-  projectId: string,
-  videoId: string,
-  runId: string,
-  candidateId: string,
-): Promise<GeneratedClip | null> {
-  try {
-    return await apiFetch<GeneratedClip>(candidateBase(projectId, videoId, runId, candidateId));
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
-}
+/** The candidate's clip, or null when none has been generated (asked with `optional=true`, so
+ * "none yet" is an answer, not a failed request). */
+export const getClip = (projectId: string, videoId: string, runId: string, candidateId: string) =>
+  apiFetch<GeneratedClip | null>(`${candidateBase(projectId, videoId, runId, candidateId)}?optional=true`);
 
 export function listVideoClips(projectId: string, videoId: string, limit = 100, offset = 0) {
   const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });

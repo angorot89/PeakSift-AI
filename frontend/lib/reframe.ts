@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, postJson } from "@/lib/api";
+import { apiFetch, postJson } from "@/lib/api";
 import { stageRanks } from "@/lib/status-sync";
 
 export type ReframeStatus = "queued" | "sampling" | "detecting" | "tracking" | "planning" | "completed" | "failed";
@@ -59,15 +59,10 @@ export const ANALYSIS_STAGES = stageRanks(ACTIVE, ["completed", "failed"]);
 const base = (projectId: string, videoId: string, clipId: string) =>
   `/projects/${projectId}/videos/${videoId}/clips/${clipId}/reframe`;
 
-/** The analysis for the server's current configuration, or null when there is none yet. */
-export async function getCurrentAnalysis(projectId: string, videoId: string, clipId: string) {
-  try {
-    return await apiFetch<ReframeAnalysis>(`${base(projectId, videoId, clipId)}/current`);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
-}
+/** The analysis for the server's current configuration, or null when there is none yet
+ * (asked with `optional=true`, so "none yet" is an answer, not a failed request). */
+export const getCurrentAnalysis = (projectId: string, videoId: string, clipId: string) =>
+  apiFetch<ReframeAnalysis | null>(`${base(projectId, videoId, clipId)}/current?optional=true`);
 
 export const startAnalysis = (projectId: string, videoId: string, clipId: string) =>
   postJson<ReframeAnalysis>(base(projectId, videoId, clipId), undefined);

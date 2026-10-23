@@ -97,9 +97,10 @@ export function nextAction(p: ProjectSummary): NextAction {
   if (t.status !== "completed") {
     return { key: "transcribing", title: "Transcribing your video", description: "You can leave this page; it keeps going.", href: `${base(p)}/source`, tone: "waiting" };
   }
-  // A plan or a short waiting for the creator comes before finding more moments.
+  // A plan or a short waiting for the creator comes before finding more moments. A draft is the
+  // next step only until the project has a Short: drafts used through the editor stay "ready".
   const plan = p.plans.latest_ready;
-  if (plan) {
+  if (plan && p.shorts.total === 0) {
     return { key: "plan-ready", title: "Your Auto Edit draft is ready", description: "See what PeakSift chose, then use it or adjust it.", cta: "Review the draft", href: autoEditLink(p.id, plan.clip_id), tone: "action" };
   }
   const recent = p.shorts.recent;

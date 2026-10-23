@@ -1,5 +1,6 @@
 """The configured publishing provider (``PUBLISHING_PROVIDER``)."""
 
+import secrets
 from functools import cache
 
 from app.core.config import Settings
@@ -10,8 +11,9 @@ from app.services.publishing.provider import PublishingProvider
 def _fake():
     from app.services.publishing.fake import FakePublishingProvider
 
-    # One per process: the simulated "YouTube" must remember uploads between tasks.
-    return FakePublishingProvider()
+    # One per process: the simulated "YouTube" must remember uploads between tasks. Its video
+    # ids carry a per-process prefix, so a restarted worker never repeats an earlier id.
+    return FakePublishingProvider(id_prefix=secrets.token_hex(4))
 
 
 def get_publishing_provider(settings: Settings) -> PublishingProvider:

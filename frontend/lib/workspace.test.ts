@@ -44,6 +44,11 @@ describe("next best action", () => {
     ["candidates", detected(3), "review-clips", `/projects/${P}/clips`],
     ["clip ready", { ...detected(3), clips: { total: 1, ready: 1, working: 0, failed: 0, latest_ready_id: CLIP } }, "create-short", `/projects/${P}/clips/${CLIP}/create`],
     ["plan ready", { ...detected(3), plans: { ready: 1, latest_ready: { plan_id: "x", clip_id: CLIP, recipe: "punchy" } } }, "plan-ready", `/projects/${P}/clips/${CLIP}/auto-edit`],
+    ["draft used through the editor, Short published", {
+      ...detected(3), plans: { ready: 1, latest_ready: { plan_id: "x", clip_id: CLIP, recipe: "punchy" } },
+      shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] },
+      published: { uploads: 1, working: 0, failed: 0, with_analytics: 0, last_synced_at: null },
+    }, "published", `/projects/${P}/analytics`],
     ["rendering", { ...detected(3), shorts: { total: 1, ready: 0, working: 1, failed: 0, recent: [short("rendering")] } }, "rendering", `/projects/${P}/clips/${CLIP}`],
     ["short ready", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] } }, "short-ready", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],
     ["upload failed", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] }, published: { uploads: 0, working: 0, failed: 1, with_analytics: 0, last_synced_at: null } }, "upload-failed", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],

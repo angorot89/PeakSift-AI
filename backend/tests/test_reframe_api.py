@@ -244,7 +244,14 @@ def test_current_list_and_status(client, db_session, storage):
     sign_up(client)
     ctx = clip_with_file(db_session, storage)
     assert client.get(f"{ctx['base']}/current").status_code == 404
+    # The app's check: "none yet" is a null answer, not a failed request.
+    optional = client.get(f"{ctx['base']}/current", params={"optional": "true"})
+    assert optional.status_code == 200 and optional.json() is None
     analysis_id = client.post(ctx["base"]).json()["id"]
+    assert (
+        client.get(f"{ctx['base']}/current", params={"optional": "true"}).json()["id"]
+        == analysis_id
+    )
     assert client.get(f"{ctx['base']}/current").json()["id"] == analysis_id
     assert client.get(f"{ctx['base']}/{analysis_id}").json()["status"] == "queued"
     page = client.get(ctx["base"]).json()

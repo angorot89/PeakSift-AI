@@ -777,6 +777,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         />
       </div>
     );
+  } else if (match?.status === "ready" && mode === "rendered" && selected?.id === match.id) {
+    action = (
+      <p className="rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-center text-small text-muted">
+        This version is on screen. Change any setting to make another.
+      </p>
+    );
   } else if (match?.status === "ready") {
     action = (
       <div className="space-y-2">
@@ -913,7 +919,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   }`}
                 >
                   <Smartphone aria-hidden="true" className="size-3.5" />
-                  Rendered short
+                  Rendered Short
                 </button>
               </div>
               <div className="flex items-center gap-3">
@@ -938,7 +944,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 {justFinished ? (
                   <p role="status" className="flex items-center justify-center gap-2 text-sm text-emerald-200">
                     <CheckCircle2 aria-hidden="true" className="size-4" />
-                    Your short is ready.
+                    Your Short is ready.
                   </p>
                 ) : null}
                 <div className="text-center">

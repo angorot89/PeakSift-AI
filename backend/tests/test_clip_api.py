@@ -361,6 +361,8 @@ def test_get_clip_404_before_generation_then_reports_state(client, db_session, s
     sign_up(client)
     ctx = candidate_setup(client, db_session)
     assert client.get(clip_url(ctx)).status_code == 404
+    optional = client.get(clip_url(ctx), params={"optional": "true"})
+    assert optional.status_code == 200 and optional.json() is None
     clip_id = client.post(clip_url(ctx)).json()["id"]
     clip = db_session.get(Clip, uuid.UUID(clip_id))
     clip.status, clip.progress_percent = "rendering", 10
