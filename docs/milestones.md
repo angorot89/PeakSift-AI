@@ -293,6 +293,40 @@ Delivered:
 - CI steps (fake provider, no Google credentials, insights benchmark gate), synthetic acceptance
   (170/170 browser checks at four widths) and real-account checks with upload-only grants
 
+## V1.5 — Creator Experience & Modern Workspace
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests on
+top of the unmerged V1.4 stack wait for GitHub Actions (unavailable because of account billing);
+nothing is merged or tagged. V1.1–V1.4 must be merged and released first.
+
+PeakSift's features become one coherent creator workspace: every screen answers *where am I,
+what is happening, what should I do next*, in the creator's words. No pipeline, model or render
+changed. See [creator-experience.md](creator-experience.md) and
+[design-system.md](design-system.md).
+
+Delivered:
+
+- One workspace navigation: a collapsible sidebar (a sheet on phones), Home, Projects, Analytics,
+  Settings; projects with Overview · Source · Clips · Assets · Analytics tabs
+- A refined design system: type scale, cards, section headers, dialogs and sheets, menus,
+  segmented controls, tool tabs, tooltips, toasts, and one status language (Waiting · a specific
+  step · Ready · Needs attention)
+- Home and project overviews driven by owner-scoped summaries (`/workspace/home`,
+  `/projects/{id}/summary`) and tested next-best-action rules; a dismissible first-run checklist
+- Guided Short creation: Start → Style → Review → Render, Auto Edit recommended, recipe cards
+  with traits, real preparing stages, review sections with reasons and Edit links
+- The editor: dominant preview with play, seek, mute and full screen; five tool groups; the render
+  action always in reach; accurate wording about versions
+- Moments best first with grounded labels (Top pick, Strong moment, Worth reviewing), one
+  primary Create Short, filters with counts; visuals search-first with Best matches / More
+  results and batch uploads; analytics that answer "How are my Shorts doing?"
+- Polish and hardening: terminology audit, skeletons, toasts and confirmations by rule; 112/112
+  browser checks (16 screens × 1440/1280/1024/768/430/390/375: no overflow, no axe WCAG 2.1 AA
+  violation, 44 px touch targets, no console errors)
+- Acceptance: the first-time journey (account → upload → transcript → moments → Auto Edit
+  Punchy → editor → render → play → download → simulated publish) and the returning journey in a
+  real browser on a production build, with the defects it found fixed
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -310,6 +344,7 @@ Delivered:
 - V1.2 Auto Edit & Creator Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.3 Semantic Asset Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.4 Performance Analytics & Learning — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.5 Creator Experience & Modern Workspace — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 

@@ -1,6 +1,6 @@
 # PeakSift AI — Frontend
 
-Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, the dashboard and projects, and the project page's source-video upload, metadata, preview, transcription workflow and AI clip detection (provider choice, staged progress, ranked candidate cards with preview and save/dismiss) and clip generation (Generate clip, real render states, rendered clip player, Download MP4) — all backed by the FastAPI API.
+Next.js (App Router) + TypeScript + Tailwind CSS. Contains the landing page, login / register, and the creator workspace: Home, projects (Overview, Source, Clips, Assets, Analytics), guided Short creation (Start → Style → Review → Render), the editor, analytics and settings — all backed by the FastAPI API. See [../docs/creator-experience.md](../docs/creator-experience.md) and [../docs/design-system.md](../docs/design-system.md).
 
 ## Run locally
 
@@ -37,17 +37,22 @@ npm run start    # Serve the production build
 | `/`         | Landing page                                                       |
 | `/login`    | Email + password login; generic error on bad credentials           |
 | `/register` | Create an account (email, password ≥ 8 chars, confirmation)        |
-| `/dashboard` | Project count, placeholders for videos/clips (not built yet), recent projects |
-| `/projects` | The signed-in user's projects                                       |
-| `/projects/new` | Create a project (name only)                                   |
-| `/projects/[id]` | The project workspace. A **workflow stepper** (Upload, Transcribe, Find clips, Generate, Edit — Done / In progress / Next / Needs attention, each linking to its section, nothing locked) above four numbered panels: **1 Source video** (upload drop zone with real progress, then a labelled "Source preview" player beside duration/resolution/size/upload date; codecs behind "Show technical details"; Replace), **2 Transcript** (start, live status with real progress, stalled/failed alerts with retry, a bounded scrollable timestamped transcript, Copy transcript), **3 Clip moments** (provider/model choice from server allow-lists, "Find clip moments", staged progress, run history, and ranked candidate cards: rank, title, time range, one prominent overall score, the hook, "Why it was selected" (clamped), score breakdown and transcript excerpt behind a disclosure, Saved/Dismissed chips, Preview source in a labelled frame, Generate clip with real render states, and a compact "Generated clip" player with **Create vertical short** and **Download MP4**), **4 Generated clips** (frame thumbnails, status, number of shorts, Download, Create short / Open editor), a **Visual assets** section (drag-and-drop uploads of images and B-roll videos with per-file progress and errors, an images/videos filter, search, thumbnails, a preview dialog with description, tags and delete), and a **Delete project** panel (permanent; enabled only once the exact project name is typed, then back to `/projects`) |
-| `/projects/[id]/clips/[clipId]/auto-edit` | **Auto Edit**: recipe cards (Clean, Punchy, Story, Minimal) and an explicit music choice, honest planning stages, the plan review (one card per section with the choice and a reason, what was left out, who planned it), **Use this edit** / **Edit choices** / **Try another plan**, Retry, and the plan history |
-| `/settings` | **Connected accounts → YouTube**: connect (Google's consent page, upload access only), the connection's state and channel (named after the first upload), Reconnect when Google no longer accepts it, Disconnect; explains every outcome of Google's redirect; says so when the server has publishing off. **Analytics access** (V1.4): Not connected / Connected (read-only), the separate **Connect analytics (read-only)** upgrade with what it allows, every outcome of that consent, and **Delete collected metrics** with a second confirmation |
-| `/analytics` | **Analytics** (V1.4): access states (not enabled, connect YouTube first, *Analytics access not connected* with the read-only upgrade), a *Simulated metrics* banner on test stacks, **Your usual short** (the creator's own median or "No reliable pattern yet"), **Patterns in your shorts** (insights with evidence, hide/show, caveats), and every short published from PeakSift with live and processed figures ("—" for not reported), its first week against the usual, freshness, status pills and Refresh |
-| `/analytics/[id]` | One short: stat tiles, **Early windows** table with positions, single-series daily charts (engaged views, average % viewed; focusable bars) with a full table, the view definition per day, and **How this short was made** |
-| `/projects/[id]/clips/[clipId]` | The **short-form editor** for one ready clip: a 9:16 stage (labelled approximate **Preview** with a real transcript caption, or the **Rendered short**; with Smart reframe the preview follows the completed crop path frame by frame), visual settings (layout cards, a **Smart reframe** panel — Analyze framing with real stages and progress, a plain-language confidence summary, Retry, and an Automatic / Focal point switch with a keyboard-accessible focal-point picker — Captions switch, a **Word synced / Phrase timed** panel with the timing state as text and Generate / Retry, caption-preset cards (Focus, Punch, Minimal, Boxed) with live samples, Top/Center/Bottom picker, an **Opening hook** panel, a **Safe area** guide, a live preview of the renderer's own cues and active word following the video clock, a **Visuals** section (B-roll suggestions with real stages and a note when the keyword provider made them, likely matches from the library, an asset chooser with upload, cutaway / picture-in-picture / overlay cards with timing, fit, position, size, opacity, video start, loop and fade, a small timeline, and a live preview on the stage), and an **Audio** section — original level, music picker with waveform/listen/upload, music volume, start, loop, fades, automatic ducking, sound-effect cues on a lightweight timeline with keyboard-movable markers, normalization — with a browser audio preview that follows the video), **Render short** replaced by the real Queued/Rendering/Validating state while it runs, the rendered result with **Download short** / **Publish to YouTube** (when the server has publishing on: a dialog with title, description, comma-separated tags and live counts against YouTube's limits, Visibility defaulting to Private, the required made-for-kids declaration, a notice that Google keeps uploads from unverified apps private and that PeakSift cannot edit or delete them; then real stages and upload progress, Retry only when the server says it is safe, links to YouTube and YouTube Studio once the video exists, never a link for simulated uploads) / **Create another version** / **Back to clip**, and the versions list named by settings (status, play, download, retry) |
+| `/home` | **Home**: first visit — what PeakSift does and *Create your first project*; afterwards *Continue working* (each project's next step from `GET /workspace/home`), *Recent Shorts*, *Recent projects*, and a dismissible *Getting started* checklist until the first Short is ready. `/dashboard` redirects here |
+| `/projects` | The signed-in user's projects |
+| `/projects/new` | Create a project (name only) |
+| `/projects/[id]` | **Overview**: the next best action (upload and *Start transcription* in place), progress *Source → Clips → Edit → Publish → Learn*, best moments, recent Shorts and facts, from `GET /projects/{id}/summary` |
+| `/projects/[id]/source` | The source video (upload, details, preview) and the transcript |
+| `/projects/[id]/clips` | **Moments** (find, filter All / Top picks / Saved / Dismissed, preview, save, dismiss, **Create Short**) and **Your clips** |
+| `/projects/[id]/assets` | **Visuals**: search first, upload (button or drop, one batch summary), grid, details dialog |
+| `/projects/[id]/analytics` | How this project's Shorts are doing |
+| `/projects/[id]/clips/[clipId]/create` | **Create a Short — Start**: Auto Edit (recommended) or start manually; follows the clip being cut |
+| `/projects/[id]/clips/[clipId]/auto-edit` | **Create a Short — Style and Review**: recipe cards (Clean, Punchy, Story, Minimal) with traits, an explicit music choice, the real preparing stages, the review (Framing, Captions, Opening, Visuals, Sound with reasons and Edit links), **Use this edit** / **Continue to editor** / **Try another**, all drafts. `?new=1` starts a new draft |
+| `/projects/[id]/clips/[clipId]` | **Edit Short**: the preview (play, seek, mute, full screen) beside five tool groups (Style, Captions, Opening, Visuals, Sound) and the render action; versions below. `?edit=` opens a version, `?plan=` a draft, `?tool=` a tool group |
+| `/analytics` | **How are my Shorts doing?**: freshness, totals of reported figures ("—" when none), *What seems to be working* (your usual Short, patterns with evidence), your Shorts; access states and the simulated-data label |
+| `/analytics/[id]` | One Short: stat tiles, early windows, small daily charts and table, how it was made |
+| `/settings` | **YouTube**: connect (upload access only), disconnect (confirmed), analytics access (read-only) and deleting collected metrics |
 
-`/dashboard` and `/projects*` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/dashboard`.
+`/home`, `/projects*`, `/analytics*` and `/settings` require a signed-in user; visitors are redirected to `/login`. That redirect is a convenience — the API enforces authorization on every request. Signed-in visitors to `/login` or `/register` are sent to `/home`.
 
 ## How authentication works in the browser
 
@@ -78,13 +83,17 @@ app/
   page.tsx         # Landing page
   login/, register/
   (app)/           # Signed-in area: layout.tsx = RequireAuth + AppShell
-    dashboard/, projects/, projects/new/, projects/[id]/
+    home/, dashboard/ (redirect), projects/, projects/new/, analytics/, settings/,
+    projects/[id]/ (layout = ProjectFrame; overview, source/, clips/, assets/, analytics/,
+      clips/[clipId]/ = editor, clips/[clipId]/create/, clips/[clipId]/auto-edit/)
   globals.css      # Tailwind import, theme tokens, base styles
   icon.svg         # Favicon
 components/
-  app/             # App shell, route guard, dashboard/projects views, states, source video,
-                   # transcription panel + viewer, clip detection panel + candidate review,
-                   # clip render controls + rendered clip, project workflow stepper,
+  app/             # App shell (sidebar, mobile sheet), route guard, home view, projects views,
+                   # project/ (ProjectFrame + tabs, overview, sections), create/ (Start step, step
+                   # indicator), auto-edit view (Style + Review), states, source video,
+                   # transcription panel + viewer, clip detection panel + moments review,
+                   # clip actions (Create Short),
                    # generated clips panel, short-editor view; editor/ = stage (+ reframed preview),
                    # controls, caption controls + caption layer (live dynamic captions),
                    # audio panel + audio timeline (music, effects, waveforms),
@@ -93,8 +102,9 @@ components/
   auth/            # AuthProvider/useAuth, login & register forms, header auth state
   landing/         # Landing page sections
   ui/              # Design system: Button/ButtonLink (one shape; primary/secondary/ghost/danger,
-                   # sm/md/lg), Panel, StatusPill, InlineAlert, EmptyState, Skeleton,
-                   # ProgressBar/Spinner/WorkingState, MediaFrame, Field, FormError, SectionHeading
+                   # sm/md/lg), Card, Panel, SectionHeader, StatusPill, InlineAlert, Skeleton,
+                   # ProgressBar/Spinner/WorkingState, MediaFrame, Field, FormError, Dialog, Menu,
+                   # SegmentedControl, ToolTabs, Tooltip, IconButton, Toast
   logo.tsx, site-header.tsx, site-footer.tsx
 lib/
   api.ts           # fetch wrapper (base URL, cookies, error parsing)
@@ -121,6 +131,15 @@ lib/
   auto-edit.ts     # Auto Edit API calls; auto-edit-rules.ts the pure display rules (unit-tested)
   edit-draft.ts    # Editor settings from a stored configuration (version or plan), unit-tested
   project-clip.ts  # Loads a project and one of its clips (editor and Auto Edit)
+  navigation.ts    # Routes, global and project navigation, which item is current (unit-tested)
+  workspace.ts     # Home and project summaries; workspace-rules.ts the next best action,
+                   # stages, moment labels and the getting-started checklist (unit-tested)
+  status.ts        # Waiting / Processing / Ready / Needs attention status language (unit-tested)
+  moments.ts       # Moment filters, their queries, counts and empty states (unit-tested)
+  editor-tools.ts  # The editor's tool groups, ?tool= links and their marks (unit-tested)
+  upload-batch.ts  # One summary for a batch of uploads (unit-tested)
+  menu-keys.ts     # Keyboard movement for menus and tab lists (unit-tested)
+  use-stored-flag.ts # Small per-browser preferences (sidebar, dismissed tips)
   use-api.ts       # Loading/error/reload hook for API data
   format.ts        # Date, bytes, duration and frame-rate formatting
 ```

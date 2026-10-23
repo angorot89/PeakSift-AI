@@ -52,6 +52,7 @@ import {
   listRecipes,
   missingInputs,
   planSections,
+  planEditorLink,
   planSteps,
   plannerNote,
   regeneratePlan,
@@ -230,12 +231,6 @@ const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
   visuals: ImageIcon,
   audio: Music,
 };
-
-/** The editor opened on this plan (or the version made from it), at one tool group. */
-export function planEditorLink(editorLink: string, plan: AutoEditPlan, tool?: SectionKey): string {
-  const from = plan.status === "applied" && plan.clip_edit_id ? `edit=${plan.clip_edit_id}` : `plan=${plan.id}`;
-  return `${editorLink}?${from}${tool ? `&tool=${tool}` : ""}`;
-}
 
 function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: string }) {
   const sections = planSections(plan);
