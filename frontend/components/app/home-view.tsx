@@ -11,12 +11,14 @@ import {
   Smartphone,
   Sparkles,
   Upload,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ErrorState } from "@/components/app/states";
 import { ButtonLink } from "@/components/ui/button-link";
+import { IconButton } from "@/components/ui/icon-button";
 import { Card, cardClasses } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/progress";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -24,10 +26,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { editContentUrl } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+import { useStoredFlag } from "@/lib/use-stored-flag";
 import {
   continueItems,
   editorLink,
   getHome,
+  gettingStarted,
   nextAction,
   projectStage,
   relativeTime,
@@ -223,6 +227,47 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
   );
 }
 
+/** A first-run checklist from real progress; gone for good once dismissed or once a Short is ready. */
+function GettingStarted({ home }: { home: Home }) {
+  const [dismissed, setDismissed] = useStoredFlag("peaksift.tips.getting-started");
+  const { steps, complete } = gettingStarted(home);
+  if (complete || dismissed) return null;
+  const done = steps.filter((step) => step.done).length;
+  return (
+    <section aria-labelledby="start-heading" className="rounded-2xl border border-accent/30 bg-accent/[0.04] px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="start-heading" className="text-title">Getting started</h2>
+          <p className="mt-0.5 text-sm text-muted">
+            {done} of {steps.length} done. Your first Short is a few steps away.
+          </p>
+        </div>
+        <IconButton aria-label="Dismiss getting started" size="sm" onClick={() => setDismissed(true)}>
+          <X aria-hidden="true" />
+        </IconButton>
+      </div>
+      <ol className="mt-3 grid gap-2 sm:grid-cols-3">
+        {steps.map((step, index) => (
+          <li key={step.key} className="flex items-center gap-2.5 text-sm">
+            <span
+              aria-hidden="true"
+              className={`flex size-6 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${
+                step.done ? "bg-success/15 text-emerald-200" : "bg-surface-3 text-subtle"
+              }`}
+            >
+              {step.done ? <CheckCircle2 className="size-3.5" /> : index + 1}
+            </span>
+            <span className={step.done ? "text-muted line-through decoration-white/20" : "text-foreground"}>
+              {step.title}
+              <span className="sr-only">{step.done ? " (done)" : ""}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function Returning({ home }: { home: Home }) {
   const items = continueItems(home);
   const firstAction = items.findIndex((item) => item.cta);
@@ -238,6 +283,8 @@ function Returning({ home }: { home: Home }) {
           New project
         </ButtonLink>
       </div>
+
+      <GettingStarted home={home} />
 
       {items.length ? (
         <section aria-labelledby="continue-heading">

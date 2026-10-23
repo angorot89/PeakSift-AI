@@ -151,7 +151,7 @@ export function TranscriptionPanel({ projectId, videoId, onTranscriptionChange }
           </Button>
         }
       >
-        The worker stopped reporting progress. Start it again to continue.
+        The work stopped responding. Start it again to continue.
       </InlineAlert>
     );
   } else if (isActive(transcription.status)) {

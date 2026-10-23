@@ -3,9 +3,10 @@
 import { Clapperboard, Download, Smartphone, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, LoadingState } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { Panel } from "@/components/ui/panel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/status-pill";
 import { clipContentUrl, clipDownloadUrl, type GeneratedClip } from "@/lib/clips";
 import { createHref, editorHref, isEditActive, listEdits } from "@/lib/edits";
@@ -155,13 +156,15 @@ export function GeneratedClipsPanel({
       description="Moments cut from the source video, and the Shorts made from them."
     >
       {clips === null ? (
-        <LoadingState label="Loading generated clips…" />
+        <div role="status" aria-label="Loading your clips" className="space-y-2">
+          <Skeleton className="h-20 rounded-xl" />
+        </div>
       ) : ordered.length === 0 ? (
         <EmptyState
           compact
           icon={Clapperboard}
           title="No generated clips yet"
-          description="Generate a candidate to create your first clip."
+          description="Choose Create Short on a moment to make your first clip."
         />
       ) : (
         <ul className="space-y-2">

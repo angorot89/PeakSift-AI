@@ -152,7 +152,7 @@ export function CaptionTimingPanel({
     status = (
       <div className="space-y-2">
         <InlineAlert tone={track.status === "failed" ? "danger" : "warning"} title={track.status === "failed" ? "Word timing failed" : "Word timing stalled"}>
-          {track.status === "failed" ? timingErrorCopy(track) : "The worker stopped reporting progress."}
+          {track.status === "failed" ? timingErrorCopy(track) : "Word timing stopped responding."}
         </InlineAlert>
         <Button variant="secondary" className="w-full" onClick={onRetry} disabled={busy}>
           {busy ? "Retrying…" : "Retry word sync"}

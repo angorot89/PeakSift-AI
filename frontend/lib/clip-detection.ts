@@ -107,19 +107,19 @@ export function detectionStageLabel(run: DetectionRun): string {
     case "queued":
       return "Waiting to start";
     case "preparing_transcript":
-      return "Preparing transcript";
+      return "Preparing the transcript";
     case "analyzing":
       return run.windows_total
-        ? `Analyzing transcript — window ${Math.min(run.windows_done + 1, run.windows_total)} of ${run.windows_total}`
-        : "Analyzing transcript";
+        ? `Reading the transcript — part ${Math.min(run.windows_done + 1, run.windows_total)} of ${run.windows_total}`
+        : "Reading the transcript";
     case "validating":
-      return "Validating candidates";
+      return "Checking moments";
     case "ranking":
-      return "Ranking candidates";
+      return "Ranking moments";
     case "completed":
-      return "Candidates ready";
+      return "Moments ready";
     case "failed":
-      return "Detection failed";
+      return "Finding moments failed";
   }
 }
 

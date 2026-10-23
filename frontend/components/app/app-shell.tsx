@@ -15,13 +15,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
 import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { activeGlobal, GLOBAL_NAV, projectLocation, SETTINGS_NAV, type GlobalKey } from "@/lib/navigation";
 import { listProjects, type Project } from "@/lib/projects";
+import { useStoredFlag } from "@/lib/use-stored-flag";
 
 const ICONS: Record<GlobalKey, LucideIcon> = {
   home: Home,
@@ -32,31 +33,6 @@ const ICONS: Record<GlobalKey, LucideIcon> = {
 const RECENT_PROJECTS = 3;
 const COLLAPSE_KEY = "peaksift.sidebar.collapsed";
 
-// The sidebar preference lives in this browser only (a convenience; everything works without it).
-const listeners = new Set<() => void>();
-function readCollapsed(): boolean {
-  try {
-    return window.localStorage.getItem(COLLAPSE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function writeCollapsed(value: boolean) {
-  try {
-    window.localStorage.setItem(COLLAPSE_KEY, value ? "1" : "0");
-  } catch {
-    // storage unavailable (private mode): the choice lasts until reload
-  }
-  listeners.forEach((listener) => listener());
-}
-function subscribeCollapsed(listener: () => void) {
-  listeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
 
 function NavLink({
   href,
@@ -221,10 +197,11 @@ function SidebarContent({
 /** The signed-in area: a sidebar on large screens, a top bar and a navigation sheet on phones. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
+  // A preference of this browser only; everything works without it.
+  const [collapsed, setCollapsed] = useStoredFlag(COLLAPSE_KEY);
   const [drawer, setDrawer] = useState(false);
   const [projects, setProjects] = useState<Project[] | null>(null);
-  const toggle = () => writeCollapsed(!collapsed);
+  const toggle = () => setCollapsed(!collapsed);
 
   // Recent projects: refreshed on navigation, so a new or renamed project shows up.
   useEffect(() => {

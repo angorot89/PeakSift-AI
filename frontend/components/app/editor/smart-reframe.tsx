@@ -243,7 +243,7 @@ export function SmartReframePanel(props: PanelProps) {
     body = (
       <div className="space-y-2">
         <InlineAlert tone={analysis.status === "failed" ? "danger" : "warning"} title={analysis.status === "failed" ? "Framing analysis failed" : "Framing analysis stalled"}>
-          {analysis.status === "failed" ? analysisErrorCopy(analysis) : "The worker stopped reporting progress."}
+          {analysis.status === "failed" ? analysisErrorCopy(analysis) : "The analysis stopped responding."}
         </InlineAlert>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" onClick={props.onRetry} disabled={props.busy}>

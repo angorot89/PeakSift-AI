@@ -1,7 +1,7 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clock, continueItems, momentLabel, nextAction, projectStage, relativeTime, shortLabel, type ProjectSummary } from "./workspace-rules.ts";
+import { clock, continueItems, gettingStarted, momentLabel, nextAction, projectStage, relativeTime, shortLabel, type Home, type ProjectSummary } from "./workspace-rules.ts";
 
 const P = "3f1c0a1e-0000-4000-8000-000000000001";
 const CLIP = "3f1c0a1e-0000-4000-8000-000000000002";
@@ -126,5 +126,18 @@ describe("short labels", () => {
     assert.equal(shortLabel({ layout: "blur_background", captions_enabled: true, caption_style: "minimal" }), "Blur background · Minimal captions");
     assert.equal(shortLabel({ layout: "smart_reframe", captions_enabled: false, caption_style: null }), "Smart reframe · No captions");
     assert.equal(shortLabel({ layout: "new_layout", captions_enabled: true, caption_style: null }), "Vertical · Captions");
+  });
+});
+
+describe("getting started", () => {
+  it("follows real progress and completes with the first ready Short", () => {
+    const home = (p: ProjectSummary): Home => ({ projects: [p], project_count: 1, recent_shorts: [] });
+    assert.deepEqual(gettingStarted(home(project())).steps.map((s) => s.done), [false, false, false]);
+    assert.deepEqual(gettingStarted(home(project({ source: ready }))).steps.map((s) => s.done), [true, false, false]);
+    const found = home(project(detected(3)));
+    assert.deepEqual(gettingStarted(found).steps.map((s) => s.done), [true, true, false]);
+    assert.equal(gettingStarted(found).complete, false);
+    const made = project({ ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [] } });
+    assert.equal(gettingStarted(home(made)).complete, true);
   });
 });

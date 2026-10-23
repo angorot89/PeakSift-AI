@@ -225,3 +225,18 @@ export function shortLabel(short: Pick<ShortSummary, "layout" | "captions_enable
   const style = short.caption_style ? short.caption_style.charAt(0).toUpperCase() + short.caption_style.slice(1) : "";
   return `${layout} · ${style ? `${style} captions` : "Captions"}`;
 }
+
+export type StartStep = { key: "upload" | "moments" | "short"; title: string; done: boolean };
+
+/** The first-run checklist on Home, from real progress only; complete once a Short is ready. */
+export function gettingStarted(home: Home): { steps: StartStep[]; complete: boolean } {
+  const short = home.recent_shorts.length > 0 || home.projects.some((p) => p.shorts.ready > 0);
+  const moments = short || home.projects.some((p) => p.detection?.status === "completed" && p.detection.candidates > 0);
+  const upload = moments || home.projects.some((p) => p.source !== null);
+  const steps: StartStep[] = [
+    { key: "upload", title: "Upload a long video", done: upload },
+    { key: "moments", title: "Let PeakSift find the best moments", done: moments },
+    { key: "short", title: "Create your first Short", done: short },
+  ];
+  return { steps, complete: short };
+}

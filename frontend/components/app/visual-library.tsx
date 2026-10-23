@@ -2,10 +2,12 @@
 
 import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, Upload as UploadIcon, UploadCloud, X } from "lucide-react";
 import { type DragEvent, type FormEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
-import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
+import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { inputBase, inputClasses, textareaClasses } from "@/components/ui/input-styles";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
@@ -174,7 +176,11 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
         ) : null}
 
         {loading && !data ? (
-          <LoadingState label="Loading your visuals…" />
+          <div role="status" aria-label="Loading your visuals" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
+            ))}
+          </div>
         ) : error ? (
           <ErrorState title="Your visuals couldn't be loaded" message={error} onRetry={reload} />
         ) : assets.length === 0 ? (
@@ -644,6 +650,7 @@ function PreviewDialog({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
 
   async function remove() {
@@ -653,6 +660,7 @@ function PreviewDialog({
     try {
       await deleteVisual(projectId, asset.id);
       onDeleted(asset.id);
+      toast("Visual deleted");
     } catch (failure) {
       setError(errorMessage(failure));
     } finally {

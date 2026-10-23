@@ -2,8 +2,9 @@
 
 import { Check, Copy, MicOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
+import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { errorMessage } from "@/lib/api";
 import { formatTimestamp } from "@/lib/format";
 import { TRANSCRIPT_PAGE_SIZE, getTranscriptPage, type TranscriptSegment } from "@/lib/transcription";
@@ -67,7 +68,15 @@ export function TranscriptViewer({ projectId, videoId, total, footnote }: Props)
     window.setTimeout(() => setCopyState("idle"), 2500);
   }
 
-  if (loading && segments.length === 0) return <LoadingState label="Loading transcript…" />;
+  if (loading && segments.length === 0) {
+    return (
+      <div role="status" aria-label="Loading transcript" className="space-y-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-5 rounded-md" />
+        ))}
+      </div>
+    );
+  }
   if (error && segments.length === 0)
     return <ErrorState title="Transcript could not be loaded" message={error} onRetry={() => loadMore(0)} />;
   if (total === 0 || (segments.length === 0 && !loading)) {
