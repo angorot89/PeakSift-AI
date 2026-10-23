@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import { CandidateReview } from "@/components/app/candidate-review";
 import { ClipDetectionPanel } from "@/components/app/clip-detection-panel";
 import { GeneratedClipsPanel } from "@/components/app/generated-clips-panel";
-import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TranscriptionPanel } from "@/components/app/transcription-panel";
@@ -68,14 +67,6 @@ function SourceDetails({ video }: { video: Video }) {
   );
 }
 
-function uploadState(video: Video | null, loading: boolean): StepState {
-  if (loading) return "unknown";
-  if (!video) return "todo";
-  if (video.status === "ready") return "done";
-  if (video.status === "failed") return "failed";
-  return "active";
-}
-
 /** The project's current source video (the newest upload) and how to reload it. */
 export function useLatestVideo(projectId: string) {
   const load = useCallback(() => listProjectVideos(projectId), [projectId]);
@@ -89,7 +80,6 @@ export function SourceSection({ projectId }: { projectId: string }) {
   const { latest, error, loading, reload } = useLatestVideo(projectId);
   const [replacing, setReplacing] = useState(false);
   const ready = latest?.status === "ready" && !replacing;
-  useWorkflowReport("upload", uploadState(latest, loading));
 
   let body;
   if (loading) {

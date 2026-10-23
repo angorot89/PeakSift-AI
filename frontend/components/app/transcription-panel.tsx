@@ -2,7 +2,6 @@
 
 import { FileText } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { TranscriptViewer } from "@/components/app/transcript-viewer";
@@ -120,16 +119,6 @@ export function TranscriptionPanel({ projectId, videoId, onTranscriptionChange }
     }
   }
 
-  const stepState: StepState = !loaded
-    ? "unknown"
-    : transcription === null
-      ? "todo"
-      : transcription.status === "completed"
-        ? "done"
-        : transcription.status === "failed" || transcription.is_stale
-          ? "failed"
-          : "active";
-  useWorkflowReport("transcribe", stepState);
 
   let body: ReactNode;
   if (!loaded) {

@@ -31,6 +31,7 @@ import {
   nextAction,
   projectStage,
   relativeTime,
+  shortLabel,
   STAGES,
   type ActionTone,
   type Home,
@@ -167,8 +168,9 @@ function ShortCard({ short }: { short: HomeShort }) {
           </span>
         </span>
         <span className="mt-2 block truncate text-sm font-medium text-foreground">{short.clip_title}</span>
+        <span className="block truncate text-caption text-subtle">{short.project_name}</span>
         <span className="block truncate text-caption text-subtle">
-          {short.project_name}
+          {shortLabel(short)}
           {short.duration_seconds ? ` · ${formatDuration(short.duration_seconds)}` : ""}
         </span>
       </Link>

@@ -2,7 +2,6 @@
 
 import { RotateCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -275,20 +274,6 @@ export function ClipDetectionPanel({
   const start = (provider: string, model: string) =>
     run(() => startDetection(projectId, videoId, provider, model));
 
-  const stepState: StepState = !transcriptionLoaded
-    ? "unknown"
-    : !transcriptReady
-      ? "todo"
-      : runs === null
-        ? "unknown"
-        : selected === null
-          ? "todo"
-          : selected.status === "completed"
-            ? "done"
-            : selected.status === "failed" || selected.is_stale
-              ? "failed"
-              : "active";
-  useWorkflowReport("detect", stepState);
 
   let body: ReactNode;
   if (!transcriptionLoaded) {

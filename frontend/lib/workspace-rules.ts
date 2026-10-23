@@ -18,6 +18,9 @@ export type ShortSummary = {
   clip_id: string;
   clip_title: string;
   status: string;
+  layout: string;
+  captions_enabled: boolean;
+  caption_style: string | null;
   duration_seconds: number | null;
   created_at: string;
   updated_at: string;
@@ -188,4 +191,36 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
   return new Date(iso).toLocaleDateString("en", { month: "short", day: "numeric" });
+}
+
+/**
+ * A creator-friendly word for a moment's place in the ranking, grounded in the run's own rank
+ * and its 0–100 editorial score (never a prediction of views).
+ */
+export function momentLabel(rank: number, score: number): "Top pick" | "Strong moment" | "Worth reviewing" {
+  if (rank === 1) return "Top pick";
+  if (score >= 75) return "Strong moment";
+  return "Worth reviewing";
+}
+
+/** 112 → "1:52"; 3725 → "1:02:05". */
+export function clock(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+const LAYOUTS: Record<string, string> = {
+  smart_reframe: "Smart reframe", center_crop: "Center crop", blur_background: "Blur background",
+  fit: "Fit", manual_crop: "Focal point",
+};
+
+/** What tells two versions of one clip apart: "Blur background · Minimal captions". */
+export function shortLabel(short: Pick<ShortSummary, "layout" | "captions_enabled" | "caption_style">): string {
+  const layout = LAYOUTS[short.layout] ?? "Vertical";
+  if (!short.captions_enabled) return `${layout} · No captions`;
+  const style = short.caption_style ? short.caption_style.charAt(0).toUpperCase() + short.caption_style.slice(1) : "";
+  return `${layout} · ${style ? `${style} captions` : "Captions"}`;
 }

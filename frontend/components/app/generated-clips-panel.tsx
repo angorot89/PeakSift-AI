@@ -3,13 +3,12 @@
 import { Clapperboard, Download, Smartphone, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useWorkflowReport, type StepState } from "@/components/app/project-workflow";
 import { EmptyState, LoadingState } from "@/components/app/states";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { Panel } from "@/components/ui/panel";
 import { StatusPill } from "@/components/ui/status-pill";
 import { autoEditHref } from "@/lib/auto-edit";
-import { clipContentUrl, clipDownloadUrl, isClipActive, type GeneratedClip } from "@/lib/clips";
+import { clipContentUrl, clipDownloadUrl, type GeneratedClip } from "@/lib/clips";
 import { editorHref, isEditActive, listEdits } from "@/lib/edits";
 import { formatDuration, formatTimestamp } from "@/lib/format";
 
@@ -135,29 +134,6 @@ export function GeneratedClipsPanel({
     };
   }, [projectId, readyKey]);
 
-  const generate: StepState =
-    clips === null
-      ? "unknown"
-      : ordered.some((c) => c.status === "ready")
-        ? "done"
-        : ordered.some((c) => isClipActive(c.status) && !c.is_stale)
-          ? "active"
-          : ordered.length > 0
-            ? "failed"
-            : "todo";
-  const counts = [...shorts.values()];
-  const edit: StepState =
-    generate !== "done"
-      ? generate === "unknown"
-        ? "unknown"
-        : "todo"
-      : counts.some((c) => c.ready > 0)
-        ? "done"
-        : counts.some((c) => c.active > 0)
-          ? "active"
-          : "todo";
-  useWorkflowReport("generate", generate);
-  useWorkflowReport("edit", edit);
 
   return (
     <Panel
