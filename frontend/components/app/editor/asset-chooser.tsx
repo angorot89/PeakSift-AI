@@ -18,6 +18,7 @@ import {
   orientationLabel,
   SEARCH_MAX_CHARS,
   searchNote,
+  splitByStrength,
   searchText,
   STRENGTH_LABEL,
   uploadVisual,
@@ -77,6 +78,10 @@ export function AssetChooser({
       .map((hit) => ({ asset: latest.get(hit.asset.id) ?? hit.asset, match: hit.match }));
   }, [assets, filter, text, found.results, found.error]);
   const note = text && !found.error ? searchNote(found.results) : null;
+  // The suggestion's matches come first, then the rest; a search is split the same way by tier.
+  const suggested = matches.length > 0 && !text;
+  const suggestedIds = new Set(matches.map((m) => m.asset.id));
+  const tiers = text ? splitByStrength(shown) : { best: [], more: suggested ? shown.filter((s) => !suggestedIds.has(s.asset.id)) : shown };
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -143,17 +148,17 @@ export function AssetChooser({
             {note ? <p className="text-xs text-muted">{note}</p> : null}
             {found.error ? <p className="text-xs text-muted">Visual search is unavailable right now; showing name matches.</p> : null}
 
-            {matches.length && !text ? (
+            {suggested || tiers.best.length ? (
               <div className="space-y-2">
                 <p className="text-caption font-medium text-muted">Best matches</p>
                 <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" aria-label="Best matches">
-                  {matches.map(({ asset, match }) => (
+                  {(suggested ? matches : tiers.best).map(({ asset, match }) => (
                     <li key={asset.id}>
-                      <AssetButton projectId={projectId} asset={asset} match={match} onPick={() => onPick(asset, match.best_frame_time)} />
+                      <AssetButton projectId={projectId} asset={asset} match={match} onPick={() => onPick(asset, match?.best_frame_time ?? null)} />
                     </li>
                   ))}
                 </ul>
-                <p className="pt-1 text-caption font-medium text-muted">All visual assets</p>
+                {tiers.more.length ? <p className="pt-1 text-caption font-medium text-muted">More results</p> : null}
               </div>
             ) : null}
             <p className="sr-only" role="status" aria-live="polite">
@@ -161,19 +166,19 @@ export function AssetChooser({
             </p>
             {assets === null ? (
               <p className="text-sm text-muted">Loading visual assets…</p>
-            ) : shown.length ? (
+            ) : tiers.more.length ? (
               <ul
                 className="grid grid-cols-2 gap-2.5 sm:grid-cols-3"
-                aria-label={text ? "Search results" : "Visual assets"}
+                aria-label={suggested || tiers.best.length ? "More results" : text ? "Search results" : "Visuals"}
                 aria-busy={found.searching}
               >
-                {shown.map(({ asset, match }) => (
+                {tiers.more.map(({ asset, match }) => (
                   <li key={asset.id}>
                     <AssetButton projectId={projectId} asset={asset} match={match} onPick={() => onPick(asset, match?.best_frame_time ?? null)} />
                   </li>
                 ))}
               </ul>
-            ) : found.searching ? (
+            ) : shown.length || suggested ? null : found.searching ? (
               <p className="text-sm text-muted">Searching…</p>
             ) : (
               <p className="text-sm text-muted">

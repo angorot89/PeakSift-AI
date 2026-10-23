@@ -1,22 +1,24 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, UploadCloud, X } from "lucide-react";
-import { type DragEvent, type FormEvent, useCallback, useId, useMemo, useState } from "react";
+import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, Upload as UploadIcon, UploadCloud, X } from "lucide-react";
+import { type DragEvent, type FormEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
 import { EmptyState, ErrorState, LoadingState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { inputClasses, textareaClasses } from "@/components/ui/input-styles";
+import { inputBase, inputClasses, textareaClasses } from "@/components/ui/input-styles";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
 import { ProgressBar, Spinner } from "@/components/ui/progress";
 import { errorMessage } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
+import { batchSummary } from "@/lib/upload-batch";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 import { useVisualSearch } from "@/components/app/use-visual-search";
 import {
   bestSceneLabel,
+  canSearchByContent,
   deleteVisual,
   isPreparing,
   filterVisuals,
@@ -31,6 +33,7 @@ import {
   asSentence,
   searchStateLabel,
   searchText,
+  splitByStrength,
   STRENGTH_LABEL,
   updateVisual,
   uploadVisual,
@@ -139,31 +142,62 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
     }
   }
 
+  const byContent = canSearchByContent(assets.map((a) => a.visual_search));
+  const preparing = assets.some((a) => isPreparing(a.visual_search?.state));
+  const tiers = text ? splitByStrength(shown) : { best: [], more: shown };
+  const open = ({ asset, match }: Shown) => setPreview({ asset, startAt: match?.best_frame_time ?? null });
+  const drop = useFileDrop(busy, addFiles);
+
   return (
     <Panel
       id="visuals"
-      title="Visual assets"
+      title="Visuals"
       description="Images and B-roll videos for cutaways and overlays. Upload only media you own or have permission to use."
       className="mt-8"
+      actions={assets.length ? <UploadButton disabled={busy} onFiles={addFiles} /> : undefined}
     >
-      <div className="space-y-5">
-        <DropZone disabled={busy} onFiles={addFiles} />
-        {uploads.length ? <UploadList uploads={uploads} onDismiss={(key) => setUploads((u) => u.filter((x) => x.key !== key))} /> : null}
+      <div {...drop.handlers} className="relative space-y-5">
+        {drop.dragging && assets.length ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-2 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-background/85 text-sm font-medium text-foreground"
+          >
+            <UploadCloud className="mr-2 size-5 text-accent-soft" />
+            Drop to add to this project
+          </div>
+        ) : null}
+        {uploads.length ? (
+          <UploadBatch
+            uploads={uploads}
+            onDismiss={() => setUploads((u) => u.filter((x) => x.state === "uploading" || x.state === "processing"))}
+          />
+        ) : null}
 
         {loading && !data ? (
-          <LoadingState label="Loading visual assets…" />
+          <LoadingState label="Loading your visuals…" />
         ) : error ? (
-          <ErrorState title="Visual assets could not be loaded" message={error} onRetry={reload} />
+          <ErrorState title="Your visuals couldn't be loaded" message={error} onRetry={reload} />
         ) : assets.length === 0 ? (
-          <EmptyState
-            compact
-            icon={Images}
-            title="No visual assets yet"
-            description="Add images or short videos to use as B-roll in your shorts."
-          />
+          <div className="space-y-4">
+            <EmptyState
+              compact
+              icon={Images}
+              title="No visuals yet"
+              description="Add images or short videos to use as B-roll in your Shorts. PeakSift can then suggest them for the right moments."
+            />
+            <DropZone disabled={busy} onFiles={addFiles} />
+          </div>
         ) : (
           <>
-            <Toolbar filter={filter} onFilter={setFilter} query={query} onQuery={setQuery} searching={search.searching} />
+            <Toolbar
+              filter={filter}
+              onFilter={setFilter}
+              query={query}
+              onQuery={setQuery}
+              searching={search.searching}
+              byContent={byContent}
+              preparing={preparing}
+            />
             {note ? <p className="text-xs text-muted">{note}</p> : null}
             {search.error ? (
               <InlineAlert title="Visual search is unavailable right now">
@@ -175,30 +209,28 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
                 ? "Searching…"
                 : text
                   ? `${shown.length} visual${shown.length === 1 ? "" : "s"} found`
-                  : `${shown.length} of ${assets.length} visual assets shown`}
+                  : `${shown.length} of ${assets.length} visuals shown`}
             </p>
             {shown.length ? (
-              <ul
-                className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
-                aria-label={text ? "Search results" : "Visual assets"}
-                aria-busy={search.searching}
-              >
-                {shown.map(({ asset, match }) => (
-                  <li key={asset.id}>
-                    <AssetCard
-                      projectId={projectId}
-                      asset={asset}
-                      match={match}
-                      onOpen={() => setPreview({ asset, startAt: match?.best_frame_time ?? null })}
-                    />
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-5" aria-busy={search.searching}>
+                {tiers.best.length ? (
+                  <AssetGrid title="Best matches" projectId={projectId} items={tiers.best} onOpen={open} />
+                ) : null}
+                {tiers.more.length ? (
+                  <AssetGrid
+                    title={tiers.best.length ? "More results" : undefined}
+                    label={text ? "Search results" : "Visuals"}
+                    projectId={projectId}
+                    items={tiers.more}
+                    onOpen={open}
+                  />
+                ) : null}
+              </div>
             ) : search.searching ? (
               <p className="text-sm text-muted">Searching…</p>
             ) : (
               <p className="text-sm text-muted">
-                {text ? `No visuals match “${text}”.` : "No visual assets match these filters."}
+                {text ? `No visuals match “${text}”. Try other words, or clear the search.` : "No visuals match this filter."}
               </p>
             )}
           </>
@@ -273,44 +305,139 @@ function DropZone({ disabled, onFiles }: { disabled: boolean; onFiles: (files: F
   );
 }
 
-function UploadList({ uploads, onDismiss }: { uploads: Upload[]; onDismiss: (key: string) => void }) {
+/** Accepts files dropped anywhere on the library (enter/leave are counted: children fire them too). */
+function useFileDrop(disabled: boolean, onFiles: (files: FileList | null) => void) {
+  const depth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes("Files");
+  return {
+    dragging,
+    handlers: {
+      onDragEnter: (event: DragEvent) => {
+        if (!hasFiles(event) || disabled) return;
+        depth.current += 1;
+        setDragging(true);
+      },
+      onDragOver: (event: DragEvent) => {
+        if (hasFiles(event)) event.preventDefault();
+      },
+      onDragLeave: (event: DragEvent) => {
+        if (!hasFiles(event) || disabled) return;
+        depth.current = Math.max(0, depth.current - 1);
+        if (depth.current === 0) setDragging(false);
+      },
+      onDrop: (event: DragEvent) => {
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        depth.current = 0;
+        setDragging(false);
+        if (!disabled) onFiles(event.dataTransfer.files);
+      },
+    },
+  };
+}
+
+function UploadButton({ disabled, onFiles }: { disabled: boolean; onFiles: (files: FileList | null) => void }) {
   return (
-    <ul className="space-y-2" aria-label="Uploads">
-      {uploads.map((u) => (
-        <li key={u.key} className="rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground" title={u.name}>
-                {u.name} <span className="font-normal text-subtle">· {formatBytes(u.size)}</span>
-              </p>
-              <p className="text-xs text-muted" role={u.state === "failed" ? "alert" : "status"}>
-                {u.state === "uploading" && `Uploading · ${u.progress}%`}
-                {u.state === "processing" && "Checking the file and making a preview…"}
-                {u.state === "done" && "Added"}
-                {u.state === "existing" && "Already in this project"}
-                {u.state === "failed" && (u.message ?? "The upload failed")}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {u.state === "processing" ? <Spinner /> : null}
-              {u.state === "done" || u.state === "existing" ? (
-                <CheckCircle2 aria-hidden="true" className="size-4 text-emerald-300" />
-              ) : null}
-              {u.state === "failed" || u.state === "done" || u.state === "existing" ? (
-                <Button variant="ghost" size="sm" className="px-2" aria-label={`Dismiss ${u.name}`} onClick={() => onDismiss(u.key)}>
-                  <X aria-hidden="true" />
-                </Button>
-              ) : null}
-            </div>
-          </div>
-          {u.state === "uploading" ? (
-            <div className="mt-2">
-              <ProgressBar value={u.progress} label={`Upload progress for ${u.name}`} />
-            </div>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+    <label
+      className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent pointer-coarse:h-11 ${
+        disabled ? "pointer-events-none opacity-60" : ""
+      }`}
+    >
+      <UploadIcon aria-hidden="true" className="size-4" />
+      Upload files
+      <input
+        type="file"
+        multiple
+        accept={VISUAL_ACCEPT}
+        disabled={disabled}
+        className="sr-only"
+        onChange={(event) => {
+          onFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+    </label>
+  );
+}
+
+/** One summary for everything being added: a single progress bar, then what failed and why. */
+function UploadBatch({ uploads, onDismiss }: { uploads: Upload[]; onDismiss: () => void }) {
+  const summary = batchSummary(uploads);
+  const failures = uploads.filter((u) => u.state === "failed");
+  const checking = uploads.some((u) => u.state === "processing");
+  return (
+    <section aria-label="Uploads" className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex min-w-0 items-center gap-2 text-sm text-foreground" role="status">
+          {summary.working ? (
+            <Spinner />
+          ) : summary.failed ? (
+            <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-amber-300" />
+          ) : (
+            <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-emerald-300" />
+          )}
+          <span className="min-w-0">
+            {summary.label}
+            {summary.working && checking ? <span className="text-muted"> · checking files and making previews</span> : null}
+          </span>
+        </p>
+        {!summary.working ? (
+          <Button variant="ghost" size="sm" className="px-2" aria-label="Dismiss upload summary" onClick={onDismiss}>
+            <X aria-hidden="true" />
+          </Button>
+        ) : null}
+      </div>
+      {summary.working ? (
+        <div className="mt-2.5">
+          <ProgressBar value={summary.percent} label="Upload progress" />
+        </div>
+      ) : null}
+      {failures.length ? (
+        <ul className="mt-2.5 space-y-1 text-xs" aria-label="Files that couldn't be added">
+          {failures.map((u) => (
+            <li key={u.key} className="flex flex-wrap gap-x-2">
+              <span className="max-w-full truncate font-medium text-foreground" title={u.name}>
+                {u.name}
+              </span>
+              <span className="text-amber-200">{u.message ?? "The upload failed"}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function AssetGrid({
+  title,
+  label,
+  projectId,
+  items,
+  onOpen,
+}: {
+  title?: string;
+  label?: string;
+  projectId: string;
+  items: Shown[];
+  onOpen: (item: Shown) => void;
+}): ReactNode {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={title ? headingId : undefined} aria-label={title ? undefined : label} className="space-y-2.5">
+      {title ? (
+        <h3 id={headingId} className="text-small font-medium text-muted">
+          {title}
+        </h3>
+      ) : null}
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {items.map((item) => (
+          <li key={item.asset.id}>
+            <AssetCard projectId={projectId} asset={item.asset} match={item.match} onOpen={() => onOpen(item)} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -320,23 +447,27 @@ function Toolbar({
   query,
   onQuery,
   searching,
+  byContent,
+  preparing,
 }: {
   filter: Filter;
   onFilter: (filter: Filter) => void;
   query: string;
   onQuery: (query: string) => void;
   searching: boolean;
+  /** At least one visual can be found by what it shows. */
+  byContent: boolean;
+  preparing: boolean;
 }) {
   const searchId = useId();
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <SegmentedControl label="Show" value={filter} onChange={onFilter} options={FILTERS} />
-      <div className="w-full sm:w-72">
+    <div className="space-y-3">
+      <div>
         <label htmlFor={searchId} className="sr-only">
           Search your visuals
         </label>
         <div className="relative">
-          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
+          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-subtle" />
           <input
             id={searchId}
             type="search"
@@ -345,14 +476,19 @@ function Toolbar({
             onChange={(event) => onQuery(event.target.value)}
             placeholder="Search your visuals"
             aria-describedby={`${searchId}-hint`}
-            className="h-9 w-full rounded-lg border border-border bg-white/[0.03] pr-9 pl-9 text-sm text-foreground outline-none placeholder:text-subtle focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+            className={`${inputBase} h-11 pr-10 pl-10 text-lead`}
           />
-          {searching ? <Spinner className="absolute top-1/2 right-3 size-4 -translate-y-1/2" /> : null}
+          {searching ? <Spinner className="absolute top-1/2 right-3.5 size-4 -translate-y-1/2" /> : null}
         </div>
-        <p id={`${searchId}-hint`} className="mt-1 text-caption text-subtle">
-          Search by what&apos;s in the image or video.
+        <p id={`${searchId}-hint`} className="mt-1.5 text-caption text-subtle">
+          {byContent
+            ? "Describe what you need, like “people talking” or “a bridge at night”. Names, descriptions and tags work too."
+            : preparing
+              ? "Searching names, descriptions and tags. Search by what's in a shot starts once your visuals are prepared."
+              : "Search names, descriptions and tags."}
         </p>
       </div>
+      <SegmentedControl label="Show" value={filter} onChange={onFilter} options={FILTERS} size="sm" />
     </div>
   );
 }

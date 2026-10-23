@@ -9,7 +9,9 @@ import {
   matchReason,
   sceneOffset,
   searchNote,
+  canSearchByContent,
   searchStateLabel,
+  splitByStrength,
   searchText,
   STRENGTH_LABEL,
 } from "./visual-search.ts";
@@ -90,5 +92,20 @@ describe("visual search rules", () => {
     assert.equal(bestSceneLabel(null), null);
     assert.equal(bestSceneLabel(Number.NaN), null);
     assert.equal(bestSceneLabel(-1), null);
+  });
+
+  it("splits results into best matches and more results, keeping order", () => {
+    const hit = (id: string, strength?: "strong" | "possible") => ({
+      id,
+      match: strength ? { strength, method: "visual" as const, best_frame_time: null } : undefined,
+    });
+    const { best, more } = splitByStrength([hit("a", "possible"), hit("b", "strong"), hit("c"), hit("d", "strong")]);
+    assert.deepEqual(best.map((h) => h.id), ["b", "d"]);
+    assert.deepEqual(more.map((h) => h.id), ["a", "c"]);
+  });
+
+  it("offers search by what visuals show only when one is ready", () => {
+    assert.equal(canSearchByContent([{ state: "indexing" }, null]), false);
+    assert.equal(canSearchByContent([{ state: "failed" }, { state: "ready" }]), true);
   });
 });

@@ -123,3 +123,17 @@ export function bestSceneLabel(seconds: number | null | undefined): string | nul
   const whole = Math.floor(seconds);
   return `Best at ${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
+
+/** Search results in two tiers: strong matches ("Best matches") first, then everything else
+ * ("More results"), each in the server's order. Unmatched entries count as "more". */
+export function splitByStrength<T extends { match?: Pick<VisualMatch, "strength"> | null }>(hits: T[]): { best: T[]; more: T[] } {
+  return {
+    best: hits.filter((hit) => hit.match?.strength === "strong"),
+    more: hits.filter((hit) => hit.match?.strength !== "strong"),
+  };
+}
+
+/** Whether search by what visuals show can be offered as such (at least one asset is ready). */
+export function canSearchByContent(statuses: (Pick<VisualSearchStatus, "state"> | null | undefined)[]): boolean {
+  return statuses.some((status) => status?.state === "ready");
+}
