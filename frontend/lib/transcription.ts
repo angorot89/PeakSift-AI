@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, postJson } from "@/lib/api";
+import { apiFetch, postJson } from "@/lib/api";
 
 export type TranscriptionStatus =
   | "queued"
@@ -49,15 +49,10 @@ export const TRANSCRIPT_PAGE_SIZE = 200;
 
 const base = (projectId: string, videoId: string) => `/projects/${projectId}/videos/${videoId}`;
 
-/** The current transcription, or null when none has been started (404). */
-export async function getTranscription(projectId: string, videoId: string): Promise<Transcription | null> {
-  try {
-    return await apiFetch<Transcription>(`${base(projectId, videoId)}/transcription`);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
-    throw error;
-  }
-}
+/** The current transcription, or null when none has been started (asked with `optional=true`,
+ * so "none yet" is an answer, not a failed request). */
+export const getTranscription = (projectId: string, videoId: string) =>
+  apiFetch<Transcription | null>(`${base(projectId, videoId)}/transcription?optional=true`);
 
 export const startTranscription = (projectId: string, videoId: string) =>
   postJson<Transcription>(`${base(projectId, videoId)}/transcription`, undefined);

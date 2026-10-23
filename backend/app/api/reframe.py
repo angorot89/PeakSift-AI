@@ -11,7 +11,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -203,11 +203,20 @@ def list_analyses(clip: OwnedClip, db: DbSession) -> ReframeAnalysisPage:
     return ReframeAnalysisPage(total=total, analyses=[_read(r) for r in rows])
 
 
-@router.get("/current", response_model=ReframeAnalysisRead)
-def current_analysis(clip: OwnedClip, db: DbSession) -> ReframeAnalysisRead:
-    """The analysis for the server's current configuration (404 if none yet)."""
+@router.get("/current", response_model=ReframeAnalysisRead | None)
+def current_analysis(
+    clip: OwnedClip,
+    db: DbSession,
+    optional: Annotated[
+        bool, Query(description="Answer 200 with null instead of 404 when there is none yet")
+    ] = False,
+) -> ReframeAnalysisRead | None:
+    """The analysis for the server's current configuration (404 if none yet, or null with
+    ``optional=true`` — the app's check, so a clip without one is not a failed request)."""
     analysis = _current(db, clip, ReframeConfig.from_settings(get_settings()).fingerprint())
     if analysis is None:
+        if optional:
+            return None
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No framing analysis yet")
     return _read(analysis)
 

@@ -127,9 +127,18 @@ def start_transcription(video: OwnedVideo, db: DbSession, response_status: None 
     return _read(db, transcription)
 
 
-@router.get("/transcription", response_model=TranscriptionRead)
-def get_transcription(video: OwnedVideo, db: DbSession) -> TranscriptionRead:
+@router.get("/transcription", response_model=TranscriptionRead | None)
+def get_transcription(
+    video: OwnedVideo,
+    db: DbSession,
+    optional: Annotated[
+        bool, Query(description="Answer 200 with null instead of 404 when there is none yet")
+    ] = False,
+) -> TranscriptionRead | None:
+    """The video's transcription (404 if none yet, or null with ``optional=true``)."""
     if video.transcription is None:
+        if optional:
+            return None
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No transcription yet")
     return _read(db, video.transcription)
 
