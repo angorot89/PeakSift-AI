@@ -56,18 +56,36 @@ export type PerformanceContext = { available: boolean; simulated: boolean; sampl
 export const ACTIVE_PLAN_STATUSES: PlanStatus[] = ["queued", "analyzing", "planning", "validating"];
 export const isPlanActive = (status: PlanStatus) => ACTIVE_PLAN_STATUSES.includes(status);
 
+// Creator words for the plan's sections (the editor's tools use the same names).
 export const SECTIONS: { key: SectionKey; title: string }[] = [
   { key: "layout", title: "Framing" },
   { key: "captions", title: "Captions" },
-  { key: "hook", title: "Hook" },
+  { key: "hook", title: "Opening" },
   { key: "visuals", title: "Visuals" },
-  { key: "audio", title: "Audio" },
+  { key: "audio", title: "Sound" },
 ];
+
+/**
+ * What each recipe feels like, in three short traits that follow its real bounds (caption
+ * presets, how many visuals, sound effects, music level) — not marketing.
+ */
+export const RECIPE_TRAITS: Record<RecipeName, string[]> = {
+  clean: ["Balanced", "clean captions", "a few supporting visuals"],
+  punchy: ["Bold captions", "a sharp opening", "quick cutaways and sound effects"],
+  story: ["Calm captions", "meaningful cutaways", "music kept low"],
+  minimal: ["Speaker first", "minimal captions", "almost nothing added"],
+};
 
 export type StepState = "done" | "current" | "todo" | "failed";
 export type PlanStep = { label: string; state: StepState };
 
-const STEP_LABELS = ["Analyzing the clip", "Creating the edit plan", "Checking every choice", "Plan ready"];
+// One label per stage the job really reports (queued/analyzing → planning → validating → ready).
+const STEP_LABELS = [
+  "Understanding the clip",
+  "Choosing framing, captions, visuals and sound",
+  "Checking every choice",
+  "Ready to review",
+];
 const STEP_INDEX: Record<PlanStatus, number> = {
   queued: 0,
   analyzing: 0,
@@ -109,7 +127,8 @@ export function planSections(plan: AutoEditPlan): { key: SectionKey; title: stri
 export function basedOn(confidence: PlanConfidence | null): string[] {
   if (!confidence) return [];
   const facts: string[] = [];
-  if (confidence.framing) facts.push(`face framing (${confidence.framing === "high" ? "strong" : confidence.framing})`);
+  const framing = { high: "face framing", mixed: "face framing (faces in part of the clip)", fallback: "centred framing (no clear face)" };
+  if (confidence.framing) facts.push(framing[confidence.framing]);
   if (confidence.word_timing) facts.push("word timing");
   else if (confidence.phrase_timing) facts.push("transcript timing");
   if (confidence.broll_suggestions)

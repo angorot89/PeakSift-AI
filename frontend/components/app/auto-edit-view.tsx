@@ -1,27 +1,31 @@
 "use client";
 
 import {
-  ArrowRight,
   BarChart3,
   BookOpen,
+  Captions,
   Check,
-  CircleAlert,
   Clapperboard,
+  Crop,
   Feather,
+  ImageIcon,
   Info,
-  ListChecks,
+  Music,
   Pencil,
   Plus,
   RotateCcw,
   Shuffle,
   Sparkles,
+  Type,
   Wand2,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { ControlGroup, InlineCheck, OptionCard } from "@/components/app/editor/controls";
+import { CreateSteps } from "@/components/app/create/create-steps";
+import { InlineCheck, OptionCard } from "@/components/app/editor/controls";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -36,6 +40,7 @@ import { ApiError, errorMessage } from "@/lib/api";
 import { listAudio, type AudioAsset } from "@/lib/audio";
 import {
   PLAN_STAGES,
+  RECIPE_TRAITS,
   applyPlan,
   basedOn,
   createPlan,
@@ -55,9 +60,10 @@ import {
   type PerformanceContext,
   type Recipe,
   type RecipeName,
+  type SectionKey,
 } from "@/lib/auto-edit";
 import type { GeneratedClip } from "@/lib/clips";
-import { editorHref } from "@/lib/edits";
+import { createHref, editorHref } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { loadProjectClip } from "@/lib/project-clip";
 import { isProjectId, type Project } from "@/lib/projects";
@@ -83,13 +89,45 @@ const STATUS_TONES: Record<AutoEditPlan["status"], StatusTone> = {
 };
 const STATUS_LABELS: Record<AutoEditPlan["status"], string> = {
   queued: "Waiting",
-  analyzing: "Analyzing",
-  planning: "Planning",
+  analyzing: "Preparing",
+  planning: "Preparing",
   validating: "Checking",
-  ready: "Ready",
+  ready: "Ready to review",
   applied: "Used",
-  failed: "Failed",
+  failed: "Needs attention",
 };
+
+/** A miniature of each recipe's caption look, so the cards read at a glance. */
+function RecipeMotif({ recipe }: { recipe: RecipeName }) {
+  const caption = {
+    clean: <span className="rounded-[3px] bg-black/70 px-1 py-px text-[9px] font-semibold text-white">So clear</span>,
+    punchy: (
+      <span className="text-[10px] leading-none font-black tracking-tight text-white uppercase [text-shadow:0_1px_0_#000]">
+        So <span className="text-amber-300">wild</span>
+      </span>
+    ),
+    story: <span className="text-[9px] font-medium text-white/90 italic">it clicked</span>,
+    minimal: <span className="text-[8px] text-white/80">just words</span>,
+  }[recipe];
+  return (
+    <span
+      aria-hidden="true"
+      className="relative flex aspect-[9/16] w-14 shrink-0 flex-col items-center justify-end overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(170deg,#3a3f4b,#16181d_70%)] pb-3"
+    >
+      <span className="absolute top-[24%] left-1/2 size-4 -translate-x-1/2 rounded-full bg-white/20" />
+      <span className="absolute top-[40%] left-1/2 h-5 w-8 -translate-x-1/2 rounded-t-full bg-white/10" />
+      {recipe === "punchy" ? (
+        <span className="absolute top-2 inset-x-1.5 rounded-[3px] bg-accent/90 px-0.5 text-center text-[7px] font-bold text-background">
+          HOOK
+        </span>
+      ) : null}
+      {recipe === "story" || recipe === "punchy" ? (
+        <span className="absolute top-[22%] right-1 h-4 w-3 rounded-sm border border-white/30 bg-sky-300/30" />
+      ) : null}
+      <span className="relative px-1 text-center leading-tight">{caption}</span>
+    </span>
+  );
+}
 
 function RecipePicker({
   recipes,
@@ -103,8 +141,10 @@ function RecipePicker({
   name: string;
 }) {
   return (
-    <ControlGroup legend="Recipe" hint="Sets the style; you can change anything later">
-      <div className="grid gap-2.5 sm:grid-cols-2">
+    <fieldset className="space-y-3">
+      <legend className="text-section">Choose a style</legend>
+      <p className="-mt-1 text-sm text-muted">It sets the feel. You can change anything before rendering.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
         {recipes.map((recipe) => {
           const Icon = RECIPE_ICONS[recipe.name];
           const checked = value === recipe.name;
@@ -118,28 +158,29 @@ function RecipePicker({
               onChange={() => onChange(recipe.name)}
               badge={false}
             >
-              <span className="flex items-start gap-3 p-3.5">
-                <span
-                  aria-hidden="true"
-                  className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                    checked ? "bg-accent/15 text-accent" : "bg-surface-3 text-muted"
-                  }`}
-                >
-                  <Icon className="size-[18px]" />
-                </span>
+              <span className="flex items-start gap-4 p-4">
+                <RecipeMotif recipe={recipe.name} />
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <span className="flex items-center gap-2 text-title text-foreground">
+                    <Icon aria-hidden="true" className={`size-4 ${checked ? "text-accent" : "text-muted"}`} />
                     {recipe.label}
                     <InlineCheck on={checked} />
                   </span>
-                  <span className="mt-0.5 block text-xs leading-snug text-pretty text-muted">{recipe.description}</span>
+                  <span className="mt-1 block text-small leading-snug text-pretty text-muted">{recipe.description}</span>
+                  <span className="mt-2.5 flex flex-wrap gap-1.5">
+                    {RECIPE_TRAITS[recipe.name].map((trait) => (
+                      <span key={trait} className="rounded-full bg-surface-3 px-2 py-0.5 text-caption text-muted">
+                        {trait}
+                      </span>
+                    ))}
+                  </span>
                 </span>
               </span>
             </OptionCard>
           );
         })}
       </div>
-    </ControlGroup>
+    </fieldset>
   );
 }
 
@@ -174,13 +215,26 @@ function PlanningState({ plan }: { plan: AutoEditPlan }) {
           </li>
         ))}
       </ol>
-      <p className="text-xs text-pretty text-subtle">
-        Auto Edit reads what PeakSift already knows about this clip — framing, word timing, B-roll suggestions and your
-        assets — and chooses options for the {plan.recipe_label} recipe. Every choice is checked before you see it. You
-        can leave this page; the plan keeps going.
+      <p className="text-small text-pretty text-subtle">
+        PeakSift is looking at this clip’s framing, word timing and your visuals, and choosing options in the{" "}
+        {plan.recipe_label} style. Every choice is checked before you see it. You can leave this page — it keeps going.
       </p>
     </div>
   );
+}
+
+const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
+  layout: Crop,
+  captions: Captions,
+  hook: Type,
+  visuals: ImageIcon,
+  audio: Music,
+};
+
+/** The editor opened on this plan (or the version made from it), at one tool group. */
+export function planEditorLink(editorLink: string, plan: AutoEditPlan, tool?: SectionKey): string {
+  const from = plan.status === "applied" && plan.clip_edit_id ? `edit=${plan.clip_edit_id}` : `plan=${plan.id}`;
+  return `${editorLink}?${from}${tool ? `&tool=${tool}` : ""}`;
 }
 
 function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: string }) {
@@ -200,16 +254,28 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
           </span>
         </p>
       ) : null}
-      <ul className="grid gap-2.5 sm:grid-cols-2" aria-label="Planned choices">
-        {sections.map(({ key, title, section }) => (
-          <li
-            key={key}
-            className={`rounded-xl border border-border bg-surface-2 px-4 py-3.5 ${
-              key === "layout" || key === "captions" ? "" : "sm:col-span-2"
-            }`}
-          >
-            <p className="text-caption font-medium tracking-wide text-subtle uppercase">{title}</p>
-            <p className="mt-1 text-sm font-medium break-words text-foreground">{section.choice}</p>
+      <ul className="space-y-2.5" aria-label="Planned choices">
+        {sections.map(({ key, title, section }) => {
+          const Icon = SECTION_ICONS[key];
+          return (
+          <li key={key} className="flex gap-3.5 rounded-xl border border-border bg-surface-2 px-4 py-3.5">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-accent-soft">
+              <Icon className="size-[18px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-caption font-medium tracking-wide text-subtle uppercase">{title}</h3>
+                <p className="mt-0.5 text-sm font-medium break-words text-foreground">{section.choice}</p>
+              </div>
+              <Link
+                href={planEditorLink(editorLink, plan, key)}
+                className="-my-1 inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md px-2 text-small text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+              >
+                <Pencil aria-hidden="true" className="size-3.5" />
+                Edit<span className="sr-only"> {title.toLowerCase()}</span>
+              </Link>
+            </div>
             <p className="mt-0.5 text-small text-pretty text-muted">{section.reason}</p>
             {section.items?.length ? (
               <ul className="mt-2.5 space-y-1.5">
@@ -223,8 +289,10 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
                 ))}
               </ul>
             ) : null}
+            </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
       {plan.performance_hints?.length ? (
         <section aria-labelledby={`patterns-${plan.id}`} className="rounded-xl border border-border px-4 py-3.5">
@@ -272,14 +340,14 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
 
 /** The panel's one-line description follows the plan's state (never "review" while planning). */
 function headerNote(composing: boolean, plan: AutoEditPlan | null): string {
-  if (composing || !plan) return "PeakSift proposes a first draft; you review it and keep full control.";
-  if (plan.status === "failed" || plan.is_stale) return "This plan could not be finished. Retry it, or start a new plan.";
-  if (isPlanActive(plan.status)) return "PeakSift is preparing a first draft. Every choice is checked before you see it.";
+  if (composing || !plan) return "PeakSift prepares a first draft; you review it and keep full control.";
+  if (plan.status === "failed" || plan.is_stale) return "This draft could not be finished. Try again, or choose another style.";
+  if (isPlanActive(plan.status)) return "Preparing a first draft. Every choice is checked before you see it.";
   if (plan.status === "applied")
     return plan.clip_edit_id
-      ? "This plan is in use as a version. Open it in the editor, or try another plan."
-      : "This plan's version was deleted. Open its settings in the editor, or try another plan.";
-  return "Review the choices, then use them, adjust them in the editor, or try another plan.";
+      ? "This draft became a version of your Short. Open it in the editor, or try another."
+      : "The version made from this draft was deleted. Open its settings in the editor, or try another.";
+  return "Here is what PeakSift chose and why. Use it, change anything, or try another.";
 }
 
 function PlanHistory({
@@ -292,7 +360,7 @@ function PlanHistory({
   onSelect: (plan: AutoEditPlan) => void;
 }) {
   return (
-    <ul className="space-y-2" aria-label="Plans for this clip">
+    <ul className="space-y-2" aria-label="Drafts for this clip">
       {plans.map((plan) => {
         const selected = plan.id === selectedId;
         return (
@@ -308,7 +376,7 @@ function PlanHistory({
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-foreground">
                   {plan.recipe_label}
-                  {plan.generation > 1 ? <span className="text-subtle"> · try {plan.generation}</span> : null}
+                  {plan.generation > 1 ? <span className="text-subtle"> · take {plan.generation}</span> : null}
                 </span>
                 <span className="tabular block text-xs text-subtle">
                   {new Date(plan.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
@@ -326,6 +394,8 @@ function PlanHistory({
 function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
   const router = useRouter();
+  // Arriving from "Create a Short" always starts a new draft; otherwise the latest one opens.
+  const startNew = useSearchParams().get("new") === "1";
   const id = useId();
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [music, setMusic] = useState<AudioAsset[]>([]);
@@ -361,11 +431,11 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
           setPatterns(context);
           setMusic(audio.filter((a) => a.kind === "music"));
           setPlans(page.plans);
-          setComposing(page.plans.length === 0);
+          setComposing(startNew || page.plans.length === 0);
           setLoadError(null);
         })
         .catch((err: unknown) => setLoadError(handleError(err))),
-    [project.id, clip.video_id, clip.id, handleError],
+    [project.id, clip.video_id, clip.id, handleError, startNew],
   );
 
   useEffect(() => {
@@ -442,30 +512,35 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
     });
 
   const editorLink = editorHref(project.id, clip.id);
+  const step = composing || !plan ? 1 : plan.status === "ready" ? 2 : plan.status === "applied" ? 3 : 1;
   const header = (
     <PageHeader
-      back={{ href: editorLink, label: "Short-form editor" }}
-      title="Auto Edit"
+      back={{ href: createHref(project.id, clip.id), label: "Start" }}
+      title="Create a Short"
       description={
         <span className="inline-flex flex-wrap items-center gap-x-2">
           <span className="text-foreground">{clip.title}</span>
-          <span className="tabular text-subtle">· {formatDuration(clip.duration_seconds)} clip</span>
+          <span className="tabular text-subtle">· {formatDuration(clip.duration_seconds)}</span>
         </span>
       }
       action={
-        <ButtonLink href={editorLink} variant="secondary">
+        <ButtonLink href={editorLink} variant="ghost">
           <Pencil aria-hidden="true" />
-          Edit manually
+          Edit manually instead
         </ButtonLink>
       }
-    />
+    >
+      <div className="mt-5">
+        <CreateSteps current={step} />
+      </div>
+    </PageHeader>
   );
 
   if (loadError) {
     return (
       <>
         {header}
-        <ErrorState title="Auto Edit could not be loaded" message={loadError} onRetry={() => void load()} />
+        <ErrorState title="Auto Edit couldn't be loaded" message={loadError} onRetry={() => void load()} />
       </>
     );
   }
@@ -537,11 +612,11 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button size="lg" onClick={() => void start()} disabled={busy !== null}>
             <Wand2 aria-hidden="true" />
-            {busy === "create" ? "Starting…" : "Create edit plan"}
+            {busy === "create" ? "Starting…" : "Prepare my edit"}
           </Button>
           {plans.length ? (
             <Button size="lg" variant="ghost" onClick={() => setComposing(false)}>
-              Back to plans
+              See earlier drafts
             </Button>
           ) : null}
         </div>
@@ -552,15 +627,15 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
   } else if (plan.status === "failed" || plan.is_stale) {
     body = (
       <InlineAlert
-        title={plan.status === "failed" ? "The plan could not be made" : "Planning stopped responding"}
+        title={plan.status === "failed" ? "This draft couldn't be prepared" : "Preparing stopped responding"}
         action={
           <Button size="sm" onClick={() => void retry(plan)} disabled={busy !== null}>
             <RotateCcw aria-hidden="true" />
-            {busy === "retry" ? "Retrying…" : "Retry"}
+            {busy === "retry" ? "Trying again…" : "Try again"}
           </Button>
         }
       >
-        {plan.error_message ?? "The worker stopped reporting progress."}
+        {plan.error_message ?? "The work stopped reporting progress. Nothing else was changed."}
       </InlineAlert>
     );
   } else {
@@ -571,12 +646,12 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
   return (
     <>
       {header}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8">
+      <div className="max-w-3xl space-y-6">
         <section aria-labelledby={`${id}-main`} className="min-w-0 rounded-2xl border border-border bg-surface">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
             <div className="min-w-0">
               <h2 id={`${id}-main`} className="text-title text-foreground">
-                {composing || !plan ? "Plan an edit" : `${plan.recipe_label} plan`}
+                {composing || !plan ? "Auto Edit" : `${plan.recipe_label} draft`}
               </h2>
               <p className="mt-0.5 text-sm text-muted">{headerNote(composing, plan)}</p>
             </div>
@@ -586,80 +661,78 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
           </header>
           <div className="px-4 py-5 sm:px-6">{body}</div>
           {reviewing && plan ? (
-            <div className="flex flex-col gap-2 border-t border-border px-4 py-4 sm:flex-row sm:flex-wrap sm:px-6">
+            <div className="flex flex-col gap-2 border-t border-border px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
               {plan.status === "applied" && plan.clip_edit_id ? (
-                <ButtonLink href={`${editorLink}?edit=${plan.clip_edit_id}`} size="lg">
+                <ButtonLink href={planEditorLink(editorLink, plan)} size="lg">
                   <Clapperboard aria-hidden="true" />
                   Open in editor
                 </ButtonLink>
               ) : plan.status === "applied" ? null : (
                 <Button size="lg" onClick={() => void apply(plan)} disabled={busy !== null}>
-                  <ListChecks aria-hidden="true" />
-                  {busy === "apply" ? "Applying…" : "Use this edit"}
+                  <Check aria-hidden="true" />
+                  {busy === "apply" ? "Starting the render…" : "Use this edit"}
                 </Button>
               )}
-              <ButtonLink href={`${editorLink}?plan=${plan.id}`} variant="secondary" size="lg">
-                <Pencil aria-hidden="true" />
-                Edit choices
-              </ButtonLink>
-              <Button size="lg" variant="ghost" onClick={() => void another(plan)} disabled={busy !== null}>
+              {plan.status === "ready" || !plan.clip_edit_id ? (
+                <ButtonLink href={`${editorLink}?plan=${plan.id}`} variant="secondary" size="lg">
+                  <Pencil aria-hidden="true" />
+                  Continue to editor
+                </ButtonLink>
+              ) : null}
+              <Button size="lg" variant="ghost" onClick={() => void another(plan)} disabled={busy !== null} className="sm:ml-auto">
                 <Shuffle aria-hidden="true" />
-                {busy === "regenerate" ? "Starting…" : "Try another plan"}
+                {busy === "regenerate" ? "Starting…" : "Try another"}
               </Button>
             </div>
           ) : null}
-          {reviewing && plan?.status === "applied" && !plan.clip_edit_id ? (
-            <p className="px-4 pb-4 text-xs text-subtle sm:px-6">
-              The version made from this plan was deleted. Use “Edit choices” to open its settings in the editor, or try
-              another plan.
-            </p>
-          ) : null}
           {reviewing && plan?.status === "ready" ? (
-            <p className="flex items-center gap-1.5 px-4 pb-4 text-xs text-subtle sm:px-6">
-              <ArrowRight aria-hidden="true" className="size-3" />
-              “Use this edit” renders the short with these settings; you can still change them in the editor.
+            <p className="px-4 pb-4 text-small text-subtle sm:px-6">
+              “Use this edit” renders your Short with these choices. “Continue to editor” lets you change them first.
             </p>
           ) : null}
           {error ? (
             <div className="px-4 pb-4 sm:px-6">
-              <InlineAlert title="That did not work">{error}</InlineAlert>
+              <InlineAlert title="That didn't work">{error}</InlineAlert>
             </div>
           ) : null}
         </section>
-        <aside aria-labelledby={`${id}-history`} className="min-w-0 space-y-3 self-start">
-          <div className="flex items-center justify-between gap-2">
-            <h2 id={`${id}-history`} className="text-sm font-medium text-muted">
-              Plans{plans.length ? <span className="tabular text-subtle"> · {plans.length}</span> : null}
-            </h2>
-            {!composing ? (
-              <Button size="sm" variant="ghost" onClick={() => setComposing(true)}>
-                <Plus aria-hidden="true" />
-                New plan
-              </Button>
-            ) : null}
-          </div>
-          {plans.length ? (
-            <PlanHistory
-              plans={plans}
-              selectedId={composing ? null : (plan?.id ?? null)}
-              onSelect={(p) => {
-                setSelectedId(p.id);
-                setComposing(false);
-              }}
-            />
-          ) : (
-            <p className="flex items-start gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-xs text-subtle">
-              <CircleAlert aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-              No plans yet. Earlier plans stay here when you try another.
-            </p>
-          )}
-        </aside>
+        {plans.length ? (
+          <details className="group rounded-2xl border border-border bg-surface">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent sm:px-6 [&::-webkit-details-marker]:hidden">
+              <span>
+                All drafts for this clip <span className="tabular text-subtle">· {plans.length}</span>
+              </span>
+              <span aria-hidden="true" className="text-subtle transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div className="space-y-3 border-t border-border px-4 py-4 sm:px-6">
+              <PlanHistory
+                plans={plans}
+                selectedId={composing ? null : (plan?.id ?? null)}
+                onSelect={(p) => {
+                  setSelectedId(p.id);
+                  setComposing(false);
+                }}
+              />
+              {!composing ? (
+                <Button size="sm" variant="ghost" onClick={() => setComposing(true)}>
+                  <Plus aria-hidden="true" />
+                  New draft in another style
+                </Button>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
       </div>
     </>
   );
 }
 
-/** /projects/[id]/clips/[clipId]/auto-edit — plan, review and apply an automatic first draft. */
+/**
+ * /projects/[id]/clips/[clipId]/auto-edit — the Style and Review steps of creating a Short:
+ * choose a recipe, watch the draft being prepared, review each choice, then use or adjust it.
+ */
 export function AutoEditView() {
   const { id, clipId } = useParams<{ id: string; clipId: string }>();
   const load = useCallback(() => loadProjectClip(id, clipId), [id, clipId]);
@@ -678,7 +751,7 @@ export function AutoEditView() {
     const notFound = error === "Clip not found" || error === "Project not found";
     return (
       <>
-        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Auto Edit" />
+        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Create a Short" />
         {notFound ? (
           <EmptyState
             icon={Clapperboard}
@@ -687,7 +760,7 @@ export function AutoEditView() {
             action={<ButtonLink href="/projects" variant="secondary">Back to projects</ButtonLink>}
           />
         ) : (
-          <ErrorState title="Auto Edit could not be loaded" message={error ?? "Unavailable."} onRetry={reload} />
+          <ErrorState title="This clip couldn't be loaded" message={error ?? "Try again."} onRetry={reload} />
         )}
       </>
     );
@@ -695,12 +768,12 @@ export function AutoEditView() {
   if (data.clip.status !== "ready") {
     return (
       <>
-        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Auto Edit" />
+        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Create a Short" />
         <EmptyState
           icon={Clapperboard}
           title="This clip isn't ready yet"
-          description="Auto Edit starts from a rendered clip. Come back once it shows Ready."
-          action={<ButtonLink href={`/projects/${id}/clips`} variant="secondary">Back to clips</ButtonLink>}
+          description="Auto Edit starts once the clip has been prepared."
+          action={<ButtonLink href={createHref(id, clipId)} variant="secondary">See its progress</ButtonLink>}
         />
       </>
     );

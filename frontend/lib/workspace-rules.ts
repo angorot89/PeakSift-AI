@@ -71,6 +71,7 @@ const base = (p: ProjectSummary) => `/projects/${p.id}`;
 export const editorLink = (projectId: string, clipId: string, editId?: string) =>
   `/projects/${projectId}/clips/${clipId}${editId ? `?edit=${editId}` : ""}`;
 export const autoEditLink = (projectId: string, clipId: string) => `/projects/${projectId}/clips/${clipId}/auto-edit`;
+export const createLink = (projectId: string, clipId: string) => `/projects/${projectId}/clips/${clipId}/create`;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -99,7 +100,7 @@ export function nextAction(p: ProjectSummary): NextAction {
   // A plan or a short waiting for the creator comes before finding more moments.
   const plan = p.plans.latest_ready;
   if (plan) {
-    return { key: "plan-ready", title: "Your Auto Edit plan is ready", description: "See what PeakSift chose, then use it or adjust it.", cta: "Review the plan", href: autoEditLink(p.id, plan.clip_id), tone: "action" };
+    return { key: "plan-ready", title: "Your Auto Edit draft is ready", description: "See what PeakSift chose, then use it or adjust it.", cta: "Review the draft", href: autoEditLink(p.id, plan.clip_id), tone: "action" };
   }
   const recent = p.shorts.recent;
   const rendering = recent.find((s) => working(s.status));
@@ -132,7 +133,7 @@ export function nextAction(p: ProjectSummary): NextAction {
     };
   }
   if (p.clips.latest_ready_id) {
-    return { key: "create-short", title: "Make your clip a Short", description: "Auto Edit prepares framing, captions, visuals and sound; you can change everything.", cta: "Create Short", href: autoEditLink(p.id, p.clips.latest_ready_id), tone: "action" };
+    return { key: "create-short", title: "Make your clip a Short", description: "Auto Edit prepares framing, captions, visuals and sound; you can change everything.", cta: "Create Short", href: createLink(p.id, p.clips.latest_ready_id), tone: "action" };
   }
   if (p.clips.working > 0) {
     return { key: "clip-working", title: "Preparing your clip", description: "Cutting the moment from your video.", href: `${base(p)}/clips`, tone: "waiting" };

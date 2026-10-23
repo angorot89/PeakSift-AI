@@ -35,7 +35,7 @@ describe("Auto Edit plan display", () => {
     assert.deepEqual(states("ready"), ["done", "done", "done", "done"]);
     assert.deepEqual(states("applied"), ["done", "done", "done", "done"]);
     assert.deepEqual(states("failed"), ["failed", "todo", "todo", "todo"]);
-    assert.deepEqual(planSteps("ready").map((s) => s.label)[3], "Plan ready");
+    assert.deepEqual(planSteps("ready").map((s) => s.label)[3], "Ready to review");
   });
 
   it("knows which plans are still running", () => {
@@ -53,7 +53,7 @@ describe("Auto Edit plan display", () => {
 
   it("lists only true facts, and offers what is missing", () => {
     assert.deepEqual(basedOn(CONFIDENCE), [
-      "face framing (strong)",
+      "face framing",
       "word timing",
       "1 B-roll suggestion",
       "2 matching assets",
@@ -75,7 +75,7 @@ describe("Auto Edit plan display", () => {
         notes: [],
       },
     } as unknown as AutoEditPlan;
-    assert.deepEqual(planSections(plan).map((s) => s.title), ["Framing", "Audio"]);
+    assert.deepEqual(planSections(plan).map((s) => s.title), ["Framing", "Sound"]);
     assert.deepEqual(planSections({ explanations: null } as unknown as AutoEditPlan), []);
   });
 

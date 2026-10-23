@@ -260,7 +260,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     getPlan(project.id, clip.video_id, clip.id, planParam)
       .then((plan) => {
         if (!cancelled) {
-          hydrate(plan.configuration, `Auto Edit plan · ${plan.recipe_label}`, autoEditHref(project.id, clip.id));
+          hydrate(plan.configuration, `Auto Edit draft · ${plan.recipe_label}`, autoEditHref(project.id, clip.id));
         }
       })
       .catch(() => {

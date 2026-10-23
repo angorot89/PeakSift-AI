@@ -245,6 +245,8 @@ export function friendlyEditError(edit: Pick<ClipEdit, "error_code">): string {
 }
 
 export const editorHref = (projectId: string, clipId: string) => `/projects/${projectId}/clips/${clipId}`;
+/** The start of making a Short from a clip: Auto Edit (recommended) or starting manually. */
+export const createHref = (projectId: string, clipId: string) => `/projects/${projectId}/clips/${clipId}/create`;
 
 const base = (projectId: string, videoId: string, clipId: string) =>
   `/projects/${projectId}/videos/${videoId}/clips/${clipId}/edits`;
