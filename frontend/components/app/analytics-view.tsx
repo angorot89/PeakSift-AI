@@ -8,6 +8,7 @@ import { InsightsPanel } from "@/components/app/analytics/insights-panel";
 import { PageHeader } from "@/components/app/page-header";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { SectionHeader } from "@/components/ui/section-header";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -16,7 +17,11 @@ import { formatDate } from "@/lib/format";
 import {
   accessState,
   baselineText,
+  coverage,
+  freshness,
   getPerformance,
+  summaryTotals,
+  type Total,
   positionText,
   windowSummary,
   metric,
@@ -29,6 +34,9 @@ import {
 } from "@/lib/performance";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
+
+/** The most recent Shorts listed before "Show all". */
+const RECENT_SHORTS = 6;
 
 const isRefreshing = (video: VideoPerformance) =>
   video.latest_sync?.status === "queued" || video.latest_sync?.status === "syncing";
@@ -55,11 +63,12 @@ export function useRefresh(id: string, onQueued: () => void) {
   return { busy, message, refresh };
 }
 
-function VideoStatus({ video }: { video: VideoPerformance }) {
+function VideoStatus({ video, pageSimulated }: { video: VideoPerformance; pageSimulated: boolean }) {
   const syncing = syncLabel(video.latest_sync);
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {video.simulated ? <StatusPill tone="warning">Simulated data</StatusPill> : null}
+    <div className="flex flex-wrap gap-1.5 empty:hidden">
+      {/* Said once for the whole page when the whole page is simulated. */}
+      {video.simulated && !pageSimulated ? <StatusPill tone="warning">Simulated data</StatusPill> : null}
       {video.remote_status === "remote_missing" ? <StatusPill tone="neutral">No longer on YouTube</StatusPill> : null}
       {syncing ? (
         <StatusPill tone={video.latest_sync?.status === "failed" ? "warning" : "processing"}>
@@ -81,7 +90,17 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
   );
 }
 
-function VideoRow({ video, canRefresh, onQueued }: { video: VideoPerformance; canRefresh: boolean; onQueued: () => void }) {
+function VideoRow({
+  video,
+  canRefresh,
+  pageSimulated,
+  onQueued,
+}: {
+  video: VideoPerformance;
+  canRefresh: boolean;
+  pageSimulated: boolean;
+  onQueued: () => void;
+}) {
   const { busy, message, refresh } = useRefresh(video.id, onQueued);
   return (
     <li className="rounded-xl border border-border bg-surface px-4 py-4">
@@ -98,8 +117,8 @@ function VideoRow({ video, canRefresh, onQueued }: { video: VideoPerformance; ca
             {video.recipe ? ` · ${video.recipe === "manual" ? "edited by hand" : `${video.recipe} recipe`}` : ""}
             {video.privacy ? ` · ${video.privacy}` : ""}
           </p>
-          <div className="mt-2">
-            <VideoStatus video={video} />
+          <div className="mt-2 empty:hidden">
+            <VideoStatus video={video} pageSimulated={pageSimulated} />
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -122,8 +141,8 @@ function VideoRow({ video, canRefresh, onQueued }: { video: VideoPerformance; ca
         </div>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
-        <Figure label="Views (live counter)" value={metric(video.views)} />
-        <Figure label="Engaged views (processed)" value={metric(video.engaged_views)} />
+        <Figure label="Views" value={metric(video.views)} hint="YouTube's live counter" />
+        <Figure label="Engaged views" value={metric(video.engaged_views)} hint="Processed by YouTube, about 2–3 days behind" />
         <Figure label="Avg. % viewed" value={percent(video.average_view_percentage)} hint="Weighted by daily views; above 100% means replays" />
         <Figure label="Likes" value={metric(video.likes)} />
         <Figure label="Comments" value={metric(video.comments)} />
@@ -155,15 +174,44 @@ function UsualShort({ overview }: { overview: PerformanceOverview }) {
   const engaged = overview.baselines.find((b) => b.metric === "engaged_views");
   const retention = overview.baselines.find((b) => b.metric === "average_view_percentage");
   return (
-    <section aria-labelledby="usual-heading" className="rounded-xl border border-border bg-surface-2 px-4 py-4">
-      <h2 id="usual-heading" className="text-sm font-medium text-foreground">Your usual short</h2>
+    <section aria-labelledby="usual-heading" className="rounded-xl border border-border bg-surface px-4 py-4">
+      <h3 id="usual-heading" className="text-title text-foreground">Your usual Short</h3>
       <p className="mt-1 text-sm text-muted">{baselineText(engaged)}</p>
       {engaged?.reliable && retention?.reliable ? (
         <p className="mt-0.5 text-sm text-muted">{baselineText(retention)}</p>
       ) : null}
       <p className="mt-2 text-xs text-subtle">
-        Compared only with your own shorts, over the same first week. Other creators&apos; data is never used.
+        Compared only with your own Shorts, over the same first week. Other creators&apos; data is never used.
       </p>
+    </section>
+  );
+}
+
+function SummaryCard({ label, total, count }: { label: string; total?: Total; count?: number }) {
+  const note = total ? coverage(total) : null;
+  return (
+    <div className="rounded-xl border border-border bg-surface px-4 py-3.5">
+      <dt className="text-xs text-subtle">{label}</dt>
+      <dd className="tabular mt-1 text-2xl leading-tight font-semibold text-foreground">{total ? metric(total.value) : metric(count)}</dd>
+      {note ? <dd className="mt-0.5 text-caption text-subtle">{note}</dd> : null}
+    </div>
+  );
+}
+
+/** At a glance: only figures YouTube reported ("—" when none did), summed over the Shorts shown. */
+function Summary({ videos }: { videos: VideoPerformance[] }) {
+  const totals = summaryTotals(videos);
+  return (
+    <section aria-labelledby="glance-heading">
+      <h2 id="glance-heading" className="sr-only">
+        At a glance
+      </h2>
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard label="Shorts published" count={videos.length} />
+        <SummaryCard label="Views" total={totals.views} />
+        <SummaryCard label="Engaged views" total={totals.engaged} />
+        <SummaryCard label="Likes" total={totals.likes} />
+      </dl>
     </section>
   );
 }
@@ -178,24 +226,27 @@ export function AnalyticsView({ projectId }: { projectId?: string } = {}) {
   const overview = all && projectId ? { ...all, videos: all.videos.filter((v) => v.project_id === projectId) } : all;
   const poll = useCallback(async () => setLive(await getPerformance()), []);
   usePolling(Boolean(overview?.videos.some(isRefreshing)), poll);
+  const fresh = overview ? freshness(overview.videos) : null;
+  const [showAll, setShowAll] = useState(false);
+  const listed = overview ? (showAll ? overview.videos : overview.videos.slice(0, RECENT_SHORTS)) : [];
+  const lead = fresh
+    ? `${fresh} (Pacific Time). Observed figures, not predictions.`
+    : "Observed figures from YouTube, not predictions. YouTube processes analytics with a delay of about 2–3 days.";
 
   return (
     <>
       {projectId ? (
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-section">Published shorts from this project</h2>
-            <p className="mt-1 text-sm text-muted">Observed figures, not predictions. YouTube processes analytics with a delay of about 2–3 days.</p>
+            <h2 className="text-section">How this project&apos;s Shorts are doing</h2>
+            <p className="mt-1 text-sm text-muted">{lead}</p>
           </div>
           <Link href="/analytics" className="inline-flex min-h-11 items-center text-sm text-accent-soft hover:underline">
             All your analytics and patterns
           </Link>
         </div>
       ) : (
-        <PageHeader
-          title="Analytics"
-          description="How your published shorts are doing on YouTube: observed figures, not predictions. YouTube processes analytics with a delay of about 2–3 days."
-        />
+        <PageHeader title="How are my Shorts doing?" description={lead} />
       )}
       {loading && !overview ? (
         <div role="status" aria-label="Loading analytics" className="space-y-3">
@@ -203,21 +254,33 @@ export function AnalyticsView({ projectId }: { projectId?: string } = {}) {
           <Skeleton className="h-28 w-full rounded-xl" />
         </div>
       ) : error || !overview ? (
-        <ErrorState title="Analytics unavailable" message={error ?? "Try again."} onRetry={reload} />
+        <ErrorState title="Analytics couldn't be loaded" message={error ?? "Try again."} onRetry={reload} />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {overview.access.simulated ? (
             <InlineAlert tone="warning" title="Simulated metrics">
               This server uses PeakSift&apos;s deterministic test provider. Every figure below is simulated, not real YouTube data.
             </InlineAlert>
           ) : null}
           {accessState(overview.access) !== "ready" ? <AnalyticsAccessGate access={overview.access} /> : null}
-          {!projectId && overview.videos.some((v) => v.source) ? <UsualShort overview={overview} /> : null}
-          {!projectId && overview.videos.some((v) => v.source) ? <InsightsPanel /> : null}
+          {overview.videos.length ? <Summary videos={overview.videos} /> : null}
+          {!projectId && overview.videos.some((v) => v.source) ? (
+            <section aria-labelledby="working-heading">
+              <SectionHeader
+                id="working-heading"
+                title="What seems to be working"
+                description="Your usual Short, and patterns among your own Shorts."
+              />
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+                <UsualShort overview={overview} />
+                <InsightsPanel />
+              </div>
+            </section>
+          ) : null}
           {overview.videos.length === 0 ? (
             <EmptyState
               icon={BarChart3}
-              title="No published shorts yet"
+              title="No published Shorts yet"
               description={
                 projectId
                   ? "Shorts you publish to YouTube from this project appear here, with how they are doing."
@@ -226,19 +289,29 @@ export function AnalyticsView({ projectId }: { projectId?: string } = {}) {
             />
           ) : (
             <section aria-labelledby="published-heading">
-              <h2 id="published-heading" className="mb-3 text-sm font-medium text-muted">
-                Published from PeakSift ({overview.videos.length})
-              </h2>
+              <SectionHeader
+                id="published-heading"
+                title={`Your Shorts (${overview.videos.length})`}
+                description="Published from PeakSift. Other videos on your channel are never tracked."
+              />
               <ul className="space-y-3">
-                {overview.videos.map((video) => (
+                {listed.map((video) => (
                   <VideoRow
                     key={video.id}
                     video={video}
                     canRefresh={accessState(overview.access) === "ready"}
+                    pageSimulated={overview.access.simulated}
                     onQueued={poll}
                   />
                 ))}
               </ul>
+              {listed.length < overview.videos.length ? (
+                <div className="mt-3 flex justify-center">
+                  <Button variant="secondary" onClick={() => setShowAll(true)}>
+                    Show all {overview.videos.length}
+                  </Button>
+                </div>
+              ) : null}
             </section>
           )}
         </div>

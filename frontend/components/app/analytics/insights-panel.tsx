@@ -30,7 +30,7 @@ function Evidence({ insight }: { insight: Insight }) {
         className="inline-flex items-center gap-1 rounded-md text-xs text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
       >
         <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-        Which shorts
+        See the evidence
       </button>
       {open ? (
         <div className="mt-2 grid gap-3 text-xs sm:grid-cols-2">
@@ -115,13 +115,14 @@ export function InsightsPanel() {
   const { data, error, loading, reload } = useApi(getInsights);
   return (
     <section aria-labelledby="insights-heading" className="rounded-xl border border-border bg-surface px-4 py-4">
-      <h2 id="insights-heading" className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <h3 id="insights-heading" className="flex items-center gap-2 text-title text-foreground">
         <Lightbulb aria-hidden="true" className="size-4 text-accent-soft" />
-        Patterns in your shorts
+        Patterns
         {data?.simulated ? <StatusPill tone="warning">Simulated data</StatusPill> : null}
-      </h2>
+      </h3>
       <p className="mt-1 mb-3 text-xs text-subtle">
-        Your shorts compared with each other over their first week. These are associations, not causes: topic, timing and trends differ between shorts too. Nothing here predicts how a short will do.
+        Your Shorts compared with each other over their first week. Associations, not causes: topic, timing and trends
+        differ between Shorts too. Nothing here predicts how a Short will do.
       </p>
       {loading && !data ? (
         <div role="status" aria-label="Loading insights">

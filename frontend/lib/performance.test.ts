@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   accessState,
+  coverage,
+  freshness,
+  summaryTotals,
+  type VideoPerformance,
   analyticsOutcome,
   baselineText,
   confidenceText,
@@ -123,5 +127,23 @@ describe("insights copy", () => {
     const insight = { group_size: 6, comparison_size: 7, confidence: "limited" } as Parameters<typeof confidenceText>[0];
     assert.equal(confidenceText(insight), "Limited evidence · 6 vs 7 shorts");
     assert.equal(confidenceText({ ...insight, confidence: "moderate" }), "Moderate confidence · 6 vs 7 shorts");
+  });
+});
+
+describe("analytics summary", () => {
+  const video = (over: Partial<VideoPerformance>) => ({ views: null, engaged_views: null, likes: null, processed_through: null, ...over }) as VideoPerformance;
+
+  it("sums only reported figures and never turns missing into zero", () => {
+    const t = summaryTotals([video({ views: 100, likes: 3 }), video({ views: 50 }), video({})]);
+    assert.deepEqual(t.views, { value: 150, reported: 2, of: 3 });
+    assert.deepEqual(t.engaged, { value: null, reported: 0, of: 3 });
+    assert.equal(coverage(t.views), "from 2 of 3 Shorts");
+    assert.equal(coverage(t.engaged), null);
+    assert.equal(coverage(summaryTotals([video({ likes: 1 })]).likes), null);
+  });
+
+  it("says how fresh the analytics are from the newest processed day", () => {
+    assert.equal(freshness([video({ processed_through: "2026-10-18" }), video({ processed_through: "2026-10-20" })]), "Analytics updated through Oct 20");
+    assert.equal(freshness([video({})]), null);
   });
 });
