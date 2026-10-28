@@ -20,7 +20,7 @@ import httpx
 
 from app.core.config import Settings
 from app.services.copilot.contract import output_schema
-from app.services.copilot.prompt import CORRECTION
+from app.services.copilot.prompt import CORRECTION, CORRECTION_IDEAS
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +74,12 @@ class OllamaCopilotProvider:
         self._base_url = settings.ollama_base_url.rstrip("/")
         self._injected = client
         self._schema = output_schema()
+        self._correction = CORRECTION
 
     def reply(self, messages: list[dict[str, str]], *, ideas: bool = False) -> ProviderReply:
         client = self._injected or httpx.Client(base_url=self._base_url)
         self._schema = output_schema(ideas=ideas)
+        self._correction = CORRECTION_IDEAS if ideas else CORRECTION
         try:
             return self._reply(list(messages), client)
         finally:
@@ -100,7 +102,7 @@ class OllamaCopilotProvider:
             logger.info("Copilot answer %d was not a JSON object; correcting once", attempt)
             messages += [
                 {"role": "assistant", "content": str(content)[:2000]},
-                {"role": "user", "content": CORRECTION},
+                {"role": "user", "content": self._correction},
             ]
         raise CopilotProviderError("malformed", "The local assistant's answer was not usable")
 

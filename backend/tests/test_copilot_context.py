@@ -147,10 +147,14 @@ def test_the_editor_sees_the_current_short_its_draft_and_visuals(client, db_sess
     )
     current = context.view["current"]
     assert current["clip"]["handle"] == "clip_1" and current["short"]["state"] == "ready"
-    assert current["short"]["layout"] == "blur_background"
+    # Creator words, never internal ids: the model repeats what it reads.
+    assert current["short"]["layout"] == "blur background"
+    assert current["clip"]["kind"] and "category" not in current["clip"]
+    assert "_" not in (current["short"]["caption_timing"] or "")
     assert current["latest_draft"]["state"] == "ready"
     library = context.view["visual_library"]
     assert library["total"] == 2 and library["images"] == 2
+    assert {item["used"] for item in library["items"]} == {"not used in any Short yet"}
     found = library["search_for_question"]
     assert found["query"] == "bridge"
     assert found["matches"] and context.targets[found["matches"][0]["handle"]].label.endswith(
@@ -227,6 +231,7 @@ def test_question_topics_keep_only_descriptive_words():
     assert question_topic("Find a picture of a city skyline at night") == "city skyline night"
     assert question_topic("What should I do next?") == "next"
     assert question_topic("?") == ""
+    assert question_topic("Which visuals am I not using?") == ""  # about the library itself
 
 
 def test_the_context_endpoint_reports_scope_and_facts(client, db_session):

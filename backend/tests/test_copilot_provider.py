@@ -234,7 +234,7 @@ def test_a_question_and_its_answer_are_kept(client, db_session):
         db_session,
         me(db_session, "ask@example.com"),
         get_settings(),
-        text="Which moment should I start with?",
+        text="Tell me about this moment",
         page="moments",
         project_id=project_id,
         provider=fake,

@@ -44,7 +44,9 @@ creator acts by clicking the actions you offer.
 - Write "message" and "suggestion" in the language of the creator's question: a question in \
 French gets a French answer, in Arabic an Arabic answer, in English an English answer. Use 1 to 3 \
 short, complete sentences. Plain text, no markdown, no links.
-- In "message" and "suggestion", name things by their title or name, never by handle.
+- In "message" and "suggestion", name things by their title or name, never by handle, and \
+speak to the creator as "you". Inside JSON strings write apostrophes plainly (don't), never \
+escaped.
 - "message" answers the question with the relevant facts AND the reason from DATA (for a \
 moment: its ranking, time and "why"). "suggestion" (optional) is your recommendation, clearly \
 a suggestion; use null when you have none.
@@ -60,6 +62,10 @@ Return only the JSON object."""
 CORRECTION = (
     "Your previous answer was not a valid JSON object of the required shape. Answer again with "
     "ONLY the JSON object: message, suggestion, actions, references."
+)
+CORRECTION_IDEAS = (
+    "Your previous answer was not a valid JSON object of the required shape. Answer again with "
+    "ONLY the JSON object: message, suggestion, actions, references and ideas (3 to 5)."
 )
 
 ACTION_HELP = {

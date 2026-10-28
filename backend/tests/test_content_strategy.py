@@ -284,6 +284,27 @@ def test_without_the_assistant_peaksift_still_offers_ideas(client, db_session):
     assert answer.cards[2]["note"] == "You've already made a clip from this moment."
 
 
+def test_an_answer_without_usable_ideas_still_gets_peaksifts_cards(client, db_session):
+    user, clip = setup(client, db_session, "no-ideas@example.com")
+    answer = service.ask(
+        db_session,
+        user,
+        get_settings(),
+        text="Donne-moi 3 idées de Shorts à partir de cette vidéo",
+        page="overview",
+        project_id=clip.video.project_id,
+        provider=FakeCopilotProvider(
+            [{"message": "Vous pouvez utiliser les moments suivants.", "ideas": []}]
+        ),
+    ).answer
+    assert answer.status == "ok"
+    assert [card["title"] for card in answer.cards][:2] == [
+        "The glue-stick incident",
+        "How load spreads",
+    ]
+    assert all(card["action"] is not None for card in answer.cards)  # each with Create Short
+
+
 def test_an_idea_naming_a_moment_exactly_is_anchored_to_it(client, db_session):
     user, clip = setup(client, db_session, "anchor@example.com")
     fake = FakeCopilotProvider(

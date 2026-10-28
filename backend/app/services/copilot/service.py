@@ -8,6 +8,7 @@ connection is held while the model thinks.
 """
 
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -17,9 +18,14 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.models import CopilotMessage, User
 from app.services.copilot import history, safety
-from app.services.copilot.answers import asks_what_next, complete, ideas_lead, next_step_answer
+from app.services.copilot.answers import complete, ideas_lead, own_answer
 from app.services.copilot.context import CopilotContext, Target, build_context
-from app.services.copilot.contract import CopilotOutputError, ParsedReply, parse_reply
+from app.services.copilot.contract import (
+    CopilotOutputError,
+    ParsedReply,
+    ProposedAction,
+    parse_reply,
+)
 from app.services.copilot.ideas import IdeaCard, asks_for_ideas, check_ideas, fallback_cards
 from app.services.copilot.prompt import build_messages
 from app.services.copilot.provider import CopilotProvider, CopilotProviderError, get_provider
@@ -29,6 +35,8 @@ logger = logging.getLogger(__name__)
 UNAVAILABLE = "PeakSift's local assistant isn't available right now."
 UNUSABLE = "PeakSift's local assistant couldn't give a usable answer this time. Please try again."
 IDEAS_FALLBACK = "Here are Short ideas from this video's moments instead."
+# Two words or fewer without closing punctuation: not an answer ("You don").
+FRAGMENT = re.compile(r"\s*\S+(?:\s+\S+)?\s*(?<![.!?。！？؟”\"')])")
 
 
 class QuestionInProgress(Exception):
@@ -83,19 +91,18 @@ def ask(
     question = history.append(db, thread, role="user", content=text, page=context.page)
     db.commit()  # the question is kept whatever happens next; no connection held while thinking
 
-    # A workflow question has a deterministic answer: the same next step Home shows.
-    own = next_step_answer(context) if asks_what_next(text) else None
+    # Questions PeakSift answers itself, from the data (see answers.py).
+    own = own_answer(context, text, asks_for_ideas(text))
     if own is not None:
-        from app.services.copilot.actions import next_step_actions
-
+        kind, content = own
         thread = _still_there(db, thread_id)
         answer = history.append(
             db,
             thread,
             role="assistant",
-            content=own,
+            content=content,
             page=context.page,
-            actions=next_step_actions(db, user, context),
+            actions=_own_actions(db, user, context, kind),
             status="ok",
         )
         db.commit()
@@ -109,9 +116,12 @@ def ask(
         reply = (provider or get_provider(settings)).reply(
             build_messages(context, text, turns, ideas=want_ideas), ideas=want_ideas
         )
-        parsed = safety.screen(parse_reply(reply.data, context.targets))
+        known_times = set(safety.TIME.findall(context.view_json()))
+        parsed = safety.screen(parse_reply(reply.data, context.targets), known_times)
         raw_ideas = reply.data.get("ideas")
         status, content = "ok", complete(parsed.message, context)
+        if FRAGMENT.fullmatch(content) and not want_ideas:  # "You don": a reply cut off
+            raise CopilotOutputError("The answer was a fragment")
         if parsed.dropped:
             logger.info("Copilot dropped %d unusable proposal(s)", parsed.dropped)
     except CopilotProviderError as error:
@@ -132,9 +142,11 @@ def ask(
     actions = actions or fallback_actions(db, user, context, status)
     cards: list[dict] = []
     ideas = check_ideas(raw_ideas, context) if parsed is not None else []
-    if not ideas and status != "ok" and asks_for_ideas(text):
-        ideas = fallback_cards(context)  # PeakSift's own ideas from this video's moments
-        if ideas:
+    if not ideas and asks_for_ideas(text):
+        # PeakSift's own ideas from this video's moments: without the assistant, or when its
+        # answer brought no usable idea (a small model sometimes lists moments in its text).
+        ideas = fallback_cards(context)
+        if ideas and status != "ok":
             content = f"{content} {IDEAS_FALLBACK}"
     cards = attach_idea_actions(db, user, ideas, actions)
     if cards and status == "ok":
@@ -154,6 +166,19 @@ def ask(
     )
     db.commit()
     return Exchange(question, answer)
+
+
+def _own_actions(db: Session, user: User, context: CopilotContext, kind: str) -> list[dict]:
+    """The buttons under one of PeakSift's own answers."""
+    from app.services.copilot.actions import next_step_actions, offer
+
+    if kind == "next_step":
+        return next_step_actions(db, user, context)
+    if kind == "assets" and "project" in context.targets:
+        return offer(db, user, [ProposedAction("open_assets", context.targets["project"])])
+    if kind.startswith("moment:") and kind[7:] in context.targets:
+        return offer(db, user, [ProposedAction("create_short", context.targets[kind[7:]])])
+    return []
 
 
 def _still_there(db: Session, thread_id: uuid.UUID):
