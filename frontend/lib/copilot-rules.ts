@@ -4,7 +4,8 @@
 export type CopilotPage =
   | "home" | "projects" | "new_project" | "overview" | "source" | "moments" | "create"
   | "auto_edit" | "editor" | "assets" | "project_analytics" | "analytics" | "short_analytics"
-  | "settings";
+  | "settings"
+  | "brand";
 
 export type CopilotScope = {
   page: CopilotPage;
@@ -40,6 +41,7 @@ export function copilotScope(pathname: string, search = ""): CopilotScope {
   if (pathname === "/projects/new") return { ...none, page: "new_project" };
   if (pathname.startsWith("/projects")) return { ...none, page: "projects" };
   if (pathname.startsWith("/settings")) return { ...none, page: "settings" };
+  if (pathname === "/brand" || pathname.startsWith("/brand/")) return { ...none, page: "brand" };
   return { ...none, page: "home" };
 }
 
@@ -55,14 +57,15 @@ const STARTERS: Record<CopilotPage, string[]> = {
   overview: ["What should I do next?", "Give me 3 Short ideas from this video"],
   source: ["Give me 3 Short ideas from this video", "What is this video about?"],
   moments: ["Which moment should I start with?", "Why is this the top pick?"],
-  create: ["Should I use Auto Edit or edit by hand?", "Which style fits this clip?"],
+  create: ["Which template fits this clip?", "Should I use Auto Edit or edit by hand?"],
   auto_edit: ["Should I use Punchy or Story here?", "Why didn't Auto Edit add B-roll?"],
-  editor: ["How can I improve this edit?", "Do I have useful B-roll for this clip?"],
+  editor: ["How can I improve this edit?", "What template am I using?"],
   assets: ["Do I have a visual of a bridge?", "Which visuals am I not using?"],
   project_analytics: ["How are this project's Shorts doing?", "Do I have enough data yet?"],
   analytics: ["What seems to be working?", "Do I have enough data yet?"],
   short_analytics: ["How is this Short doing?", "Do I have enough data yet?"],
   settings: ["What does PeakSift do with my YouTube connection?"],
+  brand: ["Do I have a default brand?", "What template am I using?"],
 };
 
 const PROJECT_PAGES: CopilotPage[] = ["overview", "source", "moments", "assets", "project_analytics"];

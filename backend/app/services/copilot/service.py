@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.models import CopilotMessage, User
 from app.services.copilot import history, safety
-from app.services.copilot.answers import complete, ideas_lead, own_answer
+from app.services.copilot.answers import complete, current_clip, ideas_lead, own_answer
 from app.services.copilot.context import CopilotContext, Target, build_context
 from app.services.copilot.contract import (
     CopilotOutputError,
@@ -174,6 +174,20 @@ def _own_actions(db: Session, user: User, context: CopilotContext, kind: str) ->
 
     if kind == "next_step":
         return next_step_actions(db, user, context)
+    if kind == "brand_studio":
+        return offer(db, user, [ProposedAction("open_brand_studio", None)])
+    if kind.startswith(("template:", "use:")):
+        handle = kind.split(":", 1)[1]
+        target = context.targets.get(handle)
+        if target is None:
+            return []
+        if kind.startswith("use:"):
+            clip = current_clip(context)
+            if clip is None:
+                return []
+            proposal = ProposedAction("use_template", target, str(context.targets[clip].id))
+            return offer(db, user, [proposal])
+        return offer(db, user, [ProposedAction("open_template", target)])
     if kind == "assets" and "project" in context.targets:
         return offer(db, user, [ProposedAction("open_assets", context.targets["project"])])
     if kind.startswith("moment:") and kind[7:] in context.targets:

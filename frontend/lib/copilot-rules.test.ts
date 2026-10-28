@@ -22,6 +22,8 @@ describe("copilot scope", () => {
     assert.equal(copilotScope(`/analytics/${P}`).page, "short_analytics");
     assert.equal(copilotScope("/analytics").page, "analytics");
     assert.equal(copilotScope("/settings").page, "settings");
+    assert.equal(copilotScope("/brand").page, "brand");
+    assert.equal(copilotScope("/brand/templates/new").page, "brand");
     assert.equal(copilotScope("/home").page, "home");
     assert.equal(copilotScope("/projects/not-an-id").page, "projects");
   });

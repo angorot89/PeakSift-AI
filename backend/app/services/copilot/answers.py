@@ -23,6 +23,7 @@ the moment's time, ranking and reason, or the step's reason — never with anyth
 
 import re
 
+from app.services.copilot.branding import branding_answer
 from app.services.copilot.context import CopilotContext
 from app.services.copilot.ideas import IDEA_WORDS
 
@@ -222,6 +223,12 @@ def unused_visuals_answer(context: CopilotContext) -> str | None:
     return f"These visuals{listed} aren't used in any Short yet: {names}."
 
 
+def current_clip(context: CopilotContext) -> str | None:
+    """The handle of the clip this page is about (create, Auto Edit, editor), if any."""
+    clip = ((context.view.get("current") or {}).get("clip") or {}).get("handle")
+    return clip if clip in context.targets else None
+
+
 def own_answer(context: CopilotContext, text: str, wants_ideas: bool) -> tuple[str, str] | None:
     """PeakSift's own answer, as (kind, text) — kind says which buttons go with it — or None
     when the question is for the model."""
@@ -229,6 +236,9 @@ def own_answer(context: CopilotContext, text: str, wants_ideas: bool) -> tuple[s
         return "none", INSTRUCTIONS_ANSWER
     if ACT.search(text):
         return "next_step", ACT_ANSWER
+    branded = branding_answer(context.view, text, has_clip=current_clip(context) is not None)
+    if branded is not None:
+        return branded
     if asks_what_next(text):
         answer = next_step_answer(context)
         if answer is not None:

@@ -8,6 +8,14 @@ import uuid
 from urllib.parse import quote
 
 
+def brand_studio() -> str:
+    return "/brand"
+
+
+def template(template_id: uuid.UUID) -> str:
+    return f"/brand/templates/{template_id}"
+
+
 def home() -> str:
     return "/home"
 

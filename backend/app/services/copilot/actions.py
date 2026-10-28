@@ -31,6 +31,7 @@ from app.models import (
     ClipEdit,
     Project,
     PublishedContent,
+    ShortTemplate,
     User,
     Video,
 )
@@ -45,6 +46,7 @@ GONE = {
     "short": "This Short is no longer available.",
     "draft": "This Auto Edit draft is no longer available.",
     "published": "This published Short is no longer available.",
+    "template": "This template is no longer available.",
 }
 NOT_READY = "This clip isn't ready yet. Try again in a moment."
 
@@ -64,6 +66,11 @@ LABELS = {
     "open_editor": "Open the editor",
     "open_short": "Open the Short",
     "open_published": "See its performance",
+    "open_brand_studio": "Open Brand Studio",
+    "open_template": "Open the template",
+    # Offered by PeakSift only (never proposed by the model): Auto Edit for this clip with a
+    # template; the clip travels in the action's ``query``, checked again when clicked.
+    "use_template": "Use this template",
 }
 
 
@@ -145,6 +152,17 @@ def _draft(db: Session, user: User, plan_id) -> tuple[AutoEditPlan, uuid.UUID]:
 # --- resolving one action ---------------------------------------------------------------------
 
 
+def _template(db: Session, user: User, template_id) -> ShortTemplate:
+    template = db.scalar(
+        select(ShortTemplate).where(
+            ShortTemplate.id == template_id, ShortTemplate.user_id == user.id
+        )
+    )
+    if template is None:
+        raise ActionUnavailable(GONE["template"])
+    return template
+
+
 def _uuid(value) -> uuid.UUID | None:
     if value is None or isinstance(value, uuid.UUID):
         return value
@@ -164,6 +182,18 @@ def resolve_action(
     target_id, project_id = _uuid(target_id), _uuid(project_id)
     if kind == "open_home":
         return Resolution("navigate", routes.home())
+    if kind == "open_brand_studio":
+        return Resolution("navigate", routes.brand_studio())
+    if target_kind == "template":
+        template = _template(db, user, target_id)
+        if kind == "use_template":
+            clip, owner = _clip(db, user, _uuid(query))
+            if clip.status != "ready":
+                raise ActionUnavailable(NOT_READY)
+            return Resolution(
+                "navigate", f"{routes.auto_edit(owner, clip.id)}?new=1&template={template.id}"
+            )
+        return Resolution("navigate", routes.template(template.id))
     if kind == "new_project":
         return Resolution("navigate", routes.new_project())
     if kind == "open_analytics":
@@ -232,6 +262,9 @@ def label_for(kind: str, target: Target | None, query: str | None) -> str:
         return f"Search visuals for “{short_text(query, 40)}”"
     if kind == "open_project" and target is not None:
         return f"Open {short_text(target.label, 40)}"
+    if kind in ("open_template", "use_template") and target is not None:
+        name = target.label.split(": ", 1)[-1]
+        return f"{'Use' if kind == 'use_template' else 'Open'} “{short_text(name, 36)}”"
     return LABELS[kind]
 
 

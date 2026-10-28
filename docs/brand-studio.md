@@ -256,3 +256,31 @@ render reads the snapshot.
   hook look, B-roll amount, sound levels, brand use) — never its words, music or visuals.
 - Edits record a display-only `origin` (`origin_template_id` on `POST …/edits`, kept only if the
   template is the creator's own).
+
+## Ask PeakSift about brands and templates
+
+`app/services/copilot/branding.py`. The Copilot's context gains a small `branding` section on
+every page: the creator's brands (name, default, logo or not), up to eight templates by handle
+(`template_N`: name, default, starting style, brand, a few creator words — never ids), how many
+Shorts they have published, and — in the editor — where this version came from (its template
+and brand, the template version it was made with, the template's version now, and how it
+differs from the template now). Brand Studio pages are their own Copilot page (`brand`).
+
+PeakSift answers the exact questions itself (never the model):
+
+| Question | Answer | Button |
+|---|---|---|
+| "What template am I using?" | in the editor: this version's template and brand; elsewhere: the default template and its settings; none: how to make one | *Open “…”* / *Open Brand Studio* |
+| "Do I have a default brand?" | the default brand and whether it has a logo, or how to make one | *Open Brand Studio* |
+| "Use my Punchy Gaming template" | with a clip on the page: Auto Edit for this clip with that template; elsewhere: open it | *Use “Punchy Gaming”* / *Open “…”* |
+| "Why does this Short look different from my template?" | the template changed after the Short was made (version 1 → 2; Shorts keep their settings), was deleted, or the remaining differences ("captions are Focus here (template: Minimal)") | — |
+| "Which template fits this clip?" | a **suggestion** from the clip's kind and each template's starting style ("“Punchy Gaming” is a reasonable fit because this is a 12s funny moment and it starts from the Punchy style. This is a suggestion, not a prediction.") and, with fewer than 10 published Shorts, "Your performance history isn't large enough to prefer one statistically." | *Use “…”* |
+
+The real-model review showed `llama3.2:3b` inventing a reason for a template choice, which is
+why that answer is PeakSift's own. For anything else about templates the model is told to
+suggest by name, say it is a suggestion, and never claim one will perform better.
+
+**Actions**: the model may offer *Open Brand Studio* and *Open the template*; only PeakSift
+offers *Use this template* (Auto Edit for this clip with the template — the clip travels with the
+action and is checked again). Every action is re-checked on click ("This template is no longer
+available."). No Copilot action creates, changes or deletes a brand or a template.
