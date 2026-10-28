@@ -88,3 +88,49 @@ export function sameSettings(a: TemplateSettings, b: TemplateSettings): boolean 
 export function freeHookPositions(captionPosition: TemplateSettings["caption_position"]): ("top" | "center")[] {
   return (["top", "center"] as const).filter((p) => p !== captionPosition);
 }
+
+/** The editor's current settings, as far as a template can hold them ("Save as template"):
+ * framing, captions, the hook's look (never its words), how much B-roll, sound levels and
+ * whether the brand shows. A Short's specific files (music, visuals) are never saved. */
+export function settingsFromEditor(editor: {
+  layout: string;
+  manual: boolean;
+  captions: boolean;
+  preset: TemplateSettings["caption_preset"];
+  position: TemplateSettings["caption_position"];
+  hookOn: boolean;
+  hookStyle: TemplateSettings["hook_style"];
+  hookPosition: TemplateSettings["hook_position"];
+  hookDuration: number;
+  visuals: number;
+  musicGainDb: number | null;
+  ducking: TemplateSettings["ducking"];
+  sfx: number;
+  normalize: boolean;
+  brand: { logo: boolean; endCardSeconds: number | null } | null;
+}): TemplateSettings {
+  const framing: TemplateSettings["framing"] = editor.manual
+    ? "auto"
+    : (["smart_reframe", "blur_background", "center_crop", "fit"] as const).find((f) => f === editor.layout) ?? "auto";
+  const level: TemplateSettings["music_level"] =
+    editor.musicGainDb === null ? null : editor.musicGainDb <= -22 ? "quiet" : editor.musicGainDb <= -18 ? "low" : "medium";
+  return {
+    ...BLANK,
+    framing,
+    captions: editor.captions,
+    caption_preset: editor.captions ? editor.preset : null,
+    caption_position: editor.captions ? editor.position : null,
+    hook: editor.hookOn,
+    hook_style: editor.hookOn ? editor.hookStyle : null,
+    hook_position: editor.hookOn ? editor.hookPosition : null,
+    hook_seconds: editor.hookOn ? Math.round(editor.hookDuration * 10) / 10 : null,
+    broll: editor.visuals === 0 ? "none" : editor.visuals === 1 ? "light" : "recipe",
+    music_level: level,
+    ducking: editor.musicGainDb === null ? null : editor.ducking,
+    sound_effects: editor.sfx > 0,
+    normalize_loudness: editor.normalize,
+    logo: editor.brand ? editor.brand.logo : true,
+    end_card: Boolean(editor.brand?.endCardSeconds),
+    end_card_seconds: editor.brand?.endCardSeconds ?? null,
+  };
+}

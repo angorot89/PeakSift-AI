@@ -33,6 +33,7 @@ from app.models import (
     Project,
     ReframeAnalysis,
     ReframeStatus,
+    ShortTemplate,
     TranscriptionStatus,
     Video,
 )
@@ -343,7 +344,9 @@ def create_edit(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
         ) from None
-    edit, created = create_or_reuse_edit(db, clip, video, storage, config)
+    edit, created = create_or_reuse_edit(
+        db, clip, video, storage, config, origin=_origin(db, video, body, config)
+    )
     if not created:
         if edit.status == ClipEditStatus.FAILED:
             raise HTTPException(
@@ -352,6 +355,26 @@ def create_edit(
             )
         response.status_code = status.HTTP_200_OK
     return read_edit(edit)
+
+
+def _origin(db: DbSession, video: Video, body: EditRequest, config: EditConfig) -> dict | None:
+    """Where a version's settings came from, for display: the creator's template (if it is
+    still theirs) and the brand's name. Never part of the configuration."""
+    origin: dict = {}
+    if body.origin_template_id is not None:
+        template = db.scalar(
+            select(ShortTemplate).where(
+                ShortTemplate.id == body.origin_template_id,
+                ShortTemplate.user_id == video.project.user_id,
+            )
+        )
+        if template is not None:
+            origin["template"] = {
+                "id": str(template.id), "name": template.name, "version": template.version
+            }  # fmt: skip
+    if config.brand is not None:
+        origin["brand"] = {"name": config.brand.name}
+    return origin or None
 
 
 def create_or_reuse_edit(

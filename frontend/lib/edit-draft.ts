@@ -34,6 +34,8 @@ export type EditorDraft = {
    * dropping it would render without loudness normalization). */
   audioSection: boolean;
   visuals: VisualElementDraft[];
+  /** The version's brand section (without its version tag), kept as it was. */
+  brand: Record<string, unknown> | null;
 };
 
 export const DEFAULT_DRAFT: EditorDraft = {
@@ -52,6 +54,7 @@ export const DEFAULT_DRAFT: EditorDraft = {
   audio: { source_gain_db: 0, normalize: true, music: null, sfx: [] },
   audioSection: false,
   visuals: [],
+  brand: null,
 };
 
 /** The analysis and word track the editor would use today (to say when a stored one differs). */
@@ -183,5 +186,11 @@ export function draftFromConfiguration(configuration: Snapshot | null | undefine
   draft.audio = audioFrom(config.audio);
   draft.audioSection = obj(config.audio) !== null;
   draft.visuals = visualsFrom(config.visuals);
+  const brand = obj(config.brand);
+  if (brand) {
+    const kept = { ...brand };
+    delete kept.version;
+    draft.brand = kept;
+  }
   return { draft, notes };
 }

@@ -10,7 +10,13 @@ export type PlanSection = { choice: string; reason: string; items?: PlanVisualIt
 export type SectionKey = "layout" | "captions" | "hook" | "visuals" | "audio";
 
 /** Creator-facing explanations (product copy; never a prompt or a model's reasoning). */
-export type PlanExplanations = { version: string; sections: Partial<Record<SectionKey, PlanSection>>; notes: string[] };
+export type PlanExplanations = {
+  version: string;
+  sections: Partial<Record<SectionKey, PlanSection>>;
+  notes: string[];
+  /** V1.7: the template (and brand) the plan started from. */
+  template?: { id: string; name: string; version: number; brand: string | null; summary: string };
+};
 
 /** What a plan was based on, in plain values (never a score). */
 export type PlanConfidence = {

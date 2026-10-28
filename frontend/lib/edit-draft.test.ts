@@ -130,3 +130,12 @@ describe("loading editor settings from a stored configuration", () => {
     assert.deepEqual(DEFAULT_DRAFT.audio.sfx, []);
   });
 });
+
+describe("a branded version", () => {
+  it("keeps its brand section exactly (without the version tag)", () => {
+    const brand = { version: "brand_v1", name: "Amine Clips", logo: { asset_id: "a", corner: "top_left", size: "small" } };
+    const { draft } = draftFromConfiguration({ layout: "fit", captions: { enabled: false }, brand }, { analysisId: null, trackId: null });
+    assert.deepEqual(draft.brand, { name: "Amine Clips", logo: { asset_id: "a", corner: "top_left", size: "small" } });
+    assert.equal(draftFromConfiguration({ layout: "fit" }, { analysisId: null, trackId: null }).draft.brand, null);
+  });
+});

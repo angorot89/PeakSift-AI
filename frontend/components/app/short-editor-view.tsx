@@ -90,8 +90,11 @@ import {
   type ClipEdit,
   type EditRequest,
   type PickableLayout,
+  type EditOrigin,
 } from "@/lib/edits";
 import { DEFAULT_DRAFT, draftFromConfiguration, type EditorDraft } from "@/lib/edit-draft";
+import { BrandStrip } from "@/components/app/editor/brand-strip";
+import { settingsFromEditor } from "@/lib/template-rules";
 import { TOOLS, toolFromParam, toolMarks, type ToolKey } from "@/lib/editor-tools";
 import { formatDuration } from "@/lib/format";
 import { loadProjectClip } from "@/lib/project-clip";
@@ -166,6 +169,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
   const [audioLimits, setAudioLimits] = useState<AudioUploadLimits | null>(null);
   const [visuals, setVisuals] = useState<VisualElementDraft[]>([]);
+  // V1.7: this Short's brand section (copied into the version) and where its settings came from.
+  const [brand, setBrand] = useState<Record<string, unknown> | null>(null);
+  const [origin, setOrigin] = useState<EditOrigin | null>(null);
   const [visualAssets, setVisualAssets] = useState<VisualAsset[] | null>(null);
   const [visualLayout, setVisualLayout] = useState<VisualLayout | null>(null);
   const [previewVideo, setPreviewVideo] = useState<HTMLVideoElement | null>(null);
@@ -211,13 +217,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     setAudio(draft.audio);
     setAudioSection(draft.audioSection);
     setVisuals(draft.visuals);
+    setBrand(draft.brand);
   }, []);
   const hydrate = useCallback(
-    (configuration: Record<string, unknown> | null | undefined, label: string, href?: string) => {
+    (configuration: Record<string, unknown> | null | undefined, label: string, href?: string, from?: EditOrigin | null) => {
       if (hydrated.current) return;
       hydrated.current = true;
       if (!configuration || touched.current) return; // never overwrite the creator's changes
       applyDraft(draftFromConfiguration(configuration, { analysisId: null, trackId: null }).draft);
+      setOrigin(from ?? null);
       setLoadedFrom({ label, configuration, href });
     },
     [applyDraft],
@@ -263,7 +271,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             // An unknown or deleted version falls back to the newest one.
             const target = (editParam ? page.edits.find((e) => e.id === editParam) : undefined) ?? page.edits[0];
             if (target) {
-              hydrate(target.configuration, describeEdit(target));
+              hydrate(target.configuration, describeEdit(target), undefined, target.origin ?? null);
               if (target.id === editParam && target.status === "ready") {
                 setSelectedId(target.id);
                 setMode("rendered");
@@ -299,7 +307,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     getPlan(project.id, clip.video_id, clip.id, planParam)
       .then((plan) => {
         if (!cancelled) {
-          hydrate(plan.configuration, `Auto Edit draft · ${plan.recipe_label}`, autoEditHref(project.id, clip.id));
+          const template = plan.explanations?.template;
+          hydrate(
+            plan.configuration,
+            `Auto Edit draft · ${plan.recipe_label}`,
+            autoEditHref(project.id, clip.id),
+            template
+              ? { template: { id: template.id, name: template.name, version: template.version }, ...(template.brand ? { brand: { name: template.brand } } : {}) }
+              : null,
+          );
         }
       })
       .catch(() => {
@@ -607,8 +623,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         : {}),
       ...(audioRequest ? { audio: audioRequest } : {}),
       ...(visualsRequest ? { visuals: visualsRequest } : {}),
+      ...(brand ? { brand } : {}),
+      ...(origin?.template ? { origin_template_id: origin.template.id } : {}),
     }),
-    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest, visualsRequest],
+    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest, visualsRequest, brand, origin],
   );
   // An approximate audio preview with the video as its clock (the render is authoritative).
   const previewPlan: PreviewPlan | null = useMemo(() => {
@@ -1050,6 +1068,36 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 ))}
               </div>
             ) : null}
+            <BrandStrip
+              brand={brand}
+              origin={origin}
+              onBrand={(next, from) => {
+                touched.current = true;
+                setBrand(next);
+                setOrigin(from);
+              }}
+              templateSettings={() =>
+                settingsFromEditor({
+                  layout,
+                  manual,
+                  captions,
+                  preset,
+                  position,
+                  hookOn,
+                  hookStyle,
+                  hookPosition,
+                  hookDuration,
+                  visuals: visuals.length,
+                  musicGainDb: audio.music ? audio.music.gain_db : null,
+                  ducking: audio.music ? audio.music.ducking : null,
+                  sfx: audio.sfx.length,
+                  normalize: audio.normalize,
+                  brand: brand
+                    ? { logo: Boolean(brand.logo), endCardSeconds: (brand.end_card as { seconds?: number } | undefined)?.seconds ?? null }
+                    : null,
+                })
+              }
+            />
             <ToolTabs
               label="Tools"
               idBase={`${id}-tool`}

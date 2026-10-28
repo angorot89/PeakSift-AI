@@ -1,16 +1,19 @@
 "use client";
 
-import { Clapperboard, Pencil, RotateCcw, Wand2, type LucideIcon } from "lucide-react";
+import { Clapperboard, Palette, Pencil, RotateCcw, Wand2, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CreateSteps } from "@/components/app/create/create-steps";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { WorkingState } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { selectClasses } from "@/components/ui/select-styles";
 import { errorMessage } from "@/lib/api";
+import { listTemplates, type Template } from "@/lib/brand";
+import { summary } from "@/lib/template-rules";
 import { autoEditHref } from "@/lib/auto-edit";
 import { clipContentUrl, friendlyClipError, isClipActive, retryClip, type GeneratedClip } from "@/lib/clips";
 import { editorHref } from "@/lib/edits";
@@ -83,6 +86,24 @@ export function CreateShortView() {
   const [clip, setClip] = useState<GeneratedClip | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // V1.7: the template a new Short starts from — the creator's default, changeable here.
+  const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    listTemplates()
+      .then((list) => {
+        if (cancelled) return;
+        setTemplates(list);
+        setTemplateId(list.find((t) => t.is_default)?.id ?? null);
+      })
+      .catch(() => !cancelled && setTemplates([])); // Auto Edit works without templates
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const chosen = templates?.find((t) => t.id === templateId) ?? null;
   const current = clip ?? data?.clip ?? null;
   const preparing = !!current && isClipActive(current.status) && !current.is_stale;
   usePolling(preparing, async () => setClip((await loadProjectClip(id, clipId)).clip), clipId);
@@ -142,12 +163,16 @@ export function CreateShortView() {
           <h2 id="start-heading" className="text-section">How do you want to start?</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <Choice
-              href={`${autoEditHref(id, current.id)}?new=1`}
+              href={`${autoEditHref(id, current.id)}?new=1&template=${chosen?.id ?? "none"}`}
               icon={Wand2}
               title="Auto Edit"
               recommended
               disabled={!ready}
-              description="PeakSift will prepare framing, captions, visuals and sound. You can change everything before rendering."
+              description={
+                chosen
+                  ? `Starts from your “${chosen.name}” template. You can change everything before rendering.`
+                  : "PeakSift will prepare framing, captions, visuals and sound. You can change everything before rendering."
+              }
             />
             <Choice
               href={editorHref(id, current.id)}
@@ -157,6 +182,45 @@ export function CreateShortView() {
               description="Open the editor with sensible defaults and choose every setting yourself."
             />
           </div>
+          {templates && templates.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+              <Palette aria-hidden="true" className="size-4 shrink-0 text-accent-soft" />
+              {changing ? (
+                <>
+                  <label htmlFor="start-template" className="text-muted">
+                    Start from
+                  </label>
+                  <select
+                    id="start-template"
+                    value={templateId ?? "none"}
+                    onChange={(e) => {
+                      setTemplateId(e.target.value === "none" ? null : e.target.value);
+                      setChanging(false);
+                    }}
+                    className={`${selectClasses} w-full sm:w-72`}
+                  >
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.is_default ? " (default)" : ""}
+                      </option>
+                    ))}
+                    <option value="none">No template</option>
+                  </select>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-muted">
+                    Using: <span className="font-medium text-foreground">{chosen ? chosen.name : "No template"}</span>
+                    {chosen ? <span className="block text-caption text-subtle">{summary(chosen.config, Boolean(chosen.brand?.has_logo))}</span> : null}
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setChanging(true)}>
+                    Change<span className="sr-only"> template</span>
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : null}
           {preparing ? (
             <div className="rounded-2xl border border-border bg-surface p-4">
               <WorkingState

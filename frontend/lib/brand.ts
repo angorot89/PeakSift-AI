@@ -60,6 +60,15 @@ export const deleteBrand = (id: string) => apiFetch<null>(`/brand/profiles/${id}
 export const listLogoCandidates = () => apiFetch<BrandLogo[]>("/brand/logo-candidates");
 export const getBrandLayout = () => apiFetch<BrandLayout>("/brand/layout");
 
+/** The brand section a Short would use now (a template, the default template or the default
+ * brand) and the template it came from. */
+export type EditSection = {
+  brand: Record<string, unknown> | null;
+  template: { id: string; name: string; version: number } | null;
+};
+export const getEditSection = (templateId?: string | null) =>
+  apiFetch<EditSection>(`/brand/edit-section${templateId ? `?template_id=${templateId}` : ""}`);
+
 /** The logo image itself (private, served with the creator's session). */
 export const logoUrl = (logo: Pick<BrandLogo, "id" | "project_id">) =>
   `${API_URL}/projects/${logo.project_id}/visual-assets/${logo.id}/content`;
