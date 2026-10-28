@@ -4,7 +4,7 @@ already carry, no handles, prompts, model names or context internals."""
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CopilotContextRead(BaseModel):
@@ -44,3 +44,21 @@ class CopilotMessageRead(BaseModel):
 class CopilotThreadRead(BaseModel):
     scope: str  # "Your workspace" or the project's name
     messages: list[CopilotMessageRead]
+
+
+class CopilotAskRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)  # the server's limit is checked too
+    page: str = Field(default="home", max_length=32)
+    project_id: uuid.UUID | None = None
+    clip_id: uuid.UUID | None = None
+    edit_id: uuid.UUID | None = None
+
+
+class CopilotExchangeRead(BaseModel):
+    question: CopilotMessageRead
+    answer: CopilotMessageRead
+
+
+class CopilotStatusRead(BaseModel):
+    enabled: bool
+    available: bool  # the local assistant can answer right now

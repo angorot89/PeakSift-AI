@@ -16,16 +16,21 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
+from app.core.rate_limit import per_user
 from app.models import CopilotMessage, Project
 from app.schemas.copilot import (
     CopilotActionRead,
+    CopilotAskRequest,
     CopilotContextRead,
+    CopilotExchangeRead,
     CopilotMessageRead,
     CopilotReferenceRead,
+    CopilotStatusRead,
     CopilotThreadRead,
 )
-from app.services.copilot import history
+from app.services.copilot import history, service
 from app.services.copilot.context import PAGES, ContextNotFound, build_context
+from app.services.copilot.provider import assistant_available
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
 
@@ -98,3 +103,50 @@ def clear_copilot_thread(
     history.clear(db, current_user.id, project_id)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/status", response_model=CopilotStatusRead)
+def copilot_status(current_user: CurrentUser) -> CopilotStatusRead:
+    settings = get_settings()
+    return CopilotStatusRead(
+        enabled=settings.copilot_enabled, available=assistant_available(settings)
+    )
+
+
+@router.post(
+    "/messages",
+    response_model=CopilotExchangeRead,
+    dependencies=[per_user("copilot_minute"), per_user("copilot_hour")],
+)
+def ask_copilot(body: CopilotAskRequest, current_user: CurrentUser, db: DbSession):
+    """Ask about the current page. The question is saved, the local assistant answers (or
+    PeakSift says it cannot right now), and both messages are returned."""
+    settings = get_settings()
+    if not settings.copilot_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Ask PeakSift is turned off"
+        )
+    text = " ".join(body.text.split()) if "\n" not in body.text else body.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Write a question first")
+    if len(text) > settings.copilot_message_max_chars:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Questions can be up to {settings.copilot_message_max_chars} characters",
+        )
+    try:
+        exchange = service.ask(
+            db,
+            current_user,
+            settings,
+            text=text,
+            page=body.page if body.page in PAGES else "home",
+            project_id=body.project_id,
+            clip_id=body.clip_id,
+            edit_id=body.edit_id,
+        )
+    except ContextNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from None
+    return CopilotExchangeRead(
+        question=message_read(exchange.question), answer=message_read(exchange.answer)
+    )

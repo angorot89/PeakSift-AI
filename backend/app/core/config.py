@@ -180,6 +180,16 @@ class Settings(BaseSettings):
     # (one corrective attempt included).
     # "fallback" uses only the deterministic planner. With the fallback on, it stands in when
     # the model cannot answer, and the plan says so.
+    # Creator Copilot (V1.6): the assistant answers with the local model ("ollama", at
+    # OLLAMA_BASE_URL; model COPILOT_OLLAMA_MODEL or the first OLLAMA_CLIP_MODELS entry) or the
+    # deterministic "fake" (tests, CI and demos; refused in production). One question may spend
+    # COPILOT_TIMEOUT_SECONDS in the model (one corrective attempt included); a question is at
+    # most COPILOT_MESSAGE_MAX_CHARS characters. With COPILOT_ENABLED off, nothing is asked.
+    copilot_enabled: bool = True
+    copilot_provider: Literal["ollama", "fake"] = "ollama"
+    copilot_ollama_model: str = ""
+    copilot_timeout_seconds: float = Field(default=45, gt=0, le=120)
+    copilot_message_max_chars: int = Field(default=1000, ge=50, le=4000)
     auto_edit_planner_provider: Literal["ollama", "fallback"] = "ollama"
     auto_edit_ollama_model: str = ""
     auto_edit_fallback_enabled: bool = True
@@ -531,6 +541,8 @@ def production_problems(settings: Settings) -> list[str]:
         problems.append("SEMANTIC_PROVIDER must not be fake")
     if settings.performance_provider != "youtube":
         problems.append("PERFORMANCE_PROVIDER must be youtube")
+    if settings.copilot_provider == "fake":
+        problems.append("COPILOT_PROVIDER must not be fake")
     if settings.storage_backend == "local" and (
         "media_root" not in explicit or not settings.media_root.is_absolute()
     ):

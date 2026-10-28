@@ -64,9 +64,16 @@ def append(
         select(func.max(CopilotMessage.sequence)).where(CopilotMessage.thread_id == thread.id)
     )
     message = CopilotMessage(
-        thread_id=thread.id, sequence=(last or 0) + 1, role=role, content=content,
-        suggestion=suggestion, page=page, status=status, actions=actions or [], refs=refs or [],
-    )  # fmt: skip
+        thread_id=thread.id,
+        sequence=(last or 0) + 1,
+        role=role,
+        content=content,
+        suggestion=suggestion,
+        page=page,
+        status=status,
+        actions=actions or [],
+        refs=refs or [],
+    )
     db.add(message)
     db.flush()
     cutoff = message.sequence - MAX_MESSAGES
