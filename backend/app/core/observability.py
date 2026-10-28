@@ -68,13 +68,15 @@ class Redactor:
         )
 
     def __call__(self, text: str) -> str:
+        # Server paths first: a whole path becomes <path> before a token pattern can match a
+        # piece of it (e.g. "…/4/abc…" looks like an OAuth code) and leave the rest visible.
+        if self._paths is not None:
+            text = self._paths.sub("<path>", text)
         for pattern in _SECRET_PATTERNS:
             text = pattern.sub(REDACTED, text)
         text = _URL_CREDENTIALS.sub(rf"\1{REDACTED}@", text)
         text = _OAUTH_QUERY.sub(rf"\1{REDACTED}", text)
         text = _SECRET_FIELDS.sub(rf"\1{REDACTED}", text)
-        if self._paths is not None:
-            text = self._paths.sub("<path>", text)
         return text
 
 

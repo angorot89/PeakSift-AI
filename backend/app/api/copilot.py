@@ -17,9 +17,10 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.rate_limit import per_user
-from app.models import CopilotMessage, Project
+from app.models import CopilotMessage, CopilotThread, Project
 from app.schemas.copilot import (
     CopilotActionRead,
+    CopilotActionResolutionRead,
     CopilotAskRequest,
     CopilotContextRead,
     CopilotExchangeRead,
@@ -29,6 +30,7 @@ from app.schemas.copilot import (
     CopilotThreadRead,
 )
 from app.services.copilot import history, service
+from app.services.copilot.actions import ActionUnavailable, resolve_record
 from app.services.copilot.context import PAGES, ContextNotFound, build_context
 from app.services.copilot.provider import assistant_available
 
@@ -150,3 +152,23 @@ def ask_copilot(body: CopilotAskRequest, current_user: CurrentUser, db: DbSessio
     return CopilotExchangeRead(
         question=message_read(exchange.question), answer=message_read(exchange.answer)
     )
+
+
+@router.post("/messages/{message_id}/actions/{index}", response_model=CopilotActionResolutionRead)
+def resolve_copilot_action(
+    message_id: uuid.UUID, index: int, current_user: CurrentUser, db: DbSession
+) -> CopilotActionResolutionRead:
+    """Re-check an offered action against the current state before the creator follows it.
+    ``409`` with a plain reason when its target is gone or no longer usable."""
+    message = db.scalar(
+        select(CopilotMessage)
+        .join(CopilotThread, CopilotThread.id == CopilotMessage.thread_id)
+        .where(CopilotMessage.id == message_id, CopilotThread.user_id == current_user.id)
+    )
+    if message is None or not 0 <= index < len(message.actions or []):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")
+    try:
+        resolution = resolve_record(db, current_user, message.actions[index])
+    except ActionUnavailable as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from None
+    return CopilotActionResolutionRead(**vars(resolution))

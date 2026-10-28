@@ -74,6 +74,17 @@ def test_symlinked_temp_roots_are_hidden_whole(tmp_path):
     assert redact(f"open {tmp_path}/alias/x.mp4 now") == "open <path> now"
 
 
+def test_a_path_that_looks_like_a_token_is_still_hidden_whole(tmp_path):
+    # "…/4/<20+ characters>" also matches the OAuth-code pattern; the path must win, whatever
+    # the temporary directory happens to be called (pytest-4/… made this flaky).
+    root = tmp_path / "media"
+    (root / "4").mkdir(parents=True)
+    redact = Redactor([str(root)])
+    line = redact(f"open {root}/4/test_symlinked_temp_roots_are_0/x.mp4: failed")
+    assert line == "open <path> failed"
+    assert redact("code 4/0AfJohXabcdefghijklmnopqrstuvwxyz leaked") == "code [redacted] leaked"
+
+
 def test_ordinary_operational_text_survives():
     text = "GET /projects/3f2c 200 12ms; status code: 500; max_tokens=4000; exit code 1"
     assert Redactor(["/var/lib/peaksift"])(text) == text
