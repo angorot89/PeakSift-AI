@@ -81,6 +81,7 @@ from app.models.semantic import (
     SemanticIndexStatus,
     VisualSemanticIndex,
 )
+from app.models.short_template import ShortTemplate
 from app.models.transcription import (
     ACTIVE_TRANSCRIPTION_STATUSES,
     Transcription,
@@ -92,6 +93,7 @@ from app.models.video import Video, VideoStatus
 from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
+    "ShortTemplate",
     "BrandProfile",
     "CopilotMessage",
     "CopilotMessageStatus",

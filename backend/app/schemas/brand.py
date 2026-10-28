@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -64,3 +64,54 @@ class BrandRead(BaseModel):
     end_card_text: str | None
     created_at: datetime
     updated_at: datetime
+
+
+TemplateRecipe = Literal["clean", "punchy", "story", "minimal"]
+
+
+class TemplateCreate(BaseModel):
+    name: str = Field(max_length=200)
+    description: str = Field(default="", max_length=1000)
+    recipe: TemplateRecipe | None = None
+    brand_profile_id: uuid.UUID | None = None
+    # The settings (see branding/template_config.py); omitted → the recipe's defaults.
+    config: dict[str, Any] | None = None
+    is_default: bool = False
+
+
+class TemplateUpdate(BaseModel):
+    """Only the fields sent change; settings, recipe or brand changes make a new version."""
+
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
+    recipe: TemplateRecipe | None = None
+    brand_profile_id: uuid.UUID | None = None
+    config: dict[str, Any] | None = None
+    is_default: bool | None = None
+
+
+class TemplateBrandRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    primary_color: str
+    has_logo: bool
+
+
+class TemplateRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str
+    recipe: TemplateRecipe | None
+    brand: TemplateBrandRead | None
+    config: dict[str, Any]
+    version: int
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class TemplateStarterRead(BaseModel):
+    recipe: TemplateRecipe
+    label: str
+    description: str
+    config: dict[str, Any]
