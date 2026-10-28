@@ -345,3 +345,54 @@ command menu: axe WCAG 2.1 AA, no horizontal overflow, the panel inside the view
 targets on phones, no console errors) — 69/69. The browser run found the phone sheet not
 scrolling to the newest answer (the sheet's scrolling box is the dialog body; the panel now
 scrolls an end marker into view) and the workspace composer saying "Ask about this project…".
+
+## Security summary
+
+- **Owner-scoped everywhere**: the context, conversations and every action are built from the
+  signed-in creator's own rows; another creator's project, clip, Short or message is a 404.
+- **Nothing identifying reaches the model**: symbolic handles instead of ids; no storage keys,
+  paths, emails, tokens or other creators' data. The model runs locally (Ollama on the server);
+  creator data never leaves it.
+- **The model only proposes**: strict JSON, unknown action types and invented handles dropped,
+  text cleaned, labels written by PeakSift, answers screened (`safety.py`), PeakSift's own answers
+  for what it knows exactly. No Copilot action can publish, delete or change anything; every
+  action is re-checked when clicked and opens a page where the creator decides.
+- **Bounded input and load**: questions ≤ 1,000 characters with control and invisible characters
+  removed; 6 questions a minute and 120 an hour per creator (Redis, 429 with a wait); one question
+  at a time per conversation (409); the model call has a time budget and a token cap; no database
+  connection is held while it thinks.
+- **Logs** record only failure codes and counts ("answered without the local assistant: timeout",
+  "dropped 2 unusable proposals") — never questions, answers, context or prompts.
+- `COPILOT_PROVIDER=fake` is refused in production; `COPILOT_ENABLED=false` turns the assistant off
+  (409) without affecting anything else.
+
+## Limitations
+
+- Ask PeakSift knows **only this creator's PeakSift data** — projects, moments, transcripts,
+  Shorts, visuals and analytics — **not the internet**: no trends, no competitors, no news, no
+  platform knowledge beyond what PeakSift itself says.
+- **No guaranteed performance**: moment rankings are editorial judgements of the transcript;
+  analytics are observed figures and patterns are associations in the creator's own uploads —
+  never predictions or causes.
+- **Local model quality varies**: `llama3.2:3b` answers in a few seconds, can be conservative,
+  repetitive or wrong in its free text (for example missing an item from a list). What PeakSift
+  knows exactly it answers itself; ideas, references and actions are checked; but free-text
+  advice is a suggestion to weigh, not a fact.
+- **Languages**: questions in any language are accepted; the model is asked to answer in the
+  question's language (French, Arabic and Chinese verified), while PeakSift's own answers, labels
+  and the product are in English. Moment reasons stay in the language they were written in.
+- **Creator approval required**: the assistant suggests and opens pages; it never publishes,
+  deletes, renders or changes settings, and there is no autonomous or scheduled action.
+- Conversations keep the last 200 messages per project; the model sees the last 3 exchanges.
+- When the local model is not running, PeakSift says so and still offers the next step and ideas
+  from the video's moments.
+
+## Testing
+
+- Backend (pytest, fake assistant and `httpx.MockTransport` for Ollama):
+  `test_copilot_context.py`, `test_copilot_domain.py`, `test_copilot_provider.py`,
+  `test_copilot_actions.py`, `test_next_action.py`, `test_content_strategy.py`,
+  `test_copilot_answers.py`, `test_copilot_hardening.py` (prompt injection, races, characters,
+  languages) and `test_copilot_acceptance.py` (journeys).
+- Frontend unit tests (`node --test`): `lib/copilot-rules.test.ts`, `lib/command-menu.test.ts`.
+- Real model: `scripts/copilot_acceptance.py` (see *Acceptance*). CI never calls a model.

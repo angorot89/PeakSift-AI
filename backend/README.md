@@ -332,6 +332,26 @@ python scripts/insights_benchmark.py                     # false-pattern and det
 
 Settings: `YOUTUBE_ANALYTICS_ENABLED`, `PERFORMANCE_PROVIDER` (`youtube`, or `fake` outside production), `PERFORMANCE_SYNC_STALE_AFTER_SECONDS`, `PERFORMANCE_MANUAL_COOLDOWN_SECONDS`, `PERFORMANCE_SCHEDULE_BATCH`, `PERFORMANCE_SCHEDULE_INTERVAL_SECONDS`.
 
+## Creator Copilot
+
+`app/services/copilot/` (V1.6): `context.py` builds the owner-scoped view with handles,
+`history.py` keeps one locked conversation per project, `prompt.py` / `provider.py` ask the local
+model (Ollama, strict JSON schema) or the deterministic fake, `contract.py` parses and cleans the
+answer, `safety.py` screens it, `answers.py` answers what PeakSift knows exactly, `ideas.py` checks
+idea cards, `actions.py` offers and re-checks actions, `service.py` ties them together;
+`app/services/next_action.py` (shared with Home) and `app/services/strategy.py`. Endpoints:
+`GET /copilot/status`, `GET /copilot/context`, `GET` / `DELETE /copilot/thread`,
+`POST /copilot/messages`, `POST /copilot/messages/{id}/actions/{index}`. Full design:
+[docs/creator-copilot.md](../docs/creator-copilot.md).
+
+```bash
+COPILOT_ACCEPTANCE_EMAIL=… COPILOT_ACCEPTANCE_PASSWORD=… \
+  python scripts/copilot_acceptance.py --api http://localhost:8000 --project ID   # real-model gate
+```
+
+Settings: `COPILOT_ENABLED`, `COPILOT_PROVIDER` (`ollama`, or `fake` outside production),
+`COPILOT_OLLAMA_MODEL`, `COPILOT_TIMEOUT_SECONDS`, `COPILOT_MESSAGE_MAX_CHARS`.
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.

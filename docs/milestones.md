@@ -327,6 +327,38 @@ Delivered:
   Punchy → editor → render → play → download → simulated publish) and the returning journey in a
   real browser on a production build, with the defects it found fixed
 
+## V1.6 — Creator Copilot & Content Strategy
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests
+(#216–#227) on top of the unmerged V1.5 stack wait for GitHub Actions (unavailable because of
+account billing); nothing is merged or tagged. V1.1–V1.5 must be merged and released first.
+
+**Ask PeakSift**: a contextual assistant that answers from the creator's own data and helps
+decide what to do next and why — never a general chatbot, never the internet, never acting on
+its own. See [creator-copilot.md](creator-copilot.md).
+
+Delivered:
+
+- A bounded, owner-scoped context per page with symbolic handles (never ids), transcript as
+  fenced data, and a per-project conversation that the creator can clear
+- A local assistant (Ollama `llama3.2:3b` by default) behind a strict JSON contract: temperature
+  0, one corrective attempt, a time budget, rate limits, and plain words when it is unavailable
+- Allow-listed actions (navigation and Create Short only) re-checked when clicked; nothing can
+  publish, delete or change anything
+- One deterministic next-best-action engine shared by Home, the project Overview and the
+  assistant
+- Content strategy from the creator's own data: unused moments, variety, relayed observed
+  patterns, repeated-work notes, and Short idea cards anchored to real moments or transcript
+  times — no virality prediction
+- The **Ask PeakSift** panel (desktop side panel, phone full-height sheet), page starters, idea
+  cards, Based-on chips, action buttons; and a **⌘K / Ctrl K** command menu
+- Hardening: prompt-injection screening (action claims, repeated instructions, unknown times),
+  an unbreakable data fence, one question at a time, polite failure when a conversation is
+  cleared mid-answer, control characters, languages and right-to-left text; 69/69 browser checks
+- Acceptance with the real local model (28 questions across three creators, including a
+  hostile transcript and visual): what PeakSift knows exactly — what next, the top pick, unused
+  visuals, nothing published yet, requests to act — it now answers itself
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -345,6 +377,7 @@ Delivered:
 - V1.3 Semantic Asset Intelligence — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.4 Performance Analytics & Learning — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.5 Creator Experience & Modern Workspace — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.6 Creator Copilot & Content Strategy — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 

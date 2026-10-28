@@ -331,3 +331,31 @@ one row per reporting day and view definition; Celery beat schedules syncs by ag
 use fixed early windows and the creator's own median; a deterministic insights engine
 (Mann–Whitney + Holm–Bonferroni) reports associations among the creator's own shorts, which
 Auto Edit may consider as weak hints. See [performance-analytics.md](performance-analytics.md).
+
+## Creator Copilot (V1.6)
+
+*Ask PeakSift* answers questions about the creator's own data. Details:
+[creator-copilot.md](creator-copilot.md).
+
+```
+panel / command menu ──POST /copilot/messages──▶ api/copilot.py (rate limits, input cleanup)
+                                                   │
+             services/copilot/context.py ◀─────────┤ build_context: owner-scoped view + handles
+             services/next_action.py      (shared with Home and the Overview)
+             services/strategy.py         (notes, moments already used, fallback ideas)
+                                                   │
+             services/copilot/answers.py ──────────┤ PeakSift's own answers (no model)
+             services/copilot/prompt.py            │ rules + quoted question + fenced DATA
+             services/copilot/provider.py ─────────┤ Ollama (format = JSON schema, temp 0) / fake
+             services/copilot/contract.py          │ parse_reply: handles → targets, clean text
+             services/copilot/safety.py            │ no claimed actions, no instructions, no unknown times
+             services/copilot/ideas.py             │ idea cards anchored to real moments / times
+             services/copilot/actions.py ──────────┤ offer (labels) · resolve on click (409 if gone)
+             services/copilot/history.py           │ one locked conversation per project
+                                                   ▼
+                                     copilot_threads / copilot_messages
+```
+
+The model proposes text and handles; the server decides what is shown and offered. No database
+connection is held while the model thinks; the question is saved first and the conversation is
+locked only to write messages.
