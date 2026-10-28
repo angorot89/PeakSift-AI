@@ -201,3 +201,32 @@ render reads the snapshot.
   bottom right)") or that the logo waits for the hook; *End card* shows the card and how much
   longer the Short gets. The preview is decorative (`aria-hidden`) with a text summary for
   assistive technology.
+
+## Template builder and library (UI)
+
+`components/app/brand/template-builder-view.tsx`, `template-library.tsx`, `lib/template-rules.ts`
+(pure, unit-tested).
+
+- **Library** (Brand Studio, *Your templates*): cards with a short summary in creator words
+  ("Boxed captions · Boxed hook · Light B-roll · Logo · End card +2s"), the brand, the starting
+  style and when it was last changed; the default first (a *Default* badge with a star — not
+  colour alone), then the most recently changed. Each card's menu: **Edit**, **Use for new
+  Shorts** (makes it the default — what "Use" means outside a Short), **Duplicate** ("… copy"),
+  **Rename** (a dialog), **Delete** (confirmed: "Shorts and plans made with it keep their
+  settings"). Empty state: *No templates yet — Save the styles you use repeatedly so every
+  Short starts closer to finished.* — **Create one**.
+- **New template**: start from **Clean, Punchy, Story, Minimal** (each recipe's defaults) or
+  **Blank**; `/brand/templates/new?start=punchy` skips the choice.
+- **Builder**: the preview is dominant (left on desktop, first on phones) and uses the same
+  `BrandPreview` as Brand Studio; the tools reuse the editor's patterns — the same tool tabs
+  (**Style, Captions, Opening, Visuals, Sound, Brand**), option cards with caption samples,
+  segmented choices and switches. Primary choices are visual (caption cards, framing cards,
+  B-roll *None / Light / As the style suggests*); technical values are under **Advanced** (hook
+  seconds, ducking, loudness). Empty choices are labelled as the style's ("Using the style's
+  choice"). The hook position the captions use is disabled. *Sound* says plainly that templates
+  never add music. *Brand* picks one of the creator's brands, shows the logo or not, and turns on
+  the end card with its length ("+2.0 s to every Short").
+- A **name is required** (focus moves to the field with "Give the template a name."); the
+  description is optional. *Saved* / *Unsaved changes* are always shown; leaving with unsaved
+  changes asks the browser to confirm; saving a new template moves to its own address.
+- *Start new Shorts from this template* makes it the default.
