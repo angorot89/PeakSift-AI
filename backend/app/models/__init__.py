@@ -37,6 +37,7 @@ from app.models.clip_detection import (
     ClipDetectionStatus,
 )
 from app.models.clip_edit import ACTIVE_CLIP_EDIT_STATUSES, ClipEdit, ClipEditStatus
+from app.models.copilot import CopilotMessage, CopilotMessageStatus, CopilotRole, CopilotThread
 from app.models.insight import CreatorInsight, InsightConfidence, InsightSet, InsightSetStatus
 from app.models.oauth_state import OAuthState
 from app.models.performance import (
@@ -90,6 +91,10 @@ from app.models.video import Video, VideoStatus
 from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
+    "CopilotMessage",
+    "CopilotMessageStatus",
+    "CopilotRole",
+    "CopilotThread",
     "CreatorInsight",
     "InsightConfidence",
     "InsightSet",
