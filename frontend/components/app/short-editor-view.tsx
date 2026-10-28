@@ -93,7 +93,9 @@ import {
   type EditOrigin,
 } from "@/lib/edits";
 import { DEFAULT_DRAFT, draftFromConfiguration, type EditorDraft } from "@/lib/edit-draft";
+import { BrandLogoLayer } from "@/components/app/editor/brand-logo-layer";
 import { BrandStrip } from "@/components/app/editor/brand-strip";
+import type { LogoCorner, LogoSize } from "@/lib/brand-rules";
 import { settingsFromEditor } from "@/lib/template-rules";
 import { TOOLS, toolFromParam, toolMarks, type ToolKey } from "@/lib/editor-tools";
 import { formatDuration } from "@/lib/format";
@@ -656,6 +658,13 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const overlay = (
     <>
       <VisualsLayer projectId={project.id} elements={visuals} assets={visualAssetMap} layout={visualLayout} />
+      {brand && brand.logo && typeof brand.logo === "object" ? (
+        <BrandLogoLayer
+          logo={brand.logo as { asset_id: string; corner: LogoCorner; size: LogoSize }}
+          captions={captions ? position : null}
+          hook={hookOn ? { position: hookPosition, seconds: hookDuration } : null}
+        />
+      ) : null}
       {spec ? (
         <CaptionLayer
           spec={spec}

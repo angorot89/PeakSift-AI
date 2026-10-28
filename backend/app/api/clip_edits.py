@@ -278,7 +278,9 @@ def _require_brand(db: DbSession, video: Video, config: EditConfig) -> None:
         )
     if brand_logo(db, video.project.user_id, config.brand.logo.asset_id) is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Choose a logo from your own images"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The brand logo is no longer one of your images; choose another logo in "
+            "Brand Studio, or remove the branding from this Short",
         )
 
 
