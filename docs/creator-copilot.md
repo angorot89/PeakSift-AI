@@ -105,3 +105,26 @@ context label: the scope and a few facts ("Bridge Workshop · 3 moments · 6 vis
   available." (or Short, clip, draft, project, published Short). `create_short` returns the
   moment's ids so the frontend creates the clip through the normal clip API (its validation
   and rate limits apply), then opens *Create a Short*.
+
+## Next best action (one source of truth)
+
+`app/services/next_action.py` decides each project's next step from its real state
+(`workspace_summary.project_summary`) with deterministic rules — no model decides the workflow:
+
+| State | Next step |
+| --- | --- |
+| No source video / unreadable / being read | Add your long video · upload a different file · preparing |
+| Not transcribed / transcribing / failed | Transcribe your video · transcribing · needs attention |
+| Auto Edit draft ready (no Short yet) | Your Auto Edit draft is ready → Review the draft |
+| A Short failed / rendering / ready | needs attention · rendering · Your Short is ready → Publish or download |
+| Upload failed / uploading / published | needs attention · uploading · See how your Shorts are doing |
+| A clip ready / being cut | Make your clip a Short → Create Short · preparing your clip |
+| No moments yet / finding / none / some | Find the best moments · finding · No moments stood out · *N* moments ready to review |
+
+Problems come first, then work in progress, then the next creative step. Each step carries its
+link and the matching Copilot action. **Home's *Continue working***
+(`GET /workspace/home` → `continue_items`), **the project Overview** (`GET
+/projects/{id}/summary` → `next_action`) and **the Copilot** (`next_step` in its context; the
+prompt tells the model to recommend that step) all read it, so "What should I do next?" and the
+dashboard always lead to the same page. When the local assistant is unavailable, the answer still
+offers PeakSift's own next step as a button.

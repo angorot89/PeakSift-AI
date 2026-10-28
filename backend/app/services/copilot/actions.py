@@ -307,6 +307,11 @@ def resolve_record(db: Session, user: User, item: dict) -> Resolution:
 
 
 def next_step_actions(db: Session, user: User, context: CopilotContext) -> list[dict]:
-    """PeakSift's own next step, offered when the local assistant cannot answer (filled in by
-    the next-action engine)."""
-    return []
+    """PeakSift's own next step (``services/next_action.py``) as buttons — offered when the
+    local assistant cannot answer, so the creator always has a way forward."""
+    proposals = [
+        ProposedAction(kind, context.targets[handle])
+        for kind, handle in context.next_steps
+        if handle in context.targets
+    ]
+    return offer(db, user, proposals)[:2]
