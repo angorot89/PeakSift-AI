@@ -172,3 +172,32 @@ explanations say "Started from your Punchy Gaming template. Used your Amine Clip
 colour codes or internals. Applying the plan records an **origin** on the new version
 (`ClipEdit.origin`: template id, name and version, brand name, plan id) — for display only; the
 render reads the snapshot.
+
+## Brand Studio (UI)
+
+`/brand` (sidebar **Brand Studio**), `components/app/brand/`, `lib/brand.ts`,
+`lib/brand-rules.ts` (pure, unit-tested; mirrors the server's colour and placement rules).
+
+- **Words**: the page opens with the three ideas — *Brand: how your Shorts look*, *Template:
+  how your Shorts are edited*, *Each Short: starts from them, you can still change anything*.
+- **Brand form** (left) and a **live preview** (right; stacked under the form on phones): name,
+  primary colour, optional accent (falls back to the primary colour) and caption emphasis
+  colours, logo, corner and size, end-card line, and *Use as my default brand*. *Saved* /
+  *Unsaved changes* are always shown; leaving with unsaved changes asks the browser to confirm;
+  deleting is confirmed ("Shorts you already made keep their look").
+- **Colour fields**: the system colour picker (keyboard accessible, labelled "… picker") and a
+  labelled hex field validated as you type ("Use a hex colour like #FF3A72"); optional colours
+  can be cleared. The emphasis field says whether the colour is readable as caption text, or
+  that captions will keep their own colour.
+- **Logo picker**: a dialog listing the creator's images from every project (thumbnails on a
+  checkerboard so transparency shows), as a radio group — arrow keys move, the choice is marked
+  by a check and text, not colour alone — with *No logo*. With no images yet it points to a
+  project's Assets.
+- **Preview** (`BrandPreview`): a 9:16 still on a sample background drawn with the renderer's
+  numbers (`GET /caption-styles`, `GET /brand/layout`) and the editor's caption CSS
+  (`CaptionSampleLayer`). *Opening* shows the hook (with the brand accent on a Boxed hook);
+  *During* shows captions with the emphasis colour and the logo where the renderer will put it
+  — the note explains a move ("Shown top right so it stays clear of the captions (you chose
+  bottom right)") or that the logo waits for the hook; *End card* shows the card and how much
+  longer the Short gets. The preview is decorative (`aria-hidden`) with a text summary for
+  assistive technology.
