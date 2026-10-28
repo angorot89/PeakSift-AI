@@ -22,6 +22,7 @@ from app.schemas.copilot import (
     CopilotActionRead,
     CopilotActionResolutionRead,
     CopilotAskRequest,
+    CopilotCardRead,
     CopilotContextRead,
     CopilotExchangeRead,
     CopilotMessageRead,
@@ -79,6 +80,7 @@ def message_read(message: CopilotMessage) -> CopilotMessageRead:
                  for i, a in enumerate(message.actions or [])],
         references=[CopilotReferenceRead(kind=r["kind"], label=r["label"])
                     for r in message.refs or []],
+        cards=[CopilotCardRead(**card) for card in message.cards or []],
         created_at=message.created_at,
     )  # fmt: skip
 

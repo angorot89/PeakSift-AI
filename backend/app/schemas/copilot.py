@@ -29,6 +29,20 @@ class CopilotReferenceRead(BaseModel):
     label: str  # e.g. "Moment: The night before the test", never an id
 
 
+class CopilotCardRead(BaseModel):
+    """A structured result under an answer (V1.6: Short ideas). ``action`` is the index of its
+    action in the message's ``actions`` (e.g. *Create Short*), when it has one."""
+
+    kind: str  # "idea"
+    title: str
+    time: str | None = None
+    angle: str | None = None
+    why: str | None = None
+    style: str | None = None
+    note: str | None = None  # e.g. "Similar to a Short you've already published."
+    action: int | None = None
+
+
 class CopilotMessageRead(BaseModel):
     id: uuid.UUID
     role: str  # "user" or "assistant"
@@ -38,6 +52,7 @@ class CopilotMessageRead(BaseModel):
     page: str
     actions: list[CopilotActionRead]
     references: list[CopilotReferenceRead]
+    cards: list[CopilotCardRead] = []
     created_at: datetime
 
 
