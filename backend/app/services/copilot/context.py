@@ -49,6 +49,7 @@ from app.models import (
     VisualAsset,
 )
 from app.services.clip_detection.labels import moment_label
+from app.services.copilot.branding import branding_view
 
 PAGES = (
     "home",
@@ -65,6 +66,7 @@ PAGES = (
     "analytics",
     "short_analytics",
     "settings",
+    "brand",
 )
 PROJECT_PAGES = {
     "overview",
@@ -93,6 +95,8 @@ PAGE_MEANING = {
     "analytics": "how the creator's published Shorts are doing, and observed patterns",
     "short_analytics": "how one published Short is doing",
     "settings": "account settings (YouTube connection)",
+    "brand": "Brand Studio: the creator's brands (how Shorts look) and templates (how they're "
+    "edited)",
 }
 
 MAX_VIEW_CHARS = 12_000
@@ -337,6 +341,14 @@ def build_context(
         view["analytics"] = _analytics(db, user, project, handles, settings)
         if page in {"analytics", "project_analytics", "short_analytics"}:
             facts.append(view["analytics"]["summary"])
+
+    # V1.7: the creator's brands and templates (and, in the editor, where this version came from).
+    edit = None
+    if page == "editor" and project is not None and clip_id is not None and edit_id is not None:
+        edit = db.scalar(
+            select(ClipEdit).where(ClipEdit.id == edit_id, ClipEdit.clip_id == clip_id)
+        )
+    view["branding"] = branding_view(db, user, handles, Target, edit)
 
     view = _fit(view)
     return CopilotContext(

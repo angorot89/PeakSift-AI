@@ -43,6 +43,9 @@ ACTION_TYPES: dict[str, tuple[str, ...] | None] = {
     "open_editor": ("clip", "short", "moment"),
     "open_short": ("short",),
     "open_published": ("published",),
+    # V1.7: Brand Studio and the creator's templates (open only — never change or delete).
+    "open_brand_studio": None,
+    "open_template": ("template",),
 }
 
 

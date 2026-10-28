@@ -35,6 +35,10 @@ idea uses a moment handle from DATA ("moment"), or "from"/"to" copied exactly fr
 transcript_excerpt times. Give each a short working title, an "angle" and a "style" from the \
 allowed values, and one sentence "why" based on what is said. Prefer moments not "already" used. \
 Never invent content that is not in DATA. Otherwise, leave "ideas" empty.
+- "branding" in DATA lists the creator's brands and Short templates. If asked which template fits, \
+suggest one by name from that list and say it is a suggestion, based on what the clip is like; \
+unless DATA shows enough published history, say the history isn't large enough to prefer one \
+statistically. Never claim a template will perform better.
 - "next_step" (or "next_steps") in DATA is PeakSift's own recommendation from the project's \
 real state. Use it ONLY when the creator asks what to do or work on next: then answer with that \
 step — what it is AND its "why" — and offer its action; never pick a different workflow step. \
@@ -84,6 +88,8 @@ ACTION_HELP = {
     "open_editor": "open the editor for a clip or Short (handle: clip_N, short_N or moment_N)",
     "open_short": "open a finished Short to preview, download or publish (handle: short_N)",
     "open_published": "open a published Short's analytics (handle: published_N)",
+    "open_brand_studio": "open Brand Studio (brands and templates)",
+    "open_template": "open one of the creator's templates (handle: template_N)",
 }
 
 
