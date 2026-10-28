@@ -32,7 +32,7 @@ describe("command menu commands", () => {
     assert.deepEqual(sections[3].run, { kind: "navigate", href: `/projects/${P1}/assets` });
     assert.deepEqual(
       commands.filter((c) => c.group === "Go to").map((c) => c.label),
-      ["Home", "Projects", "Analytics", "Settings", "New project"],
+      ["Home", "Projects", "Analytics", "Brand Studio", "Settings", "New project"],
     );
     // the current project is not offered as a place to go
     assert.ok(!commands.some((c) => c.group === "Projects" && c.label.startsWith("Bridge")));

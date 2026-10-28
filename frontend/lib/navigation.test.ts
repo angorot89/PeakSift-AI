@@ -13,6 +13,9 @@ describe("global navigation", () => {
     assert.equal(activeGlobal(`/projects/${P}/clips/${C}`), "projects");
     assert.equal(activeGlobal("/analytics/abc"), "analytics");
     assert.equal(activeGlobal("/settings"), "settings");
+    assert.equal(activeGlobal("/brand"), "brand");
+    assert.equal(activeGlobal("/brand/templates/new"), "brand");
+    assert.equal(activeGlobal("/brandnew"), null);
     assert.equal(activeGlobal("/homework"), null);
   });
 });

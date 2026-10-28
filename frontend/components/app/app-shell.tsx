@@ -7,6 +7,7 @@ import {
   Home,
   LogOut,
   Menu,
+  Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -34,6 +35,7 @@ const ICONS: Record<GlobalKey, LucideIcon> = {
   home: Home,
   projects: FolderOpen,
   analytics: BarChart3,
+  brand: Palette,
   settings: Settings,
 };
 const RECENT_PROJECTS = 3;

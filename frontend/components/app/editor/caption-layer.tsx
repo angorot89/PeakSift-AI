@@ -254,3 +254,66 @@ export function PresetSample({ spec, preset }: { spec: CaptionStyles; preset: Dy
     </span>
   );
 }
+
+/**
+ * A still frame of captions and the hook for previews without a video (Brand Studio, the
+ * template builder): the same renderer numbers and CSS as the editor's live layer, with an
+ * optional brand emphasis colour for the spoken word and a brand accent for the Boxed hook.
+ */
+export function CaptionSampleLayer({
+  spec,
+  preset,
+  position,
+  lines,
+  active,
+  activeColour,
+  hook,
+  hookAccent,
+}: {
+  spec: CaptionStyles;
+  preset: DynamicPreset | null;
+  position: "top" | "center" | "bottom";
+  lines: string[][];
+  /** [line, word] of the spoken word. */
+  active: [number, number] | null;
+  activeColour?: string | null;
+  hook: { text: string; style: HookStyle; position: HookPosition } | null;
+  hookAccent?: { box: string; text: string } | null;
+}) {
+  const look = preset ? spec.presets.find((p) => p.name === preset) : undefined;
+  const place = spec.positions[position];
+  const hookStyle = hook ? spec.hook.styles.find((s) => s.name === hook.style) : undefined;
+  const hookLook = hookStyle && hookStyle.box && hookAccent ? { ...hookStyle, outline_colour: hookAccent.box, text: hookAccent.text } : hookStyle;
+  const hookPlace = hook ? spec.hook.positions[hook.position] : undefined;
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden font-sans">
+      {look && lines.length ? (
+        <div className="absolute text-center" style={placementCss(place.alignment, place.margin_v + boxInset(look, place.alignment), place.margin_h, spec)}>
+          {lines.map((line, l) => (
+            <div key={l}>
+              <span style={textCss(look, spec)}>
+                {line.map((word, w) => {
+                  const text = look.uppercase ? word.toUpperCase() : word;
+                  const on = active !== null && active[0] === l && active[1] === w;
+                  return (
+                    <span key={w}>
+                      {w > 0 ? " " : null}
+                      <span style={on ? { color: activeColour ?? look.active } : undefined}>{text}</span>
+                    </span>
+                  );
+                })}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {hook && hookLook && hookPlace && hook.text ? (
+        <div className="absolute flex justify-center text-center" style={placementCss(hookPlace.alignment, hookPlace.margin_v + boxInset(hookLook, hookPlace.alignment), hookPlace.margin_h, spec)}>
+          <div className="text-balance" style={{ maxWidth: cw(Math.min(hookLook.max_line_width, spec.output_width - 2 * hookPlace.margin_h - 2 * hookLook.outline), spec.output_width) }}>
+            <span style={{ ...textCss(hookLook, spec), whiteSpace: "normal" }}>{hook.text}</span>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
