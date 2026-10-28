@@ -330,7 +330,7 @@ def create_plan(
     request = AutoEditRequest.from_settings(
         get_settings(), recipe=recipe or "clean", music_asset_id=music,
         performance_context=_profile_for(db, current_user.id, body.use_performance_context),
-        template=templates.plan_snapshot(template) if template else None,
+        template=_frozen(template),
     )  # fmt: skip
     return _start(db, clip, storage, request, response)
 
@@ -467,6 +467,15 @@ def apply_plan(
     _accept_suggestions(db, plan)
     db.refresh(plan)
     return AutoEditApplyRead(plan=read_plan(plan), edit=read_edit(edit))
+
+
+def _frozen(template) -> dict | None:
+    if template is None:
+        return None
+    try:
+        return templates.plan_snapshot(template)
+    except BrandProblem as problem:
+        raise HTTPException(status_code=problem.status, detail=problem.message) from None
 
 
 def _origin(plan: AutoEditPlan) -> dict:

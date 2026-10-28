@@ -234,10 +234,22 @@ def brand_for_edit(brand, config: TemplateConfig) -> dict | None:
     return section
 
 
+def readable_config(template: ShortTemplate) -> TemplateConfig:
+    """The template's settings, or a 409 asking the creator to open and save it again."""
+    try:
+        return TemplateConfig.from_snapshot(template.config)
+    except ValueError:
+        raise BrandProblem(
+            409,
+            f"“{template.name}” can't be used as it is; open it in Brand Studio and save it again",
+        ) from None
+
+
 def plan_snapshot(template: ShortTemplate) -> dict:
     """What an Auto Edit plan stores about its template: frozen at planning time, so editing
-    or deleting the template (or its brand) later never changes the plan."""
-    config = TemplateConfig.from_snapshot(template.config)
+    or deleting the template (or its brand) later never changes the plan. A template whose stored
+    settings this server cannot read is refused (409), never planned with half its settings."""
+    config = readable_config(template)
     return {
         "id": str(template.id),
         "name": template.name,

@@ -284,3 +284,34 @@ suggest by name, say it is a suggestion, and never claim one will perform better
 offers *Use this template* (Auto Edit for this clip with the template — the clip travels with the
 action and is checked again). Every action is re-checked on click ("This template is no longer
 available."). No Copilot action creates, changes or deletes a brand or a template.
+
+## Hardening
+
+| Case | Behaviour |
+|---|---|
+| brand deleted | templates lose their brand; Shorts and plans keep theirs (snapshots) |
+| template deleted | plans and Shorts keep their settings; the editor and Copilot say it was deleted |
+| default template deleted | Create a Short and Auto Edit fall back to no template; `edit-section` falls back to the default brand |
+| logo deleted from Assets | refused while a brand or any Short uses it (409, naming the brand) |
+| logo's project deleted | the brand's logo is cleared; applying a plan with that logo says "The brand logo is no longer one of your images…" (409); re-rendering fails as `brand_logo_unavailable` |
+| logo storage missing | the render fails clearly (`brand_logo_unavailable`), nothing rendered |
+| another creator's logo / template / brand | 404 for brands and templates; 409 for a logo in an edit; never recorded as an origin |
+| invalid colour / malformed settings | 422 with the reason (hex only; allow-listed values; unknown keys refused) |
+| a template saved in a format this server cannot read | 409 "open it in Brand Studio and save it again" — never planned with half its settings |
+| template changed after a plan or a render | the plan and the Short keep their frozen settings; the Copilot explains "changed after this Short was made (version 1 → 2)" |
+| two defaults at once | the partial unique index refuses it (409) |
+| transparent / CMYK / palette / very wide / very tall logo | normalized on upload; fitted inside the square box by its longer side (172×43, 43×172), transparency kept |
+| an end card with no logo / no music / longer than the clip | exact extra length; silent; card colour and text only |
+| captions, hook, picture-in-picture or overlay near the logo | the placement policy (moves, waits, hides) |
+| Smart Reframe | the logo stays fixed while the crop moves |
+| Arabic and emoji captions | the brand emphasis colour applies to the spoken word; text unchanged |
+| unsaved changes / rapid switching | Brand Studio and the builder show *Unsaved changes* and ask before leaving the page; a template switch in Create a Short or Auto Edit only changes what the next plan uses |
+
+The editor's live preview now draws the brand logo too, placed by the same rules (and hidden while
+a top hook shows). Every V1.7 screen passes the browser audit at 1440, 1280, 1024, 768, 430, 390
+and 375: axe WCAG 2.1 AA, no horizontal overflow, 44 px touch targets on phones, and no console
+errors.
+
+The audit found that Playwright's full-page screenshots turn off coarse-pointer emulation for the
+rest of a phone session, so touch targets measured after one looked too small. The audit now
+measures before any screenshot and takes phone screenshots at viewport size.

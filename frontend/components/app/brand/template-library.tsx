@@ -85,7 +85,7 @@ export function TemplateLibrary() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-title text-foreground">
-                    <Link href={`/brand/templates/${t.id}`} className="rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent hover:underline">
+                    <Link href={`/brand/templates/${t.id}`} className="rounded hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center">
                       {t.name}
                     </Link>
                   </h3>

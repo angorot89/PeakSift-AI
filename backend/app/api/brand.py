@@ -155,7 +155,10 @@ def edit_section(
     except BrandProblem as problem:
         raise _http(problem) from None
     if template is not None and template.brand is not None:
-        config = TemplateConfig.from_snapshot(template.config)
+        try:
+            config = templates.readable_config(template)
+        except BrandProblem as problem:
+            raise _http(problem) from None
         return {
             "brand": templates.brand_for_edit(template.brand, config),
             "template": {
@@ -202,12 +205,20 @@ def template_read(template: ShortTemplate) -> TemplateRead:
         )
         if brand
         else None,
-        config=template.config,
+        config=_settings(template),
         version=template.version,
         is_default=template.is_default,
         created_at=template.created_at,
         updated_at=template.updated_at,
     )
+
+
+def _settings(template: ShortTemplate) -> dict:
+    """The stored settings, normalized when readable (so the builder always gets every key)."""
+    try:
+        return templates.readable_config(template).snapshot()
+    except BrandProblem:
+        return template.config
 
 
 def _owned_template(db, user, template_id: uuid.UUID) -> ShortTemplate:
