@@ -47,6 +47,7 @@ from app.services.clip_detection.factory import (
     provider_options,
     resolve_choice,
 )
+from app.services.clip_detection.labels import STRONG_MOMENT_SCORE
 from app.services.clip_detection.pipeline import is_stale
 from app.services.clip_detection.windowing import (
     TranscriptError,
@@ -412,9 +413,6 @@ class CandidateView(StrEnum):
     TOP = "top"
 
 
-# A strong editorial score: the same threshold as the "Strong moment" label in the frontend
-# (lib/workspace-rules.ts `momentLabel`). It describes the model's judgement, never views.
-STRONG_MOMENT_SCORE = 75
 _NOT_DISMISSED = ClipCandidate.decision != CandidateDecision.DISMISSED.value
 _VIEW_FILTERS = {
     CandidateView.ACTIVE: _NOT_DISMISSED,

@@ -18,6 +18,7 @@ from app.api.clip_edits import router as clip_edits_router
 from app.api.clip_media import router as clip_media_router
 from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
+from app.api.copilot import router as copilot_router
 from app.api.health import router as health_router
 from app.api.performance import router as performance_router
 from app.api.projects import router as projects_router
@@ -65,6 +66,7 @@ ROUTERS = (
     publish_job_router,
     performance_router,
     workspace_router,
+    copilot_router,
 )
 
 
