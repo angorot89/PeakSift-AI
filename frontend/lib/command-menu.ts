@@ -26,6 +26,8 @@ export type CommandSource = {
   projects: { id: string; name: string }[];
   /** The server's next best step (the project's, or the workspace's first). */
   next: { title: string; cta: string | null; href: string; projectName?: string } | null;
+  /** Inside a project: whether it has a source video yet (null when unknown). */
+  hasSource?: boolean | null;
 };
 
 /** Projects listed before anything is typed (all of them are searchable). */
@@ -83,7 +85,7 @@ export function buildCommands(source: CommandSource): Command[] {
       run: { kind: "navigate", href: projectHref(item.id) },
     });
   }
-  for (const question of starters(source.page)) {
+  for (const question of starters(source.page, source.hasSource ?? null)) {
     commands.push({ id: `ask:${question}`, group: "Ask PeakSift", label: question, run: { kind: "ask", question } });
   }
   return commands;
@@ -118,7 +120,7 @@ function rank(command: Command, query: string, words: string[]): number | null {
  * when it reads as a question or nothing else matches, otherwise last.
  */
 export function filterCommands(commands: Command[], query: string): Command[] {
-  const text = query.trim().slice(0, QUESTION_MAX);
+  const text = [...query.trim()].slice(0, QUESTION_MAX).join("");
   if (!text) {
     let projects = 0;
     return commands.filter((command) => command.group !== "Projects" || ++projects <= RECENT_PROJECTS);

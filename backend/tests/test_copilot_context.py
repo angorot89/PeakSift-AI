@@ -237,7 +237,11 @@ def test_the_context_endpoint_reports_scope_and_facts(client, db_session):
         "/copilot/context", params={"page": "moments", "project_id": str(project_id)}
     ).json()
     assert body["page"] == "moments" and body["scope"] == "Stream"
-    assert "1 moment" in body["facts"]
+    assert "1 moment" in body["facts"] and body["has_source"] is True
+    empty = client.post("/projects", json={"name": "Empty"}).json()["id"]
+    body = client.get("/copilot/context", params={"page": "overview", "project_id": empty}).json()
+    assert body["has_source"] is False and "No source video yet" in body["facts"]
+    assert client.get("/copilot/context").json()["has_source"] is None
     unknown = client.get("/copilot/context", params={"page": "<script>"}).json()
     assert unknown["page"] == "home"
     client.cookies.clear()

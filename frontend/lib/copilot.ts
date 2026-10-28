@@ -30,7 +30,13 @@ export type CopilotMessage = {
   created_at: string;
 };
 export type CopilotThread = { scope: string; messages: CopilotMessage[] };
-export type CopilotContext = { page: string; scope: string; facts: string[] };
+export type CopilotContext = {
+  page: string;
+  scope: string;
+  facts: string[];
+  /** Inside a project: whether it has a source video yet. */
+  has_source: boolean | null;
+};
 export type CopilotStatus = { enabled: boolean; available: boolean };
 export type CopilotResolution =
   | { kind: "navigate"; href: string }

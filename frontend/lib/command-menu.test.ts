@@ -49,6 +49,11 @@ describe("command menu commands", () => {
     assert.ok(commands.some((c) => c.label === "What should I work on next?"));
   });
 
+  it("suggests getting-started questions for a project without a video", () => {
+    const asks = buildCommands({ ...inProject, hasSource: false }).filter((c) => c.group === "Ask PeakSift");
+    assert.deepEqual(asks.map((c) => c.label), ["What should I do next?", "What kind of video works best to start with?"]);
+  });
+
   it("names the project of a workspace step", () => {
     const [step] = buildCommands({ page: "home", project: null, projects: [], next: { title: "Pick a moment", cta: "Review moments", href: "/p", projectName: "Podcast" } });
     assert.equal(step.hint, "Podcast · Pick a moment");
@@ -91,6 +96,8 @@ describe("command menu filtering", () => {
   it("keeps questions within the Copilot's length limit", () => {
     const [ask] = filterCommands(commands, `why ${"x".repeat(1200)}`);
     assert.equal(ask.label.length, 1000);
+    const [emoji] = filterCommands(commands, `why ${"🎬".repeat(1200)}`);
+    assert.equal([...emoji.label].length, 1000); // never a broken half emoji
   });
 
   it("groups in order of first appearance", () => {

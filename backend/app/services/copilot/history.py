@@ -6,6 +6,7 @@ the last ``PROMPT_TURNS`` exchanges, as plain text — never earlier contexts or
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +47,24 @@ def get_or_create_thread(
         thread = find_thread(db, user_id, project_id)
         assert thread is not None
     return thread
+
+
+def lock(db: Session, thread_id: uuid.UUID) -> CopilotThread | None:
+    """The conversation, locked until the transaction ends (its messages are written one at a
+    time); None when it was cleared."""
+    return db.get(CopilotThread, thread_id, with_for_update=True, populate_existing=True)
+
+
+def awaiting_answer(db: Session, thread: CopilotThread, within: timedelta) -> bool:
+    """Whether the conversation's last message is a question still being answered (asked less
+    than ``within`` ago — a question left unanswered by a crash stops counting)."""
+    last = db.scalar(
+        select(CopilotMessage)
+        .where(CopilotMessage.thread_id == thread.id)
+        .order_by(CopilotMessage.sequence.desc())
+        .limit(1)
+    )
+    return last is not None and last.role == "user" and last.created_at > datetime.now(UTC) - within
 
 
 def append(

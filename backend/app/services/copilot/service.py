@@ -10,12 +10,13 @@ connection is held while the model thinks.
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.models import CopilotMessage, User
-from app.services.copilot import history
+from app.services.copilot import history, safety
 from app.services.copilot.answers import asks_what_next, complete, ideas_lead, next_step_answer
 from app.services.copilot.context import CopilotContext, Target, build_context
 from app.services.copilot.contract import CopilotOutputError, ParsedReply, parse_reply
@@ -28,6 +29,14 @@ logger = logging.getLogger(__name__)
 UNAVAILABLE = "PeakSift's local assistant isn't available right now."
 UNUSABLE = "PeakSift's local assistant couldn't give a usable answer this time. Please try again."
 IDEAS_FALLBACK = "Here are Short ideas from this video's moments instead."
+
+
+class QuestionInProgress(Exception):
+    """The conversation's previous question is still being answered."""
+
+
+class ConversationCleared(Exception):
+    """The creator cleared the conversation while PeakSift was answering."""
 
 
 @dataclass
@@ -63,6 +72,13 @@ def ask(
         question=text,
     )
     thread = history.get_or_create_thread(db, user.id, context.project_id)
+    thread_id = thread.id
+    # One question at a time per conversation (two tabs, a double send): checked under the lock.
+    history.lock(db, thread_id)
+    within = timedelta(seconds=2 * settings.copilot_timeout_seconds + 30)
+    if history.awaiting_answer(db, thread, within):
+        db.rollback()
+        raise QuestionInProgress
     turns = history.prompt_turns(db, thread)
     question = history.append(db, thread, role="user", content=text, page=context.page)
     db.commit()  # the question is kept whatever happens next; no connection held while thinking
@@ -72,6 +88,7 @@ def ask(
     if own is not None:
         from app.services.copilot.actions import next_step_actions
 
+        thread = _still_there(db, thread_id)
         answer = history.append(
             db,
             thread,
@@ -92,7 +109,7 @@ def ask(
         reply = (provider or get_provider(settings)).reply(
             build_messages(context, text, turns, ideas=want_ideas), ideas=want_ideas
         )
-        parsed = parse_reply(reply.data, context.targets)
+        parsed = safety.screen(parse_reply(reply.data, context.targets))
         raw_ideas = reply.data.get("ideas")
         status, content = "ok", complete(parsed.message, context)
         if parsed.dropped:
@@ -122,6 +139,7 @@ def ask(
     cards = attach_idea_actions(db, user, ideas, actions)
     if cards and status == "ok":
         content = ideas_lead(content, len(cards))
+    thread = _still_there(db, thread_id)
     answer = history.append(
         db,
         thread,
@@ -136,6 +154,15 @@ def ask(
     )
     db.commit()
     return Exchange(question, answer)
+
+
+def _still_there(db: Session, thread_id: uuid.UUID):
+    """The conversation, locked for the answer — unless the creator cleared it meanwhile."""
+    thread = history.lock(db, thread_id)
+    if thread is None:
+        db.rollback()
+        raise ConversationCleared
+    return thread
 
 
 def fallback_actions(db: Session, user: User, context: CopilotContext, status: str) -> list[dict]:

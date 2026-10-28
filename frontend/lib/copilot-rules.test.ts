@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { copilotScope, lengthNote, starters, threadKey, waitingText } from "./copilot-rules.ts";
+import { charCount, copilotScope, lengthNote, starters, threadKey, waitingText } from "./copilot-rules.ts";
 
 const P = "3f1c0a1e-0000-4000-8000-000000000001";
 const C = "3f1c0a1e-0000-4000-8000-000000000002";
@@ -39,6 +39,10 @@ describe("copilot wording", () => {
     assert.ok(starters("moments").includes("Which moment should I start with?"));
     assert.ok(starters("editor").includes("How can I improve this edit?"));
     assert.ok(starters("analytics").includes("What seems to be working?"));
+    // a project without a video yet gets getting-started questions, not ideas from "this video"
+    assert.deepEqual(starters("overview", false), ["What should I do next?", "What kind of video works best to start with?"]);
+    assert.ok(starters("overview", true).includes("Give me 3 Short ideas from this video"));
+    assert.ok(starters("editor", false).includes("How can I improve this edit?"));
   });
 
   it("says what is happening while waiting, and warns about long questions", () => {
@@ -47,5 +51,8 @@ describe("copilot wording", () => {
     assert.equal(lengthNote("hi"), null);
     assert.equal(lengthNote("x".repeat(950)), "50 characters left");
     assert.equal(lengthNote("x".repeat(1003)), "3 characters too long");
+    // counted like the server: an emoji or a Chinese character is one character
+    assert.equal(charCount("🎬我"), 2);
+    assert.equal(lengthNote("🎬".repeat(1000)), "0 characters left");
   });
 });

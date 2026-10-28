@@ -142,7 +142,9 @@ def project_strategy(db: Session, project: Project, source: str) -> Strategy:
     unused = [m for m in strategy.moments if not m.made]
     if strategy.moments:
         if unused:
-            kinds = sorted({CATEGORY_WORD.get(m.category, m.category) for m in unused})
+            # Kinds in ranking order (best-ranked unused moment first), so the note never reads
+            # as a recommendation against the ranking.
+            kinds = list(dict.fromkeys(CATEGORY_WORD.get(m.category, m.category) for m in unused))
             strategy.notes.append(
                 f"You have {_plural(len(unused), 'moment')} in this video you haven't used yet"
                 + (f" ({', '.join(kinds)})." if len(kinds) > 1 else ".")

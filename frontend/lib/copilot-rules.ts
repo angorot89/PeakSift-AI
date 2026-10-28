@@ -65,8 +65,12 @@ const STARTERS: Record<CopilotPage, string[]> = {
   settings: ["What does PeakSift do with my YouTube connection?"],
 };
 
-export function starters(page: CopilotPage): string[] {
-  return STARTERS[page];
+const PROJECT_PAGES: CopilotPage[] = ["overview", "source", "moments", "assets", "project_analytics"];
+const NO_SOURCE = ["What should I do next?", "What kind of video works best to start with?"];
+
+/** The suggested questions for a page — about getting started while a project has no video. */
+export function starters(page: CopilotPage, hasSource: boolean | null = null): string[] {
+  return hasSource === false && PROJECT_PAGES.includes(page) ? NO_SOURCE : STARTERS[page];
 }
 
 /** The waiting line: the context first, then the local model. */
@@ -76,9 +80,14 @@ export function waitingText(elapsedMs: number): string {
 
 export const QUESTION_MAX = 1000;
 
+/** Characters as the server counts them (code points: an emoji is one, not two). */
+export function charCount(text: string): number {
+  return [...text].length;
+}
+
 /** What to tell the creator about the length of their question, if anything. */
 export function lengthNote(text: string): string | null {
-  const left = QUESTION_MAX - text.length;
+  const left = QUESTION_MAX - charCount(text);
   if (left < 0) return `${-left} characters too long`;
   if (left <= 100) return `${left} characters left`;
   return null;
