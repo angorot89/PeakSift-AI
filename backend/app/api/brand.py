@@ -1,11 +1,13 @@
-"""Brand Studio (V1.7): the creator's brands and the images they may use as a logo.
+"""Brand Studio (V1.7): the creator's brands, Short templates and the images a logo may use.
 
 ``/brand/profiles`` lists, creates, reads, changes and deletes the current creator's brands
 (another creator's brand is a ``404``); ``is_default`` makes one brand the default (the
 previous default is cleared). ``GET /brand/logo-candidates`` lists the creator's image visual
 assets across their projects — logos reuse the private visual library, never a separate
-upload or storage. Brands are preferences: no render reads them; a Short copies the values it
-uses into its own configuration snapshot.
+upload or storage. ``/brand/templates`` does the same for Short templates (plus
+``duplicate``); ``GET /brand/template-starters`` gives Clean, Punchy, Story and Minimal as
+starting settings. Brands and templates are preferences: no render reads them; a Short copies
+the values it uses into its own configuration snapshot.
 """
 
 import uuid
@@ -14,9 +16,20 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
-from app.models import BrandProfile, Project, VisualAsset
-from app.schemas.brand import BrandCreate, BrandRead, BrandUpdate, LogoRead
-from app.services.branding import profiles
+from app.models import BrandProfile, Project, ShortTemplate, VisualAsset
+from app.schemas.brand import (
+    BrandCreate,
+    BrandRead,
+    BrandUpdate,
+    LogoRead,
+    TemplateBrandRead,
+    TemplateCreate,
+    TemplateRead,
+    TemplateStarterRead,
+    TemplateUpdate,
+)
+from app.services.auto_edit.recipes import current_recipe
+from app.services.branding import profiles, templates
 from app.services.branding.colors import emphasis_readable
 from app.services.branding.profiles import BrandProblem
 
@@ -128,3 +141,109 @@ def logo_candidates(current_user: CurrentUser, db: DbSession) -> list[LogoRead]:
         .limit(200)
     ).all()
     return [logo_read(asset, name) for asset, name in rows]
+
+
+# --- Short templates -----------------------------------------------------------------------------
+
+
+def template_read(template: ShortTemplate) -> TemplateRead:
+    brand = template.brand
+    return TemplateRead(
+        id=template.id,
+        name=template.name,
+        description=template.description,
+        recipe=template.recipe,
+        brand=TemplateBrandRead(
+            id=brand.id,
+            name=brand.name,
+            primary_color=brand.primary_color,
+            has_logo=brand.logo_asset_id is not None,
+        )
+        if brand
+        else None,
+        config=template.config,
+        version=template.version,
+        is_default=template.is_default,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    )
+
+
+def _owned_template(db, user, template_id: uuid.UUID) -> ShortTemplate:
+    try:
+        return templates.owned_template(db, user, template_id)
+    except BrandProblem as problem:
+        raise _http(problem) from None
+
+
+@router.get("/template-starters", response_model=list[TemplateStarterRead])
+def template_starters(current_user: CurrentUser) -> list[TemplateStarterRead]:
+    """Clean, Punchy, Story and Minimal as starting points (each recipe's own defaults)."""
+    out = []
+    for name in templates.STARTERS:
+        recipe = current_recipe(name)
+        out.append(
+            TemplateStarterRead(
+                recipe=name,
+                label=recipe.label,
+                description=recipe.description,
+                config=templates.starter_config(name),
+            )
+        )
+    return out
+
+
+@router.get("/templates", response_model=list[TemplateRead])
+def list_templates(current_user: CurrentUser, db: DbSession) -> list[TemplateRead]:
+    return [template_read(t) for t in templates.templates(db, current_user)]
+
+
+@router.post("/templates", status_code=status.HTTP_201_CREATED, response_model=TemplateRead)
+def create_template(body: TemplateCreate, current_user: CurrentUser, db: DbSession) -> TemplateRead:
+    try:
+        template = templates.create_template(db, current_user, body.model_dump())
+    except BrandProblem as problem:
+        raise _http(problem) from None
+    return template_read(template)
+
+
+@router.get("/templates/{template_id}", response_model=TemplateRead)
+def get_template(template_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> TemplateRead:
+    return template_read(_owned_template(db, current_user, template_id))
+
+
+@router.patch("/templates/{template_id}", response_model=TemplateRead)
+def update_template(
+    template_id: uuid.UUID, body: TemplateUpdate, current_user: CurrentUser, db: DbSession
+) -> TemplateRead:
+    template = _owned_template(db, current_user, template_id)
+    sent = body.model_dump(exclude_unset=True)
+    if "name" in sent and sent["name"] is None:
+        raise HTTPException(status_code=422, detail="A template needs a name")
+    try:
+        template = templates.update_template(db, current_user, template, sent)
+    except BrandProblem as problem:
+        raise _http(problem) from None
+    db.refresh(template)
+    return template_read(template)
+
+
+@router.post(
+    "/templates/{template_id}/duplicate",
+    status_code=status.HTTP_201_CREATED,
+    response_model=TemplateRead,
+)
+def duplicate_template(
+    template_id: uuid.UUID, current_user: CurrentUser, db: DbSession
+) -> TemplateRead:
+    template = _owned_template(db, current_user, template_id)
+    try:
+        return template_read(templates.duplicate_template(db, current_user, template))
+    except BrandProblem as problem:
+        raise _http(problem) from None
+
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_template(template_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> Response:
+    templates.delete_template(db, _owned_template(db, current_user, template_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
