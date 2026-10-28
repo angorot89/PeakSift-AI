@@ -230,3 +230,29 @@ render reads the snapshot.
   description is optional. *Saved* / *Unsaved changes* are always shown; leaving with unsaved
   changes asks the browser to confirm; saving a new template moves to its own address.
 - *Start new Shorts from this template* makes it the default.
+
+## Creating Shorts with templates
+
+- **Create a Short** shows *Using: Punchy Gaming* (the default template) with its summary and
+  **Change** (any template, or *No template*). Auto Edit's card says "Starts from your “Punchy
+  Gaming” template". A creator without templates sees exactly the V1.6 flow — nothing asks for
+  Brand Studio.
+- **Auto Edit** opens with that template selected (`?template=…`; otherwise the default); the
+  recipe choice disappears — the template brings its starting style — and *No template —
+  choose a recipe* brings it back. The plan's review starts with "Started from your Punchy
+  Gaming template. Used your Amine Clips brand."
+- **Measured** (real browser, real local model): a returning creator with a default template
+  goes from *Create a Short* to a rendering, branded Short in **3 clicks** (Auto Edit → Prepare
+  my edit → Use this edit), against 4 in V1.6 (with a recipe to choose and no branding at all).
+- **Editor**: a strip above the tools says where the settings came from — "Template: Punchy
+  Gaming · Brand: Amine Clips · end card +2s" (from the version's or the draft's origin) — and
+  "Changes here apply to this Short only." **Remove branding** / **Add my brand** change this
+  Short only (`GET /brand/edit-section` gives the section from the template, the default
+  template or the default brand; the server validates it again). A branded version opened in the
+  editor keeps its brand section through every change and re-render.
+- **Save as template** (a dialog with a name) and **Update “Punchy Gaming”** (a confirmation:
+  "Shorts you already made keep theirs") are the only ways the editor changes templates —
+  never silently. They save how the Short is edited (`settingsFromEditor`: framing, captions,
+  hook look, B-roll amount, sound levels, brand use) — never its words, music or visuals.
+- Edits record a display-only `origin` (`origin_template_id` on `POST …/edits`, kept only if the
+  template is the creator's own).

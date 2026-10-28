@@ -20,12 +20,14 @@ export const createPlan = (
   p: string,
   v: string,
   c: string,
-  recipe: RecipeName,
+  recipe: RecipeName | null,
   musicAssetId: string | null,
   usePerformanceContext = false,
+  templateId: string | null = null,
 ) =>
   postJson<AutoEditPlan>(base(p, v, c), {
-    recipe,
+    ...(recipe ? { recipe } : {}),
+    ...(templateId ? { template_id: templateId } : {}),
     ...(musicAssetId ? { music_asset_id: musicAssetId } : {}),
     ...(usePerformanceContext ? { use_performance_context: true } : {}),
   });

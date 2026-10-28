@@ -153,6 +153,9 @@ class EditRequest(BaseModel):
     # Optional brand identity (logo, caption emphasis, hook accent, appended end card);
     # omitted renders exactly as before.
     brand: BrandRequest | None = None
+    # Display only: the creator's template these settings started from (recorded as the new
+    # version's origin; never part of the configuration or its fingerprint).
+    origin_template_id: uuid.UUID | None = None
 
 
 class ClipEditRead(BaseModel):

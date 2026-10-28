@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Info,
   Music,
+  Palette,
   Pencil,
   Plus,
   RotateCcw,
@@ -33,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Spinner } from "@/components/ui/progress";
+import { listTemplates, type Template } from "@/lib/brand";
+import { summary } from "@/lib/template-rules";
 import { selectClasses } from "@/components/ui/select-styles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
@@ -238,8 +241,15 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
   const missing = missingInputs(plan.confidence);
   const notes = plan.explanations?.notes ?? [];
   const note = plannerNote(plan.confidence);
+  const template = plan.explanations?.template;
   return (
     <div className="space-y-5">
+      {template ? (
+        <p className="flex items-start gap-2 rounded-xl border border-accent/30 bg-accent/[0.05] px-3.5 py-2.5 text-sm text-foreground">
+          <Palette aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
+          <span>{template.summary}</span>
+        </p>
+      ) : null}
       {note ? (
         <p className="flex items-start gap-2 text-sm text-muted">
           <Wand2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent" />
@@ -398,6 +408,11 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [recipe, setRecipe] = useState<RecipeName>("punchy");
+  // V1.7: the template this plan starts from — the one chosen in "Create a Short", else the
+  // creator's default; "none" plans with a recipe only.
+  const templateParam = useSearchParams().get("template");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateId, setTemplateId] = useState<string>("none");
   const [musicId, setMusicId] = useState<string>("");
   const [patterns, setPatterns] = useState<PerformanceContext | null>(null);
   const [usePatterns, setUsePatterns] = useState(false);
@@ -420,9 +435,14 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
         listPlans(project.id, clip.video_id, clip.id),
         listAudio(project.id).catch(() => [] as AudioAsset[]),
         getPerformanceContext().catch(() => null), // optional: Auto Edit works without it
+        listTemplates().catch(() => [] as Template[]), // optional: Auto Edit works without templates
       ])
-        .then(([recipeList, page, audio, context]) => {
+        .then(([recipeList, page, audio, context, templateList]) => {
           setRecipes(recipeList);
+          setTemplates(templateList);
+          const wanted = templateParam === "none" ? null : templateList.find((t) => t.id === templateParam);
+          const chosen = templateParam === "none" ? null : (wanted ?? templateList.find((t) => t.is_default) ?? null);
+          setTemplateId(chosen?.id ?? "none");
           setPatterns(context);
           setMusic(audio.filter((a) => a.kind === "music"));
           setPlans(page.plans);
@@ -430,7 +450,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
           setLoadError(null);
         })
         .catch((err: unknown) => setLoadError(handleError(err))),
-    [project.id, clip.video_id, clip.id, handleError, startNew],
+    [project.id, clip.video_id, clip.id, handleError, startNew, templateParam],
   );
 
   useEffect(() => {
@@ -479,13 +499,15 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
 
   const start = () =>
     act("create", async () => {
+      const template = templates.find((t) => t.id === templateId) ?? null;
       const created = await createPlan(
         project.id,
         clip.video_id,
         clip.id,
-        recipe,
+        template ? null : recipe, // a template brings its own starting style
         musicId || null,
         usePatterns && !!patterns?.available,
+        template?.id ?? null,
       );
       accept(created);
       setSelectedId(created.id);
@@ -555,7 +577,34 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
   if (composing || !plan) {
     body = (
       <div className="space-y-6">
-        <RecipePicker recipes={recipes} value={recipe} onChange={setRecipe} name={`${id}-recipe`} />
+        {templates.length ? (
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-template`} className="block text-sm font-medium text-foreground">
+              Template
+            </label>
+            <select
+              id={`${id}-template`}
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
+              className={`${selectClasses} w-full sm:max-w-sm`}
+              aria-describedby={`${id}-template-hint`}
+            >
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.is_default ? " (default)" : ""}
+                </option>
+              ))}
+              <option value="none">No template — choose a recipe</option>
+            </select>
+            <p id={`${id}-template-hint`} className="text-xs text-subtle">
+              {templateId !== "none"
+                ? `${summary(templates.find((t) => t.id === templateId)!.config, Boolean(templates.find((t) => t.id === templateId)!.brand?.has_logo))}. You can change anything before rendering.`
+                : "Auto Edit plans with the recipe you choose below."}
+            </p>
+          </div>
+        ) : null}
+        {templateId === "none" ? <RecipePicker recipes={recipes} value={recipe} onChange={setRecipe} name={`${id}-recipe`} /> : null}
         <div className="space-y-1.5">
           <label htmlFor={`${id}-music`} className="block text-sm font-medium text-foreground">
             Background music

@@ -37,6 +37,18 @@ export type EditRequest = {
   audio?: AudioRequest;
   /** Optional B-roll cutaways, picture-in-picture and overlays from the project's visuals. */
   visuals?: { elements: VisualElementRequest[] };
+  /** Optional brand identity (logo, caption emphasis, hook accent, end card), validated by the
+   * server; copied into the version so later brand changes never alter it. */
+  brand?: Record<string, unknown>;
+  /** Display only: the template these settings started from. */
+  origin_template_id?: string;
+};
+
+/** Where a version's settings came from (display only; the render reads the snapshot). */
+export type EditOrigin = {
+  template?: { id: string; name: string; version: number };
+  brand?: { name: string };
+  auto_edit_plan_id?: string;
 };
 
 export type ClipEdit = {
@@ -48,6 +60,7 @@ export type ClipEdit = {
   attempt: number;
   is_stale: boolean;
   configuration: Record<string, unknown>;
+  origin?: EditOrigin | null;
   aspect_ratio: string;
   layout: Layout;
   captions_enabled: boolean;
@@ -168,6 +181,13 @@ export const normalizeHookText = (text: string) => text.split(/\s+/).filter(Bool
 
 /** Whether an existing edit was made with exactly these settings, normalized like the
  * server's fingerprint (focal points to 0.1 %). */
+/** The parts of a brand section that change the picture (the server drops unreadable colours). */
+function brandKey(value: unknown): string {
+  const brand = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!brand) return "";
+  return JSON.stringify([brand.name, brand.logo ?? null, brand.end_card ?? null]);
+}
+
 export function sameSettings(edit: ClipEdit, request: EditRequest) {
   return (
     edit.layout === request.layout &&
@@ -187,7 +207,8 @@ export function sameSettings(edit: ClipEdit, request: EditRequest) {
         edit.hook_position === request.hook_position &&
         round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds))) &&
     sameAudio(audioFromConfiguration(edit.configuration), normalizeAudio(request.audio)) &&
-    visualsKey(visualsFromConfiguration(edit.configuration)) === visualsKey(request.visuals?.elements)
+    visualsKey(visualsFromConfiguration(edit.configuration)) === visualsKey(request.visuals?.elements) &&
+    brandKey(edit.configuration.brand) === brandKey(request.brand)
   );
 }
 

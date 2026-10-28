@@ -32,6 +32,7 @@ from app.services.auto_edit.recipes import current_recipe
 from app.services.branding import profiles, templates
 from app.services.branding.colors import emphasis_readable
 from app.services.branding.profiles import BrandProblem
+from app.services.branding.template_config import TemplateConfig
 from app.services.clip_edit.brand import layout_summary
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL
 
@@ -136,6 +137,38 @@ def delete_brand(brand_id: uuid.UUID, current_user: CurrentUser, db: DbSession) 
 def brand_layout(current_user: CurrentUser) -> dict:
     """The numbers previews need to place a logo and an end card exactly like the renderer."""
     return {**layout_summary(), "margins": GENERAL_SOCIAL.px()}
+
+
+@router.get("/edit-section")
+def edit_section(
+    current_user: CurrentUser, db: DbSession, template_id: uuid.UUID | None = None
+) -> dict:
+    """The brand section a Short would use now — from ``template_id``, else the default
+    template, else the default brand (logo on, no end card) — and where it came from. The
+    editor sends it with the edit, where it is validated again like everything else."""
+    template = None
+    try:
+        if template_id is not None:
+            template = templates.owned_template(db, current_user, template_id)
+        else:
+            template = templates.default_template(db, current_user)
+    except BrandProblem as problem:
+        raise _http(problem) from None
+    if template is not None and template.brand is not None:
+        config = TemplateConfig.from_snapshot(template.config)
+        return {
+            "brand": templates.brand_for_edit(template.brand, config),
+            "template": {
+                "id": str(template.id),
+                "name": template.name,
+                "version": template.version,
+            },
+        }
+    brand = profiles.default_brand(db, current_user)
+    return {
+        "brand": templates.brand_for_edit(brand, TemplateConfig()) if brand else None,
+        "template": None,
+    }
 
 
 @router.get("/logo-candidates", response_model=list[LogoRead])
