@@ -75,3 +75,63 @@ one of those values or is empty ("let the recipe decide"):
 
 Endpoints: `GET/POST /brand/templates`, `GET/PATCH/DELETE /brand/templates/{id}`, `POST
 /brand/templates/{id}/duplicate`, `GET /brand/template-starters`.
+
+## Historical snapshots
+
+Brands and templates are **preferences**; no render ever reads them. When a Short uses a brand,
+the exact values are copied into its edit's configuration snapshot (`clip_edit/brand.py`, a
+`brand` section with `version: brand_v1`) — the logo's asset id, corner and size, the caption
+emphasis colour, the hook accent and the end card (seconds, background, line, logo). The
+renderer reads only that snapshot (`EditConfig.from_snapshot`), so **changing or deleting a
+brand, a template or the default never changes an earlier Short**, and re-rendering an old
+version renders it the way it was made. The section exists only when it changes something:
+every edit made before V1.7 keeps exactly its snapshot and fingerprint.
+
+## Rendering the brand
+
+One renderer (`clip_edit/brand_render.py` inside `composition.py`), no separate brand renderer:
+
+```
+clip → framing → [framed] → visual elements → corner logo → (+ end card) → captions + hook
+```
+
+- **Logo**: the image is one more FFmpeg input, fitted inside a square box — small 16 %, medium
+  22 %, large 28 % of the frame width — with `force_original_aspect_ratio=decrease` (never
+  stretched: a 4:1 wordmark becomes 172×43 in the small box) and RGBA kept (transparent PNGs stay
+  transparent). It is drawn above visuals and under captions and the hook.
+- **Caption emphasis**: the dynamic presets' spoken-word colour is replaced by the brand colour
+  only when it is readable as text (WCAG AA 4.5:1 on `#101014`, the lightest caption surround).
+  An unreadable colour is dropped from the snapshot, so captions keep the preset's colour. Phrase
+  captions (Clean / Bold / Creator) have no spoken word, so no emphasis applies.
+- **Hook accent**: the *Boxed* hook's label takes the brand accent, with dark or white text —
+  whichever reads better — and only if that text reaches AA. Headline and Minimal hooks keep
+  their white text (branding never costs readability).
+- **End card** (*appended*, a deliberate choice): when a template turns it on, a 1–3 s card is
+  added **after** the clip, so the Short is exactly that much longer and the editor says so.
+  - The card has the brand's primary colour, the logo centred (if there is one and it is shown),
+    the brand name, and the creator's own line. Text is drawn by libass from the same subtitle
+    file, escaped like captions, and sized down to fit one line.
+  - Nothing covers the clip itself.
+  - The card is **silent** (`apad`): the clip's sound is never repeated or stretched; music and
+    effects end with the clip.
+- **Checks**: the API and the render job both require the logo to be one of the Short owner's
+  image assets (any project), and the render fetches it into the attempt workspace. A logo
+  deleted or missing before a re-render fails it as `brand_logo_unavailable`, with nothing
+  rendered. An image used as the logo of any Short (or brand) cannot be deleted.
+
+### Safe areas and collisions (deterministic)
+
+The logo sits in its corner **inside the General Social Safe Area** (the same margins as captions,
+the hook and insets), and `logo_plan` resolves every conflict the same way in the renderer and
+the preview:
+
+| Conflict | What happens |
+|---|---|
+| captions at the bottom, logo in a bottom corner | the logo moves to the top corner on the same side (captions at the top → bottom corner) |
+| captions in the centre or off | no move |
+| the hook at the top, logo in a top corner | the logo appears once the hook has ended |
+| a picture-in-picture or overlay in the logo's corner | the logo is hidden while that inset shows |
+| a cutaway | the logo stays on top (branding continues over B-roll) |
+
+`GET /brand/layout` publishes the box fractions, safe-area margins and end-card geometry for
+previews.

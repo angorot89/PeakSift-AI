@@ -15,9 +15,10 @@ a safe position and a bounded duration. Everything else is fixed here:
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from app.services.branding.colors import normalize_color, text_on
 from app.services.clip_edit.caption_metrics import text_width
 from app.services.clip_edit.caption_v2 import ass_colour, ass_time, escape_ass_text_v2
 from app.services.clip_edit.config import OUTPUT_WIDTH
@@ -164,9 +165,14 @@ def hook_ass(
     font_family: str,
     emoji_family: str | None = None,
     area: SafeArea = GENERAL_SOCIAL,
+    accent: str | None = None,
 ) -> tuple[str, str]:
-    """(Style line, Dialogue line) for the hook, to add to a short's ASS document."""
+    """(Style line, Dialogue line) for the hook, to add to a short's ASS document. ``accent``:
+    a brand colour for the *Boxed* label (already checked: its text colour reads on it)."""
     look = HOOK_STYLES[config.style]
+    if accent is not None and look.box:
+        accent = normalize_color(accent)
+        look = replace(look, outline_colour=accent, text=text_on(accent))
     lines = hook_lines(config, area)
     if lines is None:  # create() refuses this; a stored snapshot is re-checked here
         raise ValueError("The hook text does not fit")

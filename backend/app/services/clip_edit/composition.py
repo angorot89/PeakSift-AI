@@ -25,6 +25,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.services.clip_edit.brand_render import BrandLayers, brand_graph, brand_inputs
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, Layout
 from app.services.clip_edit.smart_crop import CropPoint, smart_crop_filter
 from app.services.clip_render.renderer import (
@@ -231,6 +232,10 @@ def build_edit_command(
     visual_inputs: Sequence[str] = (),
     visual_graph: str | None = None,
     visual_label: str = "[framed]",
+    brand_inputs: Sequence[str] = (),
+    brand_graph: str | None = None,
+    brand_label: str | None = None,
+    extra_seconds: float = 0.0,
 ) -> list[str]:
     # Smart reframe passes its own validated crop graph; every other layout uses constants.
     graph = video_graph if video_graph is not None else layout_filter(layout)
@@ -240,6 +245,16 @@ def build_edit_command(
         # captions and the hook stay on top of every cutaway and inset.
         graph += f";{visual_graph}"
         picture = visual_label
+    if brand_graph:
+        # The corner logo and the appended end card: above visuals, under the text layer.
+        graph += f";{brand_graph}"
+        picture = brand_label or picture
+    audio_label = None
+    if extra_seconds > 0 and (has_audio or audio_track is not None):
+        # The end card is silent: pad the audio, never repeat or stretch the clip's sound.
+        stream = "1:a:0" if audio_track is not None else "0:a:0"
+        graph += f";[{stream}]apad=pad_dur={extra_seconds:.3f}[aud]"
+        audio_label = "[aud]"
     if captions:
         # A fixed relative name: FFmpeg runs with the workspace as its working directory.
         graph += f";{picture}subtitles=filename={CAPTIONS_FILENAME}[out]"
@@ -258,13 +273,16 @@ def build_edit_command(
     if audio_track is not None:
         command += ["-i", str(audio_track)]
     command += list(visual_inputs)  # after the audio track: input indexes follow this order
+    command += list(brand_inputs)  # then the brand's logo
     command += [
         "-filter_complex",
         graph,
         "-map",
         video_label,
     ]
-    if audio_track is not None:
+    if audio_label is not None:
+        command += ["-map", audio_label]
+    elif audio_track is not None:
         command += ["-map", "1:a:0"]
     elif has_audio:
         command += ["-map", "0:a:0"]
@@ -321,6 +339,7 @@ def compose_short(
     focus: tuple[float, float] | None = None,
     audio: Path | None = None,
     visuals: Sequence[VisualLayer] | None = None,
+    brand: BrandLayers | None = None,
 ) -> ComposedShort:
     """Render ``source`` (a generated clip) as a 1080 × 1920 short into ``target``.
 
@@ -376,6 +395,17 @@ def compose_short(
         visual_inputs = layer_inputs(layers, fps)
         first_input = 2 if audio is not None else 1
         visual_graph, visual_label = layers_graph(layers, first_input, fps)
+    brand_args: list[str] = []
+    brand_segment, brand_label = None, None
+    if brand is not None and (brand.uses_logo or brand.end_card is not None):
+        if not supports_visuals(options.ffmpeg_path):
+            raise RenderError("visuals_unavailable", "This server's FFmpeg cannot draw the brand")
+        fps = source_meta.fps if source_meta.fps and source_meta.fps > 0 else 30.0
+        brand_args = brand_inputs(brand, fps)
+        logo_input = None
+        if brand_args:
+            logo_input = (2 if audio is not None else 1) + len(visuals or ())
+        brand_segment, brand_label = brand_graph(brand, logo_input, fps, visual_label)
     command = build_edit_command(
         options.ffmpeg_path,
         source,
@@ -391,6 +421,10 @@ def compose_short(
         visual_inputs=visual_inputs,
         visual_graph=visual_graph,
         visual_label=visual_label,
+        brand_inputs=brand_args,
+        brand_graph=brand_segment,
+        brand_label=brand_label,
+        extra_seconds=brand.extra_seconds if brand_segment else 0.0,
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
@@ -401,18 +435,25 @@ def compose_short(
         redactions[str(audio)] = "<audio>"
     for layer in visuals or ():
         redactions[str(layer.path)] = "<visual>"
+    if brand is not None and brand.logo_path is not None:
+        redactions[str(brand.logo_path)] = "<logo>"
     try:
         run_ffmpeg(command, options, heartbeat, redactions, cwd=workspace)
         if not target.is_file() or target.stat().st_size == 0:
             raise RenderError("invalid_output", "Rendering produced no output")
-        return _validate(target, source_meta, has_audio, options)
+        extra = brand.extra_seconds if brand_segment else 0.0
+        return _validate(target, source_meta, has_audio, options, extra)
     except BaseException:
         target.unlink(missing_ok=True)
         raise
 
 
 def _validate(
-    target: Path, source_meta: VideoMetadata, has_audio: bool, options: RenderOptions
+    target: Path,
+    source_meta: VideoMetadata,
+    has_audio: bool,
+    options: RenderOptions,
+    extra_seconds: float = 0.0,
 ) -> ComposedShort:
     try:
         meta = probe(target, ffprobe_path=options.ffprobe_path)
@@ -427,7 +468,7 @@ def _validate(
         )
     if not meta.fps or meta.fps <= 0:
         raise RenderError("invalid_output", "The rendered short has no frame rate")
-    expected = source_meta.duration_seconds or 0.0
+    expected = (source_meta.duration_seconds or 0.0) + extra_seconds  # + an appended end card
     if meta.duration_seconds is None or (
         abs(meta.duration_seconds - expected) > options.duration_tolerance_seconds
     ):

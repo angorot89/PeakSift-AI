@@ -47,6 +47,8 @@ from app.services.audio_mix.loudness import measure_loudness
 from app.services.audio_mix.mixer import prepare_track
 from app.services.audio_mix.plan import SAMPLE_RATE as MIX_SAMPLE_RATE
 from app.services.audio_mix.plan import mix_request
+from app.services.clip_edit.brand import logo_plan
+from app.services.clip_edit.brand_render import BrandLayers, end_card_ass
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.caption_v2 import build_dynamic_ass
 from app.services.clip_edit.captions import SourceSegment, build_cues
@@ -74,7 +76,12 @@ from app.services.storage import (
     StorageProvider,
     media_storage,
 )
-from app.services.visuals.assets import VisualsProblem, check_visuals, load_visual_assets
+from app.services.visuals.assets import (
+    VisualsProblem,
+    brand_logo,
+    check_visuals,
+    load_visual_assets,
+)
 from app.services.visuals.compositor import VisualLayer
 
 logger = logging.getLogger(__name__)
@@ -247,13 +254,31 @@ def _execute(
         edit.caption_cue_count = len(cues)
     emoji_family = emoji_font(settings.ffmpeg_path) if dynamic or config.hook else None
     # The hook overlay shares the subtitle file (output-frame coordinates, safe area).
+    brand = config.brand
     hook = (
-        hook_ass(config.hook, font_family=settings.caption_font_family, emoji_family=emoji_family)
+        hook_ass(
+            config.hook,
+            font_family=settings.caption_font_family,
+            emoji_family=emoji_family,
+            accent=brand.hook_accent if brand else None,
+        )
         if config.hook
         else None
     )
-    # No speech in this range and no hook: render without a text layer, honestly.
-    captions = bool(cues) or hook is not None
+    extra_styles = [hook[0]] if hook else []
+    extra_events = [hook[1]] if hook else []
+    if brand is not None and brand.end_card is not None:
+        # The end card's name and line live in the same subtitle file, after the clip.
+        card_styles, card_events = end_card_ass(
+            brand.end_card,
+            name=brand.name,
+            start=float(clip.duration_seconds),
+            font_family=settings.caption_font_family,
+        )
+        extra_styles += card_styles
+        extra_events += card_events
+    # No speech in this range, no hook and no end card: render without a text layer, honestly.
+    captions = bool(cues) or bool(extra_events)
     if captions and dynamic:
         placement = caption_placement(config.caption_position)
         store.captions_path(edit.id, attempt).write_text(
@@ -264,9 +289,10 @@ def _execute(
                 margin_v=placement.margin_v,
                 margin_h=placement.margin_h,
                 font_family=settings.caption_font_family,
-                extra_styles=[hook[0]] if hook else (),
-                extra_events=[hook[1]] if hook else (),
+                extra_styles=extra_styles,
+                extra_events=extra_events,
                 emoji_family=emoji_family,
+                active_colour=brand.caption_emphasis if brand else None,
             ),
             encoding="utf-8",
         )
@@ -277,8 +303,8 @@ def _execute(
                 style=config.caption_style or CaptionStyle.BOLD,
                 position=config.caption_position or CaptionPosition.BOTTOM,
                 font_family=settings.caption_font_family,
-                extra_styles=[hook[0]] if hook else (),
-                extra_events=[hook[1]] if hook else (),
+                extra_styles=extra_styles,
+                extra_events=extra_events,
             ),
             encoding="utf-8",
         )
@@ -298,6 +324,9 @@ def _execute(
     if config.visuals is not None:
         extra["visuals"] = _prepare_visuals(edit, db, store, inputs, config)
         _heartbeat(edit, db, task_id)
+
+    if brand is not None:
+        extra["brand"] = _prepare_brand(edit, db, store, inputs, config)
 
     composed = composer(
         source,
@@ -376,6 +405,44 @@ def _prepare_visuals(
         )
         for element in config.visuals.elements
     ]
+
+
+def _prepare_brand(
+    edit: ClipEdit, db: Session, store: EditArtifactStore, inputs: Path, config: EditConfig
+) -> BrandLayers:
+    """The snapshot's brand, with its logo re-checked (still one of the creator's images) and
+    fetched into this attempt's workspace, and where/when the corner logo shows."""
+    brand = config.brand
+    clip_seconds = float(edit.clip.duration_seconds)
+    path, plan = None, None
+    if brand.logo is not None:
+        owner = edit.clip.video.project.user_id
+        asset = brand_logo(db, owner, brand.logo.asset_id)
+        if asset is None:
+            raise PipelineFailure("brand_logo_unavailable", "The brand logo is no longer available")
+        try:
+            path = store.storage.fetch(asset.storage_key, inputs)
+        except (ObjectNotFound, InvalidStorageKey):
+            raise PipelineFailure(
+                "brand_logo_unavailable", "The brand logo is no longer available"
+            ) from None
+        insets = [
+            (element.position.value, element.start, element.end)
+            for element in (config.visuals.elements if config.visuals else ())
+            if element.is_inset and element.position is not None
+        ]
+        plan = logo_plan(
+            brand.logo,
+            captions_position=(
+                config.caption_position.value
+                if config.captions_enabled and config.caption_position
+                else None
+            ),
+            hook_position=config.hook.position.value if config.hook else None,
+            hook_seconds=config.hook.duration if config.hook else 0.0,
+            insets=insets,
+        )
+    return BrandLayers(clip_seconds, path, plan, brand.end_card)
 
 
 def _prepare_audio(

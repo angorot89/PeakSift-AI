@@ -32,6 +32,8 @@ from app.services.auto_edit.recipes import current_recipe
 from app.services.branding import profiles, templates
 from app.services.branding.colors import emphasis_readable
 from app.services.branding.profiles import BrandProblem
+from app.services.clip_edit.brand import layout_summary
+from app.services.clip_edit.safe_area import GENERAL_SOCIAL
 
 router = APIRouter(prefix="/brand", tags=["brand"])
 
@@ -128,6 +130,12 @@ def update_brand(
 def delete_brand(brand_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> Response:
     profiles.delete_brand(db, _owned(db, current_user, brand_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/layout")
+def brand_layout(current_user: CurrentUser) -> dict:
+    """The numbers previews need to place a logo and an end card exactly like the renderer."""
+    return {**layout_summary(), "margins": GENERAL_SOCIAL.px()}
 
 
 @router.get("/logo-candidates", response_model=list[LogoRead])

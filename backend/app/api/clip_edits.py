@@ -51,7 +51,12 @@ from app.services.clip_edit.pipeline import is_stale
 from app.services.clip_render.storage import safe_download_filename
 from app.services.media_deletion import delete_edit as delete_edit_and_media
 from app.services.storage import StorageProvider
-from app.services.visuals.assets import VisualsProblem, check_visuals, load_visual_assets
+from app.services.visuals.assets import (
+    VisualsProblem,
+    brand_logo,
+    check_visuals,
+    load_visual_assets,
+)
 from app.workers.dispatch import JobQueueUnavailable, enqueue_clip_edit, new_task_id
 
 logger = logging.getLogger(__name__)
@@ -260,6 +265,21 @@ def _require_visuals(db: DbSession, clip: Clip, video: Video, config: EditConfig
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
 
 
+def _require_brand(db: DbSession, video: Video, config: EditConfig) -> None:
+    """A brand logo must be one of the project owner's images (any of their projects)."""
+    if config.brand is None or config.brand.logo is None:
+        return
+    if not supports_visuals(get_settings().ffmpeg_path):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Brand logos are not available on this server",
+        )
+    if brand_logo(db, video.project.user_id, config.brand.logo.asset_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Choose a logo from your own images"
+        )
+
+
 def _enqueue_or_503(db: DbSession, edit: ClipEdit, *, created: bool) -> None:
     """The attempt token is already committed on the row; hand the job to the broker."""
     try:
@@ -316,6 +336,7 @@ def create_edit(
             caption_track_id=body.caption_track_id,
             audio=body.audio.model_dump(mode="json") if body.audio else None,
             visuals=body.visuals.model_dump(mode="json") if body.visuals else None,
+            brand=body.brand.model_dump(mode="json") if body.brand else None,
         )
     except ValueError as error:
         raise HTTPException(
@@ -346,6 +367,7 @@ def create_or_reuse_edit(
     _require_renderable(db, clip, video, config)
     _require_audio(db, clip, video, config)
     _require_visuals(db, clip, video, config)
+    _require_brand(db, video, config)
     edit = ClipEdit(
         clip_id=clip.id,
         video_id=video.id,

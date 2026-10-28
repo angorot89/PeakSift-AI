@@ -97,20 +97,26 @@ def delete_audio_asset(db: Session, storage: StorageProvider, asset: AudioAsset)
 
 
 def visual_asset_ids(config: dict | None) -> set[str]:
-    """The visual assets an edit configuration references (its ``visuals`` section)."""
+    """The visual assets an edit configuration references (its ``visuals`` section and its
+    brand logo)."""
     visuals = (config or {}).get("visuals") or {}
-    return {
-        str(e.get("asset_id")) for e in visuals.get("elements") or [] if e and e.get("asset_id")
-    }
+    ids = {str(e.get("asset_id")) for e in visuals.get("elements") or [] if e and e.get("asset_id")}
+    logo = ((config or {}).get("brand") or {}).get("logo") or {}
+    if logo.get("asset_id"):
+        ids.add(str(logo["asset_id"]))
+    return ids
 
 
 def edits_using_visual_asset(db: Session, asset: VisualAsset) -> int:
-    """How many of the project's edits place ``asset`` in their visuals section."""
+    """How many edits use ``asset``: in their visuals (same project) or as their brand logo,
+    which may be in any of the owner's projects (a brand is creator-level)."""
     wanted = str(asset.id)
+    owner = select(Project.user_id).where(Project.id == asset.project_id).scalar_subquery()
     configs = db.scalars(
         select(ClipEdit.config)
         .join(Video, ClipEdit.video_id == Video.id)
-        .where(Video.project_id == asset.project_id)
+        .join(Project, Video.project_id == Project.id)
+        .where(Project.user_id == owner)
     )
     return sum(1 for config in configs if wanted in visual_asset_ids(config))
 

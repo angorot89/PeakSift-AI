@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
@@ -86,6 +86,36 @@ class VisualsRequest(BaseModel):
     elements: Annotated[list[VisualElementRequest], Field(max_length=MAX_ELEMENTS)] = []
 
 
+class BrandLogoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID  # one of the creator's own image visual assets
+    corner: Literal["top_left", "top_right", "bottom_left", "bottom_right"]
+    size: Literal["small", "medium", "large"]
+
+
+class EndCardRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    seconds: Annotated[float, Field(allow_inf_nan=False)]
+    background: Annotated[str, Field(max_length=16)]
+    text: Annotated[str, Field(max_length=200)] | None = None
+    show_logo: StrictBool = True
+
+
+class BrandRequest(BaseModel):
+    """The brand identity a Short is rendered with — copied from the creator's brand, then
+    validated like everything else (hex colours only, readability rules, own logo image)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(max_length=200)]
+    logo: BrandLogoRequest | None = None
+    caption_emphasis: Annotated[str, Field(max_length=16)] | None = None
+    hook_accent: Annotated[str, Field(max_length=16)] | None = None
+    end_card: EndCardRequest | None = None
+
+
 class EditRequest(BaseModel):
     """The only editing options a client can send. Unknown fields are rejected, and every
     value must come from an allow-list — no filters, fonts, paths, URLs or FFmpeg flags."""
@@ -120,6 +150,9 @@ class EditRequest(BaseModel):
     # Optional B-roll cutaways, picture-in-picture and image overlays from the project's
     # visual assets; omitted (or empty) draws only the clip, exactly as before.
     visuals: VisualsRequest | None = None
+    # Optional brand identity (logo, caption emphasis, hook accent, appended end card);
+    # omitted renders exactly as before.
+    brand: BrandRequest | None = None
 
 
 class ClipEditRead(BaseModel):
