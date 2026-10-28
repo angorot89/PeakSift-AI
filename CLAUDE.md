@@ -73,6 +73,16 @@ one next-best-action engine shared with Home, content strategy and grounded Shor
 the panel and a ⌘K command menu, prompt-injection hardening, and PeakSift's own answers for what
 it knows exactly; see [docs/creator-copilot.md](docs/creator-copilot.md).
 
+**V1.7 Brand Studio & Reusable Templates: implementation complete locally, pending
+CI/merge/release** (stacked PRs #228–#238 on top of the unmerged V1.6 stack; not merged, not
+tagged): brands (colours with contrast checks, a logo from the creator's images, an end-card
+line) and versioned templates (allow-listed framing, captions, hook, visuals, sound, logo and
+end-card settings), brand rendering from the edit snapshot (logo placement policy, caption
+emphasis, hook accent, silent end card), Auto Edit with frozen templates and a documented
+precedence, Brand Studio, the template builder and library, the create flow and editor
+integration (Save as / Update template, explicit only), Ask PeakSift about brands and
+templates, hardening and a real-render release gate; see [docs/brand-studio.md](docs/brand-studio.md).
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,
@@ -80,7 +90,7 @@ audience demographics, competitor or cross-creator benchmarking, scraping), A/B 
 automatic title changes, collaboration, billing, custom model training,
 stock media, internet image
 search or generated imagery, image generation or editing, video generation, facial identity recognition, OCR, zoom/pan or keyframed visuals,
-split screen, speaker diarization or active-speaker detection, generic object tracking, dynamic zoom, keyframe/timeline editor, manual caption timing or per-word positioning, custom fonts, templates or brand kits, transitions beyond a fade, music or sound-effect libraries, generative audio, stem separation, beat-synced editing, a multitrack/DAW timeline, publishing to platforms other than YouTube, scheduled or multi-platform publishing, comments, thumbnails, editing or deleting published videos, Kubernetes or multi-region deployment, Morocco Mode, payments) until explicitly instructed.
+split screen, speaker diarization or active-speaker detection, generic object tracking, dynamic zoom, keyframe/timeline editor, manual caption timing or per-word positioning, custom fonts, a graphic design tool or motion graphics, template marketplaces or generated branding, transitions beyond a fade, music or sound-effect libraries, generative audio, stem separation, beat-synced editing, a multitrack/DAW timeline, publishing to platforms other than YouTube, scheduled or multi-platform publishing, comments, thumbnails, editing or deleting published videos, Kubernetes or multi-region deployment, Morocco Mode, payments) until explicitly instructed.
 
 ## Stack (as built)
 
@@ -110,6 +120,13 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   `app/services/routes.py`, `app/api/copilot.py`, `scripts/copilot_acceptance.py` (real-model
   release gate); frontend `components/app/copilot/`, `components/app/command-menu.tsx`,
   `lib/copilot.ts`, `lib/copilot-rules.ts`, `lib/command-menu.ts`
+- Brand Studio: `app/models/brand.py` (`BrandProfile`), `app/models/short_template.py`
+  (`ShortTemplate`), `app/services/branding/` (colors, profiles, template_config, templates),
+  `app/services/auto_edit/template.py`, `app/services/clip_edit/brand.py` and `brand_render.py`,
+  `app/services/copilot/branding.py`, `app/api/brand.py`, `scripts/brand_acceptance.py`
+  (real-render release gate); frontend `/brand`, `components/app/brand/`,
+  `components/app/editor/brand-strip.tsx`, `brand-logo-layer.tsx`, `lib/brand.ts`,
+  `lib/brand-rules.ts`, `lib/template-rules.ts`
 - Audio & sound design: `app/models/audio_asset.py`, `app/services/audio_assets.py` (upload validation, probing, waveform), `app/services/audio_mix/` (config, plan, ducking, loudness, mixer); user-supplied audio only — never commit audio files or fetch audio from the internet; test audio is generated with FFmpeg
 
 ## Conventions
@@ -144,11 +161,21 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   unused visuals, nothing published, requests to act, ideas without a video) is answered by
   `answers.py`, not the model. Never claim performance, virality or causation; observed patterns
   keep their wording. Conversations are per project, one question at a time, clearable.
+- Brands and templates are preferences; renders read only the edit snapshot. An edit's `brand`
+  section appears only when used (old fingerprints unchanged); plans freeze the template version
+  and brand, and a template or brand change never touches an existing plan or edit. Colours are
+  hex only and contrast-checked (an unreadable colour is dropped, never adjusted); template
+  settings are allow-listed and versioned; only validated numbers, colours and enums reach the
+  filtergraph, the logo is an input file only (ownership and kind checked at the API and at
+  render), text only through `escape_ass_text`. The logo placement policy is deterministic
+  (`logo_plan`). Precedence: hard constraints > this Short > template > brand > recipe > hints >
+  planner. Templates never pick music; saving or updating a template is always the creator's
+  explicit action. No custom fonts, motion graphics, marketplaces or generated branding.
 - Clip candidates: everything a model returns is untrusted until `validation.py` has snapped it to transcript lines and checked bounds; never clamp or invent values, never store a model's quotation as the transcript excerpt, keep scores on the documented 0–100 editorial scale and never present them as performance predictions.
 - Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
 - Smart reframing: positions are fractions of the display-oriented source (x right, y down). Detector output is untrusted until `normalize_detection`; "no face" (empty list) and "detector broken" (`DetectorUnavailable`/`DetectorFailure` → failed analysis) must stay distinct. Every tuning value is server configuration in the versioned snapshot. Persisted keyframes are re-validated before rendering and only module-formatted numbers reach the filtergraph. Never load a detector at import or startup, never download or commit model weights, and never describe the feature as speaker detection.
 - Tests: Celery eager mode, mocked speech models, a fake OpenAI client, a fake ONNX session, moto and a live MinIO for S3 (`TEST_S3_*`, required in CI), a mocked YouTube and the deterministic fake metrics provider (`PERFORMANCE_PROVIDER=fake`); CI sets `HF_HUB_OFFLINE=1`, never has an API key or Google credentials, never downloads a model and never calls Google.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

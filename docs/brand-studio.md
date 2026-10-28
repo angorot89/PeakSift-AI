@@ -383,3 +383,42 @@ and audio — nothing downloaded):
   logo and end card as the template asks; −14.0 LUFS; end card −70.0 LUFS (silent); the template
   got a new version; the old version's settings unchanged, its file byte-identical, its origin
   still naming the version it was made with.
+
+## Security
+
+- Brands and templates are owner-scoped; another creator's brand or template is a 404, and
+  another creator's logo in an edit is refused (409) — never recorded as an origin.
+- Colours are hex only, normalized to `#RRGGBB`; template settings are allow-listed values and
+  unknown keys are refused. Only validated numbers, colours and enums reach the filtergraph; the
+  logo is an input file only; brand and end-card text reach captions only through
+  `escape_ass_text`.
+- A logo is one of the creator's own images, re-checked for ownership and kind at the API and
+  again at render. Nothing is fetched, generated or committed.
+
+## Limitations
+
+Brand Studio is intentionally constrained:
+
+- **No arbitrary fonts.** Captions use PeakSift's installed fonts (Noto Sans and friends); no
+  font uploads.
+- **No motion graphics** or custom animation scripting; the logo is static and the end card is
+  a still card. Fades are the only transition.
+- **No free positioning.** The logo uses four corners and three sizes; captions and the hook
+  use their presets' positions.
+- **No marketplace**, no template sharing or selling, no team brands.
+- **No generative branding**: no AI logos, images or colour palettes.
+- **The end card is silent** (music and effects end with the clip).
+- **Templates never pick music**; the creator chooses a track for each Short.
+- **Smart Reframe needs confident faces**; without them a template's Smart Reframe preference
+  falls back to its alternative with a note.
+- Colours that would make captions hard to read are left out of the Short, not adjusted.
+
+## Testing
+
+`test_brand_profiles.py`, `test_short_templates.py`, `test_brand_render.py` (including real
+renders: logo corners, flips, end card durations, Smart Reframe with a logo),
+`test_auto_edit_templates.py`, `test_brand_edit_flow.py`, `test_copilot_branding.py`,
+`test_brand_hardening.py`, `test_brand_acceptance.py`; frontend `brand-rules.test.ts` and
+`template-rules.test.ts`. The release gate is `scripts/brand_acceptance.py` (see
+*Acceptance*).
+
