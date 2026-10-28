@@ -78,7 +78,7 @@ export function CopilotPanel() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [draft, setDraft] = useState("");
   const composer = useRef<HTMLTextAreaElement>(null);
-  const scroller = useRef<HTMLDivElement>(null);
+  const end = useRef<HTMLDivElement>(null);
 
   const messages = threads[key];
 
@@ -126,10 +126,10 @@ export function CopilotPanel() {
     };
   }, [open]);
 
-  // Keep the newest message in view.
+  // Keep the newest message in view — in the side panel and in the phone sheet, whose scrolling
+  // box is the dialog's body.
   useEffect(() => {
-    const node = scroller.current;
-    if (node) node.scrollTop = node.scrollHeight;
+    end.current?.scrollIntoView({ block: "end" });
   }, [messages?.length, pending, open]);
 
   const ask = useCallback(
@@ -278,6 +278,7 @@ export function CopilotPanel() {
       )}
       {waiting ? <Waiting startedAt={waiting.startedAt} /> : null}
       {error ? <InlineAlert title="That didn't work">{error}</InlineAlert> : null}
+      <div ref={end} />
     </div>
   );
 
@@ -305,6 +306,7 @@ export function CopilotPanel() {
       onKeyDown={onKeyDown}
       onSubmit={() => void ask(draft)}
       disabled={!!pending}
+      placeholder={scope.projectId ? "Ask about this project…" : "Ask about your projects and Shorts…"}
     />
     </div>
   );
@@ -350,7 +352,7 @@ export function CopilotPanel() {
           footer={composerBlock}
           headerActions={clearButton}
         >
-          <div ref={scroller}>{body}</div>
+          <div>{body}</div>
         </Dialog>
         {confirm}
       </>
@@ -377,7 +379,7 @@ export function CopilotPanel() {
             <X aria-hidden="true" />
           </IconButton>
         </div>
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {body}
         </div>
         <div className="border-t border-border px-4 py-3">{composerBlock}</div>
@@ -548,6 +550,7 @@ function Composer({
   onKeyDown,
   onSubmit,
   disabled,
+  placeholder,
 }: {
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
@@ -555,6 +558,7 @@ function Composer({
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
   disabled: boolean;
+  placeholder: string;
 }) {
   const id = useId();
   const note = lengthNote(value);
@@ -579,7 +583,7 @@ function Composer({
           rows={rows}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask about this project…"
+          placeholder={placeholder}
           aria-describedby={note ? `${id}-note` : undefined}
           className="min-h-9 w-full resize-none bg-transparent px-2 py-1.5 pointer-coarse:min-h-11 text-base text-foreground outline-none placeholder:text-subtle sm:text-sm"
         />
