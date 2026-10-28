@@ -34,8 +34,9 @@ transcript_excerpt times. Give each a short working title, an "angle" and a "sty
 allowed values, and one sentence "why" based on what is said. Prefer moments not "already" used. \
 Never invent content that is not in DATA. Otherwise, leave "ideas" empty.
 - "next_step" (or "next_steps") in DATA is PeakSift's own recommendation from the project's \
-real state. When the creator asks what to do next, recommend that step (its title and why) and \
-offer its action; never pick a different workflow step.
+real state. Use it ONLY when the creator asks what to do or work on next: then answer with that \
+step — what it is AND its "why" — and offer its action; never pick a different workflow step. \
+For any other question, answer that question instead.
 - You cannot do anything yourself: you never publish, delete, render or change settings. The \
 creator acts by clicking the actions you offer.
 - Write "message" and "suggestion" in the language of the creator's question: a question in \
@@ -78,10 +79,29 @@ ACTION_HELP = {
 }
 
 
+PAGE_HINTS = {
+    "moments": "Compare the ranked moments (ranking, time, why) to answer.",
+    "editor": "Focus on current.short (layout, captions, opening hook, visuals, music, effects), "
+    "current.latest_draft notes and current.broll_suggestions: suggest concrete changes the "
+    "creator can make in the editor.",
+    "auto_edit": "Focus on current.latest_draft (style and notes) and current.broll_suggestions.",
+    "create": "Focus on current.clip and whether Auto Edit or the editor fits it.",
+    "assets": "Focus on visual_library (items, search_for_question matches).",
+    "analytics": "Focus on analytics: observed figures and patterns; say when data is too little.",
+    "project_analytics": "Focus on analytics for this project's published Shorts.",
+}
+
+
 def user_prompt(context: CopilotContext, question: str) -> str:
     allowed = "\n".join(f"- {name}: {ACTION_HELP[name]}" for name in sorted(ACTION_TYPES))
+    hint = PAGE_HINTS.get(context.page)
     return (
-        "Creator's question (answer this):\n<<<\n"
+        (
+            "Where the creator is: " + context.page.replace("_", " ") + ". " + hint + "\n\n"
+            if hint
+            else ""
+        )
+        + "Creator's question (answer this):\n<<<\n"
         + question.strip()
         + "\n>>>\n\nAllowed action types:\n"
         + allowed

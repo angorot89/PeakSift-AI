@@ -270,21 +270,26 @@ def test_the_copilot_recommends_the_same_step_even_offline(client, db_session):
     user = db_session.scalar(select(User).where(User.email == "same@example.com"))
     dashboard = client.get(f"/projects/{project_id}/summary").json()["next_action"]
 
-    def ask(provider):
+    def ask(text, provider):
         return service.ask(
             db_session,
             user,
             get_settings(),
-            text="What should I do next?",
+            text=text,
             page="overview",
             project_id=project_id,
             provider=provider,
         ).answer
 
-    online = ask(FakeCopilotProvider())  # answers from DATA's next_step
-    offline = ask(FakeCopilotProvider([CopilotProviderError("unavailable", "down")]))
-    assert online.content.startswith(dashboard["title"]) and online.status == "ok"
+    never = FakeCopilotProvider([AssertionError("the model must not decide the workflow")])
+    own = ask("What should I do next?", never)  # answered by PeakSift itself
+    offline = ask(
+        "Help me with this project",
+        FakeCopilotProvider([CopilotProviderError("unavailable", "down")]),
+    )
+    assert own.status == "ok" and own.content == f"{dashboard['title']}. {dashboard['description']}"
+    assert never.calls == []
     assert offline.status == "unavailable" and offline.content == service.UNAVAILABLE
-    for answer in (online, offline):
+    for answer in (own, offline):
         href = client.post(f"/copilot/messages/{answer.id}/actions/0").json()["href"]
         assert href == dashboard["href"]

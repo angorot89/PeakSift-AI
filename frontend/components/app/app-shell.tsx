@@ -11,11 +11,14 @@ import {
   PanelLeftOpen,
   Plus,
   Settings,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
+import { CopilotPanel } from "@/components/app/copilot/copilot-panel";
+import { CopilotProvider, useCopilot } from "@/components/app/copilot/copilot-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
 import { Dialog } from "@/components/ui/dialog";
@@ -66,6 +69,28 @@ function NavLink({
       {nested ? null : <Icon aria-hidden="true" className={`size-[18px] shrink-0 ${active ? "text-accent-soft" : ""}`} />}
       <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>{label}</span>
     </Link>
+  );
+}
+
+/** Ask PeakSift: opens the assistant for the page the creator is on. */
+function AskButton({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const { open, openCopilot } = useCopilot();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onNavigate?.(); // on phones the navigation sheet closes first
+        openCopilot();
+      }}
+      aria-expanded={open}
+      title={collapsed ? "Ask PeakSift" : undefined}
+      className={`group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
+        collapsed ? "justify-center" : ""
+      } ${open ? "bg-accent/[0.12] font-medium text-foreground" : "text-muted hover:bg-white/[0.04] hover:text-foreground"}`}
+    >
+      <Sparkles aria-hidden="true" className="size-[18px] shrink-0 text-accent-soft" />
+      <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>Ask PeakSift</span>
+    </button>
   );
 }
 
@@ -163,6 +188,7 @@ function SidebarContent({
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
+        <AskButton collapsed={collapsed} onNavigate={onNavigate} />
         <NavLink
           href={SETTINGS_NAV.href}
           label={SETTINGS_NAV.label}
@@ -194,9 +220,20 @@ function SidebarContent({
   );
 }
 
-/** The signed-in area: a sidebar on large screens, a top bar and a navigation sheet on phones. */
+/** The signed-in area: a sidebar on large screens, a top bar and a navigation sheet on phones,
+ * and Ask PeakSift (a side panel, or a full-height sheet on phones). */
 export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <CopilotProvider>
+      <Shell>{children}</Shell>
+      <CopilotPanel />
+    </CopilotProvider>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const copilot = useCopilot();
   // A preference of this browser only; everything works without it.
   const [collapsed, setCollapsed] = useStoredFlag(COLLAPSE_KEY);
   const [drawer, setDrawer] = useState(false);
@@ -231,7 +268,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SidebarContent collapsed={collapsed} onToggle={toggle} projects={projects} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
+      <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[26rem]" : ""}`}>
         <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-xl lg:hidden">
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <Menu aria-hidden="true" />
@@ -240,6 +278,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <LogoMark className="size-6" />
             PeakSift <span className="text-muted">AI</span>
           </Link>
+          <IconButton
+            aria-label="Ask PeakSift"
+            aria-expanded={copilot.open}
+            onClick={() => copilot.openCopilot()}
+            className="ml-auto text-accent-soft"
+          >
+            <Sparkles aria-hidden="true" />
+          </IconButton>
         </header>
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[76rem] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-8">
           {children}

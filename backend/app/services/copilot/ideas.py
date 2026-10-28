@@ -18,7 +18,7 @@ from typing import Any
 
 from app.services.copilot.context import CopilotContext, Target
 from app.services.copilot.contract import ProposedAction, clean_text
-from app.services.strategy import ANGLES, STYLES, idea_card
+from app.services.strategy import ANGLES, CATEGORY_ANGLE, CATEGORY_STYLE, STYLES, idea_card
 
 MAX_IDEAS = 5
 IDEA_WORDS = re.compile(
@@ -80,6 +80,9 @@ def check_ideas(raw: Any, context: CopilotContext) -> list[IdeaCard]:
             time = moments[handle]["time"]
             fact = facts.get(target.id)
             note = fact.note if fact else None
+            if fact is not None:  # a real moment: its own kind decides angle and style
+                angle = CATEGORY_ANGLE.get(fact.category, angle)
+                style = CATEGORY_STYLE.get(fact.category, style)
             action = ProposedAction("create_short", target)
         else:
             start, end = item.get("from"), item.get("to")

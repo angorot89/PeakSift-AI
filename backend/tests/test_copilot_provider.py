@@ -61,6 +61,11 @@ def test_actions_and_references_go_through_handles_only():
         TARGETS,
     )
     assert reply.message == "“The night before the test” is the strongest. See the docs now."
+    talk = parse_reply(
+        {"message": "Search the library (handle: project) now.", "actions": [], "references": []},
+        TARGETS,
+    )
+    assert talk.message == "Search the library now."
     assert reply.suggestion == "Start with it."
     assert [(a.type, a.target.kind if a.target else None) for a in reply.actions] == [
         ("create_short", "moment"),
