@@ -88,3 +88,19 @@ def check_visuals(
                 "the video, or turn on loop",
                 422,
             )
+
+
+def brand_logo(db: Session, owner_id: uuid.UUID, asset_id: str) -> VisualAsset | None:
+    """A brand logo: one of ``owner_id``'s image assets, from any of their projects (a brand is
+    creator-level); None when it is gone, a video, or someone else's."""
+    from app.models import Project
+
+    return db.scalar(
+        select(VisualAsset)
+        .join(Project, VisualAsset.project_id == Project.id)
+        .where(
+            VisualAsset.id == uuid.UUID(asset_id),
+            Project.user_id == owner_id,
+            VisualAsset.kind == VisualAssetKind.IMAGE,
+        )
+    )

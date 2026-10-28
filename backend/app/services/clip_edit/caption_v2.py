@@ -27,8 +27,9 @@ import math
 import re
 import unicodedata
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from app.services.branding.colors import normalize_color
 from app.services.clip_edit.caption_metrics import text_width
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
@@ -284,12 +285,17 @@ def build_dynamic_ass(
     extra_styles: Iterable[str] = (),
     extra_events: Iterable[str] = (),
     emoji_family: str | None = None,
+    active_colour: str | None = None,
 ) -> str:
     """The short's ASS document. ``emoji_family`` is the monochrome emoji font libass can
-    draw (see ``emoji.py``); None leaves emoji out of the burned-in text."""
+    draw (see ``emoji.py``); None leaves emoji out of the burned-in text. ``active_colour`` is
+    a brand's caption emphasis (``#RRGGBB``, already checked for readability) replacing the
+    preset's colour for the spoken word only."""
     if not _FONT_NAME.fullmatch(font_family):
         raise ValueError("Unsupported caption font family name")
     style = PRESETS_V2[preset]
+    if active_colour is not None:
+        style = replace(style, active=normalize_color(active_colour))
     if style.box and alignment != 5:  # libass pads the box by the outline: keep it inside too
         margin_v += round(style.outline)
     border = 3 if style.box else 1

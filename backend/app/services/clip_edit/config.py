@@ -18,6 +18,7 @@ from app.services.audio_mix.config import AudioMix
 from app.services.visuals.config import VisualsConfig
 
 if TYPE_CHECKING:
+    from app.services.clip_edit.brand import BrandConfig
     from app.services.clip_edit.hook import HookConfig
 
 CONFIG_VERSION = 1
@@ -86,6 +87,12 @@ def _focus(value: float | None) -> float:
     return round(float(value), FOCUS_DECIMALS)
 
 
+def _brand_from_snapshot(snapshot: dict[str, Any] | None) -> "BrandConfig | None":
+    from app.services.clip_edit.brand import BrandConfig
+
+    return BrandConfig.from_snapshot(snapshot)
+
+
 @dataclass(frozen=True)
 class EditConfig:
     """A validated, normalized edit configuration."""
@@ -111,6 +118,9 @@ class EditConfig:
     # Optional B-roll cutaways, picture-in-picture and image overlays; None draws only the
     # clip itself, exactly as earlier versions did.
     visuals: VisualsConfig | None = None
+    # Optional brand identity (logo, caption emphasis, hook accent, appended end card), copied
+    # from the creator's brand when the Short was made; None renders exactly as before.
+    brand: "BrandConfig | None" = None
 
     @property
     def caption_renderer(self) -> str | None:
@@ -143,9 +153,15 @@ class EditConfig:
         caption_track_id: str | uuid.UUID | None = None,
         audio: dict[str, Any] | AudioMix | None = None,
         visuals: dict[str, Any] | VisualsConfig | None = None,
+        brand: "dict[str, Any] | BrandConfig | None" = None,
     ) -> "EditConfig":
         """Validate against the allow-lists (ValueError otherwise) and normalize."""
-        from app.services.clip_edit.hook import HookConfig
+        from app.services.clip_edit.brand import BrandConfig
+        from app.services.clip_edit.hook import HookConfig, HookStyle
+
+        branded = brand if isinstance(brand, BrandConfig) or brand is None else None
+        if isinstance(brand, dict):
+            branded = BrandConfig.create(brand)
 
         if not isinstance(hook_enabled, bool):
             raise ValueError("hook_enabled must be a boolean")
@@ -170,12 +186,16 @@ class EditConfig:
         focus = (None, None)
         if chosen_layout == Layout.MANUAL_CROP:
             focus = (_focus(focus_x), _focus(focus_y))
+        if branded is not None and (hook is None or hook.style != HookStyle.BOXED):
+            branded = branded.without(accent=True)  # only the Boxed hook has a label colour
         if not captions_enabled:
             # Style and position are meaningless without captions: drop them so equivalent
             # requests share one fingerprint (and one render).
+            if branded is not None:
+                branded = branded.without(emphasis=True)
             return cls(
                 ratio, chosen_layout, False, None, None, analysis, *focus, hook, audio=mix,
-                visuals=shown,
+                visuals=shown, brand=branded,
             )  # fmt: skip
         style: CaptionStyle | DynamicPreset
         if not caption_style:
@@ -189,6 +209,8 @@ class EditConfig:
         )
         if hook is not None and hook.position.value == position.value:
             raise ValueError("The hook and the captions cannot share the same position")
+        if branded is not None and not isinstance(style, DynamicPreset):
+            branded = branded.without(emphasis=True)  # phrase captions have no spoken word
         timing, track = None, None
         if isinstance(style, DynamicPreset):  # caption_v2: timing (and its track) are explicit
             timing = CaptionTiming(caption_timing) if caption_timing else CaptionTiming.ALIGNED_WORD
@@ -198,7 +220,7 @@ class EditConfig:
                 track = str(uuid.UUID(str(caption_track_id)))
         return cls(
             ratio, chosen_layout, True, style, position, analysis, *focus, hook, timing, track,
-            audio=mix, visuals=shown,
+            audio=mix, visuals=shown, brand=branded,
         )  # fmt: skip
 
     @classmethod
@@ -225,12 +247,13 @@ class EditConfig:
             caption_track_id=captions.get("track_id"),
             audio=AudioMix.from_snapshot(snapshot.get("audio")),
             visuals=VisualsConfig.from_snapshot(snapshot.get("visuals")),
+            brand=_brand_from_snapshot(snapshot.get("brand")),
         )
 
     def snapshot(self) -> dict[str, Any]:
         """The exact parameters a render uses, stored on the edit (never future defaults).
 
-        The ``reframe``, ``focus``, ``hook``, ``audio`` and ``visuals`` keys — and the
+        The ``reframe``, ``focus``, ``hook``, ``audio``, ``visuals`` and ``brand`` keys — and the
         dynamic-caption keys (renderer, timing, track, safe area) — exist only when used, so
         every earlier configuration keeps exactly its previous snapshot and fingerprint
         (repeat requests still deduplicate).
@@ -265,6 +288,8 @@ class EditConfig:
             snapshot["audio"] = self.audio.snapshot()
         if self.visuals is not None:
             snapshot["visuals"] = self.visuals.snapshot()
+        if self.brand is not None:
+            snapshot["brand"] = self.brand.snapshot()
         return snapshot
 
     def fingerprint(self) -> str:
