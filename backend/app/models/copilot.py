@@ -94,6 +94,7 @@ class CopilotMessage(Base):
         ),
         CheckConstraint("jsonb_typeof(actions) = 'array'", name="ck_copilot_messages_actions"),
         CheckConstraint("jsonb_typeof(refs) = 'array'", name="ck_copilot_messages_refs"),
+        CheckConstraint("jsonb_typeof(cards) = 'array'", name="ck_copilot_messages_cards"),
         Index("ix_copilot_messages_thread_order", "thread_id", "sequence"),
     )
 
@@ -109,6 +110,11 @@ class CopilotMessage(Base):
     status: Mapped[str] = mapped_column(String(16), default=CopilotMessageStatus.OK)
     # [{"type", "label", "target": {"kind", "id", "ref": {...}}, "query"?}] — re-validated on use.
     actions: Mapped[list[Any]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    # [{"kind": "idea", "title", "time", "angle", "why", "style", "note", "action"}] — result
+    # cards checked by the server (ideas only from real moments or transcript times).
+    cards: Mapped[list[Any]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     # [{"kind", "label"}] — creator-facing chips, never ids.

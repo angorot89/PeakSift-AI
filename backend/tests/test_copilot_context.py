@@ -185,7 +185,7 @@ def test_transcript_text_is_bounded_data(client, db_session):
     assert all(len(line["text"]) <= ctx.MAX_LINE_CHARS for line in lines)
     assert len(context.view_json()) <= ctx.MAX_VIEW_CHARS
     # The hostile line is kept as transcript data, never promoted anywhere else.
-    assert "publish" not in json.dumps(
+    assert "publish my video" not in json.dumps(
         {k: v for k, v in context.view.items() if k != "transcript_excerpt"}
     )
 

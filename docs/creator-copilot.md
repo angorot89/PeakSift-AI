@@ -128,3 +128,29 @@ link and the matching Copilot action. **Home's *Continue working***
 prompt tells the model to recommend that step) all read it, so "What should I do next?" and the
 dashboard always lead to the same page. When the local assistant is unavailable, the answer still
 offers PeakSift's own next step as a button.
+
+## Content strategy
+
+`app/services/strategy.py`, `app/services/copilot/ideas.py` — from the creator's own data only:
+no web trends, no competitor data, no predictions.
+
+- **Notes** (deterministic, shown to the model as `strategy.notes`):
+  - unused moments in this video ("You have 2 moments in this video you haven't used yet
+    (explanation, funny).");
+  - variety against what the creator published recently ("You've published 3 insight Shorts
+    recently. This video also has a funny moment: …");
+  - the creator's own patterns about length, style or kind of moment, relayed with their
+    observational wording plus "This is an observed pattern, not a prediction.";
+  - and, when the history is small, exactly that: "Your current sample isn't large enough to
+    recommend a length, style or kind of moment yet (3 of 10 comparable Shorts)." or "You haven't
+    published from PeakSift yet, so there is no performance history to learn from."
+- **Repeated work**: a moment already made into a clip, or already published, is marked
+  ("Similar to a Short you've already published.") so it is not suggested as new.
+- **Short ideas**: for an ideas question (detected in English, French, Arabic and Chinese), the
+  model must return 3–5 ideas. Each is anchored in the video — a moment (by handle or exact
+  title) or a time range whose start and end are transcript times in the context — otherwise it
+  is dropped. PeakSift writes each card: the real time range, an angle from *Lesson, Story,
+  Mistake, Reaction, Surprise, Explanation, Comparison, Opinion*, a style from *Clean, Punchy,
+  Story, Minimal*, the reason, the repeated-work note, and *Create Short* for a moment.
+- **Without the local assistant**, an ideas question still gets idea cards built from the
+  video's best unused moments (angle and style from the moment's kind).

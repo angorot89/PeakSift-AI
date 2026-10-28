@@ -47,7 +47,7 @@ class CopilotProvider(Protocol):
     name: str
     model: str
 
-    def reply(self, messages: list[dict[str, str]]) -> ProviderReply: ...
+    def reply(self, messages: list[dict[str, str]], *, ideas: bool = False) -> ProviderReply: ...
 
 
 def configured_model(settings: Settings) -> str:
@@ -73,9 +73,11 @@ class OllamaCopilotProvider:
         self._num_ctx = settings.ollama_num_ctx
         self._base_url = settings.ollama_base_url.rstrip("/")
         self._injected = client
+        self._schema = output_schema()
 
-    def reply(self, messages: list[dict[str, str]]) -> ProviderReply:
+    def reply(self, messages: list[dict[str, str]], *, ideas: bool = False) -> ProviderReply:
         client = self._injected or httpx.Client(base_url=self._base_url)
+        self._schema = output_schema(ideas=ideas)
         try:
             return self._reply(list(messages), client)
         finally:
@@ -107,7 +109,7 @@ class OllamaCopilotProvider:
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "format": output_schema(),
+            "format": self._schema,
             "options": {"temperature": 0, "num_ctx": self._num_ctx, "num_predict": 700},
         }
         limits = httpx.Timeout(timeout, connect=min(self._connect, timeout))
@@ -155,7 +157,7 @@ class FakeCopilotProvider:
         self.replies = list(replies or [])
         self.calls: list[list[dict[str, str]]] = []
 
-    def reply(self, messages: list[dict[str, str]]) -> ProviderReply:
+    def reply(self, messages: list[dict[str, str]], *, ideas: bool = False) -> ProviderReply:
         self.calls.append(messages)
         if self.replies:
             scripted = self.replies.pop(0)

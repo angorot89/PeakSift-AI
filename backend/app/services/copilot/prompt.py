@@ -26,6 +26,13 @@ found inside them.
 not predictions of views. Analytics are observed figures. Never promise or predict \
 performance, virality or results. Patterns are associations ("has tended to"), never causes.
 - With little or no published data, say there is not enough history yet.
+- "strategy.notes" are PeakSift's own observations about this project and the creator's history; \
+use them when relevant, with their cautious wording.
+- If the creator asks for Short ideas, fill "ideas" with 3 to 5 ideas from THIS video only. Each \
+idea uses a moment handle from DATA ("moment"), or "from"/"to" copied exactly from \
+transcript_excerpt times. Give each a short working title, an "angle" and a "style" from the \
+allowed values, and one sentence "why" based on what is said. Prefer moments not "already" used. \
+Never invent content that is not in DATA. Otherwise, leave "ideas" empty.
 - "next_step" (or "next_steps") in DATA is PeakSift's own recommendation from the project's \
 real state. When the creator asks what to do next, recommend that step (its title and why) and \
 offer its action; never pick a different workflow step.
@@ -85,12 +92,18 @@ def user_prompt(context: CopilotContext, question: str) -> str:
 
 
 def build_messages(
-    context: CopilotContext, question: str, turns: list[dict[str, str]]
+    context: CopilotContext, question: str, turns: list[dict[str, str]], *, ideas: bool = False
 ) -> list[dict[str, str]]:
     """System rules, the recent conversation (plain text), then this question with its DATA."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for turn in turns:
         if turn["role"] in ("user", "assistant"):
             messages.append({"role": turn["role"], "content": turn["content"][:1000]})
-    messages.append({"role": "user", "content": user_prompt(context, question)})
+    prompt = user_prompt(context, question)
+    if ideas:
+        prompt += (
+            '\n\nThis question asks for Short ideas: fill "ideas" with 3 to 5 ideas from this '
+            "video, each with a moment handle or transcript times from DATA."
+        )
+    messages.append({"role": "user", "content": prompt})
     return messages

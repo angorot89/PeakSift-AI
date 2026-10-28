@@ -59,6 +59,7 @@ def append(
     actions: list[dict] | None = None,
     refs: list[dict] | None = None,
     status: str = "ok",
+    cards: list[dict] | None = None,
 ) -> CopilotMessage:
     last = db.scalar(
         select(func.max(CopilotMessage.sequence)).where(CopilotMessage.thread_id == thread.id)
@@ -73,6 +74,7 @@ def append(
         status=status,
         actions=actions or [],
         refs=refs or [],
+        cards=cards or [],
     )
     db.add(message)
     db.flush()

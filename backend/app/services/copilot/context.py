@@ -188,6 +188,10 @@ class CopilotContext:
     facts: list[str]
     # PeakSift's own next steps (next-action engine) as (action type, handle) pairs.
     next_steps: list[tuple[str, str]] = field(default_factory=list)
+    # Content strategy facts for this project (notes, moments already used), and the handle of
+    # every ranked moment by candidate id (idea cards and their actions).
+    strategy: Any = None
+    moment_handles: dict[uuid.UUID, str] = field(default_factory=dict)
 
     def view_json(self) -> str:
         return json.dumps(self.view, ensure_ascii=False, separators=(",", ":"), default=str)
@@ -271,6 +275,7 @@ def build_context(
         view["page_meaning"] = PAGE_MEANING["home"]
 
     next_steps: list[tuple[str, str]] = []
+    strategy, moment_handles = None, {}
     if project is None:
         view["creator"] = _workspace(db, user, handles)
         view["next_steps"] = _workspace_steps(db, user, handles, next_steps)
@@ -283,6 +288,7 @@ def build_context(
         )
         view["project"] = _project(db, project, page, handles, facts)
         view["next_step"] = _project_step(db, project, handles, next_steps)
+        strategy, moment_handles = _strategy(db, project, view, handles, settings)
         scope = project.name
         clip = None
         if page in CLIP_PAGES and clip_id is not None:
@@ -303,8 +309,41 @@ def build_context(
 
     view = _fit(view)
     return CopilotContext(
-        page, project.id if project else None, view, handles.targets, scope, facts[:4], next_steps
+        page,
+        project.id if project else None,
+        view,
+        handles.targets,
+        scope,
+        facts[:4],
+        next_steps,
+        strategy,
+        moment_handles,
     )
+
+
+def _strategy(db, project: Project, view: dict, handles: _Handles, settings):
+    """Strategy notes for the view; moments already used are marked on their ranked entry."""
+    from app.services.strategy import project_strategy
+
+    source = "fake" if settings.performance_provider == "fake" else "youtube"
+    strategy = project_strategy(db, project, source)
+    moment_handles: dict[uuid.UUID, str] = {}
+    for fact in strategy.moments:
+        ref = {"project": project.id, "candidate": fact.candidate_id}
+        if fact.clip_id:
+            ref["clip"] = fact.clip_id
+        moment_handles[fact.candidate_id] = handles.add(
+            "moment",
+            Target("moment", fact.candidate_id, f"Moment: {short_text(fact.title, 48)}", ref),
+        )
+    by_id = {m.candidate_id: m for m in strategy.moments}
+    ranked = ((view.get("project") or {}).get("moments") or {}).get("ranked") or []
+    for item in ranked:
+        fact = by_id.get(handles.targets[item["handle"]].id)
+        if fact is not None and fact.note:
+            item["already"] = fact.note
+    view["strategy"] = {"notes": strategy.notes}
+    return strategy, moment_handles
 
 
 # --- PeakSift's own next step (services/next_action.py) ---------------------------------------

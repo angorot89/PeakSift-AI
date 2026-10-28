@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.services.copilot.context import Target
+from app.services.strategy import ANGLES, STYLES
 
 MESSAGE_MAX_CHARS = 900
 SUGGESTION_MAX_CHARS = 400
@@ -65,8 +66,18 @@ class ParsedReply:
     notes: list[str] = field(default_factory=list)
 
 
-def output_schema() -> dict[str, Any]:
-    """The JSON schema given to the model (Ollama ``format``)."""
+def output_schema(*, ideas: bool = False) -> dict[str, Any]:
+    """The JSON schema given to the model (Ollama ``format``). For an ideas question, 3–5
+    ``ideas`` are required (small models skip optional fields)."""
+    schema = _schema()
+    if ideas:
+        schema["required"] = [*schema["required"], "ideas"]
+        schema["properties"]["ideas"]["minItems"] = 3
+        schema["properties"]["ideas"]["maxItems"] = 5
+    return schema
+
+
+def _schema() -> dict[str, Any]:
     return {
         "type": "object",
         "properties": {
@@ -85,6 +96,22 @@ def output_schema() -> dict[str, Any]:
                 },
             },
             "references": {"type": "array", "items": {"type": "string"}},
+            "ideas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "moment": {"type": "string"},
+                        "from": {"type": "string"},
+                        "to": {"type": "string"},
+                        "angle": {"type": "string", "enum": list(ANGLES)},
+                        "why": {"type": "string"},
+                        "style": {"type": "string", "enum": list(STYLES)},
+                    },
+                    "required": ["title", "why"],
+                },
+            },
         },
         "required": ["message", "actions", "references"],
     }
