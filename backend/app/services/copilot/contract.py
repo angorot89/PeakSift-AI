@@ -121,6 +121,8 @@ _LINK = re.compile(r"\[([^\]]{1,200})\]\((?:[^)\s]{1,500})\)")
 _URL = re.compile(r"https?://\S+")
 _HANDLE = re.compile(r"\b(project|moment|short|draft|clip|visual|published|insight)_\d{1,3}\b")
 _SPACE = re.compile(r"[ \t]+")
+# "(handle: project)", "handle: moment_2" — the model talking about handles instead of names.
+_HANDLE_TALK = re.compile(r"\s*\((?:the\s+)?handles?\s*[:=][^)]{0,80}\)|\bhandles?\s*[:=]\s*", re.I)
 
 
 def _name(target: Target) -> str:
@@ -131,6 +133,7 @@ def _name(target: Target) -> str:
 
 
 def clean_text(text: str, targets: dict[str, Target], limit: int) -> str:
+    text = _HANDLE_TALK.sub("", text)
     text = _LINK.sub(r"\1", text)
     text = _URL.sub("", text)
     text = _HANDLE.sub(

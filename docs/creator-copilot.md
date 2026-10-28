@@ -154,3 +154,47 @@ no web trends, no competitor data, no predictions.
   Story, Minimal*, the reason, the repeated-work note, and *Create Short* for a moment.
 - **Without the local assistant**, an ideas question still gets idea cards built from the
   video's best unused moments (angle and style from the moment's kind).
+
+## Answers PeakSift gives itself
+
+`app/services/copilot/answers.py`:
+
+- **"What should I do next?"** (English what-next questions: "what should I do/work on next",
+  "what's next", "next step", "where should I start", "which project should I finish first") is
+  answered by PeakSift directly from the next-action engine — the step, its reason and its
+  button — without the model. It is instant and always matches Home. Other languages go to the
+  model, which is told to recommend that same step.
+- **Terse answers are completed from the data**: when the whole answer is a moment's title or the
+  next step's title, PeakSift turns it into a sentence with the moment's time, ranking and reason
+  (or the step's reason) — nothing new is added.
+- **Idea answers** keep a short lead sentence; a message that re-lists the ideas is replaced by
+  "Here are N Short ideas from this video." (the cards hold the ideas).
+- **Grounded angles and styles**: an idea anchored to a real moment takes its angle and suggested
+  style from that moment's kind (insight → Lesson / Clean, humor → Reaction / Punchy, story →
+  Story / Story…).
+
+## The panel (UI)
+
+`components/app/copilot/`, `lib/copilot.ts`, `lib/copilot-rules.ts`:
+
+- **Entry points**: *Ask PeakSift* in the sidebar (above Settings) and a sparkle button in the
+  phone top bar. The panel opens for the page the creator is on; one conversation per project,
+  kept as they move between its pages.
+- **Desktop**: a 26rem side panel over the page (on screens of 1536 px and wider the page makes
+  room for it). Header: *Ask PeakSift*, the context line ("Bridge Lab — Episode 4 · 6 moments ·
+  1 Short"), *Clear conversation* (confirmed) and *Close*. Escape closes it and focus returns to
+  what opened it. **Phones**: a full-height sheet (a native modal dialog); the composer stays at
+  the bottom and the page resizes with the on-screen keyboard (`interactive-widget`).
+- **Empty conversation**: "Ask about {project}", what the assistant uses (your own data, not the
+  internet; it suggests, you decide) and the page's suggested questions. Once a conversation
+  exists the suggestions stay as small chips above the composer.
+- **Answers**: the text; a *Suggestion* block when the assistant has one; idea cards (title,
+  time · angle · suggested style, reason, repeated-work note, *Create Short*); *Based on* chips;
+  action buttons. Clicking an action re-checks it (a gone object says so under the button);
+  *Create Short* on a clip-less moment creates the clip first, then opens *Create a Short*.
+- **Waiting**: "Looking at this project…", then "Thinking…" (a polite status). Typed questions are
+  never lost: if a question fails (rate limit, network), its text returns to the composer.
+- **Composer**: Enter sends, Shift+Enter adds a line, IME composition is respected, at most 1,000
+  characters with a counter near the limit.
+- **Offline**: when the local assistant can't answer, the panel says so up front; everything else
+  in PeakSift works as usual and questions still get PeakSift's own next step.

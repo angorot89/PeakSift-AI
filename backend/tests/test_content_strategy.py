@@ -216,9 +216,11 @@ def test_ideas_come_only_from_real_moments_or_transcript_times(client, db_sessio
     )
     assert [c.card["title"] for c in cards] == ["The glue disaster", "Odd style"]
     first, second = cards
-    assert first.card["time"] == "1:00–1:15" and first.card["angle"] == "Story"
+    # A real moment's own kind decides angle and style (humor → Reaction / Punchy; explanation →
+    # Explanation / Clean), whatever the model chose — including values outside the lists.
+    assert first.card["time"] == "1:00–1:15" and first.card["angle"] == "Reaction"
     assert first.card["style"] == "punchy" and first.action.type == "create_short"
-    assert second.card["angle"] is None and second.card["style"] is None
+    assert second.card["angle"] == "Explanation" and second.card["style"] == "clean"
     assert asks_for_ideas("Give me 3 Short ideas") and asks_for_ideas("Des idées ?")
     assert asks_for_ideas("أعطني أفكار") and not asks_for_ideas("What next?")
 
@@ -229,7 +231,8 @@ def test_idea_cards_reach_the_creator_with_create_short(client, db_session):
         [
             {
                 "message": "Here are two ideas.",
-                "actions": [],
+                # The model also offers the same moment: one button, shown on its card.
+                "actions": [{"type": "create_short", "handle": "moment_2"}],
                 "references": [],
                 "ideas": [
                     {
@@ -255,6 +258,7 @@ def test_idea_cards_reach_the_creator_with_create_short(client, db_session):
     body = client.get("/copilot/thread", params={"project_id": str(clip.video.project_id)}).json()
     [card] = body["messages"][-1]["cards"]
     assert card["title"] == "The glue disaster" and card["note"] is None
+    assert len(body["messages"][-1]["actions"]) == 1
     action = body["messages"][-1]["actions"][card["action"]]
     assert action["label"] == "Create Short"
     resolved = client.post(f"/copilot/messages/{answer.id}/actions/{card['action']}").json()

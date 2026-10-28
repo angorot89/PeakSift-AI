@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
@@ -20,6 +20,13 @@ const captionSans = Noto_Sans({
   weight: ["400", "700"],
   preload: false,
 });
+
+// On phones the on-screen keyboard resizes the page, so composers (Ask PeakSift) stay in view.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 export const metadata: Metadata = {
   title: {

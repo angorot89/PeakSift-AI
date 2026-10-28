@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { IconButton } from "@/components/ui/icon-button";
 
-type Placement = "center" | "left" | "bottom";
+type Placement = "center" | "left" | "bottom" | "full";
 
 const PLACEMENT: Record<Placement, string> = {
   center:
@@ -12,6 +12,7 @@ const PLACEMENT: Record<Placement, string> = {
   left: "my-0 mr-auto ml-0 h-dvh max-h-dvh w-[min(20rem,calc(100vw-3rem))] rounded-r-2xl border-r data-[open=true]:animate-sheet-left",
   bottom:
     "mx-0 mt-auto mb-0 max-h-[85dvh] w-full max-w-none rounded-t-2xl border-t data-[open=true]:animate-sheet-up",
+  full: "m-0 h-dvh max-h-dvh w-full max-w-none rounded-none border-0 data-[open=true]:animate-sheet-up",
 };
 
 /**
@@ -29,6 +30,7 @@ export function Dialog({
   placement = "center",
   width = "36rem",
   hideTitle = false,
+  headerActions,
 }: {
   open: boolean;
   onClose: () => void;
@@ -41,6 +43,8 @@ export function Dialog({
   width?: string;
   /** Keep the title for assistive technology only (e.g. a navigation sheet). */
   hideTitle?: boolean;
+  /** Extra controls beside Close (e.g. "Clear conversation"). */
+  headerActions?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -71,7 +75,7 @@ export function Dialog({
       className={`overflow-hidden border-border bg-surface p-0 text-foreground shadow-2xl backdrop:bg-black/70 ${PLACEMENT[placement]}`}
     >
       {open ? (
-        <div className="flex max-h-[inherit] flex-col">
+        <div className={`flex max-h-[inherit] flex-col ${placement === "full" ? "h-full" : ""}`}>
           <div className={`flex items-start justify-between gap-3 px-4 pt-4 sm:px-6 ${hideTitle ? "pb-0" : "border-b border-border pb-4"}`}>
             <div className={`min-w-0 ${hideTitle ? "sr-only" : ""}`}>
               <h2 id={titleId} className="text-title text-foreground">
@@ -83,9 +87,12 @@ export function Dialog({
                 </p>
               ) : null}
             </div>
-            <IconButton aria-label="Close" onClick={onClose} className={hideTitle ? "ml-auto" : ""}>
-              <X aria-hidden="true" />
-            </IconButton>
+            <div className={`flex shrink-0 items-center gap-1 ${hideTitle ? "ml-auto" : ""}`}>
+              {headerActions}
+              <IconButton aria-label="Close" onClick={onClose}>
+                <X aria-hidden="true" />
+              </IconButton>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{children}</div>
           {footer ? (
