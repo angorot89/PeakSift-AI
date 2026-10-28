@@ -359,3 +359,26 @@ panel / command menu ──POST /copilot/messages──▶ api/copilot.py (rate 
 The model proposes text and handles; the server decides what is shown and offered. No database
 connection is held while the model thinks; the question is saved first and the conversation is
 locked only to write messages.
+
+## Brand Studio & templates (V1.7)
+
+Brands and templates are **preferences**; a render reads only the edit's snapshot. Details:
+[brand-studio.md](brand-studio.md).
+
+```
+Brand Studio ──/brand/profiles, /brand/templates──▶ api/brand.py ─▶ services/branding/
+                                                       (colors: hex + contrast · profiles · templates
+                                                        · template_config: allow-listed TemplateConfig)
+Auto Edit ──template_id──▶ AutoEditRequest.template (frozen: id, name, version, settings, brand)
+              validate_plan ─▶ auto_edit/template.py apply_template (precedence) ─▶ create_or_reuse_edit
+Editor ──/brand/edit-section──▶ EditRequest.brand (+ origin_template_id → ClipEdit.origin, display only)
+                                                       │
+                     clip_edit/config.py  EditConfig.brand (brand_v1; only when used)
+                     clip_edit/brand.py   logo_plan: corner, size, flips, hook wait, inset hide
+                     clip_edit/brand_render.py  logo overlay · end card (color + concat, ASS text)
+                     caption_v2 (active colour) · hook (accent) · composition (apad, duration check)
+```
+
+Old edits have no `brand` section, so their fingerprints and renders are unchanged; a template
+or brand change never touches an existing plan or edit.
+

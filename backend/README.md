@@ -352,6 +352,24 @@ COPILOT_ACCEPTANCE_EMAIL=… COPILOT_ACCEPTANCE_PASSWORD=… \
 Settings: `COPILOT_ENABLED`, `COPILOT_PROVIDER` (`ollama`, or `fake` outside production),
 `COPILOT_OLLAMA_MODEL`, `COPILOT_TIMEOUT_SECONDS`, `COPILOT_MESSAGE_MAX_CHARS`.
 
+## Brand Studio
+
+`app/services/branding/` (V1.7): `colors.py` (hex normalization, WCAG contrast),
+`profiles.py` (brands, one default, logo ownership), `template_config.py` (the allow-listed
+`TemplateConfig`), `templates.py` (versioned templates, starters, `plan_snapshot`,
+`brand_for_edit`); `app/services/auto_edit/template.py` (`apply_template`, the precedence);
+`app/services/clip_edit/brand.py` (the snapshot section and the logo placement policy) and
+`brand_render.py` (logo overlay and end card); `app/services/copilot/branding.py`. Endpoints:
+`/brand/profiles`, `/brand/templates` (+ `/duplicate`), `/brand/template-starters`,
+`/brand/logo-candidates`, `/brand/layout`, `/brand/edit-section`. Full design:
+[docs/brand-studio.md](../docs/brand-studio.md).
+
+```bash
+BRAND_ACCEPTANCE_EMAIL=… BRAND_ACCEPTANCE_PASSWORD=… \
+  python scripts/brand_acceptance.py --api http://localhost:8000 \
+  --project ID --video ID --clip ID --template ID [--music ID]   # real-render release gate
+```
+
 ## Media serving
 
 Nothing under `MEDIA_ROOT` is exposed as static files. The only ways to fetch media bytes are `GET /videos/{video_id}/content` (source videos) `GET /clips/{clip_id}/content` / `/download` (rendered clips) and `GET /edits/{edit_id}/content` / `/download` (edited shorts); each resolves the item through its project's owner and streams the stored key through the storage contract and the shared Range implementation in `app/api/media_streaming.py` (identical on the local and S3 backends; an unreachable storage backend is a `503`). The browser's `<video>` element sends the session cookie because the frontend and API are same-site (`localhost` in development); deploy them under one registrable domain so that stays true.

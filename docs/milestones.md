@@ -359,6 +359,43 @@ Delivered:
   hostile transcript and visual): what PeakSift knows exactly — what next, the top pick, unused
   visuals, nothing published yet, requests to act — it now answers itself
 
+## V1.7 — Brand Studio & Reusable Templates
+
+Status: **implementation complete locally — pending CI/merge/release.** Stacked pull requests
+(#228–#238) on top of the unmerged V1.6 stack wait for GitHub Actions (unavailable because of
+account billing); nothing is merged or tagged. V1.1–V1.6 must be merged and released first.
+
+**Brand Studio**: a creator sets up *how their Shorts look* (a brand) and *how their Shorts are
+edited* (templates) once, and every new Short starts from them — while each Short stays
+editable on its own and old Shorts never change. See [brand-studio.md](brand-studio.md).
+
+Delivered:
+
+- Brands (`BrandProfile`): name, primary / accent / caption-emphasis colours (hex, contrast
+  checked), a logo from the creator's own images with a corner and a size, an end-card line;
+  one default; logos in use cannot be deleted
+- Templates (`ShortTemplate`): versioned, allow-listed settings for framing, captions, hook,
+  B-roll amount, music level, ducking, effects, loudness, logo and end card, with a brand and a
+  recipe; starters, duplicate, default
+- Brand rendering inside the existing renderer, from the edit snapshot only (the `brand`
+  section exists only when used): the logo with a deterministic placement policy (moves away
+  from captions, waits for a top hook, hides behind a same-corner inset, stays over cutaways),
+  the caption emphasis colour on the spoken word, the accent on the Boxed hook, and a silent end
+  card (1–3 s) with the logo, name and line
+- Auto Edit with templates: the plan freezes the template version and brand; a documented
+  precedence (hard constraints > this Short > template > brand > recipe > hints > planner)
+- Brand Studio, the template builder with a live preview and the template library; *Create a
+  Short* starts from the default template; the editor shows where a Short came from and offers
+  **Save as template** / **Update template** (explicit only)
+- Ask PeakSift answers about brands and templates (which template fits, what differs) with
+  buttons to open them
+- Hardening: deleted brands, templates and logos, old template formats, another creator's
+  resources, unusual logos, end cards, the placement policy with Smart Reframe and insets;
+  106/106 browser checks
+- Acceptance: deterministic journeys in CI and a real-render release gate
+  (`scripts/brand_acceptance.py`: a branded Short checked by size, codecs, duration, loudness
+  and a silent end card, then byte-identical after the template changes)
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -378,6 +415,7 @@ Delivered:
 - V1.4 Performance Analytics & Learning — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.5 Creator Experience & Modern Workspace — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.6 Creator Copilot & Content Strategy — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.7 Brand Studio & Reusable Templates — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 
 No later milestone has been defined or started.
 
@@ -386,7 +424,7 @@ No later milestone has been defined or started.
 - Creator intelligence & metadata (titles, hooks, descriptions)
 - More publishing destinations (TikTok, Instagram, others), scheduling
 - Licensed music and sound-effect libraries, beat-synced editing
-- Brand kits, custom fonts and a caption timing editor
+- Custom fonts and a caption timing editor
 - Global asset libraries
 - Morocco Mode (localization layer extending Global). Before any Moroccan accuracy claim, benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio — none of that has been tested yet.
 - Additional localization

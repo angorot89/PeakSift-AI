@@ -182,6 +182,41 @@ top pick, nothing published yet) are in English. Answers come from a local model
 they can take a few seconds, the model can be conservative or get things wrong, and when it is
 not running PeakSift says so and still offers the next step and ideas from your moments.
 
+## Brand Studio — make every Short look like you
+
+**Brand Studio** (sidebar) keeps two things you set up once:
+
+- a **brand** — *how your Shorts look*: colours, a logo and an end-card line;
+- a **template** — *how your Shorts are edited*: framing, captions, the opening hook, visuals,
+  sound, and whether to show your logo and end card.
+
+1. **Create your brand.** Brand Studio → **Create your brand**: a name, a primary colour, an
+   optional accent and a **caption emphasis** colour (the spoken word's colour). PeakSift tells
+   you when a colour would be hard to read, and leaves it out of your Shorts rather than making
+   captions unreadable.
+2. **Add your logo.** Upload it in any project's **Assets** (a PNG with transparency looks
+   best), then choose it in your brand with a corner and a size. PeakSift moves the logo out of
+   the captions' way, waits for a top hook to finish, and hides it while a picture-in-picture
+   uses its corner.
+3. **Choose your caption style.** In a new template (**New template**, or start from a starter
+   such as *Punchy* or *Clean*), pick the captions, where they sit and the opening hook. The
+   preview shows your colours and logo as you change them.
+4. **Save a template.** Name it and **Save**. Make one template your **default** — *Create a
+   Short* and Auto Edit start from it. You can keep several (for example *Gaming highlights* and
+   *Podcast clips*) and **Duplicate**, rename or delete them in the library.
+5. **Create a Short with your template.** *Create a Short* shows **Using: your template —
+   Change**. Auto Edit follows the template and your brand and says so in its review
+   ("Started from your … template. Used your … brand.").
+6. **Edit one Short without changing the template.** In the editor, anything you change applies
+   to **this Short** only. The strip at the top says which template and brand it came from.
+7. **Update your template from an edit.** Happy with an edit? **Save as template**, or **Update
+   template** to make it the next version. Shorts you already made never change — they keep the
+   settings they were made with, and making them again gives the same file.
+
+Ask PeakSift can help too: "Which template fits this clip?", "What template am I using?" or
+"Why does this Short look different from my template?" — it explains and offers buttons; it never
+changes a template for you.
+
 ## Good to know
 
 - **Visibility:** new uploads are private by default. Google keeps videos uploaded through
