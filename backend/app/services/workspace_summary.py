@@ -6,7 +6,8 @@ that video, candidate counts by decision with the top undecided ones, generated 
 by status with the most recent shorts, Auto Edit plans waiting for review, YouTube uploads, and
 whether published shorts have processed analytics. Each summary is a bounded handful of queries.
 
-The frontend turns these facts into the next best action (``lib/workspace-rules.ts``). Every
+``services/next_action.py`` turns these facts into the next best action (Home, the Overview and
+the Copilot share it). Every
 query is scoped to the project's owner by the caller (the API checks ownership first).
 """
 
@@ -30,6 +31,7 @@ from app.models import (
     Transcription,
     Video,
 )
+from app.services.next_action import continue_items, next_action
 
 TOP_CANDIDATES = 3
 RECENT_SHORTS = 3
@@ -224,6 +226,7 @@ def project_summary(db: Session, project: Project) -> dict:
     summary["published"]["with_analytics"] = analytics[0]
     summary["published"]["last_synced_at"] = analytics[1]
     summary["last_activity_at"] = max(a for a in activity if a is not None)
+    summary["next_action"] = next_action(summary).read()
     return summary
 
 
@@ -251,6 +254,7 @@ def home(db: Session, user_id: uuid.UUID) -> dict:
         .limit(HOME_SHORTS)
     ).all()
     return {
+        "continue_items": continue_items(summaries),
         "projects": summaries[:HOME_PROJECTS],
         "project_count": db.scalar(
             select(func.count()).select_from(Project).where(Project.user_id == user_id)

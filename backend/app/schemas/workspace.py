@@ -90,6 +90,23 @@ class PublishedSummary(BaseModel):
     last_synced_at: datetime | None
 
 
+class NextActionRead(BaseModel):
+    """The project's next best step (``services/next_action.py``): one deterministic rule set
+    shared by Home, the Overview and the Copilot."""
+
+    key: str
+    title: str
+    description: str
+    cta: str | None
+    href: str
+    tone: str  # attention | action | waiting | done
+
+
+class ContinueItemRead(NextActionRead):
+    project_id: uuid.UUID
+    project_name: str
+
+
 class ProjectSummaryRead(BaseModel):
     id: uuid.UUID
     name: str
@@ -102,6 +119,7 @@ class ProjectSummaryRead(BaseModel):
     shorts: ShortsSummary
     plans: PlansSummary
     published: PublishedSummary
+    next_action: NextActionRead
 
 
 class HomeShortRead(ShortSummary):
@@ -113,3 +131,5 @@ class HomeRead(BaseModel):
     projects: list[ProjectSummaryRead]
     project_count: int
     recent_shorts: list[HomeShortRead]
+    # Home's *Continue working*: each project's next step, problems first.
+    continue_items: list[ContinueItemRead]

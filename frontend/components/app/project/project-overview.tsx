@@ -36,7 +36,6 @@ import {
   editorLink,
   getProjectSummary,
   momentLabel,
-  nextAction,
   projectStage,
   relativeTime,
   shortLabel,
@@ -54,7 +53,7 @@ const TONE: Record<NextAction["tone"], { icon: LucideIcon | null; className: str
 
 /** The one next step: what it is, why, and the single primary action (or what is happening). */
 function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: () => void }) {
-  const next = nextAction(summary);
+  const next = summary.next_action;
   const tone = TONE[next.tone];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -315,7 +314,7 @@ export function ProjectOverview() {
   const summary = live ?? data;
   const refresh = useCallback(async () => setLive(await getProjectSummary(project.id)), [project.id]);
   // Follow work in progress (a transcription, a render…) until it settles.
-  usePolling(!!summary && nextAction(summary).tone === "waiting", refresh);
+  usePolling(summary?.next_action.tone === "waiting", refresh);
 
   if (loading && !summary) {
     return (

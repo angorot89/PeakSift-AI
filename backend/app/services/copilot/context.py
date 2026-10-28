@@ -186,6 +186,8 @@ class CopilotContext:
     targets: dict[str, Target]
     scope_label: str
     facts: list[str]
+    # PeakSift's own next steps (next-action engine) as (action type, handle) pairs.
+    next_steps: list[tuple[str, str]] = field(default_factory=list)
 
     def view_json(self) -> str:
         return json.dumps(self.view, ensure_ascii=False, separators=(",", ":"), default=str)
@@ -268,8 +270,10 @@ def build_context(
         page = view["page"] = "home"
         view["page_meaning"] = PAGE_MEANING["home"]
 
+    next_steps: list[tuple[str, str]] = []
     if project is None:
         view["creator"] = _workspace(db, user, handles)
+        view["next_steps"] = _workspace_steps(db, user, handles, next_steps)
         n = view["creator"]["project_count"]
         facts.append(f"{n} project{'s' if n != 1 else ''}" if n else "No projects yet")
         scope = "Your workspace"
@@ -278,6 +282,7 @@ def build_context(
             "project", Target("project", project.id, project.name, {"project": project.id})
         )
         view["project"] = _project(db, project, page, handles, facts)
+        view["next_step"] = _project_step(db, project, handles, next_steps)
         scope = project.name
         clip = None
         if page in CLIP_PAGES and clip_id is not None:
@@ -298,8 +303,98 @@ def build_context(
 
     view = _fit(view)
     return CopilotContext(
-        page, project.id if project else None, view, handles.targets, scope, facts[:4]
+        page, project.id if project else None, view, handles.targets, scope, facts[:4], next_steps
     )
+
+
+# --- PeakSift's own next step (services/next_action.py) ---------------------------------------
+
+
+def _step_target(db: Session, project: Project, action: dict) -> tuple[str, Target] | None:
+    """The handle prefix and target of a next-action step (``{"type", "kind", "id"}``)."""
+    kind, target_id = action.get("kind"), action.get("id")
+    ref = {"project": project.id}
+    if kind == "project":
+        return "project", Target("project", project.id, project.name, ref)
+    if kind == "clip":
+        clip = db.get(Clip, target_id)
+        if clip is None:
+            return None
+        title = db.scalar(select(ClipCandidate.title).where(ClipCandidate.id == clip.candidate_id))
+        return "clip", Target(
+            "clip", clip.id, f"Clip: {short_text(title, 48)}", {**ref, "clip": clip.id}
+        )
+    if kind == "short":
+        edit = db.get(ClipEdit, target_id)
+        if edit is None:
+            return None
+        title = db.scalar(
+            select(ClipCandidate.title)
+            .join(Clip, Clip.candidate_id == ClipCandidate.id)
+            .where(Clip.id == edit.clip_id)
+        )
+        return "short", Target(
+            "short",
+            edit.id,
+            f"Short: {short_text(title, 48)}",
+            {**ref, "clip": edit.clip_id, "edit": edit.id},
+        )
+    if kind == "moment":
+        candidate = db.get(ClipCandidate, target_id)
+        if candidate is None:
+            return None
+        clip = db.scalar(select(Clip).where(Clip.candidate_id == candidate.id))
+        moment_ref = {**ref, "candidate": candidate.id}
+        if clip is not None:
+            moment_ref["clip"] = clip.id
+        return "moment", Target(
+            "moment", candidate.id, f"Moment: {short_text(candidate.title, 48)}", moment_ref
+        )
+    return None
+
+
+def _step_view(db, project: Project, handles: _Handles, steps: list, *, workspace: bool):
+    from app.services.next_action import next_action
+    from app.services.workspace_summary import project_summary
+
+    step = next_action(project_summary(db, project))
+    found = _step_target(db, project, step.action)
+    item: dict[str, Any] = {"title": step.title, "why": step.description, "state": step.tone}
+    if found is not None:
+        prefix, target = found
+        if prefix == "project" and not workspace:
+            handle = "project"
+        else:
+            handle = handles.add(prefix, target)
+        item["action"] = {"type": step.action["type"], "handle": handle}
+        steps.append((step.action["type"], handle))
+    return item
+
+
+def _project_step(db, project: Project, handles: _Handles, steps: list) -> dict:
+    return _step_view(db, project, handles, steps, workspace=False)
+
+
+def _workspace_steps(db, user: User, handles: _Handles, steps: list) -> list[dict]:
+    """The next step of each recent project, problems first (the order Home uses)."""
+    from app.services.next_action import TONE_ORDER
+
+    projects = db.scalars(
+        select(Project)
+        .where(Project.user_id == user.id)
+        .order_by(Project.updated_at.desc())
+        .limit(3)
+    ).all()
+    found: list[tuple[dict, list]] = []
+    for project in projects:
+        handles.add("project", Target("project", project.id, project.name, {"project": project.id}))
+        own: list[tuple[str, str]] = []
+        item = _step_view(db, project, handles, own, workspace=True)
+        found.append(({"project": short_text(project.name, 80), **item}, own))
+    found.sort(key=lambda pair: TONE_ORDER.get(pair[0]["state"], 9))
+    for _, own in found:
+        steps.extend(own)
+    return [item for item, _ in found]
 
 
 def _count(n: int, word: str) -> str:

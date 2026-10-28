@@ -1,11 +1,11 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clock, continueItems, gettingStarted, momentLabel, nextAction, projectStage, relativeTime, shortLabel, type Home, type ProjectSummary } from "./workspace-rules.ts";
+// The next best action itself is decided by the server (backend/tests/test_next_action.py).
+import { clock, gettingStarted, momentLabel, projectStage, relativeTime, shortLabel, type Home, type ProjectSummary } from "./workspace-rules.ts";
 
 const P = "3f1c0a1e-0000-4000-8000-000000000001";
 const CLIP = "3f1c0a1e-0000-4000-8000-000000000002";
-const EDIT = "3f1c0a1e-0000-4000-8000-000000000003";
 
 function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   return {
@@ -15,6 +15,7 @@ function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     shorts: { total: 0, ready: 0, working: 0, failed: 0, recent: [] },
     plans: { ready: 0, latest_ready: null },
     published: { uploads: 0, working: 0, failed: 0, with_analytics: 0, last_synced_at: null },
+    next_action: { key: "upload", title: "Add your long video", description: "", cta: "Upload a video", href: "/", tone: "action" },
     ...overrides,
   };
 }
@@ -24,56 +25,6 @@ const detected = (candidates: number, undecided = candidates) => ({
   ...transcribed,
   detection: { run_id: "r", status: "completed", candidates, undecided, saved: 0, dismissed: 0, top: [] },
 });
-const short = (status: string) => ({
-  edit_id: EDIT, clip_id: CLIP, clip_title: "The joint", status, duration_seconds: 20,
-  layout: "blur_background", captions_enabled: true, caption_style: "punch",
-  created_at: "2026-10-22T09:00:00Z", updated_at: "2026-10-22T09:00:00Z",
-});
-
-describe("next best action", () => {
-  const cases: [string, Partial<ProjectSummary>, string, string][] = [
-    ["no source", {}, "upload", `/projects/${P}/source`],
-    ["unreadable source", { source: { ...ready, status: "failed" } }, "source-failed", `/projects/${P}/source`],
-    ["reading the file", { source: { ...ready, status: "processing_metadata" } }, "source-working", `/projects/${P}/source`],
-    ["not transcribed", { source: ready }, "transcribe", `/projects/${P}/source`],
-    ["transcribing", { source: ready, transcript: { status: "transcribing", progress_percent: 40 } }, "transcribing", `/projects/${P}/source`],
-    ["transcript failed", { source: ready, transcript: { status: "failed", progress_percent: 10 } }, "transcript-failed", `/projects/${P}/source`],
-    ["transcript ready", transcribed, "find-clips", `/projects/${P}/clips`],
-    ["finding", { ...transcribed, detection: { ...detected(0).detection, status: "analyzing" } }, "finding", `/projects/${P}/clips`],
-    ["nothing found", detected(0), "no-moments", `/projects/${P}/clips`],
-    ["candidates", detected(3), "review-clips", `/projects/${P}/clips`],
-    ["clip ready", { ...detected(3), clips: { total: 1, ready: 1, working: 0, failed: 0, latest_ready_id: CLIP } }, "create-short", `/projects/${P}/clips/${CLIP}/create`],
-    ["plan ready", { ...detected(3), plans: { ready: 1, latest_ready: { plan_id: "x", clip_id: CLIP, recipe: "punchy" } } }, "plan-ready", `/projects/${P}/clips/${CLIP}/auto-edit`],
-    ["draft used through the editor, Short published", {
-      ...detected(3), plans: { ready: 1, latest_ready: { plan_id: "x", clip_id: CLIP, recipe: "punchy" } },
-      shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] },
-      published: { uploads: 1, working: 0, failed: 0, with_analytics: 0, last_synced_at: null },
-    }, "published", `/projects/${P}/analytics`],
-    ["rendering", { ...detected(3), shorts: { total: 1, ready: 0, working: 1, failed: 0, recent: [short("rendering")] } }, "rendering", `/projects/${P}/clips/${CLIP}`],
-    ["short ready", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] } }, "short-ready", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],
-    ["upload failed", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] }, published: { uploads: 0, working: 0, failed: 1, with_analytics: 0, last_synced_at: null } }, "upload-failed", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],
-    ["uploading", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] }, published: { uploads: 0, working: 1, failed: 0, with_analytics: 0, last_synced_at: null } }, "uploading", `/projects/${P}/clips/${CLIP}?edit=${EDIT}`],
-    ["analytics without a job", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] }, published: { uploads: 0, working: 0, failed: 1, with_analytics: 3, last_synced_at: null } }, "published", `/projects/${P}/analytics`],
-    ["published", { ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [short("ready")] }, published: { uploads: 1, working: 0, failed: 0, with_analytics: 0, last_synced_at: null } }, "published", `/projects/${P}/analytics`],
-  ];
-  for (const [name, state, key, href] of cases) {
-    it(`${name} → ${key}`, () => {
-      const action = nextAction(project(state));
-      assert.equal(action.key, key);
-      assert.equal(action.href, href);
-    });
-  }
-  it("speaks plainly and asks nothing while PeakSift works", () => {
-    const waiting = nextAction(project({ source: ready, transcript: { status: "transcribing", progress_percent: 1 } }));
-    assert.equal(waiting.cta, undefined);
-    assert.equal(nextAction(project(detected(1))).title, "1 clip ready to review");
-    assert.equal(nextAction(project(detected(4, 2))).title, "2 clips ready to review");
-    for (const [, state] of cases) {
-      const text = Object.values(nextAction(project(state))).join(" ");
-      assert.doesNotMatch(text, /celery|provider|candidate|fingerprint|embedding|null|undefined/i);
-    }
-  });
-});
 
 describe("workflow stage", () => {
   it("is the furthest stage reached", () => {
@@ -82,22 +33,6 @@ describe("workflow stage", () => {
     assert.equal(projectStage(project({ ...transcribed, clips: { total: 1, ready: 1, working: 0, failed: 0, latest_ready_id: CLIP } })), 2);
     assert.equal(projectStage(project({ published: { uploads: 1, working: 0, failed: 0, with_analytics: 0, last_synced_at: null } })), 3);
     assert.equal(projectStage(project({ published: { uploads: 1, working: 0, failed: 0, with_analytics: 2, last_synced_at: null } })), 4);
-  });
-});
-
-describe("continue working", () => {
-  it("puts problems first, then the most recent, one card per project", () => {
-    const items = continueItems({
-      project_count: 3,
-      recent_shorts: [],
-      projects: [
-        project({ id: "a", name: "Calm", last_activity_at: "2026-10-22T12:00:00Z", ...detected(2) }),
-        project({ id: "b", name: "Broken", last_activity_at: "2026-10-21T12:00:00Z", source: { ...ready, status: "failed" } }),
-        project({ id: "c", name: "Older", last_activity_at: "2026-10-20T12:00:00Z", ...transcribed }),
-      ],
-    });
-    assert.deepEqual(items.map((i) => i.projectName), ["Broken", "Calm", "Older"]);
-    assert.equal(items[0].tone, "attention");
   });
 });
 
@@ -136,7 +71,7 @@ describe("short labels", () => {
 
 describe("getting started", () => {
   it("follows real progress and completes with the first ready Short", () => {
-    const home = (p: ProjectSummary): Home => ({ projects: [p], project_count: 1, recent_shorts: [] });
+    const home = (p: ProjectSummary): Home => ({ projects: [p], project_count: 1, recent_shorts: [], continue_items: [] });
     assert.deepEqual(gettingStarted(home(project())).steps.map((s) => s.done), [false, false, false]);
     assert.deepEqual(gettingStarted(home(project({ source: ready }))).steps.map((s) => s.done), [true, false, false]);
     const found = home(project(detected(3)));

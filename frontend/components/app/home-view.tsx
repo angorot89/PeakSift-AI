@@ -28,16 +28,15 @@ import { formatDuration } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { useStoredFlag } from "@/lib/use-stored-flag";
 import {
-  continueItems,
   editorLink,
   getHome,
   gettingStarted,
-  nextAction,
   projectStage,
   relativeTime,
   shortLabel,
   STAGES,
   type ActionTone,
+  type ContinueItem,
   type Home,
   type HomeShort,
   type ProjectSummary,
@@ -98,7 +97,7 @@ function ContinueCard({
   item,
   primary,
 }: {
-  item: ReturnType<typeof continueItems>[number];
+  item: ContinueItem;
   primary: boolean;
 }) {
   const tone = TONE_ICON[item.tone];
@@ -111,7 +110,7 @@ function ContinueCard({
             <span className="sr-only">{tone.label}</span>
           </span>
           <div className="min-w-0">
-            <p className="truncate text-caption font-medium text-subtle">{item.projectName}</p>
+            <p className="truncate text-caption font-medium text-subtle">{item.project_name}</p>
             <p className="mt-0.5 text-title">{item.title}</p>
             <p className="mt-0.5 text-sm text-pretty text-muted">{item.description}</p>
           </div>
@@ -202,7 +201,7 @@ export function StageBar({ project }: { project: ProjectSummary }) {
 }
 
 function ProjectCard({ project }: { project: ProjectSummary }) {
-  const next = nextAction(project);
+  const next = project.next_action;
   return (
     <li>
       <Link href={`/projects/${project.id}`} className={`${cardClasses({ interactive: true })} flex h-full flex-col gap-3`}>
@@ -269,7 +268,7 @@ function GettingStarted({ home }: { home: Home }) {
 }
 
 function Returning({ home }: { home: Home }) {
-  const items = continueItems(home);
+  const items = home.continue_items;
   const firstAction = items.findIndex((item) => item.cta);
   return (
     <div className="space-y-10">
@@ -291,7 +290,7 @@ function Returning({ home }: { home: Home }) {
           <SectionHeader id="continue-heading" title="Continue working" />
           <ul className="grid gap-3 md:grid-cols-2">
             {items.map((item, index) => (
-              <ContinueCard key={item.projectId} item={item} primary={index === firstAction} />
+              <ContinueCard key={item.project_id} item={item} primary={index === firstAction} />
             ))}
           </ul>
         </section>
