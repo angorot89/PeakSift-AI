@@ -99,6 +99,7 @@ def read_edit(edit: ClipEdit) -> ClipEditRead:
         attempt=edit.attempt,
         is_stale=is_stale(edit, get_settings()),
         configuration=edit.config,
+        origin=edit.origin,
         aspect_ratio=edit.aspect_ratio,
         layout=edit.layout,
         captions_enabled=edit.captions_enabled,
@@ -354,7 +355,12 @@ def create_edit(
 
 
 def create_or_reuse_edit(
-    db: DbSession, clip: Clip, video: Video, storage: StorageProvider, config: EditConfig
+    db: DbSession,
+    clip: Clip,
+    video: Video,
+    storage: StorageProvider,
+    config: EditConfig,
+    origin: dict | None = None,
 ) -> tuple[ClipEdit, bool]:
     """The edit for this (normalized) configuration: the existing one (any status), or a new
     one checked like every request and queued for rendering. Shared by the edit endpoint and
@@ -394,6 +400,7 @@ def create_or_reuse_edit(
         output_width=OUTPUT_WIDTH,
         output_height=OUTPUT_HEIGHT,
         render_profile=RENDER_PROFILE_VERTICAL_V1,
+        origin=origin,  # display only (template and brand names); never read by a render
         celery_task_id=new_task_id(),  # attempt token committed before the job exists
     )
     db.add(edit)

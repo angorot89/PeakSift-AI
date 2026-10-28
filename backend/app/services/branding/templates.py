@@ -206,3 +206,43 @@ def delete_template(db: Session, template: ShortTemplate) -> None:
     """Delete one template. Plans and Shorts made with it keep their settings (snapshots)."""
     db.delete(template)
     db.commit()
+
+
+def brand_for_edit(brand, config: TemplateConfig) -> dict | None:
+    """The brand section a Short made with ``config`` uses (``clip_edit/brand.py`` validates
+    it again and drops colours that would not be readable): the logo only when the template
+    shows it, the accent for a Boxed hook's label, and the end card only when turned on."""
+    if brand is None:
+        return None
+    section: dict = {"name": brand.name}
+    if config.logo and brand.logo_asset_id is not None:
+        section["logo"] = {
+            "asset_id": str(brand.logo_asset_id),
+            "corner": brand.logo_position,
+            "size": brand.logo_size,
+        }
+    if brand.caption_emphasis_color:
+        section["caption_emphasis"] = brand.caption_emphasis_color
+    section["hook_accent"] = brand.accent_color or brand.primary_color
+    if config.end_card:
+        section["end_card"] = {
+            "seconds": config.end_card_seconds,
+            "background": brand.primary_color,
+            "text": brand.end_card_text,
+            "show_logo": config.logo and brand.logo_asset_id is not None,
+        }
+    return section
+
+
+def plan_snapshot(template: ShortTemplate) -> dict:
+    """What an Auto Edit plan stores about its template: frozen at planning time, so editing
+    or deleting the template (or its brand) later never changes the plan."""
+    config = TemplateConfig.from_snapshot(template.config)
+    return {
+        "id": str(template.id),
+        "name": template.name,
+        "version": template.version,
+        "recipe": template.recipe,
+        "config": config.snapshot(),
+        "brand": brand_for_edit(template.brand, config),
+    }

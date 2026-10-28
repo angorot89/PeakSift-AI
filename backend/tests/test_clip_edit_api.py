@@ -56,6 +56,7 @@ EDIT_KEYS = {
     "output_height",
     "render_profile",
     "caption_cue_count",
+    "origin",
     "audio_loudness_lufs",
     "audio_true_peak_dbtp",
     "duration_seconds",

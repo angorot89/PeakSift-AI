@@ -3,9 +3,11 @@
 Everything is server configuration except the creator's choices: the recipe (an allow-listed
 name, resolved to today's exact version), optionally one of the project's music tracks
 explicitly chosen for this plan, and (V1.4) whether to use patterns from their published shorts
-— stored as the profile snapshot itself (``performance/profile.py``). A request without it has
-exactly the V1.2 snapshot, so earlier fingerprints are unchanged. The planner, its model and
-version, and whether the deterministic fallback may stand in come from settings.
+— stored as the profile snapshot itself (``performance/profile.py``) — and (V1.7) the Short
+template with its brand, frozen at request time (``branding/templates.plan_snapshot``). A
+request without them has exactly the V1.2 snapshot, so earlier fingerprints are unchanged.
+The planner, its model and version, and whether the deterministic fallback may stand in come
+from settings.
 ``generation`` > 1 marks a deliberate "try another plan". The job always runs with its stored
 snapshot, never with today's defaults.
 """
@@ -33,6 +35,8 @@ class AutoEditRequest:
     music_asset_id: str | None
     generation: int
     performance_context: dict[str, Any] | None = None
+    # V1.7: the creator's Short template (and its brand), frozen when the plan was requested.
+    template: dict[str, Any] | None = None
 
     @classmethod
     def from_settings(
@@ -43,6 +47,7 @@ class AutoEditRequest:
         music_asset_id: str | None = None,
         generation: int = 1,
         performance_context: dict[str, Any] | None = None,
+        template: dict[str, Any] | None = None,
     ) -> "AutoEditRequest":
         chosen = current_recipe(recipe)
         return cls(
@@ -56,13 +61,14 @@ class AutoEditRequest:
             music_asset_id=music_asset_id,
             generation=int(generation),
             performance_context=performance_context,
+            template=template,
         )
 
     @classmethod
     def from_snapshot(cls, snapshot: dict[str, Any]) -> "AutoEditRequest":
         if not isinstance(snapshot, dict) or snapshot.get("request_version") != REQUEST_VERSION:
             raise ValueError("Unsupported Auto Edit request version")
-        optional = {"performance_context"}
+        optional = {"performance_context", "template"}
         fields = cls.__dataclass_fields__
         if any(name not in snapshot for name in fields if name not in optional):
             raise ValueError("Incomplete Auto Edit request")
@@ -70,6 +76,7 @@ class AutoEditRequest:
 
     def snapshot(self) -> dict[str, Any]:
         data = asdict(self)
-        if data["performance_context"] is None:  # V1.2 snapshots (and fingerprints) unchanged
-            del data["performance_context"]
+        for optional in ("performance_context", "template"):
+            if data[optional] is None:  # earlier snapshots (and fingerprints) unchanged
+                del data[optional]
         return data
