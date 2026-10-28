@@ -8,6 +8,7 @@ from app.models.auto_edit import (
     AutoEditRecipe,
     AutoEditStatus,
 )
+from app.models.brand import BrandProfile
 from app.models.broll import (
     ACTIVE_BROLL_ANALYSIS_STATUSES,
     BrollAnalysis,
@@ -91,6 +92,7 @@ from app.models.video import Video, VideoStatus
 from app.models.visual_asset import VisualAsset, VisualAssetKind
 
 __all__ = [
+    "BrandProfile",
     "CopilotMessage",
     "CopilotMessageStatus",
     "CopilotRole",
