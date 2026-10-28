@@ -8,6 +8,7 @@ from app.api.audio_assets import router as audio_assets_router
 from app.api.auth import router as auth_router
 from app.api.auto_edit import recipes_router as auto_edit_recipes_router
 from app.api.auto_edit import router as auto_edit_router
+from app.api.brand import router as brand_router
 from app.api.broll import router as broll_router
 from app.api.caption_styles import router as caption_styles_router
 from app.api.caption_tracks import router as caption_tracks_router
@@ -66,6 +67,7 @@ ROUTERS = (
     publish_job_router,
     performance_router,
     workspace_router,
+    brand_router,
     copilot_router,
 )
 

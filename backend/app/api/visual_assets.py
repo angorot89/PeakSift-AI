@@ -33,6 +33,7 @@ from app.schemas.visual_asset import (
     VisualSearchResults,
     VisualUploadLimits,
 )
+from app.services.branding.profiles import brands_using_logo
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
 from app.services.semantic.indexing import TooManyAttempts
 from app.services.semantic.lifecycle import (
@@ -278,13 +279,21 @@ def update_visual(asset: OwnedVisual, body: VisualAssetUpdate, db: DbSession) ->
 @router.delete("/{asset_id}", response_model=MediaDeletionRead)
 def delete_visual(asset: OwnedVisual, db: DbSession, storage: Storage) -> MediaDeletionRead:
     """Delete a visual the project no longer uses. Refused (409) while any edit still
-    references it: rendered and future edits must never lose an input."""
+    references it (rendered and future edits must never lose an input) or a brand uses it as
+    its logo."""
     users = edits_using_visual_asset(db, asset)
     if users:
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
             detail=f"This visual is used by {users} edit{'s' if users != 1 else ''}; "
             "delete those edits first",
+        )
+    brands = brands_using_logo(db, asset)
+    if brands:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"This image is the logo of your brand “{brands[0]}”; choose another logo "
+            "in Brand Studio first",
         )
     report = delete_visual_asset(db, storage, asset)
     return MediaDeletionRead(
