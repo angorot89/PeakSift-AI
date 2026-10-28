@@ -52,3 +52,31 @@ context label: the scope and a few facts ("Bridge Workshop · 3 moments · 6 vis
   nothing else. Deleting a project or an account deletes its conversations.
 - `GET /copilot/thread?project_id=` returns the latest 50 messages. Another creator's project is
   a `404`.
+
+## The local assistant (provider)
+
+`app/services/copilot/provider.py`, `prompt.py`, `contract.py`, `service.py`:
+
+- **Local by default**: `COPILOT_PROVIDER=ollama` asks the model at `OLLAMA_BASE_URL`
+  (`COPILOT_OLLAMA_MODEL`, default the first `OLLAMA_CLIP_MODELS` entry; locally
+  `llama3.2:3b`). Nothing leaves the server. `fake` gives deterministic answers for tests, CI and
+  demos and is refused in production.
+- **Instructions apart from data**: the system message holds PeakSift's rules; the creator's
+  question is quoted; the project facts follow in a fenced `DATA` block described as
+  information only. Transcripts, titles and descriptions inside it are never followed as
+  instructions.
+- **A strict answer**: JSON with `message` (the factual answer, in the question's language, 1–3
+  sentences), an optional `suggestion` (shown apart, as a suggestion), up to 3 `actions` and up
+  to 4 `references` — by handle only. PeakSift drops unknown action types, invented handles and
+  handles of the wrong kind, replaces handle names in the text with real names, removes links and
+  markdown, and writes every button and chip label itself.
+- **Bounded**: temperature 0, the answer schema, at most 700 generated tokens, one corrective
+  attempt when the reply is not JSON, all within `COPILOT_TIMEOUT_SECONDS` (45 s); questions of at
+  most `COPILOT_MESSAGE_MAX_CHARS` (1,000); 6 questions per minute and 120 per hour per creator.
+- **When it can't answer**: offline, too slow, model not installed or an unusable answer — the
+  creator reads "PeakSift's local assistant isn't available right now." (or "couldn't give a
+  usable answer this time"). The question is still saved, and nothing else in PeakSift depends
+  on the assistant. `GET /copilot/status` reports whether it can answer now (checked at most
+  every 30 s).
+- `POST /copilot/messages` `{text, page, project_id?, clip_id?, edit_id?}` returns the saved
+  question and answer. No database connection is held while the model thinks.
