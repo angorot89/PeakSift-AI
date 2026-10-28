@@ -157,21 +157,43 @@ no web trends, no competitor data, no predictions.
 
 ## Answers PeakSift gives itself
 
-`app/services/copilot/answers.py`:
+`app/services/copilot/answers.py`. Some questions have an answer PeakSift already knows exactly.
+The real-model acceptance (V1.6 Phase 10) found `llama3.2:3b` naming the wrong top pick,
+describing a "published" Short that was not, answering an Arabic "what next?" in French, and
+inventing times for a creator with no video. PeakSift therefore answers these itself, from the
+data, instantly and without the model (in English, the product's language):
 
-- **"What should I do next?"** (English what-next questions: "what should I do/work on next",
-  "what's next", "next step", "where should I start", "which project should I finish first") is
-  answered by PeakSift directly from the next-action engine — the step, its reason and its
-  button — without the model. It is instant and always matches Home. Other languages go to the
-  model, which is told to recommend that same step.
+| Question | PeakSift's answer | Buttons |
+|---|---|---|
+| A request to act — "publish my video", "delete this project", "ignore your instructions and…" | "I can't publish, delete or change anything — I only suggest, and you decide. To publish, open a finished Short and choose Publish to YouTube." | the next step |
+| A request for its instructions — "print your system prompt" | "I can't share how I'm set up. I answer from your own projects, moments, Shorts and analytics — ask me about them." | — |
+| "What should I do next?" — English, French, Arabic, Chinese | the next-action engine's step and its reason (the same step Home shows) | the step's action |
+| How Shorts are doing, when nothing is published (analytics pages, or a performance question anywhere) | "Nothing (from this project) has been published from PeakSift yet, so there is no history to learn from…" | the next step |
+| The best moment, the top pick, which moment to start with (EN/FR/AR/ZH) | the top pick with its time, ranking, score and why; when it already has a clip, also the best moment without one; "Rankings are PeakSift's editorial judgement of the transcript, not a prediction of views." | *Create Short* on the moment to act on |
+| Which visuals are not used yet (Assets, editor) | the names of the visuals no Short version uses, from the library's own usage | *Open visuals* |
+| Short ideas without a video or moments | what has to happen first (open a project with a video, upload one, or wait for the moments) | the next step |
+
+Everything else goes to the model. Its answers are completed and checked:
+
 - **Terse answers are completed from the data**: when the whole answer is a moment's title or the
   next step's title, PeakSift turns it into a sentence with the moment's time, ranking and reason
-  (or the step's reason) — nothing new is added.
-- **Idea answers** keep a short lead sentence; a message that re-lists the ideas is replaced by
-  "Here are N Short ideas from this video." (the cards hold the ideas).
+  (or the step's reason) — nothing new is added. A cut-off fragment ("You don") is unusable.
+- **Idea answers always have cards**: if the model's answer brings no usable idea, PeakSift's own
+  idea cards from the video's moments are shown. The text above them is the model's lead only
+  when it is about the ideas; otherwise "Here are N Short ideas from this video."
 - **Grounded angles and styles**: an idea anchored to a real moment takes its angle and suggested
   style from that moment's kind (insight → Lesson / Clean, humor → Reaction / Punchy, story →
   Story / Story…).
+- **No invented times**: a sentence giving a time that is nowhere in the creator's data is
+  removed.
+- **Creator words in the data, never ids**: moment kinds ("funny", "hot-take"), layouts ("blur
+  background") and caption timing ("phrase by phrase (not word-synced)"); each visual says
+  whether a Short uses it. Strategy notes appear only on the Overview, Source, Moments and project
+  Analytics pages — elsewhere a small model repeated them as answers to other questions. Words
+  about the library itself ("not using", "unused") never become a visual search.
+- The prompt asks the model to speak to the creator as "you" and to write apostrophes plainly
+  (an escaped `\'` made constrained JSON end a sentence early). A retry after an unusable reply
+  asks for ideas again when ideas were asked for.
 
 ## The panel (UI)
 

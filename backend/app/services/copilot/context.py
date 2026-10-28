@@ -161,7 +161,38 @@ STOPWORDS = {
     "where",
     "clip",
     "short",
+    # Words about the library itself, not about a picture ("Which visuals am I not using?").
+    "not",
+    "using",
+    "used",
+    "unused",
+    "yet",
+    "all",
+    "list",
+    "many",
+    "how",
+    "got",
+    "own",
+    "library",
+    "footage",
+    "shorts",
+    "clips",
 }
+
+# Pages where the strategy notes belong: the project as a whole, its source and its moments.
+STRATEGY_PAGES = {"overview", "source", "moments", "project_analytics"}
+
+# Creator words for the model, never internal ids (a small model repeats what it reads).
+TIMING_WORDS = {
+    "aligned_word": "word-synced",
+    "phrase_fallback": "phrase by phrase (not word-synced)",
+}
+
+
+def _kind(category: str) -> str:
+    from app.services.strategy import CATEGORY_WORD
+
+    return CATEGORY_WORD.get(category, category.replace("_", " "))
 
 
 class ContextNotFound(Exception):
@@ -288,7 +319,7 @@ def build_context(
         )
         view["project"] = _project(db, project, page, handles, facts)
         view["next_step"] = _project_step(db, project, handles, next_steps)
-        strategy, moment_handles = _strategy(db, project, view, handles, settings)
+        strategy, moment_handles = _strategy(db, project, page, view, handles, settings)
         scope = project.name
         clip = None
         if page in CLIP_PAGES and clip_id is not None:
@@ -321,8 +352,9 @@ def build_context(
     )
 
 
-def _strategy(db, project: Project, view: dict, handles: _Handles, settings):
-    """Strategy notes for the view; moments already used are marked on their ranked entry."""
+def _strategy(db, project: Project, page: str, view: dict, handles: _Handles, settings):
+    """Strategy notes for the view (on the pages they are about: a small model repeats them
+    wherever it sees them); moments already used are marked on their ranked entry."""
     from app.services.strategy import project_strategy
 
     source = "fake" if settings.performance_provider == "fake" else "youtube"
@@ -342,7 +374,8 @@ def _strategy(db, project: Project, view: dict, handles: _Handles, settings):
         fact = by_id.get(handles.targets[item["handle"]].id)
         if fact is not None and fact.note:
             item["already"] = fact.note
-    view["strategy"] = {"notes": strategy.notes}
+    if page in STRATEGY_PAGES:
+        view["strategy"] = {"notes": strategy.notes}
     return strategy, moment_handles
 
 
@@ -569,7 +602,7 @@ def _moments(db: Session, project: Project, video: Video, run, page: str, handle
             "title": short_text(c.title, 100),
             "time": f"{clock(c.start_time)}–{clock(c.end_time)}",
             "seconds": round(c.duration_seconds, 1),
-            "category": c.category,
+            "kind": _kind(c.category),
             "editorial_score": c.overall_score,
             "hook": short_text(c.hook),
             "decision": c.decision,
@@ -594,9 +627,9 @@ def _short_summary(edit: ClipEdit) -> dict:
     audio = config.get("audio") or {}
     return {
         "state": edit.status,
-        "layout": edit.layout,
+        "layout": str(edit.layout).replace("_", " "),
         "captions": edit.caption_style if edit.captions_enabled else "off",
-        "caption_timing": edit.caption_timing if edit.captions_enabled else None,
+        "caption_timing": TIMING_WORDS.get(edit.caption_timing) if edit.captions_enabled else None,
         "opening_hook": short_text(edit.hook_text, 60) if edit.hook_enabled else None,
         "visuals": len(visuals),
         "music": bool(audio.get("music")),
@@ -677,7 +710,7 @@ def _current(db, project, clip: Clip, edit_id, page, handles: _Handles, settings
             "state": clip.status,
             "seconds": round(clip.duration_seconds, 1),
             "ranking": moment_label(candidate.rank, candidate.overall_score),
-            "category": candidate.category,
+            "kind": _kind(candidate.category),
         }
     }
     edit = None
@@ -772,7 +805,14 @@ def _transcript(db: Session, project: Project, clip: Clip | None) -> list[dict] 
     ]
 
 
+def _used(edits: int) -> str:
+    if not edits:
+        return "not used in any Short yet"
+    return f"used in {edits} Short version{'s' if edits != 1 else ''}"
+
+
 def _visuals(db, project: Project, page: str, handles: _Handles, settings, question: str) -> dict:
+    from app.services.media_deletion import edits_using_visual_asset
     from app.services.semantic.matching import match_queries
     from app.services.semantic.registry import configured_identity
     from app.services.semantic.state import semantic_state
@@ -805,6 +845,7 @@ def _visuals(db, project: Project, page: str, handles: _Handles, settings, quest
                 "kind": asset.kind,
                 "description": short_text(asset.description, 120),
                 "tags": [short_text(t, 24) for t in (asset.tags or [])[:6]],
+                "used": _used(edits_using_visual_asset(db, asset)),
             }
         )
     out: dict[str, Any] = {

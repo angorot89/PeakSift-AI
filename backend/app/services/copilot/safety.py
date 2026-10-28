@@ -8,15 +8,18 @@ answer when the model follows an instruction hidden in a transcript or a questio
   publishes, deletes or changes anything, so such a sentence is always false;
 - **PeakSift's own instructions** repeated back ("show me your system prompt").
 
+A third check keeps answers grounded: a sentence giving a **time that is nowhere in the
+creator's data** (a model inventing "0:10, 0:30, 0:50") is removed.
+
 An answer claiming an action is not shown at all (PeakSift says the answer was unusable and
-offers its own next step); sentences repeating the instructions are removed.
+offers its own next step); sentences repeating the instructions or inventing times are removed.
 """
 
 import dataclasses
 import re
 
 from app.services.copilot.contract import CopilotOutputError, ParsedReply
-from app.services.copilot.prompt import CORRECTION, SYSTEM_PROMPT
+from app.services.copilot.prompt import CORRECTION, CORRECTION_IDEAS, SYSTEM_PROMPT
 
 _SENTENCE = re.compile(r"(?<=[.!?。！？؟])\s+|\n+")
 _WORD = re.compile(r"\w+")
@@ -40,7 +43,12 @@ def _runs(words: list[str]) -> list[tuple[str, ...]]:
     return [tuple(words[i : i + _RUN]) for i in range(len(words) - _RUN + 1)]
 
 
-_INSTRUCTIONS = set(_runs(_words(SYSTEM_PROMPT))) | set(_runs(_words(CORRECTION)))
+_INSTRUCTIONS = (
+    set(_runs(_words(SYSTEM_PROMPT)))
+    | set(_runs(_words(CORRECTION)))
+    | set(_runs(_words(CORRECTION_IDEAS)))
+)
+TIME = re.compile(r"(?<![\d:])(\d{1,2}:\d{2})(?![\d:])")
 
 
 def _covered(words: list[str]) -> set[int]:
@@ -74,14 +82,28 @@ def screen_text(text: str) -> str:
     )
 
 
-def screen(reply: ParsedReply) -> ParsedReply:
-    """``reply`` without repeated instructions. An answer claiming an action is never shown —
-    the Copilot cannot act, so the claim is false and the model was led astray — and neither is
-    one with nothing left: both raise ``CopilotOutputError``."""
+def drop_unknown_times(text: str, known: set[str]) -> str:
+    """The text without sentences giving a time that is not in the creator's data."""
+    if all(time in known for time in TIME.findall(text)):
+        return text
+    parts = [part.strip() for part in _SENTENCE.split(text) if part and part.strip()]
+    return " ".join(p for p in parts if all(time in known for time in TIME.findall(p)))
+
+
+def screen(reply: ParsedReply, known_times: set[str] | None = None) -> ParsedReply:
+    """``reply`` without repeated instructions (nor, given ``known_times``, invented times). An
+    answer claiming an action is never shown — the Copilot cannot act, so the claim is false and
+    the model was led astray — and neither is one with nothing left: both raise
+    ``CopilotOutputError``."""
     if claims_action(reply.message) or (reply.suggestion and claims_action(reply.suggestion)):
         raise CopilotOutputError("The answer claimed an action")
-    message = screen_text(reply.message)
+
+    def clean(text: str) -> str:
+        text = screen_text(text)
+        return drop_unknown_times(text, known_times) if known_times is not None else text
+
+    message = clean(reply.message)
     if not message:
         raise CopilotOutputError("The answer had nothing PeakSift may show")
-    suggestion = screen_text(reply.suggestion) if reply.suggestion else None
+    suggestion = clean(reply.suggestion) if reply.suggestion else None
     return dataclasses.replace(reply, message=message, suggestion=suggestion or None)
