@@ -62,3 +62,15 @@ class CopilotExchangeRead(BaseModel):
 class CopilotStatusRead(BaseModel):
     enabled: bool
     available: bool  # the local assistant can answer right now
+
+
+class CopilotActionResolutionRead(BaseModel):
+    """Where a clicked action leads now: ``navigate`` to ``href``, or ``create_short`` — the
+    frontend creates the moment's clip through the clip API, then opens *Create a Short*."""
+
+    kind: str
+    href: str | None = None
+    project_id: uuid.UUID | None = None
+    video_id: uuid.UUID | None = None
+    run_id: uuid.UUID | None = None
+    candidate_id: uuid.UUID | None = None

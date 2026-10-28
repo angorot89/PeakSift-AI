@@ -80,3 +80,28 @@ context label: the scope and a few facts ("Bridge Workshop · 3 moments · 6 vis
   every 30 s).
 - `POST /copilot/messages` `{text, page, project_id?, clip_id?, edit_id?}` returns the saved
   question and answer. No database connection is held while the model thinks.
+
+## Actions
+
+`app/services/copilot/actions.py`, `app/services/routes.py`:
+
+| Action | Target | Leads to |
+| --- | --- | --- |
+| `open_home`, `new_project`, `open_analytics` | — | Home, a new project, Analytics |
+| `open_project`, `open_source`, `open_moments`, `open_assets`, `open_project_analytics` | a project | its Overview, Source, Moments, Visuals or Analytics |
+| `search_assets` | a project + words | Visuals, searching for those words |
+| `create_short` | a moment | *Create a Short* (the clip is created first if it does not exist yet) |
+| `open_create`, `open_auto_edit`, `open_editor` | a clip, draft or moment | Create a Short, Auto Edit, or the editor |
+| `open_short` | a Short | the editor on that version (preview, download, publish) |
+| `open_published` | a published Short | its analytics |
+
+- **Allow-listed**: the model proposes a type and a handle; nothing else is possible. No
+  action publishes, deletes, disconnects, renders or changes settings.
+- **Checked when offered**: the target must exist, belong to the creator and fit the step (a
+  dismissed moment is never offered; "open the editor" on a moment without a clip becomes
+  *Create Short*). Labels are written by PeakSift; repeated labels name their object.
+- **Checked again when clicked**: `POST /copilot/messages/{id}/actions/{index}` re-validates
+  ownership and state and returns where to go now — or `409` with "This moment is no longer
+  available." (or Short, clip, draft, project, published Short). `create_short` returns the
+  moment's ids so the frontend creates the clip through the normal clip API (its validation
+  and rate limits apply), then opens *Create a Short*.
