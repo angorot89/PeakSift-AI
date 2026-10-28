@@ -198,3 +198,28 @@ no web trends, no competitor data, no predictions.
   characters with a counter near the limit.
 - **Offline**: when the local assistant can't answer, the panel says so up front; everything else
   in PeakSift works as usual and questions still get PeakSift's own next step.
+
+## Command menu (Cmd/Ctrl+K)
+
+`components/app/command-menu.tsx`, `lib/command-menu.ts` (pure, unit-tested):
+
+- **Opening**: ⌘K on a Mac, Ctrl+K elsewhere (on a Mac, Ctrl+K stays the text fields' "delete to
+  end of line"), *Search* at the top of the sidebar (with the shortcut shown), or the search
+  button in the phone top bar. The shortcut never opens the menu over another dialog; pressing it
+  again closes the menu. The editor has no shortcut on K, and a plain K typed in any field is
+  text.
+- **What it lists**: the server's **next step** (the project's, or on workspace pages the first
+  *Continue working* step — the same one Home shows), the current project's sections, the global
+  destinations and *New project*, the other projects (five before typing, all searchable) and the
+  page's suggested questions for Ask PeakSift.
+- **Typing** filters by name, hint and a few keywords ("b-roll" finds Assets, "moments" finds
+  Clips), ignoring case and accents, best match first. The typed text is always offered as
+  *Ask PeakSift: “…”* — first when it reads as a question (a question mark in Latin, Chinese or
+  Arabic script, a question word, or four words or more) or when nothing else matches, otherwise
+  last.
+- **Keyboard**: a WAI-ARIA combobox — the cursor stays in the field, ↑/↓ move the highlighted
+  command (wrapping), Enter runs it, Escape closes and the browser returns focus to where it was.
+  Pointer and touch select directly; options are 44 px tall on touch screens.
+- **Handing a question to Ask PeakSift**: the panel opens (or, already open, takes it) and asks
+  it; while another answer is still coming the question waits in the composer instead of being
+  lost. When the panel closes, focus returns to what had it before the menu opened.
