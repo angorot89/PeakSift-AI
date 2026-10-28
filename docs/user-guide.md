@@ -147,6 +147,41 @@ Good to know about visual search:
 6. **Refresh** a short to update it now (at most every few minutes). **Delete collected
    metrics** in Settings removes everything PeakSift collected and stops updates.
 
+## Ask PeakSift — your project assistant
+
+**Ask PeakSift** (sidebar, or the ✦ button at the top on phones) answers questions about the
+page you are on, from **your own** projects, moments, Shorts, visuals and analytics. It is not a
+general chatbot and it does not search the internet.
+
+- **Ask what to do next.** "What should I do next?" gives the same next step Home shows, with a
+  button to do it.
+- **Ask about your moments.** "Which moment should I start with?" names your top pick with its
+  time and why — and, if you already made a clip of it, the best one you haven't used. Rankings
+  are PeakSift's editorial judgement of the transcript, never a prediction of views.
+- **Ask for Short ideas.** "Give me 3 Short ideas from this video" shows idea cards — each from a
+  real moment or transcript time, with an angle, a suggested style, why, and **Create Short**. A
+  card says when you already made a clip of that moment.
+- **Ask about an edit.** In the editor: "How can I improve this edit?" or "Do I have useful
+  B-roll for this clip?" — suggestions you apply yourself in the editor.
+- **Ask about your visuals.** On Assets: "Do I have a visual of a bridge?" or "Which visuals am
+  I not using?"
+- **Ask how your Shorts are doing.** On Analytics: observed figures and patterns from your own
+  uploads; with nothing published yet it says there is no history — never a guess.
+
+Each answer shows what it is **Based on** (chips), a **Suggestion** when there is one, and
+buttons. Buttons are checked again when you click them: if a moment or Short is gone, the
+button says so. The assistant **suggests; you decide** — it can't publish, delete or change
+anything, and asking it to does nothing but explain that.
+
+**Search** (sidebar, or **⌘K** on a Mac / **Ctrl K** elsewhere) jumps to any page or project;
+type a question there and press Enter to ask PeakSift.
+
+Good to know: one conversation per project, kept until you **Clear conversation** (↺ in the
+panel). Answer in English, French, Arabic or Chinese — the product's own answers (next step,
+top pick, nothing published yet) are in English. Answers come from a local model on the server:
+they can take a few seconds, the model can be conservative or get things wrong, and when it is
+not running PeakSift says so and still offers the next step and ideas from your moments.
+
 ## Good to know
 
 - **Visibility:** new uploads are private by default. Google keeps videos uploaded through
