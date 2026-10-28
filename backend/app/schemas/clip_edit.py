@@ -166,6 +166,8 @@ class ClipEditRead(BaseModel):
     attempt: int
     is_stale: bool
     configuration: dict[str, Any]
+    # V1.7: the template and brand this version started from (display only), if any.
+    origin: dict[str, Any] | None = None
     aspect_ratio: str
     layout: str
     captions_enabled: bool

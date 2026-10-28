@@ -34,6 +34,7 @@ from app.services.auto_edit.fallback import FALLBACK_PROVIDER, FallbackAutoEditP
 from app.services.auto_edit.planners import get_planner, plan
 from app.services.auto_edit.recipes import recipe_version
 from app.services.auto_edit.sources import Gathered, SourcesUnavailable, gather
+from app.services.auto_edit.template import apply_template
 from app.services.auto_edit.validation import PlanRejected, ValidatedPlan, validate_plan
 from app.services.storage import StorageProvider, StorageUnavailable, media_storage
 
@@ -123,6 +124,9 @@ def _execute(
         fallback_reason = "plan_invalid"
         validated = validate_plan(result.proposal, gathered.context, recipe)
 
+    if request.template is not None:
+        # The template (and its brand) win over the planner and the recipe: applied last.
+        validated = apply_template(validated, request.template, gathered.context)
     explanations = _with_context_notes(validated, gathered)
     state.finish(
         row,

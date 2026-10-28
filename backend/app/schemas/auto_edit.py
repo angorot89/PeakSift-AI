@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.models.auto_edit import AutoEditRecipe
 from app.schemas.clip_edit import ClipEditRead
@@ -14,13 +14,22 @@ from app.schemas.clip_edit import ClipEditRead
 class AutoEditCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    recipe: AutoEditRecipe
+    # The recipe; optional when a template is given (its starting style, else Clean).
+    recipe: AutoEditRecipe | None = None
+    # V1.7: one of the creator's Short templates (with its brand); applied after planning.
+    template_id: uuid.UUID | None = None
     # Optional: one of this project's music tracks, chosen by the creator for this plan.
     # Auto Edit never picks music on its own.
     music_asset_id: uuid.UUID | None = None
     # V1.4: let the planner consider patterns from the creator's own published shorts
     # (weak hints inside the recipe's bounds). Off unless the creator turns it on.
     use_performance_context: bool = False
+
+    @model_validator(mode="after")
+    def _recipe_or_template(self) -> "AutoEditCreate":
+        if self.recipe is None and self.template_id is None:
+            raise ValueError("Choose a recipe or a template")
+        return self
 
 
 class AutoEditRecipeRead(BaseModel):

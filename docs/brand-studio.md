@@ -135,3 +135,40 @@ the preview:
 
 `GET /brand/layout` publishes the box fractions, safe-area margins and end-card geometry for
 previews.
+
+## Auto Edit with templates
+
+`app/services/auto_edit/template.py`. `POST …/auto-edits` takes an optional `template_id` (one
+of the creator's templates; another creator's is a 404) and then `recipe` becomes optional:
+the creator's recipe choice, else the template's starting style, else Clean. A request must
+name one or the other.
+
+**Precedence**, strongest first:
+
+1. hard product constraints — a completed, confident framing analysis for Smart Reframe;
+   transcript timing for captions; hook words grounded in the clip; every visual and audio check;
+2. the creator's explicit per-Short choices (in the editor, on the new version);
+3. the **template**'s settings;
+4. the template's **brand** (logo, colours, end card);
+5. the **recipe**;
+6. performance hints (opt-in, weak, inside the recipe);
+7. the planner's preferences.
+
+The planner (local model or rules) proposes inside the recipe; `validate_plan` makes it a valid
+edit; **then** the template is applied, so a model can never undo a template setting (Minimal
+captions stay Minimal, the logo stays on). What a template cannot force falls back with a note:
+
+- Smart Reframe without a confident analysis keeps Auto Edit's framing;
+- an opening hook needs a grounded line from the clip;
+- a template never adds music — it only sets the level and ducking of the track the creator
+  chose;
+- hook and captions never share a position (the hook takes the other place);
+- a combination that cannot form a valid edit keeps Auto Edit's choices.
+
+**Frozen**: the plan stores the template — its id, name, version, settings and the brand section
+— in its request snapshot when it is asked for, so editing or deleting the template or brand
+later never changes the plan; *Try another plan* keeps the same frozen template. The plan's
+explanations say "Started from your Punchy Gaming template. Used your Amine Clips brand." — never
+colour codes or internals. Applying the plan records an **origin** on the new version
+(`ClipEdit.origin`: template id, name and version, brand name, plan id) — for display only; the
+render reads the snapshot.

@@ -128,6 +128,9 @@ class ClipEdit(Base):
 
     # The normalized configuration snapshot and its fingerprint (see services/clip_edit/config).
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # V1.7, display only: the template and brand a version started from ({"template": {id, name,
+    # version}, "brand": {name}, "auto_edit_plan_id"}). Never read by a render — the snapshot is.
+    origin: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     config_fingerprint: Mapped[str] = mapped_column(String(64))
     # Queryable copies of the snapshot's fields (checked against the allow-lists).
     aspect_ratio: Mapped[str] = mapped_column(String(8))

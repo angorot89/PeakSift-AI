@@ -54,6 +54,8 @@ from app.services.auto_edit.config import AutoEditRequest
 from app.services.auto_edit.fingerprint import source_fingerprint
 from app.services.auto_edit.recipes import RECIPE_ORDER, current_recipe, recipe_version
 from app.services.auto_edit.sources import SourcesUnavailable, gather
+from app.services.branding import templates
+from app.services.branding.profiles import BrandProblem
 from app.services.clip_edit.config import EditConfig
 from app.services.performance.profile import creator_profile
 from app.services.storage import StorageProvider, StorageUnavailable
@@ -317,9 +319,18 @@ def create_plan(
     (200); changed inputs (a new caption track, a tagged asset…) make a new one."""
     _require_plannable(clip, storage)
     music = _owned_music(db, video, body.music_asset_id)
+    template = None
+    if body.template_id is not None:
+        try:
+            template = templates.owned_template(db, current_user, body.template_id)
+        except BrandProblem as problem:
+            raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    # The creator's recipe choice, else the template's starting style, else Clean.
+    recipe = body.recipe.value if body.recipe else (template.recipe if template else None)
     request = AutoEditRequest.from_settings(
-        get_settings(), recipe=body.recipe.value, music_asset_id=music,
+        get_settings(), recipe=recipe or "clean", music_asset_id=music,
         performance_context=_profile_for(db, current_user.id, body.use_performance_context),
+        template=templates.plan_snapshot(template) if template else None,
     )  # fmt: skip
     return _start(db, clip, storage, request, response)
 
@@ -409,6 +420,7 @@ def regenerate_plan(
         performance_context=_profile_for(
             db, current_user.id, previous.performance_context is not None
         ),
+        template=previous.template,  # the same frozen template as the plan it replaces
     )
     return _start(db, clip, storage, request, response)
 
@@ -445,7 +457,7 @@ def apply_plan(
             status_code=status.HTTP_409_CONFLICT,
             detail="This plan can no longer be applied; try another plan",
         ) from None
-    edit, _ = create_or_reuse_edit(db, clip, video, storage, config)
+    edit, _ = create_or_reuse_edit(db, clip, video, storage, config, origin=_origin(plan))
     try:
         state.mark_applied(plan, db, edit.id)
     except state.PlanNotReady:  # pragma: no cover - changed concurrently
@@ -455,6 +467,19 @@ def apply_plan(
     _accept_suggestions(db, plan)
     db.refresh(plan)
     return AutoEditApplyRead(plan=read_plan(plan), edit=read_edit(edit))
+
+
+def _origin(plan: AutoEditPlan) -> dict:
+    """Where a Short version came from, for the editor ("Template: … · Brand: …")."""
+    origin: dict = {"auto_edit_plan_id": str(plan.id)}
+    template = (plan.explanation_snapshot or {}).get("template")
+    if template:
+        origin["template"] = {
+            "id": template["id"], "name": template["name"], "version": template["version"]
+        }  # fmt: skip
+        if template.get("brand"):
+            origin["brand"] = {"name": template["brand"]}
+    return origin
 
 
 def _accept_suggestions(db: DbSession, plan: AutoEditPlan) -> None:
