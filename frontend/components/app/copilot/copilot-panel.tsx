@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/toast";
 import { ApiError, errorMessage } from "@/lib/api";
 import { generateClip } from "@/lib/clips";
 import {
+  charCount,
   QUESTION_MAX,
   askCopilot,
   clearCopilotThread,
@@ -134,7 +135,7 @@ export function CopilotPanel() {
   const ask = useCallback(
     async (text: string, at: CopilotScope = scope) => {
       const question = text.trim();
-      if (!question || pending || question.length > QUESTION_MAX) return;
+      if (!question || pending || charCount(question) > QUESTION_MAX) return;
       const askedKey = threadKey(at);
       setError(null);
       setDraft("");
@@ -253,7 +254,7 @@ export function CopilotPanel() {
           <Spinner /> Loading the conversation…
         </div>
       ) : messages.length === 0 && !waiting ? (
-        <Welcome page={scope.page} scope={scopeLabel} onAsk={(text) => void ask(text)} disabled={!!pending} />
+        <Welcome page={scope.page} hasSource={context?.has_source ?? null} scope={scopeLabel} onAsk={(text) => void ask(text)} disabled={!!pending} />
       ) : (
         <ol className="flex flex-col gap-4" aria-label="Conversation">
           {(messages ?? []).map((message) => (
@@ -268,7 +269,7 @@ export function CopilotPanel() {
           ))}
           {waiting ? (
             <li>
-              <article aria-label="Your question" className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm text-foreground">
+              <article aria-label="Your question" dir="auto" className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm text-foreground">
                 {waiting.text}
               </article>
             </li>
@@ -284,7 +285,7 @@ export function CopilotPanel() {
     <div className="w-full space-y-2">
       {messages && messages.length > 0 && !pending ? (
         <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" aria-label="Suggested questions">
-          {starters(scope.page).map((text) => (
+          {starters(scope.page, context?.has_source ?? null).map((text) => (
             <li key={text} className="shrink-0">
               <button
                 type="button"
@@ -332,7 +333,7 @@ export function CopilotPanel() {
   );
 
   const clearButton = messages && messages.length > 0 ? (
-    <IconButton aria-label="Clear conversation" size="sm" onClick={() => setConfirmClear(true)}>
+    <IconButton aria-label="Clear conversation" size="sm" onClick={() => setConfirmClear(true)} disabled={!!pending}>
       <RotateCcw aria-hidden="true" />
     </IconButton>
   ) : null;
@@ -386,7 +387,19 @@ export function CopilotPanel() {
   );
 }
 
-function Welcome({ page, scope, onAsk, disabled }: { page: CopilotScope["page"]; scope: string; onAsk: (text: string) => void; disabled: boolean }) {
+function Welcome({
+  page,
+  hasSource,
+  scope,
+  onAsk,
+  disabled,
+}: {
+  page: CopilotScope["page"];
+  hasSource: boolean | null;
+  scope: string;
+  onAsk: (text: string) => void;
+  disabled: boolean;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -397,7 +410,7 @@ function Welcome({ page, scope, onAsk, disabled }: { page: CopilotScope["page"];
         </p>
       </div>
       <ul className="flex flex-col gap-2" aria-label="Suggested questions">
-        {starters(page).map((text) => (
+        {starters(page, hasSource).map((text) => (
           <li key={text}>
             <button
               type="button"
@@ -450,13 +463,13 @@ function Message({
   const actions = message.actions.filter((action) => !inCards.has(action.index));
   return (
     <article aria-label="PeakSift's answer" className="space-y-3">
-      <p className={`text-sm leading-relaxed break-words text-pretty ${message.status === "ok" ? "text-foreground" : "text-muted"}`}>
+      <p dir="auto" className={`text-sm leading-relaxed break-words text-pretty ${message.status === "ok" ? "text-foreground" : "text-muted"}`}>
         {message.content}
       </p>
       {message.suggestion ? (
         <div className="rounded-xl border border-accent/25 bg-accent/[0.05] px-3.5 py-2.5">
           <p className="text-caption font-medium text-accent-soft">Suggestion</p>
-          <p className="mt-0.5 text-sm text-pretty text-foreground">{message.suggestion}</p>
+          <p dir="auto" className="mt-0.5 text-sm text-pretty text-foreground">{message.suggestion}</p>
         </div>
       ) : null}
       {message.cards.length ? (
@@ -465,14 +478,14 @@ function Message({
             <li key={`${card.time}-${index}`} className="rounded-xl border border-border bg-surface-2 px-3.5 py-3">
               <p className="flex items-start gap-2 text-sm font-medium text-foreground">
                 <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
-                <span className="min-w-0 break-words">{card.title}</span>
+                <span dir="auto" className="min-w-0 break-words">{card.title}</span>
               </p>
               <p className="mt-1 text-caption text-subtle">
                 {[card.time, card.angle, card.style ? `Suggested style: ${card.style[0].toUpperCase()}${card.style.slice(1)}` : null]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-              {card.why ? <p className="mt-1 text-small text-pretty text-muted">{card.why}</p> : null}
+              {card.why ? <p dir="auto" className="mt-1 text-small text-pretty text-muted">{card.why}</p> : null}
               {card.note ? <p className="mt-1 text-small text-amber-200">{card.note}</p> : null}
               {card.action !== null && message.actions[card.action] ? (
                 <div className="mt-2">
@@ -561,19 +574,20 @@ function Composer({
         <textarea
           ref={inputRef}
           id={id}
+          dir="auto"
           value={value}
           rows={rows}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Ask about this project…"
           aria-describedby={note ? `${id}-note` : undefined}
-          className="min-h-9 w-full resize-none bg-transparent px-2 py-1.5 text-base text-foreground outline-none placeholder:text-subtle sm:text-sm"
+          className="min-h-9 w-full resize-none bg-transparent px-2 py-1.5 pointer-coarse:min-h-11 text-base text-foreground outline-none placeholder:text-subtle sm:text-sm"
         />
         <IconButton
           type="submit"
           variant="secondary"
           aria-label="Send question"
-          disabled={disabled || !value.trim() || value.length > QUESTION_MAX}
+          disabled={disabled || !value.trim() || charCount(value) > QUESTION_MAX}
           className="shrink-0 bg-foreground text-background hover:bg-zinc-200 disabled:bg-surface-3 disabled:text-subtle"
         >
           <ArrowUp aria-hidden="true" />

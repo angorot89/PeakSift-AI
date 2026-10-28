@@ -67,21 +67,22 @@ function MenuBody({
   const list = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [next, setNext] = useState<CommandSource["next"]>(null);
+  const [server, setServer] = useState<Pick<CommandSource, "next" | "hasSource">>({ next: null, hasSource: null });
 
   const scope = copilotScope(pathname);
   const project = scope.projectId ? (projects ?? []).find((p) => p.id === scope.projectId) : undefined;
 
-  // The server's next step for where the creator is (the same one Home and the Overview show).
+  // The server's next step for where the creator is (the same one Home and the Overview show),
+  // and whether the project has a video yet (for the suggested questions).
   useEffect(() => {
     let cancelled = false;
-    const request = scope.projectId
-      ? getProjectSummary(scope.projectId).then((summary) => summary.next_action)
+    const request: Promise<Pick<CommandSource, "next" | "hasSource">> = scope.projectId
+      ? getProjectSummary(scope.projectId).then((summary) => ({ next: summary.next_action, hasSource: summary.source !== null }))
       : getHome().then((home) => {
           const first = home.continue_items[0];
-          return first ? { ...first, projectName: first.project_name } : null;
+          return { next: first ? { ...first, projectName: first.project_name } : null, hasSource: null };
         });
-    request.then((step) => !cancelled && setNext(step)).catch(() => undefined); // the menu works without it
+    request.then((value) => !cancelled && setServer(value)).catch(() => undefined); // the menu works without it
     return () => {
       cancelled = true;
     };
@@ -93,9 +94,9 @@ function MenuBody({
         page: scope.page,
         project: project ? { id: project.id, name: project.name } : null,
         projects: projects ?? [],
-        next,
+        ...server,
       }),
-    [scope.page, project, projects, next],
+    [scope.page, project, projects, server],
   );
   const shown = useMemo(() => filterCommands(commands, query), [commands, query]);
   const groups = useMemo(() => groupCommands(shown), [shown]);

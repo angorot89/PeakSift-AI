@@ -85,7 +85,7 @@ def test_a_fresh_project_gets_honest_notes(client, db_session):
     user, clip = setup(client, db_session, "fresh@example.com")
     strategy = project_strategy(db_session, clip.video.project, "youtube")
     assert strategy.notes[0] == (
-        "You have 2 moments in this video you haven't used yet (explanation, funny)."
+        "You have 2 moments in this video you haven't used yet (funny, explanation)."
     )
     assert "haven't published from PeakSift yet" in strategy.notes[1]
     assert [m.note for m in strategy.moments] == [

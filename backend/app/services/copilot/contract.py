@@ -12,6 +12,7 @@ Nothing here can publish, delete, disconnect or change anything: the action type
 navigation and the creator's own existing, non-destructive steps, each re-validated on use.
 """
 
+import html
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -132,7 +133,13 @@ def _name(target: Target) -> str:
     return label.split(": ", 1)[1] if ": " in label else label
 
 
+# A separator left at the very end ("…（0:39–0:50）”，"), with any quotes around it; a closing
+# quote alone ("Start with “Bridge Lab Tip”") stays.
+_DANGLING = re.compile(r"\s*[\"“”'‘’]*[,，、;；:：]+[\s\"“”'‘’,，、;；:：]*$")
+
+
 def clean_text(text: str, targets: dict[str, Target], limit: int) -> str:
+    text = html.unescape(text)  # a model sometimes writes l&#39; for l'
     text = _HANDLE_TALK.sub("", text)
     text = _LINK.sub(r"\1", text)
     text = _URL.sub("", text)
@@ -142,6 +149,7 @@ def clean_text(text: str, targets: dict[str, Target], limit: int) -> str:
     text = text.replace("**", "").replace("__", "").replace("`", "")
     lines = [_SPACE.sub(" ", line).strip() for line in text.splitlines()]
     text = "\n".join(line for line in lines if line)
+    text = _DANGLING.sub("", text)
     if len(text) <= limit:
         return text
     cut = text[:limit]

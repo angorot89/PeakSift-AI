@@ -8,6 +8,7 @@ itself — built by ``services/copilot/context.py`` from the creator's own rows,
 handles — stays on the server. Another creator's project or clip is a ``404``.
 """
 
+import re
 import uuid
 from typing import Annotated
 
@@ -37,6 +38,11 @@ from app.services.copilot.provider import assistant_available
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
 
+# Control characters (never part of a question; NUL cannot even be stored), zero-width spaces and
+# byte-order marks, and bidirectional overrides that make text display other than it reads.
+# Joiners (U+200C/U+200D) stay: emoji sequences and Persian or Arabic text use them.
+_INVISIBLE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u200b\ufeff\u202a-\u202e\u2066-\u2069]")
+
 Page = Annotated[str, Query(max_length=32)]
 
 
@@ -60,7 +66,13 @@ def copilot_context(
     edit_id: uuid.UUID | None = None,
 ) -> CopilotContextRead:
     context = _context(db, current_user, page, project_id, clip_id, edit_id)
-    return CopilotContextRead(page=context.page, scope=context.scope_label, facts=context.facts)
+    project = context.view.get("project")
+    return CopilotContextRead(
+        page=context.page,
+        scope=context.scope_label,
+        facts=context.facts,
+        has_source=project.get("source_video") is not None if isinstance(project, dict) else None,
+    )
 
 
 def _owned_project(db, user, project_id: uuid.UUID | None) -> Project | None:
@@ -130,7 +142,8 @@ def ask_copilot(body: CopilotAskRequest, current_user: CurrentUser, db: DbSessio
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Ask PeakSift is turned off"
         )
-    text = " ".join(body.text.split()) if "\n" not in body.text else body.text.strip()
+    text = _INVISIBLE.sub("", body.text)
+    text = " ".join(text.split()) if "\n" not in text else text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="Write a question first")
     if len(text) > settings.copilot_message_max_chars:
@@ -151,6 +164,16 @@ def ask_copilot(body: CopilotAskRequest, current_user: CurrentUser, db: DbSessio
         )
     except ContextNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from None
+    except service.QuestionInProgress:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="PeakSift is still answering your last question here.",
+        ) from None
+    except service.ConversationCleared:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This conversation was cleared while PeakSift was answering.",
+        ) from None
     return CopilotExchangeRead(
         question=message_read(exchange.question), answer=message_read(exchange.answer)
     )

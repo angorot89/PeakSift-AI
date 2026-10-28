@@ -13,6 +13,8 @@ class CopilotContextRead(BaseModel):
     page: str
     scope: str  # "Your workspace" or the project's name
     facts: list[str]
+    # Inside a project: whether it has a source video yet (the panel suggests other questions).
+    has_source: bool | None = None
 
 
 class CopilotActionRead(BaseModel):
