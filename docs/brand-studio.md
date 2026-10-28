@@ -315,3 +315,71 @@ errors.
 The audit found that Playwright's full-page screenshots turn off coarse-pointer emulation for the
 rest of a phone session, so touch targets measured after one looked too small. The audit now
 measures before any screenshot and takes phone screenshots at viewport size.
+
+## Acceptance
+
+**Journeys** (`tests/test_brand_acceptance.py`, deterministic planner, run in CI):
+
+- a fresh creator: nothing forced at sign-up → a brand with a logo and an emphasis colour → a
+  default Punchy template with an end card → Auto Edit with the template → a version whose
+  snapshot has the logo, the emphasis colour, the end card (brand colour, line, logo) and whose
+  origin names the template version;
+- historical safety: after the template (Minimal captions, no end card) and the brand colour
+  change, the earlier version's configuration is exactly as it was and still names version 1,
+  while a new plan uses version 2's values;
+- two templates (Punchy Gaming and Clean Professional) on one clip make two different versions.
+
+**Release gate** (`scripts/brand_acceptance.py`, against a running PeakSift with the real planner
+and renderer, as a dedicated acceptance creator): renders a branded Short from a template
+through Auto Edit and checks the file (1080×1920 H.264 + AAC, the duration = clip + end card,
+−14 LUFS ± 1, a silent end card, the brand section the template asks for), then changes the
+template and checks that the rendered version's settings and **file bytes** are unchanged and
+its origin still names the old version (and puts the template back).
+
+```bash
+BRAND_ACCEPTANCE_EMAIL=… BRAND_ACCEPTANCE_PASSWORD=… \
+  python scripts/brand_acceptance.py --api http://localhost:8000 \
+  --project ID --video ID --clip ID --template ID [--music ID]
+```
+
+**Local results** (isolated review stack, `llama3.2:3b`, FFmpeg with libass; generated footage
+and audio — nothing downloaded):
+
+- **Final branded Short** ("Speedrun Fails — Episode 7", template *Punchy Gaming*, brand *Amine
+  Clips*):
+  - **file**: 14.0 s (12.0 s clip + 2.0 s end card), 1080 × 1920, 30 fps, H.264 + AAC,
+    3,818,286 bytes; −14.0 LUFS integrated, −2.5 dBFS peak; the end card measured −70 LUFS
+    (silent);
+  - **what the frames show**: word-synced Punch captions with the spoken word in the brand's
+    yellow; a Boxed hook ("It feels wrong") on a brand-pink label, the logo waiting for it; the
+    logo moved from bottom right to top right (captions at the bottom); a faded lava cutaway
+    with the logo and captions on top; a picture-in-picture in the logo's corner with the logo
+    hidden meanwhile; the end card in brand pink with the logo, "Amine Clips" and "Follow for
+    more"; music and a whoosh at the cutaway (the visuals and the effect were the creator's own
+    per-Short additions in the editor, on top of the template);
+  - **the plan**: "Started from your Punchy Gaming template. Used your Amine Clips brand." The
+    template's Smart Reframe preference fell back with a note, because the generated footage has
+    no faces ("…isn't analyzed confidently yet, so blur background was kept"). Smart Reframe
+    with a logo is verified by the render tests with a moving crop path. The B-roll analysis
+    found no suggestions on this narration, so Auto Edit placed none.
+- **Historical safety**: after the template went from version 2 to 3 (Minimal captions, no end
+  card) and the brand's primary colour changed, the version made with version 2 had exactly
+  the same configuration and a **byte-identical file** (sha256), and still named version 2; a
+  new plan used Minimal captions and no end card (12.0 s).
+- **Two templates on one clip**: Punchy Gaming → Punch captions, logo, 14.0 s; Clean
+  Professional → Minimal captions, no logo, no B-roll, 12.0 s.
+- **Fresh creator in the browser**: sign-up → the logo uploaded in a project's Assets → a brand
+  ("Nova Plays", violet, yellow emphasis, logo, "More runs every Friday") and a default template
+  ("Nova Punchy", end card) made in Brand Studio → video upload → *Create a Short* already
+  *Using: Nova Punchy* → Auto Edit's review "Started from your Nova Punchy template. Used your
+  Nova Plays brand." → *Use this edit* → the editor "Template: Nova Punchy · Brand: Nova Plays" →
+  render → **Download**: 10.0 s, 1080 × 1920, H.264 + AAC, 2,555,293 bytes. (Transcription,
+  moment detection and the clip — V1.0–V1.5 journeys — were driven through the API to save
+  time.)
+- **Returning creator**: 3 clicks from *Create a Short* to a rendering, branded Short (V1.6: 4,
+  unbranded).
+- **Release gate run** (`scripts/brand_acceptance.py`, review stack): **13/13 PASS** — the plan used
+  the template; 1080 × 1920 H.264 + AAC; 13.50 s = 12.00 s clip + 1.5 s end card; brand section,
+  logo and end card as the template asks; −14.0 LUFS; end card −70.0 LUFS (silent); the template
+  got a new version; the old version's settings unchanged, its file byte-identical, its origin
+  still naming the version it was made with.
