@@ -4,8 +4,11 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef
 
 type CopilotState = {
   open: boolean;
-  /** Open the panel; an optional question is asked right away (e.g. from the command menu). */
-  openCopilot: (question?: string) => void;
+  /** Each call to openCopilot, counted: the panel takes a queued question even when already open. */
+  request: number;
+  /** Open the panel; an optional question is asked right away (e.g. from the command menu). Focus
+   * returns to `returnTo` (default: what has focus now) when the panel closes. */
+  openCopilot: (question?: string, returnTo?: HTMLElement | null) => void;
   closeCopilot: () => void;
   /** A question waiting to be asked once the panel is open (read once, then cleared). */
   takeQueued: () => string | null;
@@ -17,11 +20,15 @@ const CopilotContext = createContext<CopilotState | null>(null);
  * whatever opened it when it closes. */
 export function CopilotProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [request, setRequest] = useState(0);
   const opener = useRef<HTMLElement | null>(null);
   const queued = useRef<string | null>(null);
-  const openCopilot = useCallback((question?: string) => {
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const openCopilot = useCallback((question?: string, returnTo?: HTMLElement | null) => {
+    const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Opening again while open keeps the original opener.
+    if (!opener.current) opener.current = returnTo ?? focused;
     queued.current = question?.trim() || null;
+    setRequest((count) => count + 1);
     setOpen(true);
   }, []);
   const closeCopilot = useCallback(() => {
@@ -36,8 +43,8 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     return question;
   }, []);
   const value = useMemo(
-    () => ({ open, openCopilot, closeCopilot, takeQueued }),
-    [open, openCopilot, closeCopilot, takeQueued],
+    () => ({ open, request, openCopilot, closeCopilot, takeQueued }),
+    [open, request, openCopilot, closeCopilot, takeQueued],
   );
   return <CopilotContext.Provider value={value}>{children}</CopilotContext.Provider>;
 }

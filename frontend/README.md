@@ -132,8 +132,11 @@ lib/
   edit-draft.ts    # Editor settings from a stored configuration (version or plan), unit-tested
   project-clip.ts  # Loads a project and one of its clips (editor and Auto Edit)
   navigation.ts    # Routes, global and project navigation, which item is current (unit-tested)
-  workspace.ts     # Home and project summaries; workspace-rules.ts the next best action,
-                   # stages, moment labels and the getting-started checklist (unit-tested)
+  workspace.ts     # Home and project summaries (the next best action is decided by the server);
+                   # workspace-rules.ts stages, moment labels and the getting-started checklist (unit-tested)
+  copilot.ts       # Ask PeakSift API calls; copilot-rules.ts the page scope, conversation keys,
+                   # suggested questions and waiting text (unit-tested)
+  command-menu.ts  # The command menu's commands, filtering, question detection and shortcut (unit-tested)
   status.ts        # Waiting / Processing / Ready / Needs attention status language (unit-tested)
   moments.ts       # Moment filters, their queries, counts and empty states (unit-tested)
   editor-tools.ts  # The editor's tool groups, ?tool= links and their marks (unit-tested)

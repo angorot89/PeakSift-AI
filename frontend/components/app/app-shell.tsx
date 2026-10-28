@@ -10,19 +10,22 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Search,
   Settings,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { CommandMenu } from "@/components/app/command-menu";
 import { CopilotPanel } from "@/components/app/copilot/copilot-panel";
 import { CopilotProvider, useCopilot } from "@/components/app/copilot/copilot-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
 import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
+import { isCommandShortcut, shortcutLabel } from "@/lib/command-menu";
 import { activeGlobal, GLOBAL_NAV, projectLocation, SETTINGS_NAV, type GlobalKey } from "@/lib/navigation";
 import { listProjects, type Project } from "@/lib/projects";
 import { useStoredFlag } from "@/lib/use-stored-flag";
@@ -36,6 +39,14 @@ const ICONS: Record<GlobalKey, LucideIcon> = {
 const RECENT_PROJECTS = 3;
 const COLLAPSE_KEY = "peaksift.sidebar.collapsed";
 
+/** Whether this is a Mac (⌘K rather than Ctrl K); null while rendering on the server. */
+function useIsMac(): boolean | null {
+  return useSyncExternalStore(
+    () => () => undefined,
+    () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent),
+    () => null,
+  );
+}
 
 function NavLink({
   href,
@@ -94,16 +105,43 @@ function AskButton({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?:
   );
 }
 
+/** Search: opens the command menu (also Cmd/Ctrl+K). */
+function SearchButton({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
+  const mac = useIsMac();
+  return (
+    <button
+      type="button"
+      onClick={onSearch}
+      aria-haspopup="dialog"
+      aria-keyshortcuts={mac === null ? undefined : mac ? "Meta+K" : "Control+K"}
+      title={collapsed ? "Search" : undefined}
+      className={`flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
+        collapsed ? "justify-center" : ""
+      }`}
+    >
+      <Search aria-hidden="true" className="size-[18px] shrink-0" />
+      <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate text-left"}>Search</span>
+      {!collapsed && mac !== null ? (
+        <kbd aria-hidden="true" className="rounded border border-border px-1.5 font-sans text-xs text-subtle pointer-coarse:hidden">
+          {shortcutLabel(mac)}
+        </kbd>
+      ) : null}
+    </button>
+  );
+}
+
 /** Everything in the sidebar: brand, the quick action, destinations, recent projects, account. */
 function SidebarContent({
   collapsed,
   onToggle,
   onNavigate,
+  onSearch,
   projects,
 }: {
   collapsed: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
+  onSearch: () => void;
   projects: Project[] | null;
 }) {
   const { user, logout } = useAuth();
@@ -156,6 +194,7 @@ function SidebarContent({
       </Link>
 
       <nav aria-label="Main" className="flex flex-col gap-0.5">
+        <SearchButton collapsed={collapsed} onSearch={onSearch} />
         {GLOBAL_NAV.map((item) => (
           <div key={item.key} className="flex flex-col gap-0.5">
             <NavLink
@@ -238,7 +277,35 @@ function Shell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useStoredFlag(COLLAPSE_KEY);
   const [drawer, setDrawer] = useState(false);
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [menuReturn, setMenuReturn] = useState<HTMLElement | null>(null);
+  const mac = useIsMac();
   const toggle = () => setCollapsed(!collapsed);
+
+  function openMenu() {
+    setMenuReturn(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    setDrawer(false); // on phones the navigation sheet makes way
+    setMenu(true);
+  }
+
+  // Cmd/Ctrl+K opens (or closes) the command menu — not over another dialog, and the editor has
+  // no shortcut of its own on K.
+  useEffect(() => {
+    if (mac === null) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing || event.repeat || !isCommandShortcut(event, mac === true)) return;
+      if (menu) {
+        event.preventDefault();
+        setMenu(false);
+      } else if (!document.querySelector("dialog[open]")) {
+        event.preventDefault();
+        setMenuReturn(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        setMenu(true);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mac, menu]);
 
   // Recent projects: refreshed on navigation, so a new or renamed project shows up.
   useEffect(() => {
@@ -265,7 +332,7 @@ function Shell({ children }: { children: ReactNode }) {
           collapsed ? "w-[4.5rem]" : "w-60"
         }`}
       >
-        <SidebarContent collapsed={collapsed} onToggle={toggle} projects={projects} />
+        <SidebarContent collapsed={collapsed} onToggle={toggle} onSearch={openMenu} projects={projects} />
       </aside>
 
       {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
@@ -278,11 +345,14 @@ function Shell({ children }: { children: ReactNode }) {
             <LogoMark className="size-6" />
             PeakSift <span className="text-muted">AI</span>
           </Link>
+          <IconButton aria-label="Search" aria-haspopup="dialog" onClick={openMenu} className="ml-auto">
+            <Search aria-hidden="true" />
+          </IconButton>
           <IconButton
             aria-label="Ask PeakSift"
             aria-expanded={copilot.open}
             onClick={() => copilot.openCopilot()}
-            className="ml-auto text-accent-soft"
+            className="text-accent-soft"
           >
             <Sparkles aria-hidden="true" />
           </IconButton>
@@ -293,8 +363,9 @@ function Shell({ children }: { children: ReactNode }) {
       </div>
 
       <Dialog open={drawer} onClose={() => setDrawer(false)} title="Navigation" placement="left" hideTitle>
-        <SidebarContent collapsed={false} onNavigate={() => setDrawer(false)} projects={projects} />
+        <SidebarContent collapsed={false} onNavigate={() => setDrawer(false)} onSearch={openMenu} projects={projects} />
       </Dialog>
+      <CommandMenu open={menu} onClose={() => setMenu(false)} projects={projects} returnTo={menuReturn} />
     </div>
   );
 }

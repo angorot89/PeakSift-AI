@@ -57,7 +57,7 @@ type Pending = { key: string; text: string; startedAt: number };
 
 /** Ask PeakSift: a side panel on large screens, a full-height sheet on phones. */
 export function CopilotPanel() {
-  const { open, closeCopilot, takeQueued } = useCopilot();
+  const { open, request, closeCopilot, takeQueued } = useCopilot();
   const desktop = useDesktop();
   const pathname = usePathname();
   const router = useRouter();
@@ -88,7 +88,11 @@ export function CopilotPanel() {
     getCopilotThread(scope.projectId)
       .then((thread) => {
         if (cancelled) return;
-        setThreads((all) => ({ ...all, [key]: thread.messages }));
+        // A question asked as the panel opened may already be answered: keep it after the history.
+        setThreads((all) => {
+          const known = new Set(thread.messages.map((message) => message.id));
+          return { ...all, [key]: [...thread.messages, ...(all[key] ?? []).filter((message) => !known.has(message.id))] };
+        });
         setScopes((all) => ({ ...all, [key]: thread.scope }));
       })
       .catch((failure: unknown) => !cancelled && setError(errorMessage(failure)));
@@ -170,18 +174,22 @@ export function CopilotPanel() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, desktop, confirmClear, closeCopilot]);
 
-  // On opening: ask a question handed over by another entry point (e.g. the command menu), or
-  // put the cursor in the composer. Only when the panel opens — never on later renders.
+  // On each opening request: ask a question handed over by another entry point (e.g. the command
+  // menu) — or, while an answer is still coming, leave it in the composer — or put the cursor in
+  // the composer. Only on a request, never on later renders.
   const askRef = useRef(ask);
+  const pendingRef = useRef(pending);
   useEffect(() => {
     askRef.current = ask;
-  }, [ask]);
+    pendingRef.current = pending;
+  }, [ask, pending]);
   useEffect(() => {
     if (!open) return;
     const queued = takeQueued();
-    if (queued) void askRef.current(queued);
-    else if (window.matchMedia(DESKTOP).matches) composer.current?.focus();
-  }, [open, takeQueued]);
+    if (queued && !pendingRef.current) void askRef.current(queued);
+    else if (queued) setDraft(queued);
+    if (!queued && window.matchMedia(DESKTOP).matches) composer.current?.focus();
+  }, [open, request, takeQueued]);
 
   async function runAction(message: CopilotMessage, action: CopilotAction) {
     const id = `${message.id}:${action.index}`;
