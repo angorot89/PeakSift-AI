@@ -166,10 +166,13 @@ export function EditorTimeline({
   duration,
   video,
   footer,
+  message,
   children,
 }: {
   duration: number;
   video: HTMLVideoElement | null;
+  /** A short status after an edit on the timeline (e.g. a move that was undone). */
+  message?: string;
   /** Under the tracks (e.g. what the timeline does not show). */
   footer?: ReactNode;
   children: ReactNode;
@@ -326,6 +329,9 @@ export function EditorTimeline({
             </div>
           </div>
         </div>
+        <p role="status" aria-live="polite" className="px-4 text-caption text-amber-200 empty:hidden sm:px-5 [&:not(:empty)]:pb-2.5">
+          {message}
+        </p>
         {footer ? <div className="border-t border-border/70 px-4 py-2.5 text-caption text-subtle sm:px-5">{footer}</div> : null}
       </section>
     </ScaleContext.Provider>
