@@ -292,3 +292,30 @@ export function representativeTime(item: Pick<TimelineItem, "start" | "end" | "r
 
 /** Whether an item is playing at `t` — the same half-open interval the preview uses. */
 export const activeAt = (start: number, end: number, t: number) => t >= start && t < end;
+
+/** A tooltip for an item: "B-roll · 0:12.4–0:15.2", "Whoosh · 0:10.2", "Music · Full Short". */
+export function itemTooltip(item: Pick<TimelineItem, "kind" | "label" | "start" | "end">, duration: number): string {
+  if (item.kind === "sfx") return `${item.label} · ${timecode(item.start)}`;
+  if (item.kind === "music" && item.start <= 0.01 && item.end >= duration - 0.01) return `${item.label} · Full Short`;
+  return `${item.label} · ${timeRange(item.start, item.end)}`;
+}
+
+export type RenderState = "blocked" | "attention" | "rendering" | "rendered" | "unrendered";
+
+/** The editor's render state in creator words. Settings are saved as a version only when
+ * rendered — there is no autosave, so nothing claims "Saved" before that. */
+export const RENDER_STATE: Record<RenderState, { label: string; tone: "warning" | "danger" | "processing" | "success" | "neutral" }> = {
+  blocked: { label: "Needs a fix to render", tone: "warning" },
+  attention: { label: "Needs attention", tone: "danger" },
+  rendering: { label: "Rendering…", tone: "processing" },
+  rendered: { label: "Rendered", tone: "success" },
+  unrendered: { label: "Not rendered yet", tone: "neutral" },
+};
+
+export function renderState(s: { blocked: boolean; stuck: boolean; active: boolean; ready: boolean }): RenderState {
+  if (s.blocked) return "blocked";
+  if (s.stuck) return "attention";
+  if (s.active) return "rendering";
+  if (s.ready) return "rendered";
+  return "unrendered";
+}

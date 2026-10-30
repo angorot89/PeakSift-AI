@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canvasWidth,
+  itemTooltip,
+  renderState,
   activeAt,
   representativeTime,
   dragTimes,
@@ -198,5 +200,22 @@ describe("preview sync", () => {
     assert.equal(activeAt(4, 6, 4), true);
     assert.equal(activeAt(4, 6, 6), false);
     assert.equal(activeAt(4, 6, 3.99), false);
+  });
+});
+
+describe("polish", () => {
+  it("writes tooltips creators can read", () => {
+    assert.equal(itemTooltip({ kind: "cutaway", label: "B-roll", start: 12.4, end: 15.2 }, 30), "B-roll · 0:12.4–0:15.2");
+    assert.equal(itemTooltip({ kind: "sfx", label: "Whoosh", start: 10.15, end: 10.75 }, 30), "Whoosh · 0:10.2");
+    assert.equal(itemTooltip({ kind: "music", label: "chill-bed.mp3", start: 0, end: 30 }, 30), "chill-bed.mp3 · Full Short");
+    assert.equal(itemTooltip({ kind: "music", label: "intro.mp3", start: 0, end: 12 }, 30), "intro.mp3 · 0:00.0–0:12.0");
+  });
+  it("says the render state honestly (no autosave)", () => {
+    const base = { blocked: false, stuck: false, active: false, ready: false };
+    assert.equal(renderState(base), "unrendered");
+    assert.equal(renderState({ ...base, ready: true }), "rendered");
+    assert.equal(renderState({ ...base, active: true }), "rendering");
+    assert.equal(renderState({ ...base, stuck: true, active: true }), "attention");
+    assert.equal(renderState({ ...base, blocked: true, ready: true }), "blocked");
   });
 });
