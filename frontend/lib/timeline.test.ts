@@ -219,3 +219,32 @@ describe("polish", () => {
     assert.equal(renderState({ ...base, blocked: true, ready: true }), "blocked");
   });
 });
+
+describe("hardening", () => {
+  const bounds = { duration: 15, minLength: 0.5 };
+  it("keeps an element at 0 s and one ending exactly at the end inside the Short", () => {
+    assert.deepEqual(dragTimes("move", 0, 2, -1, bounds), { start: 0, end: 2 });
+    assert.deepEqual(dragTimes("move", 13, 15, 1, bounds), { start: 13, end: 15 });
+    assert.deepEqual(dragTimes("end", 13, 15, 0.5, bounds), { start: 13, end: 15 });
+  });
+  it("never makes an element shorter than the minimum, even when dragged past itself", () => {
+    assert.deepEqual(dragTimes("end", 4, 4.5, -3, bounds), { start: 4, end: 4.5 });
+    assert.deepEqual(dragTimes("start", 4, 4.5, 3, bounds), { start: 4, end: 4.5 });
+  });
+  it("lets two elements touch (adjacent is not overlapping) by snapping to the other's edge", () => {
+    const snapped = snapDelta([6, 8.5], 0.45, [9, 12], 0.1); // 8.5 + 0.45 = 8.95 → 9
+    assert.equal(snapped.point, 9);
+    const next = dragTimes("move", 6, 8.5, snapped.delta, bounds);
+    assert.ok(Math.abs(next.end - 9) < 1e-9);
+  });
+  it("stays smooth with many caption lines: one region per run of lines, not one per word", () => {
+    const cues = Array.from({ length: 120 }, (_, i) => ({ start: i * 0.5, end: i * 0.5 + 0.45 }));
+    const regions = captionRegions(cues);
+    assert.equal(regions.length, 1);
+    assert.equal(regions[0].lines, 120);
+  });
+  it("handles a very short Short", () => {
+    assert.equal(canvasWidth(1.2, 800), 800);
+    assert.deepEqual(ticks(1.2, tickStep(1.2, 800)), [0, 0.5, 1]);
+  });
+});
