@@ -22,6 +22,8 @@ export type ShortSummary = {
   captions_enabled: boolean;
   caption_style: string | null;
   duration_seconds: number | null;
+  /** YouTube confirmed the upload; never an upload still in flight. */
+  published: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -140,4 +142,103 @@ export function gettingStarted(home: Home): { steps: StartStep[]; complete: bool
     { key: "short", title: "Create your first Short", done: short },
   ];
   return { steps, complete: short };
+}
+
+/** "amine.k@example.com" → "Amine.k": a friendly name from the sign-in email (no profile names yet). */
+export function displayName(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  return local ? local.charAt(0).toUpperCase() + local.slice(1) : "";
+}
+
+const MOMENT_STEPS = new Set(["review-clips", "create-short", "clip-working", "find-clips"]);
+const SHORT_STEPS = new Set(["plan-ready", "short-failed", "rendering", "upload-failed", "uploading", "short-ready", "published"]);
+
+export type ContinueVisual =
+  | { kind: "moments"; moments: CandidateSummary[]; count: number }
+  | { kind: "short"; short: ShortSummary }
+  | { kind: "source" }
+  | { kind: "none" };
+
+/** What a Home "Continue working" card shows for a next step, from the project's real data:
+ * the moments waiting, the Short in question, or the source video. */
+export function continueVisual(key: string, project: ProjectSummary | undefined): ContinueVisual {
+  if (!project) return { kind: "none" };
+  const top = project.detection?.top ?? [];
+  if (MOMENT_STEPS.has(key) && top.length) {
+    return { kind: "moments", moments: top.slice(0, 3), count: project.detection?.candidates ?? top.length };
+  }
+  const short = project.shorts.recent[0];
+  if (SHORT_STEPS.has(key) && short) return { kind: "short", short };
+  return project.source && project.source.status !== "failed" ? { kind: "source" } : { kind: "none" };
+}
+
+export type FlowState = "done" | "current" | "working" | "attention" | "upcoming";
+export type FlowStep = {
+  key: "upload" | "transcribe" | "moments" | "short" | "publish";
+  title: string;
+  /** One short line under the title, from the project's real state. */
+  detail: string;
+  state: FlowState;
+};
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/**
+ * The project's workflow in creator words — Upload → Transcribe → Find moments → Create Short →
+ * Edit & publish — each step's state read from the real summary (never guessed).
+ */
+export function workflowSteps(p: ProjectSummary): FlowStep[] {
+  const source = p.source;
+  const sourceReady = source?.status === "ready";
+  const upload: FlowStep = !source
+    ? { key: "upload", title: "Upload", detail: "Add a long video", state: "current" }
+    : source.status === "failed"
+      ? { key: "upload", title: "Upload", detail: "Try another file", state: "attention" }
+      : sourceReady
+        ? { key: "upload", title: "Upload", detail: "Video added", state: "done" }
+        : { key: "upload", title: "Upload", detail: "Preparing the video…", state: "working" };
+
+  const t = p.transcript?.status;
+  const transcribe: FlowStep =
+    t === "completed"
+      ? { key: "transcribe", title: "Transcribe", detail: "Transcript ready", state: "done" }
+      : t === "failed"
+        ? { key: "transcribe", title: "Transcribe", detail: "Needs another try", state: "attention" }
+        : t
+          ? { key: "transcribe", title: "Transcribe", detail: "Transcribing…", state: "working" }
+          : { key: "transcribe", title: "Transcribe", detail: "Get the words", state: sourceReady ? "current" : "upcoming" };
+
+  const d = p.detection;
+  const moments: FlowStep =
+    d?.status === "completed"
+      ? d.candidates > 0
+        ? { key: "moments", title: "Find moments", detail: plural(d.candidates, "moment"), state: "done" }
+        : { key: "moments", title: "Find moments", detail: "None stood out", state: "attention" }
+      : d?.status === "failed"
+        ? { key: "moments", title: "Find moments", detail: "Needs another try", state: "attention" }
+        : d
+          ? { key: "moments", title: "Find moments", detail: "Finding moments…", state: "working" }
+          : { key: "moments", title: "Find moments", detail: "Best moments, ranked", state: t === "completed" ? "current" : "upcoming" };
+
+  const s = p.shorts;
+  const short: FlowStep =
+    s.ready > 0
+      ? { key: "short", title: "Create Short", detail: `${plural(s.ready, "Short")} ready`, state: "done" }
+      : s.working > 0 || p.clips.working > 0
+        ? { key: "short", title: "Create Short", detail: "Rendering…", state: "working" }
+        : s.failed > 0
+          ? { key: "short", title: "Create Short", detail: "A render needs attention", state: "attention" }
+          : { key: "short", title: "Create Short", detail: "Pick a moment", state: moments.state === "done" ? "current" : "upcoming" };
+
+  const u = p.published;
+  const publish: FlowStep =
+    u.uploads > 0
+      ? { key: "publish", title: "Edit & publish", detail: "On YouTube", state: "done" }
+      : u.working > 0
+        ? { key: "publish", title: "Edit & publish", detail: "Uploading…", state: "working" }
+        : u.failed > 0
+          ? { key: "publish", title: "Edit & publish", detail: "An upload needs attention", state: "attention" }
+          : { key: "publish", title: "Edit & publish", detail: "Polish, publish or download", state: s.ready > 0 ? "current" : "upcoming" };
+
+  return [upload, transcribe, moments, short, publish];
 }

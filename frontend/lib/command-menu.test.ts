@@ -28,7 +28,7 @@ describe("command menu commands", () => {
     assert.equal(commands[0].label, "Open the Short");
     assert.deepEqual(commands[0].run, { kind: "navigate", href: `/projects/${P1}/clips/c?edit=e` });
     const sections = commands.filter((c) => c.group === "This project");
-    assert.deepEqual(sections.map((c) => c.label), ["Overview", "Source", "Clips", "Assets", "Analytics"]);
+    assert.deepEqual(sections.map((c) => c.label), ["Overview", "Source", "Moments", "Assets", "Analytics"]);
     assert.deepEqual(sections[3].run, { kind: "navigate", href: `/projects/${P1}/assets` });
     assert.deepEqual(
       commands.filter((c) => c.group === "Go to").map((c) => c.label),
@@ -74,7 +74,7 @@ describe("command menu filtering", () => {
     assert.equal(assets[0].label, "Assets");
     assert.equal(assets.at(-1)?.run.kind, "ask");
     assert.equal(filterCommands(commands, "b-roll")[0].label, "Assets");
-    assert.equal(filterCommands(commands, "moments")[0].label, "Clips");
+    assert.equal(filterCommands(commands, "moments")[0].label, "Moments");
     assert.equal(filterCommands(commands, "project 7")[0].label, "Project 7");
     assert.equal(filterCommands(commands, "episode")[0].hint, "Bridge Lab — Épisode 4");
   });

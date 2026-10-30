@@ -3,53 +3,109 @@
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   Check,
   CheckCircle2,
   Clapperboard,
-  Film,
+  FileText,
   Smartphone,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProject } from "@/components/app/project/project-frame";
 import { ErrorState } from "@/components/app/states";
-import { StatusBadge } from "@/components/app/status-badge";
 import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Spinner } from "@/components/ui/progress";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/status-pill";
+import { FrameTag, VideoFrame } from "@/components/ui/video-frame";
 import { errorMessage } from "@/lib/api";
+import { editContentUrl } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
+import { categoryLabel } from "@/lib/moments";
 import { projectHref } from "@/lib/navigation";
-import { startTranscription } from "@/lib/transcription";
+import { humanStatus } from "@/lib/status";
+import { getTranscriptPage, startTranscription, type TranscriptSegment } from "@/lib/transcription";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
+import { videoContentUrl } from "@/lib/videos";
 import {
   clock,
   editorLink,
   getProjectSummary,
   momentLabel,
-  projectStage,
   relativeTime,
   shortLabel,
-  STAGES,
+  workflowSteps,
+  type FlowState,
   type NextAction,
   type ProjectSummary,
 } from "@/lib/workspace";
 
-const TONE: Record<NextAction["tone"], { icon: LucideIcon | null; className: string; eyebrow: string }> = {
-  attention: { icon: AlertTriangle, className: "bg-danger/15 text-rose-200", eyebrow: "Needs attention" },
-  action: { icon: ArrowRight, className: "bg-accent/15 text-accent-soft", eyebrow: "Next step" },
-  waiting: { icon: null, className: "bg-surface-3 text-muted", eyebrow: "In progress" },
-  done: { icon: CheckCircle2, className: "bg-success/15 text-emerald-200", eyebrow: "Done" },
+const TONE: Record<NextAction["tone"], { icon: LucideIcon | null; tile: string; eyebrow: string }> = {
+  attention: { icon: AlertTriangle, tile: "bg-danger/15 text-rose-200", eyebrow: "Needs attention" },
+  action: { icon: Sparkles, tile: "bg-accent/15 text-accent-soft", eyebrow: "Next best action" },
+  waiting: { icon: null, tile: "bg-violet/15 text-violet-200", eyebrow: "In progress" },
+  done: { icon: CheckCircle2, tile: "bg-success/15 text-emerald-200", eyebrow: "Done" },
 };
+
+const FLOW: Record<FlowState, { circle: string; label: string }> = {
+  done: { circle: "border-success/50 bg-success/15 text-emerald-200", label: "done" },
+  current: { circle: "border-accent bg-accent/15 text-accent-soft shadow-glow", label: "next" },
+  working: { circle: "border-violet/60 bg-violet/15 text-violet-200", label: "in progress" },
+  attention: { circle: "border-danger/60 bg-danger/15 text-rose-200", label: "needs attention" },
+  upcoming: { circle: "border-border-strong bg-surface-2 text-subtle", label: "not started" },
+};
+
+/** Upload → Transcribe → Find moments → Create Short → Edit & publish, from real progress. */
+function Workflow({ summary }: { summary: ProjectSummary }) {
+  const steps = workflowSteps(summary);
+  return (
+    <nav aria-label="Project progress" className="rounded-card border border-border bg-surface/80 px-3 py-3 shadow-card sm:px-5 sm:py-4">
+      <ol className="grid grid-cols-5 gap-1">
+        {steps.map((step, index) => {
+          const look = FLOW[step.state];
+          return (
+            <li key={step.key} className="relative flex min-w-0 flex-col items-center gap-1.5 px-0.5 py-1 text-center lg:flex-row lg:items-center lg:gap-3 lg:px-1 lg:text-left">
+              {index > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-1/2 -left-3 hidden h-px w-5 lg:block ${steps[index - 1].state === "done" ? "bg-success/50" : "bg-white/10"}`}
+                />
+              ) : null}
+              <span
+                aria-current={step.state === "current" ? "step" : undefined}
+                className={`flex size-9 shrink-0 items-center justify-center rounded-full border text-caption font-semibold ${look.circle}`}
+              >
+                {step.state === "done" ? (
+                  <Check aria-hidden="true" className="size-4" strokeWidth={3} />
+                ) : step.state === "working" ? (
+                  <Spinner className="size-4" />
+                ) : step.state === "attention" ? (
+                  <AlertTriangle aria-hidden="true" className="size-4" />
+                ) : (
+                  <span aria-hidden="true">{index + 1}</span>
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className={`block text-caption leading-tight font-semibold sm:text-small lg:text-sm ${step.state === "current" ? "text-accent-soft" : "text-foreground"}`}>
+                  {step.title}
+                  <span className="sr-only"> ({look.label})</span>
+                </span>
+                <span className="hidden truncate text-caption text-subtle lg:block">{step.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 /** The one next step: what it is, why, and the single primary action (or what is happening). */
 function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: () => void }) {
@@ -73,17 +129,22 @@ function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: 
   }
 
   return (
-    <Card padding="md" className="sm:p-6">
+    <section
+      aria-labelledby="next-heading"
+      className={`relative overflow-hidden rounded-card border p-5 shadow-card sm:p-6 ${
+        next.tone === "action" ? "next-glow border-accent/40" : "border-border bg-surface"
+      }`}
+    >
       <div className="flex gap-4">
-        <span className={`hidden size-11 shrink-0 items-center justify-center rounded-xl sm:flex ${tone.className}`}>
-          {tone.icon ? <tone.icon aria-hidden="true" className="size-5" /> : <Spinner />}
+        <span className={`hidden size-12 shrink-0 items-center justify-center rounded-block sm:flex ${tone.tile}`}>
+          {tone.icon ? <tone.icon aria-hidden="true" className="size-6" /> : <Spinner />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-caption font-medium tracking-wide text-subtle uppercase">{tone.eyebrow}</p>
-          <h2 className="mt-1 text-section" aria-live="polite">
+          <p className={`text-caption font-semibold tracking-wide uppercase ${next.tone === "attention" ? "text-rose-200" : "text-accent-soft"}`}>{tone.eyebrow}</p>
+          <h2 id="next-heading" className="mt-1 text-section text-pretty" aria-live="polite">
             {next.title}
           </h2>
-          <p className="mt-1 text-sm text-pretty text-muted">{next.description}</p>
+          <p className="mt-1.5 text-sm text-pretty text-muted">{next.description}</p>
           {next.key === "upload" ? (
             <div className="mt-5">
               <VideoUpload projectId={summary.id} onUploaded={onChanged} />
@@ -96,7 +157,10 @@ function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: 
             </div>
           ) : next.cta ? (
             <div className="mt-5">
-              <ButtonLink href={next.href}>{next.cta}</ButtonLink>
+              <ButtonLink href={next.href}>
+                {next.cta}
+                <ArrowRight aria-hidden="true" />
+              </ButtonLink>
             </div>
           ) : (
             <p className="mt-4 flex items-center gap-2 text-small text-subtle">
@@ -111,201 +175,207 @@ function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: 
           ) : null}
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 
-/** Source → Clips → Edit → Publish → Learn: where the project is, every step reachable. */
-function Workflow({ summary }: { summary: ProjectSummary }) {
-  const stage = projectStage(summary);
-  const short = summary.shorts.recent.find((s) => s.status === "ready") ?? summary.shorts.recent[0];
-  const detail = [
-    summary.source ? summary.source.filename : "Add a long video",
-    summary.detection?.status === "completed"
-      ? `${summary.detection.candidates} moment${summary.detection.candidates === 1 ? "" : "s"} · ${summary.clips.ready} clip${summary.clips.ready === 1 ? "" : "s"}`
-      : summary.transcript?.status === "completed"
-        ? "Transcript ready"
-        : "Find the best moments",
-    summary.shorts.total ? `${summary.shorts.ready} Short${summary.shorts.ready === 1 ? "" : "s"} ready` : "Turn a clip into a Short",
-    summary.published.uploads || summary.published.with_analytics
-      ? "On YouTube"
-      : "Publish or download",
-    summary.published.with_analytics ? "Analytics ready" : "See what worked",
-  ];
-  const links = [
-    projectHref(summary.id, "source"),
-    projectHref(summary.id, "clips"),
-    short ? editorLink(summary.id, short.clip_id, short.edit_id) : projectHref(summary.id, "clips"),
-    short ? editorLink(summary.id, short.clip_id, short.edit_id) : projectHref(summary.id, "clips"),
-    projectHref(summary.id, "analytics"),
-  ];
+/** The source video: a real frame, its length and state; details live on the Source page. */
+function SourceCard({ summary }: { summary: ProjectSummary }) {
+  const source = summary.source;
+  if (!source) return null;
+  const status = humanStatus(source.status);
   return (
-    <nav aria-label="Project progress">
-      <ol className="grid gap-1 sm:grid-cols-5 lg:grid-cols-1">
-        {STAGES.map((name, index) => {
-          const state = index < stage ? "done" : index === stage ? "current" : "upcoming";
-          return (
-            <li key={name}>
-              <Link
-                href={links[index]}
-                aria-current={state === "current" ? "step" : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-accent ${
-                  state === "current" ? "bg-surface-2" : ""
-                }`}
+    <section aria-labelledby="source-heading" className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
+      <SectionHeader as="h3" id="source-heading" title="Source video" />
+      <Link
+        href={projectHref(summary.id, "source")}
+        className="group block rounded-block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <VideoFrame
+          src={source.status === "failed" ? null : videoContentUrl(source.id)}
+          at={Math.min(5, (source.duration_seconds ?? 2) / 3)}
+          className="rounded-block border border-border transition-[border-color] group-hover:border-border-strong"
+        >
+          {source.duration_seconds ? <FrameTag className="right-2 bottom-2">{clock(source.duration_seconds)}</FrameTag> : null}
+        </VideoFrame>
+        <span className="mt-3 flex items-center justify-between gap-3">
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">{source.filename}</span>
+          <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        </span>
+        <span className="mt-0.5 block text-caption text-subtle">Open the source, transcript and technical details</span>
+      </Link>
+    </section>
+  );
+}
+
+/** The first lines of the transcript, read-only; the full, searchable transcript is on Source. */
+function TranscriptPeek({ summary }: { summary: ProjectSummary }) {
+  const source = summary.source;
+  const ready = summary.transcript?.status === "completed" && !!source;
+  const [lines, setLines] = useState<TranscriptSegment[] | null>(null);
+  useEffect(() => {
+    if (!ready || !source) return;
+    let cancelled = false;
+    getTranscriptPage(summary.id, source.id, 0, 6)
+      .then((page) => !cancelled && setLines(page.segments))
+      .catch(() => !cancelled && setLines([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, source, summary.id]);
+  if (!ready) return null;
+  const top = summary.detection?.top[0];
+  return (
+    <section aria-labelledby="transcript-heading" className="flex flex-col rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
+      <SectionHeader
+        as="h3"
+        id="transcript-heading"
+        title="Transcript"
+        actions={
+          <Link
+            href={projectHref(summary.id, "source")}
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <FileText aria-hidden="true" className="size-4" />
+            Full transcript
+          </Link>
+        }
+      />
+      {lines === null ? (
+        <div className="space-y-2" role="status" aria-label="Loading the transcript">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+        </div>
+      ) : lines.length ? (
+        <ol className="space-y-1">
+          {lines.map((line) => {
+            // The top moment's opening line is highlighted, so the creator sees where it starts.
+            const inTop = !!top && line.start < top.end_time && line.end > top.start_time;
+            return (
+              <li
+                key={line.sequence_index}
+                className={`flex gap-3 rounded-control px-2 py-1.5 text-sm ${inTop ? "bg-accent/[0.08] ring-1 ring-accent/25 ring-inset" : ""}`}
               >
-                <span
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${
-                    state === "done"
-                      ? "bg-success/15 text-emerald-200"
-                      : state === "current"
-                        ? "bg-accent text-background"
-                        : "bg-surface-3 text-subtle"
-                  }`}
-                >
-                  {state === "done" ? <Check aria-hidden="true" className="size-3.5" strokeWidth={3} /> : index + 1}
+                <span className={`tabular mt-0.5 shrink-0 self-start rounded-md px-1.5 text-caption ${inTop ? "bg-accent/20 text-accent-soft" : "bg-surface-2 text-subtle"}`}>
+                  {clock(line.start)}
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-foreground">
-                    {name}
-                    <span className="sr-only">{state === "done" ? " (done)" : state === "current" ? " (current)" : ""}</span>
+                <span className="min-w-0 text-pretty text-muted">{line.text}</span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="text-sm text-muted">The transcript has no lines to show.</p>
+      )}
+    </section>
+  );
+}
+
+/** The best moments as visual cards: a real frame at the moment, its type, time and rank label. */
+function Moments({ summary }: { summary: ProjectSummary }) {
+  const top = summary.detection?.top ?? [];
+  const source = summary.source;
+  if (!top.length || !source) return null;
+  return (
+    <section aria-labelledby="moments-heading">
+      <SectionHeader
+        id="moments-heading"
+        title="Clip moments"
+        description="Ranked by PeakSift's editorial judgement of the transcript — not a prediction of views."
+        actions={
+          <Link
+            href={projectHref(summary.id, "clips")}
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            View all moments
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        }
+      />
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {top.slice(0, 3).map((moment) => (
+          <li key={moment.id} className="min-w-0">
+            <Link
+              href={projectHref(summary.id, "clips")}
+              className="group flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-card transition-[border-color,background-color] hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <VideoFrame src={videoContentUrl(source.id)} at={moment.start_time + 0.5}>
+                <span className="absolute top-2 left-2">
+                  <StatusPill tone="info" overlay>
+                    {categoryLabel(moment.category)}
+                  </StatusPill>
+                </span>
+                {moment.rank === 1 ? (
+                  <span className="absolute top-2 right-2">
+                    <StatusPill tone="accent" overlay>
+                      {momentLabel(moment.rank, moment.overall_score)}
+                    </StatusPill>
                   </span>
-                  <span className="block truncate text-caption text-subtle">{detail[index]}</span>
+                ) : null}
+                <FrameTag className="bottom-2 left-2">
+                  {clock(moment.start_time)} – {clock(moment.end_time)}
+                </FrameTag>
+              </VideoFrame>
+              <span className="flex flex-1 flex-col gap-1 p-4">
+                <span className="text-title text-pretty">{moment.title}</span>
+                <span className="text-caption text-subtle">
+                  {formatDuration(moment.duration_seconds)}
+                  {moment.rank === 1 ? "" : ` · ${momentLabel(moment.rank, moment.overall_score)}`}
+                </span>
+                <span className="mt-auto pt-3 text-small font-medium text-accent-soft">Review and create a Short</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The project's Shorts as vertical thumbnails with their state. */
+function Shorts({ summary }: { summary: ProjectSummary }) {
+  const shorts = summary.shorts.recent;
+  if (!shorts.length) return null;
+  return (
+    <section aria-labelledby="overview-shorts-heading">
+      <SectionHeader id="overview-shorts-heading" title="Generated Shorts" />
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        {shorts.map((short) => {
+          const status = short.published ? { tone: "success" as const, label: "Published" } : humanStatus(short.status);
+          return (
+            <li key={short.edit_id} className="min-w-0">
+              <Link
+                href={editorLink(summary.id, short.clip_id, short.edit_id)}
+                className="group block rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <VideoFrame
+                  src={short.status === "ready" ? editContentUrl(short.edit_id) : null}
+                  ratio="vertical"
+                  icon={short.status === "ready" ? Smartphone : Clapperboard}
+                  className="rounded-card border border-border group-hover:border-border-strong"
+                >
+                  <span className="absolute top-2 left-2">
+                    <StatusPill tone={status.tone} overlay>
+                      {status.label}
+                    </StatusPill>
+                  </span>
+                  {short.duration_seconds ? <FrameTag className="right-2 bottom-2">{formatDuration(short.duration_seconds)}</FrameTag> : null}
+                </VideoFrame>
+                <span className="mt-2.5 line-clamp-2 text-sm font-medium text-foreground">{short.clip_title}</span>
+                <span className="mt-0.5 block truncate text-caption text-subtle">
+                  {shortLabel(short)} · {relativeTime(short.updated_at)}
                 </span>
               </Link>
             </li>
           );
         })}
-      </ol>
-      <p className="mt-2 px-2.5 text-caption text-subtle">You can open any step at any time.</p>
-    </nav>
-  );
-}
-
-function BestMoments({ summary }: { summary: ProjectSummary }) {
-  const top = summary.detection?.top ?? [];
-  if (!top.length) return null;
-  return (
-    <section aria-labelledby="moments-heading">
-      <SectionHeader
-        id="moments-heading"
-        title="Best moments"
-        description="Ranked by PeakSift's editorial judgement of the transcript — not a prediction of views."
-        actions={
-          <Link href={projectHref(summary.id, "clips")} className="inline-flex min-h-11 items-center text-sm text-muted hover:text-foreground">
-            All clips
-          </Link>
-        }
-      />
-      <ul className="space-y-2">
-        {top.map((moment) => (
-          <li key={moment.id}>
-            <Link
-              href={projectHref(summary.id, "clips")}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-foreground">{moment.title}</span>
-                <span className="tabular block text-caption text-subtle">
-                  {clock(moment.start_time)}–{clock(moment.end_time)} · {formatDuration(moment.duration_seconds)}
-                </span>
-              </span>
-              <StatusPill tone={moment.rank === 1 ? "accent" : "neutral"}>{momentLabel(moment.rank, moment.overall_score)}</StatusPill>
-            </Link>
-          </li>
-        ))}
       </ul>
     </section>
   );
 }
 
-function RecentShorts({ summary }: { summary: ProjectSummary }) {
-  const shorts = summary.shorts.recent;
-  if (!shorts.length) return null;
-  return (
-    <section aria-labelledby="overview-shorts-heading">
-      <SectionHeader id="overview-shorts-heading" title="Recent Shorts" />
-      <ul className="space-y-2">
-        {shorts.map((short) => (
-          <li key={short.edit_id}>
-            <Link
-              href={editorLink(summary.id, short.clip_id, short.edit_id)}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <Smartphone aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-foreground">{short.clip_title}</span>
-                <span className="block truncate text-caption text-subtle">
-                  {shortLabel(short)} · {short.duration_seconds ? `${formatDuration(short.duration_seconds)} · ` : ""}
-                  {relativeTime(short.updated_at)}
-                </span>
-              </span>
-              <StatusBadge status={short.status} />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function SideFacts({ summary }: { summary: ProjectSummary }) {
-  const published = summary.published.uploads + summary.published.with_analytics > 0;
-  return (
-    <div className="space-y-3">
-      {summary.source ? (
-        <Link
-          href={projectHref(summary.id, "source")}
-          className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <Film aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-caption text-subtle">Source video</span>
-            <span className="block truncate text-sm font-medium text-foreground">{summary.source.filename}</span>
-            {summary.source.duration_seconds ? (
-              <span className="block text-caption text-subtle">{formatDuration(summary.source.duration_seconds)}</span>
-            ) : null}
-          </span>
-          <StatusBadge status={summary.source.status} />
-        </Link>
-      ) : null}
-      {summary.clips.total ? (
-        <Link
-          href={projectHref(summary.id, "clips")}
-          className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <Clapperboard aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-caption text-subtle">Clips</span>
-            <span className="block text-sm font-medium text-foreground">
-              {summary.clips.ready} ready{summary.clips.working ? ` · ${summary.clips.working} in progress` : ""}
-            </span>
-          </span>
-        </Link>
-      ) : null}
-      {published ? (
-        <Link
-          href={projectHref(summary.id, "analytics")}
-          className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <BarChart3 aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-caption text-subtle">On YouTube</span>
-            <span className="block text-sm font-medium text-foreground">
-              {summary.published.with_analytics
-                ? `${summary.published.with_analytics} Short${summary.published.with_analytics === 1 ? "" : "s"} with analytics`
-                : `${summary.published.uploads} upload${summary.published.uploads === 1 ? "" : "s"}`}
-            </span>
-            {summary.published.last_synced_at ? (
-              <span className="block text-caption text-subtle">Updated {relativeTime(summary.published.last_synced_at)}</span>
-            ) : null}
-          </span>
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-/** The project's landing page: the next step first, where it is, and what it has. */
+/** The project's landing page: where it is, the next step, its source, moments and Shorts. */
 export function ProjectOverview() {
   const { project } = useProject();
   const load = useCallback(() => getProjectSummary(project.id), [project.id]);
@@ -318,24 +388,45 @@ export function ProjectOverview() {
 
   if (loading && !summary) {
     return (
-      <div role="status" aria-label="Loading the overview" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-44 rounded-2xl" />
-        <Skeleton className="h-72 rounded-2xl" />
+      <div role="status" aria-label="Loading the overview" className="space-y-6">
+        <Skeleton className="h-20 rounded-card" />
+        <div className="grid gap-6 lg:grid-cols-12">
+          <Skeleton className="h-56 rounded-card lg:col-span-7" />
+          <Skeleton className="h-56 rounded-card lg:col-span-5" />
+        </div>
       </div>
     );
   }
   if (error || !summary) return <ErrorState title="The overview could not be loaded" message={error ?? "Try again."} onRetry={reload} />;
+  const hasTranscript = summary.transcript?.status === "completed";
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <div className="min-w-0 space-y-8">
-        <NextStep summary={summary} onChanged={() => void refresh()} />
-        <BestMoments summary={summary} />
-        <RecentShorts summary={summary} />
+    <div className="space-y-8">
+      <Workflow summary={summary} />
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        <div className={summary.source ? "lg:col-span-7" : "lg:col-span-12"}>
+          <NextStep summary={summary} onChanged={() => void refresh()} />
+        </div>
+        {summary.source ? (
+          <div className="lg:col-span-5">
+            <SourceCard summary={summary} />
+          </div>
+        ) : null}
       </div>
-      <aside aria-label="Project at a glance" className="space-y-6 lg:row-span-2">
-        <Workflow summary={summary} />
-        <SideFacts summary={summary} />
-      </aside>
+      <Moments summary={summary} />
+      {summary.shorts.recent.length || hasTranscript ? (
+        <div className="grid gap-6 lg:grid-cols-12">
+          {summary.shorts.recent.length ? (
+            <div className={hasTranscript ? "lg:col-span-7" : "lg:col-span-12"}>
+              <Shorts summary={summary} />
+            </div>
+          ) : null}
+          {hasTranscript ? (
+            <div className={summary.shorts.recent.length ? "lg:col-span-5" : "lg:col-span-12"}>
+              <TranscriptPeek summary={summary} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

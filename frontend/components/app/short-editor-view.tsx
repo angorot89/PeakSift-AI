@@ -900,7 +900,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   return (
     <>
       <PageHeader
-        back={{ href: backToProject, label: "Clips" }}
+        back={{ href: backToProject, label: "Moments" }}
         title="Edit Short"
         action={
           <ButtonLink href={autoEditHref(project.id, clip.id)} variant="ghost">
@@ -1321,7 +1321,7 @@ export function ShortEditorView() {
     const notFound = error === "Clip not found" || error === "Project not found";
     return (
       <>
-        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Edit Short" />
+        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Moments" }} title="Edit Short" />
         {notFound ? (
           <EmptyState
             icon={Clapperboard}
@@ -1338,7 +1338,7 @@ export function ShortEditorView() {
   if (data.clip.status !== "ready") {
     return (
       <>
-        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Edit Short" />
+        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Moments" }} title="Edit Short" />
         <EmptyState
           icon={Clapperboard}
           title="This clip isn't ready yet"

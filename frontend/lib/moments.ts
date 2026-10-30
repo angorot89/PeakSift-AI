@@ -44,3 +44,18 @@ export function emptyMoments(
   if (filter === "saved") return { title: "Nothing saved yet", description: "Save the moments you want to come back to." };
   return { title: "Nothing dismissed", description: "Moments you dismiss are kept here, so you can restore them." };
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  humor: "Humor",
+  reaction: "Reaction",
+  story: "Story",
+  insight: "Insight",
+  conflict: "Conflict",
+  emotional: "Emotional",
+  hot_take: "Hot take",
+  explanation: "Explanation",
+  other: "Moment",
+};
+
+/** A moment's type in creator words ("Hot take"); unknown types read "Moment". */
+export const categoryLabel = (category: string): string => CATEGORY_LABELS[category] ?? "Moment";

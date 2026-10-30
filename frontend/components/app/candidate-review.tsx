@@ -23,19 +23,8 @@ import type { GeneratedClip } from "@/lib/clips";
 import { formatDuration, formatTimestamp } from "@/lib/format";
 import { MOMENT_FILTERS, emptyMoments, momentCount, momentQuery, type MomentFilter } from "@/lib/moments";
 import { videoContentUrl } from "@/lib/videos";
+import { categoryLabel } from "@/lib/moments";
 import { momentLabel } from "@/lib/workspace";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  humor: "Humor",
-  reaction: "Reaction",
-  story: "Story",
-  insight: "Insight",
-  conflict: "Conflict",
-  emotional: "Emotional",
-  hot_take: "Hot take",
-  explanation: "Explanation",
-  other: "Moment",
-};
 
 const DIMENSIONS: Array<{ key: keyof ClipCandidate["scores"]; label: string }> = [
   { key: "hook", label: "Hook" },
@@ -275,7 +264,7 @@ function MomentCard({
               {label}
             </span>
             <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
-              {CATEGORY_LABELS[candidate.category] ?? candidate.category}
+              {categoryLabel(candidate.category)}
             </span>
           </div>
           <h3 className="mt-1.5 text-section text-balance break-words text-foreground">{candidate.title}</h3>

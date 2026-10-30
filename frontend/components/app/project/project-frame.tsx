@@ -1,10 +1,11 @@
 "use client";
 
-import { FolderX, MoreHorizontal, Trash2 } from "lucide-react";
+import { ChevronLeft, FolderX, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { DeleteProjectDialog } from "@/components/app/delete-project";
+import { ShellSearch } from "@/components/app/shell-search";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Menu } from "@/components/ui/menu";
@@ -39,7 +40,7 @@ function ProjectTabs({ projectId, compact }: { projectId: string; compact: boole
               <Link
                 href={projectHref(projectId, section.key)}
                 aria-current={exact ? "page" : active ? "location" : undefined}
-                className={`relative flex min-h-11 items-center px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                className={`relative flex min-h-11 items-center px-3.5 text-[0.9375rem] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                   active ? "font-medium text-foreground" : "text-muted hover:text-foreground"
                 }`}
               >
@@ -112,17 +113,29 @@ export function ProjectFrame({ children }: { children: ReactNode }) {
           <ProjectTabs projectId={project.id} compact />
         </div>
       ) : (
-        <div className="mb-8">
-          <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="relative mb-8">
+          <div className="mb-5 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-caption font-medium tracking-wide text-subtle uppercase">Project</p>
-              <h1 className="mt-1 text-page text-balance break-words">{project.name}</h1>
+              <Link
+                href="/projects"
+                className="-ml-1 mb-1 inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <ChevronLeft aria-hidden="true" className="size-4" />
+                All projects
+              </Link>
+              <h1 className="text-page text-balance break-words">{project.name}</h1>
+              <p className="mt-1.5 text-sm text-muted">
+                Project workspace · created {new Date(project.created_at).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
             </div>
-            <Menu
-              label="Project actions"
-              trigger={<MoreHorizontal aria-hidden="true" />}
-              items={[{ label: "Delete project…", icon: Trash2, tone: "danger", onSelect: () => setDeleting(true) }]}
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <ShellSearch />
+              <Menu
+                label="Project actions"
+                trigger={<MoreHorizontal aria-hidden="true" />}
+                items={[{ label: "Delete project…", icon: Trash2, tone: "danger", onSelect: () => setDeleting(true) }]}
+              />
+            </div>
           </div>
           <ProjectTabs projectId={project.id} compact={false} />
           <DeleteProjectDialog project={project} open={deleting} onClose={() => setDeleting(false)} />

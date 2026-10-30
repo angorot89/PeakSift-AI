@@ -2,7 +2,19 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 // The next best action itself is decided by the server (backend/tests/test_next_action.py).
-import { clock, gettingStarted, momentLabel, projectStage, relativeTime, shortLabel, type Home, type ProjectSummary } from "./workspace-rules.ts";
+import {
+  clock,
+  continueVisual,
+  displayName,
+  gettingStarted,
+  momentLabel,
+  projectStage,
+  relativeTime,
+  shortLabel,
+  workflowSteps,
+  type Home,
+  type ProjectSummary,
+} from "./workspace-rules.ts";
 
 const P = "3f1c0a1e-0000-4000-8000-000000000001";
 const CLIP = "3f1c0a1e-0000-4000-8000-000000000002";
@@ -79,5 +91,45 @@ describe("getting started", () => {
     assert.equal(gettingStarted(found).complete, false);
     const made = project({ ...detected(3), shorts: { total: 1, ready: 1, working: 0, failed: 0, recent: [] } });
     assert.equal(gettingStarted(home(made)).complete, true);
+  });
+});
+
+describe("workflow steps", () => {
+  const states = (p: ProjectSummary) => workflowSteps(p).map((step) => step.state);
+  it("starts at Upload for an empty project", () => {
+    assert.deepEqual(states(project()), ["current", "upcoming", "upcoming", "upcoming", "upcoming"]);
+  });
+  it("follows real progress and says when PeakSift is working", () => {
+    assert.deepEqual(states(project({ source: ready })), ["done", "current", "upcoming", "upcoming", "upcoming"]);
+    assert.deepEqual(states(project({ source: ready, transcript: { status: "transcribing", progress_percent: 40 } })), [
+      "done", "working", "upcoming", "upcoming", "upcoming",
+    ]);
+    assert.deepEqual(states(project(detected(4))), ["done", "done", "done", "current", "upcoming"]);
+    assert.equal(workflowSteps(project(detected(4)))[2].detail, "4 moments");
+  });
+  it("flags problems instead of hiding them", () => {
+    assert.equal(workflowSteps(project(detected(0)))[2].state, "attention");
+    assert.equal(workflowSteps(project({ source: { ...ready, status: "failed" } }))[0].state, "attention");
+  });
+  it("finishes once a Short is on YouTube", () => {
+    const shorts = { total: 1, ready: 1, working: 0, failed: 0, recent: [] };
+    const published = { uploads: 1, working: 0, failed: 0, with_analytics: 0, last_synced_at: null };
+    assert.deepEqual(states(project({ ...detected(3), shorts })), ["done", "done", "done", "done", "current"]);
+    assert.deepEqual(states(project({ ...detected(3), shorts, published })), ["done", "done", "done", "done", "done"]);
+  });
+});
+
+describe("home helpers", () => {
+  it("makes a friendly name from the email", () => {
+    assert.equal(displayName("amine@example.com"), "Amine");
+    assert.equal(displayName(""), "");
+  });
+  it("shows the moments waiting, the Short in question, or the source", () => {
+    const moment = { id: "m", rank: 1, title: "A", start_time: 10, end_time: 30, duration_seconds: 20, category: "insight", overall_score: 80 };
+    const withMoments = project({ ...detected(5), detection: { ...detected(5).detection, top: [moment] } });
+    assert.deepEqual(continueVisual("review-clips", withMoments), { kind: "moments", moments: [moment], count: 5 });
+    assert.equal(continueVisual("transcribe", project({ source: ready })).kind, "source");
+    assert.equal(continueVisual("upload", project()).kind, "none");
+    assert.equal(continueVisual("short-ready", project({ source: ready })).kind, "source"); // no Short listed: the source
   });
 });

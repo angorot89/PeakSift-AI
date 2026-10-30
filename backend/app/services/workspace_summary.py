@@ -48,7 +48,20 @@ def _counts(rows) -> dict[str, int]:
     return {status: count for status, count in rows}
 
 
-def _short(edit: ClipEdit, title: str) -> dict:
+def _published(db: Session, edit_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """The edits YouTube has confirmed as published (never an upload still in flight)."""
+    if not edit_ids:
+        return set()
+    return set(
+        db.scalars(
+            select(PublishJob.edit_id).where(
+                PublishJob.edit_id.in_(edit_ids), PublishJob.status == "published"
+            )
+        ).all()
+    )
+
+
+def _short(edit: ClipEdit, title: str, published: set[uuid.UUID]) -> dict:
     return {
         "edit_id": edit.id,
         "clip_id": edit.clip_id,
@@ -58,6 +71,7 @@ def _short(edit: ClipEdit, title: str) -> dict:
         "captions_enabled": edit.captions_enabled,
         "caption_style": edit.caption_style,
         "duration_seconds": edit.duration_seconds,
+        "published": edit.id in published,
         "created_at": edit.created_at,
         "updated_at": edit.updated_at,
     }
@@ -180,12 +194,13 @@ def project_summary(db: Session, project: Project) -> dict:
             .limit(RECENT_SHORTS)
         ).all()
         activity.extend(edit.updated_at for edit, _ in recent)
+        published = _published(db, [edit.id for edit, _ in recent])
         summary["shorts"] = {
             "total": sum(edit_counts.values()),
             "ready": edit_counts.get("ready", 0),
             "working": sum(n for s, n in edit_counts.items() if s in WORKING),
             "failed": edit_counts.get("failed", 0),
-            "recent": [_short(edit, title) for edit, title in recent],
+            "recent": [_short(edit, title, published) for edit, title in recent],
         }
         plan = db.execute(
             select(
@@ -253,6 +268,7 @@ def home(db: Session, user_id: uuid.UUID) -> dict:
         .order_by(ClipEdit.updated_at.desc())
         .limit(HOME_SHORTS)
     ).all()
+    published = _published(db, [edit.id for edit, *_ in shorts])
     return {
         "continue_items": continue_items(summaries),
         "projects": summaries[:HOME_PROJECTS],
@@ -260,7 +276,7 @@ def home(db: Session, user_id: uuid.UUID) -> dict:
             select(func.count()).select_from(Project).where(Project.user_id == user_id)
         ),
         "recent_shorts": [
-            {**_short(edit, title), "project_id": project_id, "project_name": name}
+            {**_short(edit, title, published), "project_id": project_id, "project_name": name}
             for edit, title, project_id, name in shorts
         ],
     }
