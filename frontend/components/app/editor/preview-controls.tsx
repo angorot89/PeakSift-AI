@@ -107,7 +107,7 @@ export function PreviewControls({
         aria-label="Seek preview"
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
         onChange={(event) => video && seek(video, Number(event.target.value))}
-        className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
+        className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[var(--accent)] pointer-coarse:h-11"
       />
       <span className="tabular shrink-0 px-1 text-caption text-subtle">
         {clock(time)} / {clock(duration)}
