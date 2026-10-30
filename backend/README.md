@@ -352,6 +352,19 @@ COPILOT_ACCEPTANCE_EMAIL=… COPILOT_ACCEPTANCE_PASSWORD=… \
 Settings: `COPILOT_ENABLED`, `COPILOT_PROVIDER` (`ollama`, or `fake` outside production),
 `COPILOT_OLLAMA_MODEL`, `COPILOT_TIMEOUT_SECONDS`, `COPILOT_MESSAGE_MAX_CHARS`.
 
+## Editor timeline gate
+
+`scripts/timeline_acceptance.py` checks that a rendered version matches the timing its editor
+timeline showed: cutaway frames before / inside / after, sound-effect onsets (cross-correlated
+above 10 kHz) and caption lines read back with Tesseract. See
+[docs/editor-timeline.md](../docs/editor-timeline.md).
+
+```bash
+TIMELINE_ACCEPTANCE_EMAIL=… TIMELINE_ACCEPTANCE_PASSWORD=… \
+  python scripts/timeline_acceptance.py --api http://localhost:8000 \
+  --project ID --video ID --clip ID --edit ID
+```
+
 ## Brand Studio
 
 `app/services/branding/` (V1.7): `colors.py` (hex normalization, WCAG contrast),

@@ -139,6 +139,8 @@ lib/
   brand.ts         # Brand Studio API calls and types; brand-rules.ts colours, contrast and logo
                    # placement for previews (unit-tested)
   template-rules.ts # Template settings: starters, summaries, settings from an editor draft (unit-tested)
+  timeline.ts      # Editor timeline: scale, ticks, items from the edit, drag/resize/snap, sync, tooltips, render state (unit-tested)
+  reveal.ts        # Reveal a settings card inside the panel without scrolling the page
   morocco.ts       # Morocco Mode preview: the flag, capabilities (all unavailable until real data), Kit tabs (unit-tested)
   command-menu.ts  # The command menu's commands, filtering, question detection and shortcut (unit-tested)
   status.ts        # Waiting / Processing / Ready / Needs attention status language (unit-tested)
