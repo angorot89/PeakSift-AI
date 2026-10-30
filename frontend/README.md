@@ -139,6 +139,7 @@ lib/
   brand.ts         # Brand Studio API calls and types; brand-rules.ts colours, contrast and logo
                    # placement for previews (unit-tested)
   template-rules.ts # Template settings: starters, summaries, settings from an editor draft (unit-tested)
+  morocco.ts       # Morocco Mode preview: the flag, capabilities (all unavailable until real data), Kit tabs (unit-tested)
   command-menu.ts  # The command menu's commands, filtering, question detection and shortcut (unit-tested)
   status.ts        # Waiting / Processing / Ready / Needs attention status language (unit-tested)
   moments.ts       # Moment filters, their queries, counts and empty states (unit-tested)

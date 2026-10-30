@@ -132,3 +132,47 @@ draft, and the editor offering to view the version already on screen.
 `GET /workspace/home` · `GET /projects/{id}/summary` · `view=active|top` and `counts` on
 `GET …/clip-detection/{run_id}/candidates` · `GET /auth/session`. Existing endpoints, security
 boundaries, rendering, publishing and analytics behaviour are unchanged.
+
+## Visual overhaul (after V1.7)
+
+A visual-first pass toward the reference pack (warm, dark, preview-first), on the same data and
+behaviour (PRs #239–#246):
+
+- **Home** — *Welcome back*, **Continue working** cards from the next-best-action engine (tone,
+  one action, real frames of the moments or Short in question), **Recent projects** (source frame,
+  five-step progress, next step) and vertical **Recent Shorts** (Ready / Published).
+- **Project** — the creator workflow **Upload → Transcribe → Find moments → Create Short → Edit &
+  publish** (done / next / in progress / needs attention, from the summary; one compact row on
+  phones), one **next best action**, the source, **moment cards** with a frame at the moment, the
+  generated Shorts and a transcript peek. The *Clips* tab is now **Moments** (same route).
+- **Editor** — a header with the clip, **Template / Brand chips**, Auto Edit and (large screens)
+  the one **Render Short**; a sixth tool, **Brand** (this Short's template and brand, its brand
+  elements, Save as / Update template — explicit only).
+- **Brand Studio** — brand library cards (swatch or logo, default, template count), an *Edit brand*
+  card with unsaved state and Reset, the live preview in its own column.
+- **Ask PeakSift** — a context card ("Answers from your own data"), suggested-question tiles,
+  numbered idea cards with fact chips, the warm composer and "PeakSift can get things wrong".
+- **Analytics** — "How are my Shorts doing?", freshness, figure tiles ("—" when unreported) and
+  each Short with its real thumbnail. No deltas or predictions.
+- **Morocco Mode (preview)** — see below.
+
+Browser audit: **330/330** (19 surfaces × 1440/1280/1024/768/430/390/375: axe WCAG 2.1 AA, overflow,
+44 px touch targets on phones, console errors). Functional regression on the redesigned build: the
+fresh-creator journey (sign-up → brand → template → upload → Create a Short → Auto Edit → render →
+download), the brand release gate (13/13) and the Copilot acceptance with the local model (17/17).
+
+### Morocco Mode (preview)
+
+Morocco Mode **extends** Global — it never replaces it. Its UI architecture exists behind
+`NEXT_PUBLIC_MOROCCO_MODE_PREVIEW` (off by default; the routes return 404 without it):
+
+- `/morocco` — *Create Shorts for Morocco*, the **Global / Morocco Mode** switch with **Global library
+  included**, and what Morocco Mode adds;
+- `/morocco/kit` — the **Creator Kit**: a local library (Images, B-roll, Sounds, Hooks, Templates),
+  suggestions for a clip, and **local + global match** (Moroccan matches first, then global).
+
+No Moroccan data source exists yet — no Darija hooks, sound library, audience trends or local
+assets — so every capability reads **Not available yet** and links to what works in Global today.
+Nothing is generated, curated as if real, or invented; no place or topic filters ship without a
+library behind them. The capabilities live in `lib/morocco.ts` (unit-tested); a real source flips
+its capability to available. Darija transcription accuracy has not been measured.

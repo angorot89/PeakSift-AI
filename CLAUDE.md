@@ -17,7 +17,7 @@ Long-term:
 
 - **Global** is the base experience, available to everyone.
 - **Morocco Mode** (future) *extends* Global — it is not a separate app. Morocco Mode users keep all Global tools and libraries, plus: Darija-aware AI analysis, Moroccan humor and cultural context, Moroccan sound effects and creator assets, local memes/reactions, Moroccan caption styles, Morocco-specific clip suggestions, and local trend/context intelligence.
-- **Do not implement Morocco Mode** until its milestone is explicitly started. Do not add speculative hooks or abstractions for it either.
+- **Do not implement Morocco Mode** until its milestone is explicitly started. Only its UI architecture exists, as a preview behind `NEXT_PUBLIC_MOROCCO_MODE_PREVIEW` (`lib/morocco.ts`, `/morocco`, `/morocco/kit`): every Moroccan capability is "Not available yet". Never show invented Darija hooks, sounds, trends, assets or figures; a capability turns on only with a real data source.
 
 ## Current state
 
@@ -83,6 +83,15 @@ precedence, Brand Studio, the template builder and library, the create flow and 
 integration (Save as / Update template, explicit only), Ask PeakSift about brands and
 templates, hardening and a real-render release gate; see [docs/brand-studio.md](docs/brand-studio.md).
 
+**Visual UI/UX overhaul: implementation complete locally, pending CI/merge/release** (stacked PRs
+#239–#246 on top of the unmerged V1.7 stack; not merged, not tagged): warm design tokens and
+primitives (`VideoFrame`, `PeakArt`, tinted status pills), a new app shell, Home and the project
+workspace (creator workflow, moment cards with real frames), the editor (Template/Brand chips, a
+Brand tool), Brand Studio library cards, Ask PeakSift tiles and idea cards, creator analytics, a
+feature-gated **Morocco Mode preview** (UI architecture only — no Moroccan data, every capability
+"Not available yet") and a 330/330 browser audit; see
+[docs/creator-experience.md](docs/creator-experience.md) and [docs/design-system.md](docs/design-system.md).
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,
@@ -114,6 +123,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Semantic assets: `app/models/semantic.py` (`VisualSemanticIndex`, `AssetEmbedding`, pgvector `vector(512)`), `app/services/semantic/` (contract, vectors, images, clip_onnx, fake, registry, indexing, sampling, lifecycle, search, matching, benchmark), `app/workers/semantic_tasks.py`, `app/cli/semantic.py`, `scripts/fetch_semantic_model.py` (pinned files + sha256), `scripts/semantic_benchmark.py`, `scripts/semantic_search_probe.py`; frontend `lib/visual-search.ts`, `components/app/use-visual-search.ts`. Model weights are never committed or downloaded automatically; creator media never leaves the server
 - Creator workspace: `app/services/workspace_summary.py` + `app/api/workspace.py` (`/workspace/home`, `/projects/{id}/summary`; not to be confused with `app/services/workspace.py`, the job scratch directories); frontend `components/app/app-shell.tsx`, `home-view.tsx`, `project/`, `create/`, `components/ui/` (design system), `lib/navigation.ts`, `lib/workspace*.ts`, `lib/status.ts`, `lib/moments.ts`, `lib/editor-tools.ts`, `lib/upload-batch.ts`
 - Performance analytics: `app/models/performance.py`, `app/models/insight.py`, `app/services/performance/` (provenance, content, metrics, provider, youtube, fake, factory, sync, lifecycle, summary, normalization, insights, profile, retention), `app/api/performance.py`, `app/workers/performance_tasks.py` (Celery beat schedule), `app/cli/performance.py`, `scripts/insights_benchmark.py`; frontend `/analytics`, `components/app/analytics*`, `lib/performance*.ts`
+- Visual shell and primitives: `app/globals.css` (tokens), `components/ui/` (`video-frame.tsx`, `peak-art.tsx`, `status-pill.tsx`), `components/app/app-shell.tsx`, `shell-search.tsx`, `page-header.tsx`; Morocco Mode preview `lib/morocco.ts`, `components/app/morocco/`
 - Creator Copilot: `app/models/copilot.py` (`CopilotThread`, `CopilotMessage`),
   `app/services/copilot/` (context, history, prompt, contract, provider, answers, safety, ideas,
   actions, service), `app/services/next_action.py`, `app/services/strategy.py`,
