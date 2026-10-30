@@ -25,7 +25,7 @@ export function InlineAlert({
   return (
     <div
       role={tone === "info" ? "status" : "alert"}
-      className={`flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${s.box}`}
+      className={`flex flex-col gap-3 rounded-block border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${s.box}`}
     >
       <div className="flex min-w-0 gap-3">
         <s.Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${s.icon}`} />

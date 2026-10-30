@@ -1,23 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  /* Surfaces, from the page outwards: page < panel < raised control/inset. */
-  --background: #09090b;
-  --surface: #111113;
-  --surface-2: #18181b;
-  --surface-3: #202024;
-  --border: rgb(255 255 255 / 0.08);
-  --border-strong: rgb(255 255 255 / 0.16);
+  /* Surfaces, from the page outwards: a warm near-black page < panel < raised control < elevated. */
+  --background: #0a0a0c;
+  --surface: #121215;
+  --surface-2: #19191d;
+  --surface-3: #222227;
+  --border: rgb(255 255 255 / 0.07);
+  --border-strong: rgb(255 255 255 / 0.14);
   /* Text: primary, secondary (≥ 7:1 on panels), tertiary metadata (≥ 4.5:1). */
-  --foreground: #fafafa;
-  --muted: #a1a1aa;
-  --subtle: #8b8b94;
-  /* One brand accent, used sparingly; status colours only for state. */
+  --foreground: #f7f7f8;
+  --muted: #a8a8b0;
+  --subtle: #8d8d96;
+  /* One warm brand accent: `accent` for marks and focus, `accent-soft` for text on dark,
+     `accent-fill` for the primary action (with dark `accent-ink` text, ≥ 8:1). */
   --accent: #f97316;
   --accent-soft: #fdba74;
+  --accent-fill: #fb9d55;
+  --accent-fill-hover: #fdb072;
+  --accent-ink: #1c0e03;
+  /* Semantic accents, only where they mean something: success (done, published, growth),
+     info (drafts, links, neutral facts), violet (working, AI, rendering). */
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #fb7185;
+  --info: #7cb4fa;
+  --violet: #a78bfa;
 }
 
 @theme inline {
@@ -35,18 +43,41 @@
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-fill-hover: var(--accent-fill-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-info: var(--info);
+  --color-violet: var(--violet);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Type scale: page title, section, card title, body (default), small, caption. */
-  --text-page: 1.625rem;
-  --text-page--line-height: 2rem;
-  --text-page--font-weight: 600;
-  --text-page--letter-spacing: -0.02em;
-  --text-section: 1.0625rem;
-  --text-section--line-height: 1.5rem;
+  /* Radius scale: controls < inner blocks and media < cards and dialogs. */
+  --radius-control: 0.625rem;
+  --radius-block: 0.875rem;
+  --radius-card: 1.125rem;
+
+  /* Elevation: a hairline highlight and a soft drop; the accent glow only on the primary action
+     and the selected navigation item. */
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 32px -18px rgb(0 0 0 / 0.7);
+  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 18px 48px -20px rgb(0 0 0 / 0.85);
+  --shadow-glow: 0 8px 28px -10px rgb(249 115 22 / 0.55);
+
+  /* Motion: one easing for everything that moves; durations stay short. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Type scale: display (a page's welcome), page title, section, card title, body, small, caption. */
+  --text-display: 2.5rem;
+  --text-display--line-height: 2.875rem;
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.03em;
+  --text-page: 2rem;
+  --text-page--line-height: 2.375rem;
+  --text-page--font-weight: 700;
+  --text-page--letter-spacing: -0.025em;
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.75rem;
   --text-section--font-weight: 600;
-  --text-section--letter-spacing: -0.01em;
+  --text-section--letter-spacing: -0.015em;
   --text-title: 0.9375rem;
   --text-title--line-height: 1.375rem;
   --text-title--font-weight: 600;
@@ -144,6 +175,41 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* The signed-in workspace: a faint warm light from the top right (the "peak" at dawn), fixed so
+   it never moves with content. Decorative only. */
+.app-atmosphere {
+  background:
+    radial-gradient(60rem 28rem at 85% -8rem, rgb(249 115 22 / 0.09), transparent 70%),
+    radial-gradient(40rem 30rem at 10% 110%, rgb(249 115 22 / 0.05), transparent 70%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+/* The sidebar: a slightly lifted panel with the warm light pooling at its foot (behind Ask
+   PeakSift). */
+.sidebar {
+  background:
+    radial-gradient(18rem 16rem at 0% 100%, rgb(249 115 22 / 0.11), transparent 70%),
+    linear-gradient(rgb(18 18 21 / 0.92), rgb(14 14 17 / 0.92));
+}
+
+/* The current destination in the sidebar: a warm, quiet highlight (plus aria-current). */
+.nav-active {
+  background: linear-gradient(90deg, rgb(249 115 22 / 0.16), rgb(249 115 22 / 0.05));
+  box-shadow: inset 0 0 0 1px rgb(249 115 22 / 0.28);
+}
+
+/* Ask PeakSift: the assistant's door, warm and always findable. */
+.ask-button {
+  background: linear-gradient(135deg, rgb(249 115 22 / 0.18), rgb(249 115 22 / 0.05));
+  box-shadow: inset 0 0 0 1px rgb(249 115 22 / 0.4), 0 10px 30px -14px rgb(249 115 22 / 0.6);
+}
+.ask-button:hover,
+.ask-button-open {
+  background: linear-gradient(135deg, rgb(249 115 22 / 0.26), rgb(249 115 22 / 0.08));
+  box-shadow: inset 0 0 0 1px rgb(253 186 116 / 0.6), 0 10px 30px -12px rgb(249 115 22 / 0.7);
 }
 
 /* Timestamps, durations and counters line up in columns. */

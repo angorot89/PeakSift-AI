@@ -34,7 +34,7 @@ function ToastItem({ toast, onDone }: { toast: Toast; onDone: (id: number) => vo
     <li
       onMouseEnter={stop}
       onMouseLeave={start}
-      className="pointer-events-auto flex animate-dialog-in items-center gap-3 rounded-xl border border-border-strong bg-surface-2 py-2.5 pr-2 pl-3.5 text-sm text-foreground shadow-2xl"
+      className="pointer-events-auto flex animate-dialog-in items-center gap-3 rounded-block border border-border-strong bg-surface-2 py-2.5 pr-2 pl-3.5 text-sm text-foreground shadow-2xl"
     >
       <Icon aria-hidden="true" className={`size-4 shrink-0 ${toast.tone === "success" ? "text-emerald-300" : "text-muted"}`} />
       <span className="min-w-0 flex-1">{toast.message}</span>
@@ -42,7 +42,7 @@ function ToastItem({ toast, onDone }: { toast: Toast; onDone: (id: number) => vo
         type="button"
         aria-label="Dismiss"
         onClick={() => onDone(toast.id)}
-        className="inline-flex size-8 items-center justify-center rounded-lg text-muted hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+        className="inline-flex size-8 items-center justify-center rounded-control text-muted hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
       >
         <X aria-hidden="true" className="size-4" />
       </button>

@@ -5,7 +5,7 @@ export function FormError({ children }: { children?: ReactNode }) {
   return (
     <div role="alert" aria-live="polite">
       {children ? (
-        <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200">
+        <p className="rounded-control border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200">
           {children}
         </p>
       ) : null}

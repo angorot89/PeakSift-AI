@@ -3,12 +3,13 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 // One shape for every button in the product: a softly rounded rectangle, never a pill.
 const base =
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&_svg]:size-4 [&_svg]:shrink-0";
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&_svg]:size-4 [&_svg]:shrink-0";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-foreground text-background shadow-sm hover:bg-zinc-200",
+  // The one warm action per region (Create Short, Render Short, New project).
+  primary: "bg-accent-fill font-semibold text-accent-ink shadow-glow hover:bg-accent-fill-hover",
   secondary:
-    "border border-border-strong bg-surface-2 text-foreground hover:border-white/25 hover:bg-surface-3",
+    "border border-border-strong bg-surface-2/80 text-foreground hover:border-white/25 hover:bg-surface-3",
   ghost: "text-muted hover:bg-white/[0.06] hover:text-foreground",
   danger: "border border-danger/40 bg-danger/10 text-rose-100 hover:bg-danger/20",
 };

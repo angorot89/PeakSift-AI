@@ -33,7 +33,7 @@ export function ToolTabs<K extends string>({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div role="tablist" aria-label={label} className="flex gap-0.5 rounded-xl border border-border bg-surface-2 p-1">
+    <div role="tablist" aria-label={label} className="flex gap-1 rounded-block border border-border bg-surface/80 p-1">
       {items.map((item, index) => {
         const selected = item.key === value;
         const Icon = item.icon;
@@ -57,8 +57,10 @@ export function ToolTabs<K extends string>({
               onChange(items[next].key);
               refs.current[next]?.focus();
             }}
-            className={`relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-1 text-caption font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
-              selected ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:bg-surface-3/60 hover:text-foreground"
+            className={`relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-1 text-caption font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+              selected
+                ? "bg-accent/[0.13] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]"
+                : "text-muted hover:bg-surface-3/70 hover:text-foreground"
             }`}
           >
             <Icon aria-hidden="true" className={`size-4 ${selected ? "text-accent-soft" : ""}`} />

@@ -17,12 +17,12 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center rounded-xl border border-dashed border-border-strong text-center ${
+      className={`flex flex-col items-center rounded-block border border-dashed border-border-strong text-center ${
         compact ? "px-5 py-8" : "px-6 py-12"
       }`}
     >
       {Icon ? (
-        <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-surface-3 text-muted">
+        <span className="mb-3 flex size-10 items-center justify-center rounded-block bg-surface-3 text-muted">
           <Icon aria-hidden="true" className="size-5" />
         </span>
       ) : null}

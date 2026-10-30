@@ -8,9 +8,9 @@ type Placement = "center" | "palette" | "left" | "bottom" | "full";
 
 const PLACEMENT: Record<Placement, string> = {
   center:
-    "m-auto max-h-[calc(100dvh-2rem)] w-[min(var(--dialog-width),calc(100vw-2rem))] rounded-2xl border data-[open=true]:animate-dialog-in",
+    "m-auto max-h-[calc(100dvh-2rem)] w-[min(var(--dialog-width),calc(100vw-2rem))] rounded-card border data-[open=true]:animate-dialog-in",
   palette:
-    "mx-auto mt-[10dvh] mb-auto max-h-[min(34rem,80dvh)] w-[min(var(--dialog-width),calc(100vw-2rem))] rounded-2xl border data-[open=true]:animate-dialog-in",
+    "mx-auto mt-[10dvh] mb-auto max-h-[min(34rem,80dvh)] w-[min(var(--dialog-width),calc(100vw-2rem))] rounded-card border data-[open=true]:animate-dialog-in",
   left: "my-0 mr-auto ml-0 h-dvh max-h-dvh w-[min(20rem,calc(100vw-3rem))] rounded-r-2xl border-r data-[open=true]:animate-sheet-left",
   bottom:
     "mx-0 mt-auto mb-0 max-h-[85dvh] w-full max-w-none rounded-t-2xl border-t data-[open=true]:animate-sheet-up",

@@ -19,7 +19,7 @@ export function Panel({ id, step, title, description, status, actions, children,
     <section
       id={id}
       aria-labelledby={headingId}
-      className={`scroll-mt-24 rounded-2xl border border-border bg-surface ${className}`}
+      className={`scroll-mt-24 rounded-card border border-border bg-surface shadow-card ${className}`}
     >
       <header className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-3">
