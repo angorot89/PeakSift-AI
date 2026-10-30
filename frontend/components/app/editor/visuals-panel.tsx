@@ -79,6 +79,8 @@ export function VisualsPanel({
   onUploaded,
   elements,
   onChange,
+  selected,
+  onSelect,
 }: {
   projectId: string;
   videoId: string;
@@ -89,12 +91,15 @@ export function VisualsPanel({
   onUploaded: (asset: VisualAsset) => void;
   elements: VisualElementDraft[];
   onChange: (elements: VisualElementDraft[]) => void;
+  /** The visual selected here or on the timeline (one selection for both). */
+  selected: string | null;
+  onSelect: (key: string | null) => void;
 }) {
   const [state, setState] = useState<BrollState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chooser, setChooser] = useState<Chooser>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const setSelected = onSelect;
   const byId = useMemo(() => new Map((assets ?? []).map((a) => [a.id, a])), [assets]);
 
   const load = useCallback(
@@ -290,15 +295,6 @@ export function VisualsPanel({
       {/* --- the creator's elements ------------------------------------------------------- */}
       {elements.length ? (
         <>
-          <VisualsTimeline
-            duration={duration}
-            video={video}
-            elements={elements}
-            assets={byId}
-            suggestions={open}
-            selected={selected}
-            onSelect={setSelected}
-          />
           <ul className="space-y-3" aria-label="Visuals in this short">
             {elements.map((element) => (
               <ElementEditor
@@ -687,6 +683,33 @@ function ElementEditor({
   }, [selected]);
   const set = (patch: Partial<VisualElementDraft>) => onChange({ ...element, ...patch });
   const problems = [...elementProblems(element, asset, duration), ...(overlap ? [overlap] : [])];
+  if (!selected && problems.length === 0) {
+    // Not being edited: one compact row (the timeline shows its timing); Edit opens it.
+    return (
+      <li ref={ref} className="flex items-center gap-3 rounded-block border border-border bg-surface-2/40 p-2.5">
+        <span className={`flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md ${asset?.has_alpha ? "checkerboard" : "bg-black"}`}>
+          {asset?.has_thumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element -- private, authenticated API image
+            <img src={visualThumbnailUrl(projectId, asset.id)} alt="" className="size-full object-contain" />
+          ) : (
+            <ImageIcon aria-hidden="true" className="size-4 text-subtle" />
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-foreground">{asset?.display_name ?? "Missing visual"}</span>
+          <span className="tabular block text-caption text-subtle">
+            {MODE_LABELS[element.mode]} · {formatSeconds(element.start_seconds)}–{formatSeconds(element.end_seconds)}
+          </span>
+        </span>
+        <Button variant="secondary" size="sm" onClick={onFocus} aria-label={`Edit ${asset?.display_name ?? "visual"}`}>
+          Edit
+        </Button>
+        <Button variant="ghost" size="sm" className="px-2" onClick={onRemove} aria-label={`Remove ${asset?.display_name ?? "visual"}`}>
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </li>
+    );
+  }
   const isVideo = asset?.kind === "video";
   const positions: VisualPosition[] =
     element.mode === "overlay" ? ["top_left", "top_right", "center", "bottom_left", "bottom_right"] : ["top_left", "top_right", "bottom_left", "bottom_right"];
@@ -900,79 +923,5 @@ function ElementEditor({
         </ul>
       ) : null}
     </li>
-  );
-}
-
-/** A light strip over the short: cutaways on one row, insets on another, suggestion marks and
- * the playhead. Blocks are buttons (select an element); timing is edited in its fields. */
-function VisualsTimeline({
-  duration,
-  video,
-  elements,
-  assets,
-  suggestions,
-  selected,
-  onSelect,
-}: {
-  duration: number;
-  video: HTMLVideoElement | null;
-  elements: VisualElementDraft[];
-  assets: Map<string, VisualAsset>;
-  suggestions: BrollSuggestion[];
-  selected: string | null;
-  onSelect: (key: string) => void;
-}) {
-  const [time, setTime] = useState(0);
-  useEffect(() => {
-    if (!video) return;
-    const update = () => setTime(video.currentTime || 0);
-    update();
-    video.addEventListener("timeupdate", update);
-    video.addEventListener("seeked", update);
-    return () => {
-      video.removeEventListener("timeupdate", update);
-      video.removeEventListener("seeked", update);
-    };
-  }, [video]);
-  const pct = (t: number) => `${Math.max(0, Math.min(100, (t / Math.max(duration, 0.01)) * 100))}%`;
-  const rows: { label: string; items: VisualElementDraft[] }[] = [
-    { label: "Cutaways", items: elements.filter((e) => e.mode === "cutaway") },
-    { label: "Insets", items: elements.filter((e) => e.mode !== "cutaway") },
-  ];
-  return (
-    <div className="space-y-1.5" aria-label="Visuals timeline" role="group">
-      <div className="relative h-2" aria-hidden="true">
-        {suggestions.map((s) => (
-          <span key={s.id} className="absolute top-0 h-2 rounded-sm bg-accent-soft/40" style={{ left: pct(s.start), width: pct(s.end - s.start) }} />
-        ))}
-      </div>
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center gap-2">
-          <span className="w-14 shrink-0 text-[10px] text-subtle">{row.label}</span>
-          <div className="relative h-7 min-w-0 flex-1 rounded-md bg-surface-3/60">
-            {row.items.map((e) => (
-              <button
-                key={e.key}
-                type="button"
-                onClick={() => onSelect(e.key)}
-                aria-pressed={selected === e.key}
-                aria-label={`${MODE_LABELS[e.mode]}: ${assets.get(e.asset_id)?.display_name ?? "visual"}, ${formatSeconds(e.start_seconds)} to ${formatSeconds(e.end_seconds)}`}
-                className={`absolute top-0.5 bottom-0.5 min-w-1.5 truncate rounded px-1 text-left text-[10px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
-                  e.mode === "cutaway" ? "bg-sky-500/70" : "bg-violet-500/70"
-                } ${selected === e.key ? "ring-2 ring-white/80" : ""}`}
-                style={{ left: pct(e.start_seconds), width: pct(e.end_seconds - e.start_seconds) }}
-              >
-                {assets.get(e.asset_id)?.display_name ?? ""}
-              </button>
-            ))}
-            <span aria-hidden="true" className="absolute top-0 bottom-0 w-px bg-white/80" style={{ left: pct(time) }} />
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-between pl-16 text-[10px] text-subtle tabular" aria-hidden="true">
-        <span>0:00</span>
-        <span>{formatSeconds(duration)}</span>
-      </div>
-    </div>
   );
 }
