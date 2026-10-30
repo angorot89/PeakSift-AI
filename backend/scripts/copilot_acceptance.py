@@ -96,6 +96,10 @@ def facts(c: httpx.Client, project: str) -> tuple[set[str], set[str], str]:
     names |= {v["display_name"].lower() for v in c.get(f"/projects/{project}/visual-assets").json()}
     for short in c.get("/workspace/home").json().get("recent_shorts", []):
         names |= {str(short.get(k) or "").lower() for k in ("title", "hook_text", "project_name")}
+    # Published Shorts keep the title the creator gave them on YouTube (analytics answers use it).
+    performance = c.get("/performance")
+    if performance.status_code == 200:
+        names |= {str(v.get("title") or "").lower() for v in performance.json().get("videos", [])}
     return {n for n in names if n}, times, transcript
 
 
