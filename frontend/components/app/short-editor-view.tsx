@@ -35,7 +35,16 @@ import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/tim
 import { setMediaTime } from "@/lib/use-audio-preview";
 import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack, type ItemEdit } from "@/components/app/editor/timeline/tracks";
 import { heardPeaks } from "@/components/app/editor/audio-timeline";
-import { editableEdges, musicEnd, representativeTime, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
+import {
+  editableEdges,
+  musicEnd,
+  RENDER_STATE,
+  renderState,
+  representativeTime,
+  timelineItems,
+  toolForItem,
+  type TimelineItem,
+} from "@/lib/timeline";
 import { VisualsLayer } from "@/components/app/editor/visuals-layer";
 import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
@@ -45,7 +54,8 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { buttonClasses } from "@/components/ui/button-styles";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { WorkingState } from "@/components/ui/progress";
+import { Spinner, WorkingState } from "@/components/ui/progress";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToolTabs, toolPanelProps } from "@/components/ui/tool-tabs";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -1047,6 +1057,11 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 <Sparkles aria-hidden="true" />
                 {busy ? "Starting…" : "Render Short"}
               </Button>
+            ) : matchActive && mode === "preview" ? (
+              <Button className="max-lg:hidden" disabled>
+                <Spinner className="size-4" />
+                Rendering…
+              </Button>
             ) : null}
           </>
         }
@@ -1056,7 +1071,17 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               <span className="text-foreground">{clip.title}</span>
               <span className="tabular text-subtle">· {formatDuration(clip.duration_seconds)} clip</span>
             </span>
-            <OriginChips origin={origin} brand={brand} />
+            <span className="flex flex-wrap items-center gap-2">
+              <OriginChips origin={origin} brand={brand} />
+              {(() => {
+                const state = RENDER_STATE[renderState({ blocked, stuck: matchStuck, active: matchActive, ready: match?.status === "ready" })];
+                return (
+                  <span role="status" title={saveNote}>
+                    <StatusPill tone={state.tone}>{state.label}</StatusPill>
+                  </span>
+                );
+              })()}
+            </span>
           </span>
         }
       />

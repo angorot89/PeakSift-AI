@@ -12,6 +12,7 @@ import {
   keyEdit,
   roundTime,
   snapDelta,
+  itemTooltip,
   timecode,
   timeRange,
   type Bounds,
@@ -155,8 +156,16 @@ export function ItemBlock({
     "data-end": item.kind === "sfx" ? Math.max(item.end, item.start + 0.25) : item.end,
     "aria-label": label + hint,
     "aria-pressed": selected,
-    title: label,
   };
+  const tooltip = ghost ? null : (
+    <span
+      role="presentation"
+      className="pointer-events-none absolute -top-7 z-40 -translate-x-1/2 rounded-md border border-border-strong bg-surface-3 px-1.5 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-foreground opacity-0 shadow-raised transition-opacity duration-150 peer-hover:opacity-100 peer-focus-visible:opacity-100"
+      style={{ left: `${left + (item.kind === "sfx" ? 0 : span / 2)}%` }}
+    >
+      {itemTooltip(item, duration)}
+    </span>
+  );
   const bubble = ghost ? (
     <span
       role="presentation"
@@ -175,13 +184,13 @@ export function ItemBlock({
 
   if (item.kind === "sfx") {
     return (
-      <>
+      <span className="contents">
         {guide}
         {bubble}
         <button
           {...common}
           {...handlers}
-          className={`group absolute inset-y-0 z-10 flex w-8 -translate-x-1/2 touch-none items-center justify-center outline-none pointer-coarse:w-11 ${edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""}`}
+          className={`peer group absolute inset-y-0 z-10 flex w-8 -translate-x-1/2 touch-none items-center justify-center outline-none pointer-coarse:w-11 ${edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""}`}
           style={{ left: `${left}%` }}
         >
           <span
@@ -191,7 +200,8 @@ export function ItemBlock({
             } ${selected || ghost ? "scale-125 ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
           />
         </button>
-      </>
+        {tooltip}
+      </span>
     );
   }
   const handle = (side: "start" | "end") =>
@@ -207,13 +217,13 @@ export function ItemBlock({
       </span>
     ) : null;
   return (
-    <>
+    <span className="contents">
       {guide}
       {bubble}
       <button
         {...common}
         {...handlers}
-        className={`group absolute z-10 flex min-w-1.5 touch-none items-center data-[active=true]:shadow-[0_0_0_1px_rgb(255_255_255/0.35),0_0_16px_-4px_currentColor] data-[active=true]:brightness-125 gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${
+        className={`peer group absolute z-10 flex min-w-1.5 touch-none items-center data-[active=true]:shadow-[0_0_0_1px_rgb(255_255_255/0.35),0_0_16px_-4px_currentColor] data-[active=true]:brightness-125 gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${
           ghost?.problem ? "border-danger bg-danger/25 text-rose-50" : KIND_STYLE[item.kind]
         } ${selected || ghost ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""} ${ghost ? "shadow-raised" : ""} ${
           edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""
@@ -229,7 +239,8 @@ export function ItemBlock({
         )}
         {handle("end")}
       </button>
-    </>
+      {tooltip}
+    </span>
   );
 }
 
