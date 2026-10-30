@@ -1,5 +1,6 @@
 "use client";
 
+import { revealInPanel } from "@/lib/reveal";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Info, Music2, Pause, Play, Plus, Trash2, Upload, Volume2, Waves } from "lucide-react";
 import { Waveform } from "@/components/app/editor/audio-timeline";
@@ -381,7 +382,7 @@ export function AudioPanel({
                 <li
                   key={index}
                   ref={(node) => {
-                    if (node && index === selectedCue) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                    if (index === selectedCue) revealInPanel(node);
                   }}
                   className={`space-y-2 rounded-block border bg-surface-2/50 p-3 transition-colors ${index === selectedCue ? "border-accent/60 ring-1 ring-accent/30" : "border-border"}`}
                 >

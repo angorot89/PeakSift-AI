@@ -1257,7 +1257,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               items={TOOLS.map((t) => ({ ...t, icon: TOOL_ICONS[t.key], mark: marks[t.key] }))}
             />
           </div>
-          <div className="min-h-0 flex-1 px-4 py-5 sm:px-5 lg:overflow-y-auto">
+          <div data-scroll-panel className="min-h-0 flex-1 px-4 py-5 sm:px-5 lg:overflow-y-auto">
             <div {...toolPanelProps(`${id}-tool`, "style", tool === "style")} className="space-y-3 focus-visible:outline-none">
               <LayoutPicker value={layout} onChange={edit(setLayout)} name={`${id}-layout`} />
               {smart ? (

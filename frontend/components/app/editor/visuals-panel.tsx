@@ -1,5 +1,6 @@
 "use client";
 
+import { revealInPanel } from "@/lib/reveal";
 import {
   CheckCircle2,
   Clapperboard,
@@ -679,7 +680,7 @@ function ElementEditor({
   const id = useId();
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (selected) revealInPanel(ref.current);
   }, [selected]);
   const set = (patch: Partial<VisualElementDraft>) => onChange({ ...element, ...patch });
   const problems = [...elementProblems(element, asset, duration), ...(overlap ? [overlap] : [])];
