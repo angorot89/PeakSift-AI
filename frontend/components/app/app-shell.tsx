@@ -321,7 +321,7 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
-      <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[26rem]" : ""}`}>
+      <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[28rem]" : ""}`}>
         <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-xl lg:hidden">
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <MenuIcon aria-hidden="true" />
