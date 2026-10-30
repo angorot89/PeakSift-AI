@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canvasWidth,
+  captionRegions,
+  musicEnd,
+  timelineItems,
+  toolForItem,
+  usesInsetLane,
   filmFrameCount,
   filmFrameTimes,
   fractionAt,
@@ -66,5 +71,64 @@ describe("film strip", () => {
     assert.equal(filmFrameCount(900), 10);
     assert.equal(filmFrameCount(5000), 12);
     assert.deepEqual(filmFrameTimes(20, 4), [2.5, 7.5, 12.5, 17.5]);
+  });
+});
+
+describe("timeline items", () => {
+  const input = {
+    duration: 15,
+    hook: { on: true, text: "Four seconds ahead", seconds: 2.5 },
+    visuals: [
+      { key: "a", mode: "cutaway" as const, start: 4, end: 6.5, name: "lava-pit.png" },
+      { key: "b", mode: "pip" as const, start: 8, end: 11, name: "controller.png" },
+      { key: "c", mode: "overlay" as const, start: 12, end: 20, name: "controller.png" },
+    ],
+    sfx: [{ name: "Whoosh", at: 3, seconds: 0.6 }, { name: "Whoosh", at: 14.9, seconds: null }],
+    music: { name: "chill-bed.mp3", end: 15 },
+  };
+
+  it("derives every item from the editor's settings, on its track and lane", () => {
+    const items = timelineItems(input);
+    assert.deepEqual(items.map((i) => `${i.track}/${i.lane}/${i.label}`), [
+      "opening/0/Hook", "visuals/0/B-roll", "visuals/1/PiP", "visuals/1/Overlay",
+      "sound/0/Whoosh", "sound/0/Whoosh", "music/0/chill-bed.mp3",
+    ]);
+    assert.deepEqual(items[0].ref, { type: "hook" });
+    assert.deepEqual(items[1].ref, { type: "visual", key: "a" });
+    assert.deepEqual(items[4].ref, { type: "sfx", index: 0 });
+    assert.ok(usesInsetLane(items));
+  });
+
+  it("clamps to the Short and gives sound effects their length", () => {
+    const items = timelineItems(input);
+    assert.equal(items[3].end, 15); // an overlay past the end is drawn to the end
+    assert.equal(items[4].end, 3.6);
+    assert.equal(items[5].end, 15); // unknown length: a short marker, clamped
+  });
+
+  it("leaves out what is off", () => {
+    const items = timelineItems({ ...input, hook: { ...input.hook, on: false }, visuals: [], sfx: [], music: null });
+    assert.deepEqual(items, []);
+    assert.equal(usesInsetLane(items), false);
+  });
+
+  it("knows where the music is heard", () => {
+    assert.equal(musicEnd(true, 8, 0, 15), 15);
+    assert.equal(musicEnd(false, 8, 2, 15), 6);
+    assert.equal(musicEnd(false, 40, 0, 15), 15);
+  });
+
+  it("groups caption lines into readable regions", () => {
+    const cues = [{ start: 0.2, end: 1.4 }, { start: 1.6, end: 3 }, { start: 5, end: 6 }];
+    assert.deepEqual(captionRegions(cues), [{ start: 0.2, end: 3, lines: 2 }, { start: 5, end: 6, lines: 1 }]);
+  });
+});
+
+describe("item tools", () => {
+  it("opens the tool that edits each item", () => {
+    assert.equal(toolForItem({ type: "hook" }), "opening");
+    assert.equal(toolForItem({ type: "visual", key: "a" }), "visuals");
+    assert.equal(toolForItem({ type: "sfx", index: 0 }), "sound");
+    assert.equal(toolForItem({ type: "music" }), "sound");
   });
 });

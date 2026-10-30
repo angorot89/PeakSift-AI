@@ -82,3 +82,139 @@ export function filmFrameTimes(duration: number, count: number): number[] {
   const slice = Math.max(0.1, duration) / count;
   return Array.from({ length: count }, (_, i) => Math.round((i + 0.5) * slice * 100) / 100);
 }
+
+// --- Items: everything a track shows, derived from the editor's own settings -------------------
+
+export type TrackKey = "opening" | "visuals" | "captions" | "sound" | "music";
+export type ItemKind = "hook" | "cutaway" | "pip" | "overlay" | "sfx" | "music";
+
+/** What an item stands for in the editor's state (never a database id or a copy of it). */
+export type ItemRef = { type: "hook" } | { type: "visual"; key: string } | { type: "sfx"; index: number } | { type: "music" };
+
+export type TimelineItem = {
+  id: string;
+  track: TrackKey;
+  /** Visuals use two lanes: cutaways (0) and picture-in-picture / overlays (1). */
+  lane: 0 | 1;
+  kind: ItemKind;
+  start: number;
+  end: number;
+  /** A short name for the block ("B-roll", "Whoosh"). */
+  label: string;
+  /** What it is, for tooltips and screen readers ("lava-pit.png"). */
+  name: string;
+  ref: ItemRef;
+};
+
+export type TimelineInput = {
+  duration: number;
+  hook: { on: boolean; text: string; seconds: number };
+  visuals: { key: string; mode: "cutaway" | "pip" | "overlay"; start: number; end: number; name: string }[];
+  sfx: { name: string; at: number; seconds: number | null }[];
+  music: { name: string; end: number } | null;
+};
+
+export const KIND_LABELS: Record<ItemKind, string> = {
+  hook: "Hook",
+  cutaway: "B-roll",
+  pip: "PiP",
+  overlay: "Overlay",
+  sfx: "Sound effect",
+  music: "Music",
+};
+
+/** A sound effect's length on the timeline: the file's length, or a short marker when unknown. */
+const SFX_FALLBACK_SECONDS = 0.4;
+
+/** Every item on the timeline, from the editor's settings, clamped to the Short. */
+export function timelineItems(input: TimelineInput): TimelineItem[] {
+  const d = Math.max(0.1, input.duration);
+  const clamp = (t: number) => Math.min(d, Math.max(0, t));
+  const items: TimelineItem[] = [];
+  if (input.hook.on) {
+    const text = input.hook.text.trim();
+    items.push({
+      id: "hook",
+      track: "opening",
+      lane: 0,
+      kind: "hook",
+      start: 0,
+      end: clamp(input.hook.seconds),
+      label: "Hook",
+      name: text || "Opening hook",
+      ref: { type: "hook" },
+    });
+  }
+  for (const v of input.visuals) {
+    items.push({
+      id: `visual:${v.key}`,
+      track: "visuals",
+      lane: v.mode === "cutaway" ? 0 : 1,
+      kind: v.mode,
+      start: clamp(v.start),
+      end: clamp(Math.max(v.start, v.end)),
+      label: KIND_LABELS[v.mode],
+      name: v.name,
+      ref: { type: "visual", key: v.key },
+    });
+  }
+  input.sfx.forEach((cue, index) => {
+    const start = clamp(cue.at);
+    items.push({
+      id: `sfx:${index}`,
+      track: "sound",
+      lane: 0,
+      kind: "sfx",
+      start,
+      end: clamp(start + (cue.seconds ?? SFX_FALLBACK_SECONDS)),
+      label: cue.name,
+      name: cue.name,
+      ref: { type: "sfx", index },
+    });
+  });
+  if (input.music) {
+    items.push({
+      id: "music",
+      track: "music",
+      lane: 0,
+      kind: "music",
+      start: 0,
+      end: clamp(input.music.end),
+      label: input.music.name,
+      name: input.music.name,
+      ref: { type: "music" },
+    });
+  }
+  return items;
+}
+
+/** Where the music is heard: from the start, to the end of the Short when it loops, otherwise
+ * until the track (from its start point) runs out. */
+export function musicEnd(loop: boolean, trackSeconds: number, sourceStart: number, duration: number): number {
+  if (loop || trackSeconds <= 0) return duration;
+  return Math.min(duration, Math.max(0, trackSeconds - sourceStart));
+}
+
+/** Whether the visuals need their second lane (any picture-in-picture or overlay). */
+export const usesInsetLane = (items: TimelineItem[]) => items.some((i) => i.track === "visuals" && i.lane === 1);
+
+/** Caption lines grouped into readable regions: lines closer than `gap` seconds join. */
+export function captionRegions(cues: { start: number; end: number }[], gap = 0.6): { start: number; end: number; lines: number }[] {
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  const regions: { start: number; end: number; lines: number }[] = [];
+  for (const cue of sorted) {
+    const last = regions[regions.length - 1];
+    if (last && cue.start - last.end <= gap) {
+      last.end = Math.max(last.end, cue.end);
+      last.lines += 1;
+    } else regions.push({ start: cue.start, end: cue.end, lines: 1 });
+  }
+  return regions;
+}
+
+/** The editor tool that edits an item. */
+export function toolForItem(ref: ItemRef): "opening" | "visuals" | "sound" {
+  if (ref.type === "hook") return "opening";
+  if (ref.type === "visual") return "visuals";
+  return "sound";
+}
