@@ -37,6 +37,7 @@ import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack, type
 import { heardPeaks } from "@/components/app/editor/audio-timeline";
 import {
   editableEdges,
+  itemTooltip,
   musicEnd,
   RENDER_STATE,
   renderState,
@@ -1213,6 +1214,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
 
         {/* Settings: everything the server accepts, nothing it does not, in five tool groups. */}
         <aside
+          id={`${id}-settings`}
           aria-label="Edit settings"
           className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
         >
@@ -1434,6 +1436,14 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               duration={clip.duration_seconds}
               video={previewVideo}
               message={timelineMessage}
+              selection={(() => {
+                const picked = timelineSelected === "captions" ? null : items.find((i) => i.id === timelineSelected);
+                if (!timelineSelected) return null;
+                return {
+                  text: picked ? itemTooltip(picked, clip.duration_seconds) : "Captions",
+                  onEdit: () => document.getElementById(`${id}-settings`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
+                };
+              })()}
               footer={
                 (brand?.end_card as { seconds?: number } | undefined)?.seconds
                   ? `Your end card adds ${(brand?.end_card as { seconds: number }).seconds} s after the clip; it appears in the rendered Short, not in this preview.`

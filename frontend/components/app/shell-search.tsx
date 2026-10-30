@@ -28,7 +28,7 @@ export function ShellSearch() {
       onClick={open}
       aria-haspopup="dialog"
       aria-keyshortcuts={mac === null ? undefined : mac ? "Meta+K" : "Control+K"}
-      className="hidden h-10 w-64 items-center gap-2.5 rounded-control border border-border bg-surface/80 px-3 text-sm text-subtle transition-colors hover:border-border-strong hover:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex xl:w-72"
+      className="hidden h-10 items-center gap-2.5 rounded-control border border-border bg-surface/80 px-3 text-sm text-subtle transition-colors hover:border-border-strong hover:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex lg:w-52 xl:w-72"
     >
       <Search aria-hidden="true" className="size-4 shrink-0" />
       <span className="flex-1 truncate text-left">Search or ask PeakSift…</span>

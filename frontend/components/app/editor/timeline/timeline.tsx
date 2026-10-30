@@ -1,7 +1,7 @@
 "use client";
 
 import { Film, type LucideIcon } from "lucide-react";
-import { createContext, useContext, useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type PointerEvent, type ReactNode } from "react";
 import { setMediaTime } from "@/lib/use-audio-preview";
 import {
   activeAt,
@@ -27,6 +27,23 @@ export function useTimelineScale(): Scale {
 }
 
 const LABEL_WIDTH = 104; // px: the sticky track-name column
+const LABEL_WIDTH_NARROW = 88; // small screens keep more room for the canvas
+const TOUCH_PX_PER_SECOND = 44; // a second wide enough to grab on a touch screen
+
+/** A media query as state (false while rendering on the server). */
+function useMedia(query: string): boolean {
+  return useSyncExternalStore(
+    (change) => {
+      const list = window.matchMedia(query);
+      list.addEventListener("change", change);
+      return () => list.removeEventListener("change", change);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+const LabelWidthContext = createContext(LABEL_WIDTH);
 
 /** Runs `onTime` on every animation frame while the video plays, and on seeks and pauses —
  * DOM updates only, never a React render per frame. */
@@ -81,16 +98,19 @@ export function TimelineTrack({
   tall?: boolean;
   children?: ReactNode;
 }) {
+  const labelWidth = useContext(LabelWidthContext);
   return (
     <div role="group" aria-label={label} className="flex border-t border-border/70">
       <div
-        className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-border/70 bg-surface px-3 text-caption font-medium text-muted"
-        style={{ width: LABEL_WIDTH }}
+        data-track-label
+        className="sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r border-border/70 bg-surface px-3 text-caption font-medium text-muted max-sm:gap-1.5 max-sm:px-2"
+        style={{ width: labelWidth }}
       >
         <Icon aria-hidden="true" className="size-3.5 shrink-0 text-subtle" />
         <span className="truncate">{label}</span>
       </div>
-      <div className={`relative grow ${tall ? "h-[4.25rem]" : "h-11"}`}>{children}</div>
+      {/* Taller on touch screens, so every block is at least 44 px high. */}
+      <div className={`relative grow ${tall ? "h-[4.25rem] pointer-coarse:h-[6.25rem]" : "h-11 pointer-coarse:h-14"}`}>{children}</div>
     </div>
   );
 }
@@ -168,12 +188,15 @@ export function EditorTimeline({
   video,
   footer,
   message,
+  selection,
   children,
 }: {
   duration: number;
   video: HTMLVideoElement | null;
   /** A short status after an edit on the timeline (e.g. a move that was undone). */
   message?: string;
+  /** Small screens: what is selected, and a way to its settings (they sit above the timeline). */
+  selection?: { text: string; onEdit: () => void } | null;
   /** Under the tracks (e.g. what the timeline does not show). */
   footer?: ReactNode;
   children: ReactNode;
@@ -185,18 +208,21 @@ export function EditorTimeline({
   const handle = useRef<HTMLDivElement>(null);
   const readout = useRef<HTMLSpanElement>(null);
   const [container, setContainer] = useState(0);
+  const narrow = useMedia("(max-width: 639px)");
+  const coarse = useMedia("(pointer: coarse)");
+  const LABEL = narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH;
   const safe = Math.max(0.1, duration);
-  const width = canvasWidth(safe, container);
+  const width = canvasWidth(safe, container, coarse ? TOUCH_PX_PER_SECOND : undefined);
 
   useEffect(() => {
     const element = scroller.current;
     if (!element) return;
-    const measure = () => setContainer(Math.max(0, element.clientWidth - LABEL_WIDTH));
+    const measure = () => setContainer(Math.max(0, element.clientWidth - LABEL));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [LABEL]);
 
   useVideoClock(video, (t) => {
     const x = fractionAt(t, safe) * width;
@@ -243,6 +269,7 @@ export function EditorTimeline({
   const step = tickStep(safe, width);
   return (
     <ScaleContext.Provider value={{ duration: safe, width, seek }}>
+      <LabelWidthContext.Provider value={LABEL}>
       <section aria-labelledby={`${id}-title`} className="rounded-card border border-border bg-surface shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
           <h2 id={`${id}-title`} className="text-title">
@@ -254,10 +281,10 @@ export function EditorTimeline({
           </p>
         </div>
         <div ref={scroller} className="overflow-x-auto overscroll-x-contain rounded-b-card [scrollbar-width:thin]">
-          <div className="relative" style={{ width: LABEL_WIDTH + width }}>
+          <div className="relative" style={{ width: LABEL + width }}>
             {/* Ruler */}
             <div className="flex">
-              <div className="sticky left-0 z-20 shrink-0 border-r border-border/70 bg-surface" style={{ width: LABEL_WIDTH }} />
+              <div className="sticky left-0 z-20 shrink-0 border-r border-border/70 bg-surface" style={{ width: LABEL }} />
               <div
                 className="relative h-8 cursor-pointer touch-none select-none"
                 style={{ width }}
@@ -282,7 +309,7 @@ export function EditorTimeline({
             <div
               ref={canvasRef}
               className="absolute top-0 bottom-0"
-              style={{ left: LABEL_WIDTH, width }}
+              style={{ left: LABEL, width }}
               aria-hidden="true"
             />
             <div
@@ -302,7 +329,7 @@ export function EditorTimeline({
             {/* Playhead: a line across every track, and a handle on the ruler. */}
             <div
               className="pointer-events-none absolute top-0 bottom-0 z-30"
-              style={{ left: LABEL_WIDTH, width: 0 }}
+              style={{ left: LABEL, width: 0 }}
             >
               <div ref={playhead} className="absolute top-0 bottom-0 will-change-transform">
                 <div className="absolute top-0 bottom-0 -left-px w-0.5 bg-accent shadow-[0_0_8px_rgb(249_115_22/0.6)]" />
@@ -339,8 +366,21 @@ export function EditorTimeline({
         <p role="status" aria-live="polite" className="px-4 text-caption text-amber-200 empty:hidden sm:px-5 [&:not(:empty)]:pb-2.5">
           {message}
         </p>
+        {selection ? (
+          <div className="flex items-center gap-3 border-t border-border/70 px-4 py-2 lg:hidden">
+            <p className="min-w-0 flex-1 truncate text-small text-foreground">{selection.text}</p>
+            <button
+              type="button"
+              onClick={selection.onEdit}
+              className="inline-flex min-h-11 shrink-0 items-center rounded-control border border-border-strong px-3 text-small font-medium text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              Edit settings
+            </button>
+          </div>
+        ) : null}
         {footer ? <div className="border-t border-border/70 px-4 py-2.5 text-caption text-subtle sm:px-5">{footer}</div> : null}
       </section>
+      </LabelWidthContext.Provider>
     </ScaleContext.Provider>
   );
 }
