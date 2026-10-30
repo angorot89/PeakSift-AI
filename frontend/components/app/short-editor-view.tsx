@@ -32,6 +32,9 @@ import { SmartReframePanel, type FramingMode } from "@/components/app/editor/sma
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
 import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/timeline";
+import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack } from "@/components/app/editor/timeline/tracks";
+import { heardPeaks } from "@/components/app/editor/audio-timeline";
+import { musicEnd, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
 import { VisualsLayer } from "@/components/app/editor/visuals-layer";
 import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
@@ -199,6 +202,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const editParam = search.get("edit");
   // Which tool group is open; links from an Auto Edit review open the one they name.
   const [tool, setTool] = useState<ToolKey>(() => toolFromParam(search.get("tool")));
+  // What is selected on the timeline (an item id, or "captions"); the settings stay the source of truth.
+  const [timelineSelected, setTimelineSelected] = useState<string | null>(null);
   // Any change by the creator wins over settings that arrive later from the network.
   const touched = useRef(false);
   const hydrated = useRef(false);
@@ -755,6 +760,46 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     hook_enabled: hookOn,
   })}${audioLabel ? ` · ${audioLabel}` : ""}${visuals.length ? ` · ${visualsSummary(visuals.length)}` : ""}`;
 
+  const audioById = new Map((audioAssets ?? []).map((a) => [a.id, a]));
+  const visualById = new Map((visualAssets ?? []).map((a) => [a.id, a]));
+  const musicAsset = audio.music ? audioById.get(audio.music.asset_id) : undefined;
+  const items = timelineItems({
+    duration: clip.duration_seconds,
+    hook: { on: hookOn, text: hookText, seconds: hookDuration },
+    visuals: visuals.map((v) => ({
+      key: v.key,
+      mode: v.mode,
+      start: v.start_seconds,
+      end: v.end_seconds,
+      name: visualById.get(v.asset_id)?.display_name ?? "Visual",
+    })),
+    sfx: audio.sfx.map((cue) => {
+      const asset = audioById.get(cue.asset_id);
+      return { name: asset?.display_name.replace(/\.[a-z0-9]+$/i, "") ?? "Sound effect", at: cue.at_seconds, seconds: asset?.duration_seconds ?? null };
+    }),
+    music: audio.music
+      ? {
+          name: musicAsset?.display_name ?? "Music",
+          end: musicEnd(audio.music.loop, musicAsset?.duration_seconds ?? 0, audio.music.source_start_seconds, clip.duration_seconds),
+        }
+      : null,
+  });
+  const musicPeaks =
+    audio.music && musicAsset && waveforms[audio.music.asset_id]
+      ? heardPeaks(waveforms[audio.music.asset_id], audio.music, musicAsset.duration_seconds, clip.duration_seconds)
+      : null;
+  const timelineActions = {
+    selectedId: timelineSelected,
+    onSelect: (item: TimelineItem) => {
+      setTimelineSelected(item.id);
+      setTool(toolForItem(item.ref));
+    },
+  };
+  const onTrack = (key: ToolKey) => () => {
+    setTimelineSelected(null);
+    setTool(key);
+  };
+
   const marks = toolMarks({
     awaitingAnalysis,
     awaitingWords,
@@ -1278,6 +1323,20 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               }
             >
               <VideoTrack src={clipContentUrl(clip.id)} />
+              <OpeningTrack items={items.filter((i) => i.track === "opening")} actions={timelineActions} onAdd={onTrack("opening")} />
+              <VisualsTrack items={items.filter((i) => i.track === "visuals")} actions={timelineActions} onAdd={onTrack("visuals")} />
+              <CaptionsTrack
+                enabled={captions}
+                cues={cues}
+                selected={timelineSelected === "captions"}
+                onSelect={() => {
+                  setTimelineSelected("captions");
+                  setTool("captions");
+                }}
+                onAdd={onTrack("captions")}
+              />
+              <SoundTrack items={items.filter((i) => i.track === "sound")} actions={timelineActions} onAdd={onTrack("sound")} />
+              <MusicTrack item={items.find((i) => i.track === "music") ?? null} peaks={musicPeaks} actions={timelineActions} onAdd={onTrack("sound")} />
             </EditorTimeline>
           </div>
         ) : null}
