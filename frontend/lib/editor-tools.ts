@@ -1,6 +1,6 @@
 // The editor's tool groups and how links (e.g. from an Auto Edit review) open one of them.
 
-export type ToolKey = "style" | "captions" | "opening" | "visuals" | "sound";
+export type ToolKey = "style" | "captions" | "opening" | "visuals" | "sound" | "brand";
 
 export const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "style", label: "Style" },
@@ -8,6 +8,7 @@ export const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "opening", label: "Opening" },
   { key: "visuals", label: "Visuals" },
   { key: "sound", label: "Sound" },
+  { key: "brand", label: "Brand" },
 ];
 
 /** Auto Edit's section names, as used in `?tool=` links from its review. */
@@ -31,6 +32,7 @@ export function toolMarks(state: {
   visuals: number;
   visualsInvalid: boolean;
   audioActive: boolean;
+  branded: boolean;
 }): Record<ToolKey, ToolMark> {
   return {
     style: state.awaitingAnalysis ? "attention" : null,
@@ -38,5 +40,6 @@ export function toolMarks(state: {
     opening: state.hookInvalid ? "attention" : state.hookOn ? "on" : null,
     visuals: state.visualsInvalid ? "attention" : state.visuals > 0 ? "on" : null,
     sound: state.audioActive ? "on" : null,
+    brand: state.branded ? "on" : null,
   };
 }

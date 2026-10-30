@@ -11,10 +11,12 @@ import {
   History,
   ImageIcon,
   Music,
+  Palette,
   Plus,
   RotateCcw,
   ScanFace,
   Smartphone,
+  Sparkles,
   Type,
   Wand2,
 } from "lucide-react";
@@ -94,7 +96,7 @@ import {
 } from "@/lib/edits";
 import { DEFAULT_DRAFT, draftFromConfiguration, type EditorDraft } from "@/lib/edit-draft";
 import { BrandLogoLayer } from "@/components/app/editor/brand-logo-layer";
-import { BrandStrip } from "@/components/app/editor/brand-strip";
+import { BrandPanel, OriginChips } from "@/components/app/editor/brand-strip";
 import type { LogoCorner, LogoSize } from "@/lib/brand-rules";
 import { settingsFromEditor } from "@/lib/template-rules";
 import { TOOLS, toolFromParam, toolMarks, type ToolKey } from "@/lib/editor-tools";
@@ -134,6 +136,7 @@ const TOOL_ICONS: Record<ToolKey, typeof Crop> = {
   opening: Type,
   visuals: ImageIcon,
   sound: Music,
+  brand: Palette,
 };
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
@@ -759,6 +762,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     visuals: visuals.length,
     visualsInvalid,
     audioActive,
+    branded: Boolean(brand),
   });
   const timingPanel = (
     <CaptionTimingPanel
@@ -903,23 +907,35 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         back={{ href: backToProject, label: "Moments" }}
         title="Edit Short"
         action={
-          <ButtonLink href={autoEditHref(project.id, clip.id)} variant="ghost">
-            <Wand2 aria-hidden="true" />
-            Auto Edit
-          </ButtonLink>
+          <>
+            <ButtonLink href={autoEditHref(project.id, clip.id)} variant="secondary">
+              <Wand2 aria-hidden="true" />
+              Auto Edit
+            </ButtonLink>
+            {canRender && mode === "preview" ? (
+              // The one Render Short on large screens; phones keep it in the panel and the bottom bar.
+              <Button className="max-lg:hidden" onClick={() => void render()} disabled={busy || edits === null}>
+                <Sparkles aria-hidden="true" />
+                {busy ? "Starting…" : "Render Short"}
+              </Button>
+            ) : null}
+          </>
         }
         description={
-          <span className="inline-flex flex-wrap items-center gap-x-2">
-            <span className="text-foreground">{clip.title}</span>
-            <span className="tabular text-subtle">· {formatDuration(clip.duration_seconds)} clip</span>
+          <span className="flex flex-col gap-3">
+            <span className="inline-flex flex-wrap items-center gap-x-2">
+              <span className="text-foreground">{clip.title}</span>
+              <span className="tabular text-subtle">· {formatDuration(clip.duration_seconds)} clip</span>
+            </span>
+            <OriginChips origin={origin} brand={brand} />
           </span>
         }
       />
 
-      <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_440px] xl:gap-8">
         {/* Stage: the video is the focal point. */}
         <section aria-label="Stage" ref={stageRef} className="min-w-0 scroll-mt-20 lg:col-start-1 lg:row-start-1">
-          <div className="rounded-2xl border border-border bg-[radial-gradient(ellipse_at_top,rgb(255_255_255/0.04),transparent_60%)] bg-surface p-4 sm:p-6">
+          <div className="rounded-card border border-border bg-[radial-gradient(ellipse_at_top,rgb(249_115_22/0.06),transparent_60%)] bg-surface p-4 shadow-card sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5" role="group" aria-label="Stage view">
                 <button
@@ -927,7 +943,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   aria-pressed={mode === "preview"}
                   onClick={() => setMode("preview")}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
-                    mode === "preview" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
+                    mode === "preview" ? "bg-accent/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]" : "text-muted hover:text-foreground"
                   }`}
                 >
                   <Eye aria-hidden="true" className="size-3.5" />
@@ -942,7 +958,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     if (target) showRendered(target);
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 disabled:cursor-not-allowed disabled:opacity-40 ${
-                    mode === "rendered" ? "bg-surface-3 text-foreground shadow-sm" : "text-muted hover:text-foreground"
+                    mode === "rendered" ? "bg-accent/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]" : "text-muted hover:text-foreground"
                   }`}
                 >
                   <Smartphone aria-hidden="true" className="size-3.5" />
@@ -1044,7 +1060,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         {/* Settings: everything the server accepts, nothing it does not, in five tool groups. */}
         <aside
           aria-label="Edit settings"
-          className="flex flex-col self-start rounded-2xl border border-border bg-surface lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
+          className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
         >
           <div className="space-y-3 border-b border-border px-4 pt-4 pb-3 sm:px-5">
             <div className="flex items-center justify-between gap-3">
@@ -1077,36 +1093,6 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 ))}
               </div>
             ) : null}
-            <BrandStrip
-              brand={brand}
-              origin={origin}
-              onBrand={(next, from) => {
-                touched.current = true;
-                setBrand(next);
-                setOrigin(from);
-              }}
-              templateSettings={() =>
-                settingsFromEditor({
-                  layout,
-                  manual,
-                  captions,
-                  preset,
-                  position,
-                  hookOn,
-                  hookStyle,
-                  hookPosition,
-                  hookDuration,
-                  visuals: visuals.length,
-                  musicGainDb: audio.music ? audio.music.gain_db : null,
-                  ducking: audio.music ? audio.music.ducking : null,
-                  sfx: audio.sfx.length,
-                  normalize: audio.normalize,
-                  brand: brand
-                    ? { logo: Boolean(brand.logo), endCardSeconds: (brand.end_card as { seconds?: number } | undefined)?.seconds ?? null }
-                    : null,
-                })
-              }
-            />
             <ToolTabs
               label="Tools"
               idBase={`${id}-tool`}
@@ -1231,14 +1217,46 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 onUploaded={audioUploaded}
               />
             </div>
+            <div {...toolPanelProps(`${id}-tool`, "brand", tool === "brand")} className="focus-visible:outline-none">
+              <BrandPanel
+                brand={brand}
+                origin={origin}
+                onBrand={(next, from) => {
+                  touched.current = true;
+                  setBrand(next);
+                  setOrigin(from);
+                }}
+                templateSettings={() =>
+                  settingsFromEditor({
+                    layout,
+                    manual,
+                    captions,
+                    preset,
+                    position,
+                    hookOn,
+                    hookStyle,
+                    hookPosition,
+                    hookDuration,
+                    visuals: visuals.length,
+                    musicGainDb: audio.music ? audio.music.gain_db : null,
+                    ducking: audio.music ? audio.music.ducking : null,
+                    sfx: audio.sfx.length,
+                    normalize: audio.normalize,
+                    brand: brand
+                      ? { logo: Boolean(brand.logo), endCardSeconds: (brand.end_card as { seconds?: number } | undefined)?.seconds ?? null }
+                      : null,
+                  })
+                }
+              />
+            </div>
           </div>
           {/* Always reachable: sticks to the bottom of the screen on phones, of the panel on desktop. */}
-          <div ref={footerRef} className="sticky bottom-0 z-10 space-y-3 rounded-b-2xl border-t border-border bg-surface px-4 py-4 sm:px-5">
+          <div ref={footerRef} className="sticky bottom-0 z-10 space-y-3 rounded-b-card border-t border-border bg-surface px-4 py-4 sm:px-5">
             <p className="text-xs text-muted">
               <span className="text-subtle">Output: </span>
               {settingsSummary}
             </p>
-            {action}
+            <div className={canRender ? "lg:hidden" : ""}>{action}</div>
             <p className="text-caption text-pretty text-subtle">{saveNote}</p>
             {actionError ? (
               <InlineAlert title="The render could not start">{actionError}</InlineAlert>

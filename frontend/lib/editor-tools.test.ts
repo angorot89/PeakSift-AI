@@ -10,16 +10,18 @@ describe("editor tools", () => {
     assert.equal(toolFromParam("hook"), "opening");
     assert.equal(toolFromParam("audio"), "sound");
     assert.equal(toolFromParam("visuals"), "visuals");
+    assert.equal(toolFromParam("brand"), "brand");
     assert.equal(toolFromParam("<script>"), "style");
   });
 
   it("marks what blocks rendering before what is merely in use", () => {
-    const idle = { awaitingAnalysis: false, awaitingWords: false, hookOn: false, hookInvalid: false, visuals: 0, visualsInvalid: false, audioActive: false };
-    assert.deepEqual(toolMarks(idle), { style: null, captions: null, opening: null, visuals: null, sound: null });
-    const busy = toolMarks({ ...idle, awaitingWords: true, hookOn: true, hookInvalid: true, visuals: 2, audioActive: true });
+    const idle = { awaitingAnalysis: false, awaitingWords: false, hookOn: false, hookInvalid: false, visuals: 0, visualsInvalid: false, audioActive: false, branded: false };
+    assert.deepEqual(toolMarks(idle), { style: null, captions: null, opening: null, visuals: null, sound: null, brand: null });
+    const busy = toolMarks({ ...idle, awaitingWords: true, hookOn: true, hookInvalid: true, visuals: 2, audioActive: true, branded: true });
     assert.equal(busy.captions, "attention");
     assert.equal(busy.opening, "attention");
     assert.equal(busy.visuals, "on");
     assert.equal(busy.sound, "on");
+    assert.equal(busy.brand, "on");
   });
 });
