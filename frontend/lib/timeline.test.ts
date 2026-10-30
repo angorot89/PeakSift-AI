@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canvasWidth,
+  dragTimes,
+  editableEdges,
+  keyEdit,
+  roundTime,
+  snapDelta,
   captionRegions,
   musicEnd,
   timelineItems,
@@ -130,5 +135,51 @@ describe("item tools", () => {
     assert.equal(toolForItem({ type: "visual", key: "a" }), "visuals");
     assert.equal(toolForItem({ type: "sfx", index: 0 }), "sound");
     assert.equal(toolForItem({ type: "music" }), "sound");
+  });
+});
+
+describe("editing on the timeline", () => {
+  it("lets only supported timing change", () => {
+    assert.deepEqual(editableEdges("cutaway"), { move: true, start: true, end: true });
+    assert.deepEqual(editableEdges("sfx"), { move: true, start: false, end: false });
+    assert.deepEqual(editableEdges("hook"), { move: false, start: false, end: true });
+    assert.deepEqual(editableEdges("music"), { move: false, start: false, end: false });
+  });
+
+  it("moves inside the Short, keeping the length", () => {
+    const bounds = { duration: 15, minLength: 0.5 };
+    assert.deepEqual(dragTimes("move", 4, 6.5, 2, bounds), { start: 6, end: 8.5 });
+    assert.deepEqual(dragTimes("move", 4, 6.5, -10, bounds), { start: 0, end: 2.5 });
+    assert.deepEqual(dragTimes("move", 4, 6.5, 20, bounds), { start: 12.5, end: 15 });
+  });
+
+  it("resizes without going under the minimum or past the end", () => {
+    const bounds = { duration: 15, minLength: 0.5 };
+    assert.deepEqual(dragTimes("start", 4, 6.5, 5, bounds), { start: 6, end: 6.5 });
+    assert.deepEqual(dragTimes("start", 4, 6.5, -9, bounds), { start: 0, end: 6.5 });
+    assert.deepEqual(dragTimes("end", 4, 6.5, 30, bounds), { start: 4, end: 15 });
+    assert.deepEqual(dragTimes("end", 0, 2.5, 4, { duration: 15, minLength: 0.5, maxLength: 5 }), { start: 0, end: 5 });
+  });
+
+  it("snaps the nearest edge gently, and only when close", () => {
+    assert.deepEqual(snapDelta([4, 6.5], 1.4, [8], 0.2), { delta: 1.5, point: 8 });
+    assert.deepEqual(snapDelta([4, 6.5], 1, [8], 0.2), { delta: 1, point: null });
+    const near = snapDelta([4], 0.95, [5.3, 4.9], 0.2);
+    assert.equal(near.point, 4.9);
+    assert.ok(Math.abs(near.delta - 0.9) < 1e-9);
+  });
+
+  it("stores times to the nearest 0.05 s", () => {
+    assert.equal(roundTime(4.123), 4.1);
+    assert.equal(roundTime(4.126), 4.15);
+  });
+
+  it("maps keys to supported edits", () => {
+    const visual = editableEdges("pip");
+    assert.deepEqual(keyEdit("ArrowRight", false, false, visual), { mode: "move", delta: 0.1 });
+    assert.deepEqual(keyEdit("ArrowLeft", true, true, visual), { mode: "end", delta: -1 });
+    assert.deepEqual(keyEdit("ArrowRight", false, false, editableEdges("hook")), { mode: "end", delta: 0.1 });
+    assert.equal(keyEdit("ArrowRight", false, true, editableEdges("sfx")), null);
+    assert.equal(keyEdit("ArrowUp", false, false, visual), null);
   });
 });

@@ -32,9 +32,9 @@ import { SmartReframePanel, type FramingMode } from "@/components/app/editor/sma
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
 import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/timeline";
-import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack } from "@/components/app/editor/timeline/tracks";
+import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack, type ItemEdit } from "@/components/app/editor/timeline/tracks";
 import { heardPeaks } from "@/components/app/editor/audio-timeline";
-import { musicEnd, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
+import { editableEdges, musicEnd, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
 import { VisualsLayer } from "@/components/app/editor/visuals-layer";
 import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
@@ -126,6 +126,7 @@ import { getYouTubeStatus } from "@/lib/publishing";
 import { getVisualLayout } from "@/lib/broll";
 import {
   elementProblems,
+  MIN_ELEMENT_SECONDS,
   elementRequest,
   overlapProblems,
   visualsSummary,
@@ -204,6 +205,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [tool, setTool] = useState<ToolKey>(() => toolFromParam(search.get("tool")));
   // What is selected on the timeline (an item id, or "captions"); the settings stay the source of truth.
   const [timelineSelected, setTimelineSelected] = useState<string | null>(null);
+  const [timelineMessage, setTimelineMessage] = useState("");
   // Any change by the creator wins over settings that arrive later from the network.
   const touched = useRef(false);
   const hydrated = useRef(false);
@@ -788,12 +790,89 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     audio.music && musicAsset && waveforms[audio.music.asset_id]
       ? heardPeaks(waveforms[audio.music.asset_id], audio.music, musicAsset.duration_seconds, clip.duration_seconds)
       : null;
+  const changeAudio = edit((next: AudioRequest) => {
+    setAudioSection(true);
+    setAudio(next);
+  });
+  const hookLimits = spec ? { min: spec.hook.min_seconds, max: spec.hook.max_seconds } : { min: 0.5, max: 5 };
+  // How an item may be edited on the timeline: only timing the edit already supports, through
+  // the same setters the forms use (the settings stay the one source of truth).
+  const editFor = (item: TimelineItem): ItemEdit | null => {
+    const edges = editableEdges(item.kind);
+    const snapPoints = () => [
+      0,
+      clip.duration_seconds,
+      previewVideo?.currentTime ?? 0,
+      ...items.filter((other) => other.id !== item.id).flatMap((other) => [other.start, other.end]),
+    ];
+    const ref = item.ref;
+    if (ref.type === "visual") {
+      const element = visuals.find((v) => v.key === ref.key);
+      if (!element) return null;
+      const asset = visualById.get(element.asset_id);
+      const facts = asset ? { kind: asset.kind, duration_seconds: asset.duration_seconds, width: asset.width, height: asset.height } : undefined;
+      const at = (s: number, e: number) => visuals.map((v) => (v.key === ref.key ? { ...v, start_seconds: s, end_seconds: e } : v));
+      return {
+        edges,
+        bounds: { duration: clip.duration_seconds, minLength: MIN_ELEMENT_SECONDS },
+        snapPoints,
+        validate: (s, e) => {
+          const next = at(s, e);
+          return overlapProblems(next).get(ref.key) ?? elementProblems(next.find((v) => v.key === ref.key)!, facts, clip.duration_seconds)[0] ?? null;
+        },
+        commit: (s, e) => {
+          setTimelineMessage("");
+          edit(setVisuals)(at(s, e));
+        },
+        remove: () => {
+          edit(setVisuals)(visuals.filter((v) => v.key !== ref.key));
+          setTimelineSelected(null);
+          setTimelineMessage(`${item.label} removed.`);
+        },
+      };
+    }
+    if (ref.type === "sfx") {
+      const length = item.end - item.start;
+      return {
+        edges,
+        // A sound effect may start up to the very end (its sound is cut there), so its own
+        // length is allowed past the end on the timeline.
+        bounds: { duration: clip.duration_seconds + length, minLength: 0 },
+        snapPoints,
+        validate: (s) => (s > clip.duration_seconds ? "A sound effect has to start before the end of the Short." : null),
+        commit: (s) => {
+          setTimelineMessage("");
+          changeAudio({ ...audio, sfx: audio.sfx.map((cue, i) => (i === ref.index ? { ...cue, at_seconds: s } : cue)) });
+        },
+        remove: () => {
+          changeAudio({ ...audio, sfx: audio.sfx.filter((_, i) => i !== ref.index) });
+          setTimelineSelected(null);
+          setTimelineMessage("Sound effect removed.");
+        },
+      };
+    }
+    if (ref.type === "hook") {
+      return {
+        edges,
+        bounds: { duration: clip.duration_seconds, minLength: hookLimits.min, maxLength: hookLimits.max },
+        snapPoints,
+        validate: () => null,
+        commit: (_s, e) => {
+          setTimelineMessage("");
+          edit(setHookDuration)(Math.round(e * 10) / 10);
+        },
+      };
+    }
+    return null;
+  };
   const timelineActions = {
     selectedId: timelineSelected,
     onSelect: (item: TimelineItem) => {
       setTimelineSelected(item.id);
       setTool(toolForItem(item.ref));
     },
+    editFor,
+    onMessage: setTimelineMessage,
   };
   const onTrack = (key: ToolKey) => () => {
     setTimelineSelected(null);
@@ -1106,7 +1185,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         {/* Settings: everything the server accepts, nothing it does not, in five tool groups. */}
         <aside
           aria-label="Edit settings"
-          className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:sticky lg:top-20 lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
+          className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
         >
           <div className="space-y-3 border-b border-border px-4 pt-4 pb-3 sm:px-5">
             <div className="flex items-center justify-between gap-3">
@@ -1316,6 +1395,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
             <EditorTimeline
               duration={clip.duration_seconds}
               video={previewVideo}
+              message={timelineMessage}
               footer={
                 (brand?.end_card as { seconds?: number } | undefined)?.seconds
                   ? `Your end card adds ${(brand?.end_card as { seconds: number }).seconds} s after the clip; it appears in the rendered Short, not in this preview.`

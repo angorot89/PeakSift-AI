@@ -1,11 +1,25 @@
 "use client";
 
 import { Captions, ImageIcon, Music, Plus, Sparkles, Type, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { Waveform } from "@/components/app/editor/audio-timeline";
 import { TimelineTrack, useTimelineScale } from "@/components/app/editor/timeline/timeline";
 import type { PreviewCue } from "@/lib/caption-timing";
-import { captionRegions, fractionAt, timeRange, type ItemKind, type TimelineItem } from "@/lib/timeline";
+import {
+  captionRegions,
+  dragTimes,
+  fractionAt,
+  keyEdit,
+  roundTime,
+  snapDelta,
+  timecode,
+  timeRange,
+  type Bounds,
+  type DragMode,
+  type Edges,
+  type ItemKind,
+  type TimelineItem,
+} from "@/lib/timeline";
 
 const KIND_STYLE: Record<ItemKind, string> = {
   hook: "border-accent/70 bg-accent/25 text-orange-50",
@@ -16,71 +30,204 @@ const KIND_STYLE: Record<ItemKind, string> = {
   music: "border-success/40 bg-success/10 text-emerald-100",
 };
 
+export type ItemEdit = {
+  edges: Edges;
+  bounds: Bounds;
+  /** Where edges may snap (taken when a drag starts): the playhead, the ends, other items. */
+  snapPoints: () => number[];
+  /** Why this timing cannot be used (an overlap, a limit), or null. */
+  validate: (start: number, end: number) => string | null;
+  commit: (start: number, end: number) => void;
+  remove?: () => void;
+};
+
 export type TrackActions = {
   selectedId: string | null;
   onSelect: (item: TimelineItem) => void;
+  /** How an item may be edited on the timeline (null: select only). */
+  editFor?: (item: TimelineItem) => ItemEdit | null;
+  /** Says something politely (a move that was undone, and why). */
+  onMessage?: (text: string) => void;
 };
 
-/** One item as a block (or a diamond marker for a sound effect), placed by its timing. */
+type Ghost = { start: number; end: number; problem: string | null; snap: number | null };
+
+/** One item as a block (or a diamond marker for a sound effect), placed by its timing. Items
+ * that support it can be dragged, resized by their handles, or moved with the keyboard. */
 export function ItemBlock({
   item,
   lanes = 1,
   selected,
-  onSelect,
+  actions,
   children,
 }: {
   item: TimelineItem;
   lanes?: 1 | 2;
   selected: boolean;
-  onSelect: (item: TimelineItem) => void;
+  actions: TrackActions;
   children?: ReactNode;
 }) {
-  const { duration } = useTimelineScale();
-  const left = fractionAt(item.start, duration) * 100;
-  const width = Math.max(0, fractionAt(item.end, duration) - fractionAt(item.start, duration)) * 100;
+  const { duration, width } = useTimelineScale();
+  const edit = actions.editFor?.(item) ?? null;
+  const [ghost, setGhost] = useState<Ghost | null>(null);
+  const ghostRef = useRef<Ghost | null>(null);
+  const drag = useRef<{ mode: DragMode; x: number; moved: boolean; points: number[] } | null>(null);
+  const pxPerSecond = width / Math.max(0.1, duration);
+
+  const shown = ghost ?? { start: item.start, end: item.end, problem: null, snap: null };
+  const left = fractionAt(shown.start, duration) * 100;
+  const span = Math.max(0, fractionAt(shown.end, duration) - fractionAt(shown.start, duration)) * 100;
   const vertical = lanes === 2 ? (item.lane === 0 ? "top-1 h-[calc(50%-0.375rem)]" : "bottom-1 h-[calc(50%-0.375rem)]") : "inset-y-1.5";
+  const timing = item.kind === "sfx" ? timecode(shown.start) : timeRange(shown.start, shown.end);
   const label = `${item.label === item.name ? item.label : `${item.label}: ${item.name}`}, ${timeRange(item.start, item.end)}`;
+  const hint = edit
+    ? edit.edges.move
+      ? `. Drag to move${edit.edges.end ? " or drag its edges to change the timing" : ""}; arrow keys move it${edit.edges.end ? ", Alt + arrows change its end" : ""}${edit.remove ? ", Delete removes it" : ""}.`
+      : edit.edges.end
+        ? ". Drag its end, or use the arrow keys, to change how long it lasts."
+        : ""
+    : "";
+
+  function start(event: PointerEvent<HTMLElement>) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    // The block moves; its edge handles (data-drag="start" / "end") change one end.
+    const mode = ((event.target as HTMLElement).closest("[data-drag]")?.getAttribute("data-drag") ?? "move") as DragMode;
+    if (!edit || !edit.edges[mode]) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { mode, x: event.clientX, moved: false, points: edit.snapPoints() };
+  }
+  function move(event: PointerEvent<HTMLElement>) {
+    const d = drag.current;
+    if (!d || !edit) return;
+    const dx = event.clientX - d.x;
+    if (!d.moved && Math.abs(dx) < 3) return; // a click, not a drag
+    d.moved = true;
+    const delta = dx / pxPerSecond;
+    const moving = d.mode === "move" ? [item.start, item.end] : d.mode === "start" ? [item.start] : [item.end];
+    const snapped = event.altKey ? { delta, point: null } : snapDelta(moving, delta, d.points, 8 / pxPerSecond);
+    const next = dragTimes(d.mode, item.start, item.end, snapped.delta, edit.bounds);
+    const g = { ...next, problem: edit.validate(roundTime(next.start), roundTime(next.end)), snap: snapped.point };
+    ghostRef.current = g;
+    setGhost(g);
+  }
+  function end(event: PointerEvent<HTMLElement>) {
+    const d = drag.current;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const g = ghostRef.current;
+    ghostRef.current = null;
+    setGhost(null);
+    if (!d?.moved || !g || !edit) return;
+    if (g.problem) actions.onMessage?.(`${g.problem} It went back to where it was.`);
+    else edit.commit(roundTime(g.start), roundTime(g.end));
+  }
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!edit) return;
+    if ((event.key === "Delete" || event.key === "Backspace") && edit.remove) {
+      event.preventDefault();
+      edit.remove();
+      return;
+    }
+    const change = keyEdit(event.key, event.shiftKey, event.altKey, edit.edges);
+    if (!change) return;
+    event.preventDefault();
+    const next = dragTimes(change.mode, item.start, item.end, change.delta, edit.bounds);
+    const s = roundTime(next.start);
+    const e = roundTime(next.end);
+    const problem = edit.validate(s, e);
+    if (problem) actions.onMessage?.(problem);
+    else edit.commit(s, e);
+  }
+
+  const handlers = {
+    onPointerDown: start,
+    onPointerMove: move,
+    onPointerUp: end,
+    onPointerCancel: end,
+    onKeyDown,
+    onClick: () => actions.onSelect(item),
+  };
+  const common = {
+    type: "button" as const,
+    "data-timeline-item": item.id,
+    "aria-label": label + hint,
+    "aria-pressed": selected,
+    title: label,
+  };
+  const bubble = ghost ? (
+    <span
+      role="presentation"
+      className={`tabular pointer-events-none absolute -top-7 z-40 -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap shadow-raised ${
+        ghost.problem ? "bg-danger text-white" : "bg-foreground text-background"
+      }`}
+      style={{ left: `${left + span / 2}%` }}
+    >
+      {ghost.problem ? "Overlaps" : timing}
+    </span>
+  ) : null;
+  const guide =
+    ghost?.snap != null ? (
+      <span aria-hidden="true" className="pointer-events-none absolute -inset-y-1 z-30 w-px bg-accent-soft" style={{ left: `${fractionAt(ghost.snap, duration) * 100}%` }} />
+    ) : null;
+
   if (item.kind === "sfx") {
     return (
-      <button
-        type="button"
-        data-timeline-item={item.id}
-        aria-label={label}
-        aria-pressed={selected}
-        title={label}
-        onClick={() => onSelect(item)}
-        className="group absolute inset-y-0 z-10 flex w-8 -translate-x-1/2 items-center justify-center outline-none pointer-coarse:w-11"
-        style={{ left: `${left}%` }}
-      >
-        <span
-          aria-hidden="true"
-          className={`size-3 rotate-45 rounded-[3px] border transition-transform duration-150 group-hover:scale-125 group-focus-visible:ring-2 group-focus-visible:ring-accent ${KIND_STYLE.sfx} ${
-            selected ? "scale-125 ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""
-          }`}
-        />
-      </button>
+      <>
+        {guide}
+        {bubble}
+        <button
+          {...common}
+          {...handlers}
+          className={`group absolute inset-y-0 z-10 flex w-8 -translate-x-1/2 touch-none items-center justify-center outline-none pointer-coarse:w-11 ${edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""}`}
+          style={{ left: `${left}%` }}
+        >
+          <span
+            aria-hidden="true"
+            className={`size-3 rotate-45 rounded-[3px] border transition-transform duration-150 group-hover:scale-125 group-focus-visible:ring-2 group-focus-visible:ring-accent ${
+              ghost?.problem ? "border-danger bg-danger/40" : KIND_STYLE.sfx
+            } ${selected || ghost ? "scale-125 ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
+          />
+        </button>
+      </>
     );
   }
+  const handle = (side: "start" | "end") =>
+    edit?.edges[side] ? (
+      <span
+        aria-hidden="true"
+        data-drag={side}
+        className={`absolute inset-y-0 z-20 w-2.5 cursor-ew-resize touch-none pointer-coarse:w-5 ${side === "start" ? "left-0" : "right-0"} ${
+          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        <span className={`absolute inset-y-1.5 w-1 rounded-full bg-white/80 ${side === "start" ? "left-0.5" : "right-0.5"}`} />
+      </span>
+    ) : null;
   return (
-    <button
-      type="button"
-      data-timeline-item={item.id}
-      aria-label={label}
-      aria-pressed={selected}
-      title={label}
-      onClick={() => onSelect(item)}
-      className={`absolute z-10 flex min-w-1.5 items-center gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${KIND_STYLE[item.kind]} ${
-        selected ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""
-      }`}
-      style={{ left: `${left}%`, width: `${width}%` }}
-    >
-      {children ?? (
-        <span className="truncate">
-          {item.label}
-          {item.name !== item.label ? <span className="font-normal opacity-75"> · {item.name.replace(/\.[a-z0-9]+$/i, "")}</span> : null}
-        </span>
-      )}
-    </button>
+    <>
+      {guide}
+      {bubble}
+      <button
+        {...common}
+        {...handlers}
+        className={`group absolute z-10 flex min-w-1.5 touch-none items-center gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${
+          ghost?.problem ? "border-danger bg-danger/25 text-rose-50" : KIND_STYLE[item.kind]
+        } ${selected || ghost ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""} ${ghost ? "shadow-raised" : ""} ${
+          edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
+        style={{ left: `${left}%`, width: `${span}%` }}
+      >
+        {handle("start")}
+        {children ?? (
+          <span className="pointer-events-none truncate">
+            {item.label}
+            {item.name !== item.label ? <span className="font-normal opacity-75"> · {item.name.replace(/\.[a-z0-9]+$/i, "")}</span> : null}
+          </span>
+        )}
+        {handle("end")}
+      </button>
+    </>
   );
 }
 
@@ -120,7 +267,7 @@ function ItemsTrack({
     <TimelineTrack label={label} icon={icon} tall={lanes === 2}>
       {items.length ? (
         items.map((item) => (
-          <ItemBlock key={item.id} item={item} lanes={lanes} selected={actions.selectedId === item.id} onSelect={actions.onSelect} />
+          <ItemBlock key={item.id} item={item} lanes={lanes} selected={actions.selectedId === item.id} actions={actions} />
         ))
       ) : (
         <EmptyLane {...empty} />
@@ -165,7 +312,7 @@ export function MusicTrack({
   return (
     <TimelineTrack label="Music" icon={Music}>
       {item ? (
-        <ItemBlock item={item} selected={actions.selectedId === item.id} onSelect={actions.onSelect}>
+        <ItemBlock item={item} selected={actions.selectedId === item.id} actions={actions}>
           {peaks?.length ? <Waveform peaks={peaks} className="absolute inset-x-1 inset-y-1.5 w-auto text-emerald-300/60" /> : null}
           <span className="relative truncate">{item.label}</span>
         </ItemBlock>

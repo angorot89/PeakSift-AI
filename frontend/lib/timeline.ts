@@ -218,3 +218,64 @@ export function toolForItem(ref: ItemRef): "opening" | "visuals" | "sound" {
   if (ref.type === "visual") return "visuals";
   return "sound";
 }
+
+// --- Editing on the timeline: only what the edit already supports ------------------------------
+
+export type DragMode = "move" | "start" | "end";
+export type Edges = { move: boolean; start: boolean; end: boolean };
+
+/** What may change by dragging: visuals move and resize; a sound effect moves (it plays its
+ * whole file); the hook always starts at 0, so only its end moves; music and captions follow
+ * the Short and do not drag. */
+export function editableEdges(kind: ItemKind): Edges {
+  if (kind === "cutaway" || kind === "pip" || kind === "overlay") return { move: true, start: true, end: true };
+  if (kind === "sfx") return { move: true, start: false, end: false };
+  if (kind === "hook") return { move: false, start: false, end: true };
+  return { move: false, start: false, end: false };
+}
+
+export type Bounds = { duration: number; minLength: number; maxLength?: number };
+
+/** The item's new timing after dragging by `delta` seconds, kept inside the Short and its own
+ * length limits (moving keeps the length). */
+export function dragTimes(mode: DragMode, start: number, end: number, delta: number, bounds: Bounds): { start: number; end: number } {
+  const { duration, minLength } = bounds;
+  const maxLength = bounds.maxLength ?? duration;
+  if (mode === "move") {
+    const length = end - start;
+    const s = Math.min(Math.max(0, start + delta), Math.max(0, duration - length));
+    return { start: s, end: s + length };
+  }
+  if (mode === "start") {
+    const s = Math.min(Math.max(0, start + delta, end - maxLength), end - minLength);
+    return { start: s, end };
+  }
+  const e = Math.max(Math.min(duration, end + delta, start + maxLength), start + minLength);
+  return { start, end: e };
+}
+
+/** Snapping: the delta that brings the nearest dragged edge onto a point within `tolerance`
+ * seconds, and the point it snapped to (or the delta unchanged). */
+export function snapDelta(edges: number[], delta: number, points: number[], tolerance: number): { delta: number; point: number | null } {
+  let best: { delta: number; point: number; distance: number } | null = null;
+  for (const edge of edges) {
+    for (const point of points) {
+      const distance = Math.abs(edge + delta - point);
+      if (distance <= tolerance && (!best || distance < best.distance)) best = { delta: point - edge, point, distance };
+    }
+  }
+  return best ? { delta: best.delta, point: best.point } : { delta, point: null };
+}
+
+/** Times are stored to the nearest 0.05 s (what the forms show and the renderer accepts). */
+export const roundTime = (seconds: number) => Math.round(seconds * 20) / 20;
+
+/** Keyboard editing of a selected item: ←/→ move it (Shift: 1 s, else 0.1 s); with Alt they
+ * change its end (resizable items only). Null when the key does nothing for this item. */
+export function keyEdit(key: string, shift: boolean, alt: boolean, edges: Edges): { mode: DragMode; delta: number } | null {
+  const step = shift ? 1 : 0.1;
+  const sign = key === "ArrowRight" ? 1 : key === "ArrowLeft" ? -1 : 0;
+  if (!sign) return null;
+  if (alt) return edges.end ? { mode: "end", delta: sign * step } : null;
+  return edges.move ? { mode: "move", delta: sign * step } : edges.end ? { mode: "end", delta: sign * step } : null;
+}
