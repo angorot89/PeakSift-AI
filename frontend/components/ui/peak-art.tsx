@@ -12,7 +12,7 @@ export function PeakArt() {
       aria-hidden="true"
       viewBox="0 0 640 220"
       preserveAspectRatio="xMaxYMin slice"
-      className="pointer-events-none absolute -top-8 right-0 hidden h-56 w-[42rem] max-w-[70%] [mask-image:linear-gradient(to_right,transparent,black_40%)] md:block"
+      className="pointer-events-none absolute -top-8 right-0 bottom-0 hidden h-[calc(100%+2rem)] w-[42rem] max-w-[70%] [mask-image:linear-gradient(to_right,transparent,black_40%)] md:block"
     >
       <defs>
         <radialGradient id={`${id}-sun`} cx="0.62" cy="0.62" r="0.5">

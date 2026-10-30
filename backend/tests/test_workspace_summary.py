@@ -125,3 +125,26 @@ def test_summaries_are_private(client, db_session):
     assert client.get(f"/projects/{project_id}/summary").status_code == 404
     body = client.get("/workspace/home").json()
     assert body["projects"] == [] and body["recent_shorts"] == [] and body["project_count"] == 0
+
+
+def test_a_short_reads_published_only_once_youtube_confirmed_it(client, db_session):
+    sign_up(client, "pub@example.com")
+    ctx = ready_clip(db_session, "pub@example.com")
+    user = me(db_session, "pub@example.com")
+    edits = [
+        make_edit(db_session, ctx["clip"], status="ready", storage_key=f"edits/{uuid.uuid4()}.mp4",
+                  file_size=10, duration_seconds=20.0, config_fingerprint=c * 64)
+        for c in "ef"
+    ]  # fmt: skip
+    for edit, status, fingerprint in ((edits[0], "published", "1"), (edits[1], "uploaded", "2")):
+        db_session.add(PublishJob(
+            user_id=user.id, edit_id=edit.id, provider="youtube", title="t", privacy="private",
+            category_id="22", fingerprint=fingerprint * 64, status=status,
+            provider_video_id=f"vid{fingerprint * 8}", completed_at=datetime.now(UTC),
+        ))  # fmt: skip
+    db_session.commit()
+    published = {str(edits[0].id): True, str(edits[1].id): False}  # an upload in flight is not
+    project = client.get(f"/projects/{ctx['clip'].video.project_id}/summary").json()
+    assert {s["edit_id"]: s["published"] for s in project["shorts"]["recent"]} == published
+    home = client.get("/workspace/home").json()
+    assert {s["edit_id"]: s["published"] for s in home["recent_shorts"]} == published

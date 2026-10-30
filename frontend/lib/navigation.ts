@@ -16,7 +16,7 @@ export type ProjectSection = "overview" | "source" | "clips" | "assets" | "analy
 export const PROJECT_SECTIONS: { key: ProjectSection; label: string; path: string }[] = [
   { key: "overview", label: "Overview", path: "" },
   { key: "source", label: "Source", path: "/source" },
-  { key: "clips", label: "Clips", path: "/clips" },
+  { key: "clips", label: "Moments", path: "/clips" },
   { key: "assets", label: "Assets", path: "/assets" },
   { key: "analytics", label: "Analytics", path: "/analytics" },
 ];

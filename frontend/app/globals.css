@@ -212,6 +212,13 @@ body {
   box-shadow: inset 0 0 0 1px rgb(253 186 116 / 0.6), 0 10px 30px -12px rgb(249 115 22 / 0.7);
 }
 
+/* The project's next best action: the one warm card on the page. */
+.next-glow {
+  background:
+    radial-gradient(28rem 14rem at 100% 0%, rgb(249 115 22 / 0.16), transparent 70%),
+    linear-gradient(160deg, rgb(249 115 22 / 0.07), var(--surface) 55%);
+}
+
 /* Timestamps, durations and counters line up in columns. */
 time,
 .tabular {

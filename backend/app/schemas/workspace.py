@@ -58,6 +58,8 @@ class ShortSummary(BaseModel):
     captions_enabled: bool
     caption_style: str | None
     duration_seconds: float | None
+    # YouTube confirmed the upload (a publish job reached "published"); never an upload in flight.
+    published: bool = False
     created_at: datetime
     updated_at: datetime
 

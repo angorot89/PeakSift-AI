@@ -795,7 +795,7 @@ export function AutoEditView() {
     const notFound = error === "Clip not found" || error === "Project not found";
     return (
       <>
-        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Clips" }} title="Create a Short" />
+        <PageHeader back={{ href: isProjectId(id) ? `/projects/${id}/clips` : "/projects", label: "Moments" }} title="Create a Short" />
         {notFound ? (
           <EmptyState
             icon={Clapperboard}
@@ -812,7 +812,7 @@ export function AutoEditView() {
   if (data.clip.status !== "ready") {
     return (
       <>
-        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Clips" }} title="Create a Short" />
+        <PageHeader back={{ href: `/projects/${id}/clips`, label: "Moments" }} title="Create a Short" />
         <EmptyState
           icon={Clapperboard}
           title="This clip isn't ready yet"
