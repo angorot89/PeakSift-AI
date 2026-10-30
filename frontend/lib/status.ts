@@ -1,7 +1,7 @@
 // Human status language (no React): what a creator reads instead of a job's internal state.
 // Waiting · Processing (or the specific step, when that says more) · Ready · Needs attention.
 
-export type StatusTone = "neutral" | "waiting" | "processing" | "success" | "warning" | "danger" | "accent";
+export type StatusTone = "neutral" | "waiting" | "processing" | "success" | "warning" | "danger" | "accent" | "info";
 
 const PRESENTATION: Record<string, { label: string; tone: StatusTone }> = {
   // waiting for a worker

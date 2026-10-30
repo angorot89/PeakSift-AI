@@ -15,12 +15,20 @@ export function Menu({
   trigger,
   items,
   align = "end",
+  side = "below",
+  triggerClassName,
+  className = "",
 }: {
   /** The button's accessible name (e.g. "Project actions"). */
   label: string;
   trigger: ReactNode;
   items: MenuItem[];
   align?: "start" | "end";
+  /** "above" for a button at the bottom of the screen (the account chip). */
+  side?: "below" | "above";
+  /** Replaces the icon-button look (e.g. a full-width account chip). */
+  triggerClassName?: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -60,7 +68,7 @@ export function Menu({
   }
 
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <button
         ref={button}
         type="button"
@@ -75,7 +83,10 @@ export function Menu({
             setOpen(true);
           }
         }}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11 [&_svg]:size-4"
+        className={
+          triggerClassName ??
+          "inline-flex size-9 items-center justify-center rounded-control text-muted transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11 [&_svg]:size-4"
+        }
       >
         {trigger}
       </button>
@@ -86,9 +97,9 @@ export function Menu({
           role="menu"
           aria-label={label}
           onKeyDown={onKeyDown}
-          className={`absolute top-full z-50 mt-1 min-w-48 animate-dialog-in rounded-xl border border-border-strong bg-surface-2 p-1 shadow-2xl ${
-            align === "end" ? "right-0" : "left-0"
-          }`}
+          className={`absolute z-50 min-w-48 animate-dialog-in rounded-block border border-border-strong bg-surface-2 p-1 shadow-raised ${
+            side === "above" ? "bottom-full mb-1" : "top-full mt-1"
+          } ${align === "end" ? "right-0" : "left-0"}`}
         >
           {items.map((item) => (
             <button
@@ -102,7 +113,7 @@ export function Menu({
                 close();
                 item.onSelect();
               }}
-              className={`flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors outline-none focus-visible:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-subtle pointer-coarse:min-h-11 ${
+              className={`flex min-h-9 w-full items-center gap-2.5 rounded-control px-2.5 text-left text-sm transition-colors outline-none focus-visible:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-subtle pointer-coarse:min-h-11 ${
                 item.tone === "danger" ? "text-rose-200 hover:bg-danger/15 focus-visible:bg-danger/15" : "text-foreground hover:bg-white/[0.06]"
               }`}
             >

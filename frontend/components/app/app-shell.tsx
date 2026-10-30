@@ -2,15 +2,14 @@
 
 import {
   BarChart3,
-  Folder,
+  ChevronsUpDown,
   FolderOpen,
   Home,
   LogOut,
-  Menu,
+  Menu as MenuIcon,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
   Search,
   Settings,
   Sparkles,
@@ -18,15 +17,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { CommandMenu } from "@/components/app/command-menu";
+import { ShellSearchContext, useIsMac } from "@/components/app/shell-search";
 import { CopilotPanel } from "@/components/app/copilot/copilot-panel";
 import { CopilotProvider, useCopilot } from "@/components/app/copilot/copilot-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
 import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
-import { isCommandShortcut, shortcutLabel } from "@/lib/command-menu";
+import { Menu } from "@/components/ui/menu";
+import { isCommandShortcut } from "@/lib/command-menu";
 import { activeGlobal, GLOBAL_NAV, projectLocation, SETTINGS_NAV, type GlobalKey } from "@/lib/navigation";
 import { listProjects, type Project } from "@/lib/projects";
 import { useStoredFlag } from "@/lib/use-stored-flag";
@@ -40,15 +41,6 @@ const ICONS: Record<GlobalKey, LucideIcon> = {
 };
 const RECENT_PROJECTS = 3;
 const COLLAPSE_KEY = "peaksift.sidebar.collapsed";
-
-/** Whether this is a Mac (⌘K rather than Ctrl K); null while rendering on the server. */
-function useIsMac(): boolean | null {
-  return useSyncExternalStore(
-    () => () => undefined,
-    () => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent),
-    () => null,
-  );
-}
 
 function NavLink({
   href,
@@ -73,13 +65,19 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       title={collapsed ? label : undefined}
-      className={`group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+      className={`group flex items-center gap-3 rounded-control transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
         collapsed ? "justify-center" : ""
-      } ${nested ? "min-h-9 pl-9 text-small" : ""} ${
-        active ? "bg-white/[0.08] font-medium text-foreground" : "text-muted hover:bg-white/[0.04] hover:text-foreground"
+      } ${nested ? "min-h-9 pl-11 pr-2.5 text-small" : "min-h-11 px-3 text-[0.9375rem]"} ${
+        active
+          ? nested
+            ? "bg-white/[0.06] font-medium text-foreground"
+            : "nav-active font-medium text-foreground"
+          : "text-muted hover:bg-white/[0.045] hover:text-foreground"
       }`}
     >
-      {nested ? null : <Icon aria-hidden="true" className={`size-[18px] shrink-0 ${active ? "text-accent-soft" : ""}`} />}
+      {nested ? null : (
+        <Icon aria-hidden="true" className={`size-5 shrink-0 ${active ? "text-accent-soft" : "text-subtle group-hover:text-muted"}`} />
+      )}
       <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>{label}</span>
     </Link>
   );
@@ -97,37 +95,12 @@ function AskButton({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?:
       }}
       aria-expanded={open}
       title={collapsed ? "Ask PeakSift" : undefined}
-      className={`group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
-        collapsed ? "justify-center" : ""
-      } ${open ? "bg-accent/[0.12] font-medium text-foreground" : "text-muted hover:bg-white/[0.04] hover:text-foreground"}`}
+      className={`ask-button group flex min-h-12 items-center gap-3 rounded-block px-3.5 text-[0.9375rem] font-semibold text-foreground transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+        collapsed ? "justify-center px-0" : ""
+      } ${open ? "ask-button-open" : ""}`}
     >
-      <Sparkles aria-hidden="true" className="size-[18px] shrink-0 text-accent-soft" />
+      <Sparkles aria-hidden="true" className="size-5 shrink-0 text-accent-soft" />
       <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>Ask PeakSift</span>
-    </button>
-  );
-}
-
-/** Search: opens the command menu (also Cmd/Ctrl+K). */
-function SearchButton({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
-  const mac = useIsMac();
-  return (
-    <button
-      type="button"
-      onClick={onSearch}
-      aria-haspopup="dialog"
-      aria-keyshortcuts={mac === null ? undefined : mac ? "Meta+K" : "Control+K"}
-      title={collapsed ? "Search" : undefined}
-      className={`flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
-        collapsed ? "justify-center" : ""
-      }`}
-    >
-      <Search aria-hidden="true" className="size-[18px] shrink-0" />
-      <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate text-left"}>Search</span>
-      {!collapsed && mac !== null ? (
-        <kbd aria-hidden="true" className="rounded border border-border px-1.5 font-sans text-xs text-subtle pointer-coarse:hidden">
-          {shortcutLabel(mac)}
-        </kbd>
-      ) : null}
     </button>
   );
 }
@@ -163,17 +136,19 @@ function SidebarContent({
     router.replace("/login"); // RequireAuth also redirects; this keeps it deterministic
   }
 
+  const name = user ? user.email.split("@")[0] : "";
+
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-6">
       <div className={`flex items-center gap-2 ${collapsed ? "flex-col" : "justify-between"}`}>
         <Link
           href="/home"
           onClick={onNavigate}
-          className="flex min-h-10 items-center gap-2.5 rounded-md px-1 font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 items-center gap-2.5 rounded-control px-1 text-lg font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <LogoMark />
+          <LogoMark className="size-8" />
           <span className={collapsed ? "sr-only" : ""}>
-            PeakSift <span className="text-muted">AI</span>
+            PeakSift <span className="text-accent-soft">AI</span>
           </span>
         </Link>
         {onToggle ? (
@@ -183,21 +158,8 @@ function SidebarContent({
         ) : null}
       </div>
 
-      <Link
-        href="/projects/new"
-        onClick={onNavigate}
-        title={collapsed ? "New project" : undefined}
-        className={`flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface-2 text-sm font-medium text-foreground transition-colors hover:border-white/25 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-          collapsed ? "size-10 self-center" : "px-3"
-        }`}
-      >
-        <Plus aria-hidden="true" className="size-4" />
-        <span className={collapsed ? "sr-only" : ""}>New project</span>
-      </Link>
-
-      <nav aria-label="Main" className="flex flex-col gap-0.5">
-        <SearchButton collapsed={collapsed} onSearch={onSearch} />
-        {GLOBAL_NAV.map((item) => (
+      <nav aria-label="Main" className="flex flex-col gap-1">
+        {[...GLOBAL_NAV, SETTINGS_NAV].map((item) => (
           <div key={item.key} className="flex flex-col gap-0.5">
             <NavLink
               href={item.href}
@@ -214,7 +176,7 @@ function SidebarContent({
                     <NavLink
                       href={`/projects/${project.id}`}
                       label={project.name}
-                      icon={Folder}
+                      icon={FolderOpen}
                       active={project.id === current}
                       collapsed={false}
                       onNavigate={onNavigate}
@@ -228,34 +190,54 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
+      <div className="mt-auto flex flex-col gap-3">
+        {onSearch ? (
+          // Phones: the navigation sheet keeps a way into search (the top bar has one too).
+          <button
+            type="button"
+            onClick={onSearch}
+            aria-haspopup="dialog"
+            className="flex min-h-11 items-center gap-3 rounded-control px-3 text-[0.9375rem] text-muted transition-colors hover:bg-white/[0.045] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:hidden"
+          >
+            <Search aria-hidden="true" className="size-5 shrink-0 text-subtle" />
+            Search
+          </button>
+        ) : null}
         <AskButton collapsed={collapsed} onNavigate={onNavigate} />
-        <NavLink
-          href={SETTINGS_NAV.href}
-          label={SETTINGS_NAV.label}
-          icon={Settings}
-          active={active === "settings"}
-          collapsed={collapsed}
-          onNavigate={onNavigate}
-        />
-        <div className={`flex items-center gap-2 rounded-lg px-1.5 py-1 ${collapsed ? "flex-col" : ""}`}>
-          {user ? (
-            <span
-              aria-hidden="true"
-              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-foreground uppercase ring-1 ring-white/10"
-            >
-              {user.email.charAt(0)}
-            </span>
-          ) : null}
-          {user && !collapsed ? (
-            <span className="min-w-0 flex-1 truncate text-small text-muted" title={user.email}>
-              {user.email}
-            </span>
-          ) : null}
-          <IconButton aria-label={loggingOut ? "Logging out" : "Log out"} onClick={handleLogout} disabled={loggingOut} size="sm">
-            <LogOut aria-hidden="true" />
-          </IconButton>
-        </div>
+        {user ? (
+          <Menu
+            label={`Account: ${user.email}`}
+            side="above"
+            align="start"
+            className="w-full"
+            triggerClassName={`flex min-h-14 w-full items-center gap-3 rounded-block border border-border bg-surface/70 text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              collapsed ? "justify-center px-0" : "px-2.5"
+            }`}
+            trigger={
+              <>
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent/80 to-violet/70 text-sm font-semibold text-white uppercase ring-1 ring-white/15"
+                >
+                  {user.email.charAt(0)}
+                </span>
+                {collapsed ? null : (
+                  <>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground">{name}</span>
+                      <span className="block truncate text-caption text-subtle">{user.email}</span>
+                    </span>
+                    <ChevronsUpDown aria-hidden="true" className="size-4 shrink-0 text-subtle" />
+                  </>
+                )}
+              </>
+            }
+            items={[
+              { label: "Settings", icon: Settings, onSelect: () => { onNavigate?.(); router.push(SETTINGS_NAV.href); } },
+              { label: loggingOut ? "Logging out…" : "Log out", icon: LogOut, onSelect: handleLogout, disabled: loggingOut },
+            ]}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -321,7 +303,8 @@ function Shell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-dvh">
+    <ShellSearchContext.Provider value={openMenu}>
+    <div className="app-atmosphere flex min-h-dvh">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
@@ -330,8 +313,8 @@ function Shell({ children }: { children: ReactNode }) {
       </a>
       <aside
         aria-label="Sidebar"
-        className={`sticky top-0 hidden h-dvh shrink-0 border-r border-border bg-surface/60 px-3 py-4 transition-[width] duration-200 lg:block ${
-          collapsed ? "w-[4.5rem]" : "w-60"
+        className={`sidebar sticky top-0 hidden h-dvh shrink-0 border-r border-border px-3 py-5 transition-[width] duration-200 lg:block ${
+          collapsed ? "w-[4.75rem]" : "w-64"
         }`}
       >
         <SidebarContent collapsed={collapsed} onToggle={toggle} onSearch={openMenu} projects={projects} />
@@ -339,13 +322,13 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
       <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[26rem]" : ""}`}>
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-xl lg:hidden">
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
-            <Menu aria-hidden="true" />
+            <MenuIcon aria-hidden="true" />
           </IconButton>
-          <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-semibold tracking-tight">
-            <LogoMark className="size-6" />
-            PeakSift <span className="text-muted">AI</span>
+          <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-bold tracking-tight">
+            <LogoMark className="size-7" />
+            PeakSift <span className="text-accent-soft">AI</span>
           </Link>
           <IconButton aria-label="Search" aria-haspopup="dialog" onClick={openMenu} className="ml-auto">
             <Search aria-hidden="true" />
@@ -359,7 +342,7 @@ function Shell({ children }: { children: ReactNode }) {
             <Sparkles aria-hidden="true" />
           </IconButton>
         </header>
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[76rem] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-8">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[80rem] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-9">
           {children}
         </main>
       </div>
@@ -369,5 +352,6 @@ function Shell({ children }: { children: ReactNode }) {
       </Dialog>
       <CommandMenu open={menu} onClose={() => setMenu(false)} projects={projects} returnTo={menuReturn} />
     </div>
+    </ShellSearchContext.Provider>
   );
 }

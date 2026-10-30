@@ -14,9 +14,9 @@ const PADDING = { none: "", sm: "p-3 sm:p-4", md: "p-4 sm:p-5" };
 
 /** The card look for elements that are not a plain container (e.g. a Next <Link> card). */
 export function cardClasses({ padding = "md", interactive = false }: { padding?: keyof typeof PADDING; interactive?: boolean } = {}) {
-  return `rounded-2xl border border-border bg-surface ${PADDING[padding]} ${
+  return `rounded-card border border-border bg-surface shadow-card ${PADDING[padding]} ${
     interactive
-      ? "transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      ? "transition-[border-color,background-color,transform] duration-200 ease-out-soft hover:-translate-y-px hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:hover:translate-y-0"
       : ""
   }`;
 }

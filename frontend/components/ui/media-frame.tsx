@@ -27,7 +27,7 @@ export function MediaFrame({
         </span>
         {meta ? <span className="tabular truncate text-subtle">{meta}</span> : null}
       </figcaption>
-      <div className="overflow-hidden rounded-xl border border-border bg-black">{children}</div>
+      <div className="overflow-hidden rounded-block border border-border bg-black">{children}</div>
     </figure>
   );
 }
