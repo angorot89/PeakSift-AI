@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, ExternalLink, RefreshCw } from "lucide-react";
+import { Activity, BarChart3, CalendarClock, ExternalLink, Eye, Heart, RefreshCw, Smartphone, Upload, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { AnalyticsAccessGate } from "@/components/app/analytics/analytics-access";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VideoFrame } from "@/components/ui/video-frame";
+import { editContentUrl } from "@/lib/edits";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ApiError, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -83,7 +85,7 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
   return (
     <div className="min-w-0">
       <dt className="text-xs text-subtle">{label}</dt>
-      <dd className="tabular mt-0.5 text-base font-semibold text-foreground" title={hint}>
+      <dd className="tabular mt-0.5 text-lg font-semibold text-foreground" title={hint}>
         {value}
       </dd>
     </div>
@@ -103,7 +105,14 @@ function VideoRow({
 }) {
   const { busy, message, refresh } = useRefresh(video.id, onQueued);
   return (
-    <li className="rounded-xl border border-border bg-surface px-4 py-4">
+    <li className="flex gap-4 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
+      <VideoFrame
+        src={video.edit_id ? editContentUrl(video.edit_id) : null}
+        ratio="vertical"
+        icon={Smartphone}
+        className="w-16 shrink-0 self-start rounded-control border border-border sm:w-20"
+      />
+      <div className="min-w-0 flex-1">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link
@@ -154,6 +163,7 @@ function VideoRow({
           : "Not synced yet."}
       </p>
       {message ? <p className="mt-2 text-xs text-warning">{message}</p> : null}
+      </div>
     </li>
   );
 }
@@ -174,7 +184,7 @@ function UsualShort({ overview }: { overview: PerformanceOverview }) {
   const engaged = overview.baselines.find((b) => b.metric === "engaged_views");
   const retention = overview.baselines.find((b) => b.metric === "average_view_percentage");
   return (
-    <section aria-labelledby="usual-heading" className="rounded-xl border border-border bg-surface px-4 py-4">
+    <section aria-labelledby="usual-heading" className="rounded-card border border-border bg-surface p-5 shadow-card">
       <h3 id="usual-heading" className="text-title text-foreground">Your usual Short</h3>
       <p className="mt-1 text-sm text-muted">{baselineText(engaged)}</p>
       {engaged?.reliable && retention?.reliable ? (
@@ -187,13 +197,37 @@ function UsualShort({ overview }: { overview: PerformanceOverview }) {
   );
 }
 
-function SummaryCard({ label, total, count }: { label: string; total?: Total; count?: number }) {
+const TILE = {
+  accent: "bg-accent/15 text-accent-soft",
+  info: "bg-info/15 text-sky-200",
+  violet: "bg-violet/15 text-violet-200",
+  success: "bg-success/15 text-emerald-200",
+};
+
+function SummaryCard({
+  label,
+  icon: Icon,
+  tone,
+  total,
+  count,
+}: {
+  label: string;
+  icon: LucideIcon;
+  tone: keyof typeof TILE;
+  total?: Total;
+  count?: number;
+}) {
   const note = total ? coverage(total) : null;
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-3.5">
-      <dt className="text-xs text-subtle">{label}</dt>
-      <dd className="tabular mt-1 text-2xl leading-tight font-semibold text-foreground">{total ? metric(total.value) : metric(count)}</dd>
-      {note ? <dd className="mt-0.5 text-caption text-subtle">{note}</dd> : null}
+    <div className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
+      <dt className="flex items-center gap-2.5 text-sm text-muted">
+        <span aria-hidden="true" className={`flex size-9 items-center justify-center rounded-block ${TILE[tone]}`}>
+          <Icon className="size-[18px]" />
+        </span>
+        {label}
+      </dt>
+      <dd className="tabular mt-3 text-3xl leading-tight font-bold tracking-tight text-foreground">{total ? metric(total.value) : metric(count)}</dd>
+      {note ? <dd className="mt-1 text-caption text-subtle">{note}</dd> : null}
     </div>
   );
 }
@@ -206,11 +240,11 @@ function Summary({ videos }: { videos: VideoPerformance[] }) {
       <h2 id="glance-heading" className="sr-only">
         At a glance
       </h2>
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard label="Shorts published" count={videos.length} />
-        <SummaryCard label="Views" total={totals.views} />
-        <SummaryCard label="Engaged views" total={totals.engaged} />
-        <SummaryCard label="Likes" total={totals.likes} />
+      <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <SummaryCard label="Shorts published" icon={Upload} tone="accent" count={videos.length} />
+        <SummaryCard label="Views" icon={Eye} tone="info" total={totals.views} />
+        <SummaryCard label="Engaged views" icon={Activity} tone="violet" total={totals.engaged} />
+        <SummaryCard label="Likes" icon={Heart} tone="success" total={totals.likes} />
       </dl>
     </section>
   );
@@ -246,12 +280,24 @@ export function AnalyticsView({ projectId }: { projectId?: string } = {}) {
           </Link>
         </div>
       ) : (
-        <PageHeader title="How are my Shorts doing?" description={lead} />
+        <PageHeader
+          size="hero"
+          title="Analytics"
+          description={
+            <>
+              How are my Shorts doing?
+              <span className="mt-2 flex items-start gap-2 text-small text-subtle">
+                <CalendarClock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                {lead}
+              </span>
+            </>
+          }
+        />
       )}
       {loading && !overview ? (
         <div role="status" aria-label="Loading analytics" className="space-y-3">
-          <Skeleton className="h-28 w-full rounded-xl" />
-          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-28 w-full rounded-card" />
+          <Skeleton className="h-28 w-full rounded-card" />
         </div>
       ) : error || !overview ? (
         <ErrorState title="Analytics couldn't be loaded" message={error ?? "Try again."} onRetry={reload} />
