@@ -79,6 +79,7 @@ export function ItemBlock({
   const left = fractionAt(shown.start, duration) * 100;
   const span = Math.max(0, fractionAt(shown.end, duration) - fractionAt(shown.start, duration)) * 100;
   const vertical = lanes === 2 ? (item.lane === 0 ? "top-1 h-[calc(50%-0.375rem)]" : "bottom-1 h-[calc(50%-0.375rem)]") : "inset-y-1.5";
+  // (On touch screens the rows are taller, so each lane stays at least 44 px high.)
   const timing = item.kind === "sfx" ? timecode(shown.start) : timeRange(shown.start, shown.end);
   const label = `${item.label === item.name ? item.label : `${item.label}: ${item.name}`}, ${timeRange(item.start, item.end)}`;
   const hint = edit
