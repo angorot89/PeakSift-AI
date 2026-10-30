@@ -32,9 +32,10 @@ import { SmartReframePanel, type FramingMode } from "@/components/app/editor/sma
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
 import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/timeline";
+import { setMediaTime } from "@/lib/use-audio-preview";
 import { CaptionsTrack, MusicTrack, OpeningTrack, SoundTrack, VisualsTrack, type ItemEdit } from "@/components/app/editor/timeline/tracks";
 import { heardPeaks } from "@/components/app/editor/audio-timeline";
-import { editableEdges, musicEnd, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
+import { editableEdges, musicEnd, representativeTime, timelineItems, toolForItem, type TimelineItem } from "@/lib/timeline";
 import { VisualsLayer } from "@/components/app/editor/visuals-layer";
 import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
@@ -870,6 +871,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     onSelect: (item: TimelineItem) => {
       setTimelineSelected(item.id);
       setTool(toolForItem(item.ref));
+      // The preview shows it: a visual on screen, a sound effect about to play, the hook.
+      const at = representativeTime(item);
+      if (at !== null && previewVideo) setMediaTime(previewVideo, at);
     },
     editFor,
     onMessage: setTimelineMessage,

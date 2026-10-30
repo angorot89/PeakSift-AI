@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canvasWidth,
+  activeAt,
+  representativeTime,
   dragTimes,
   editableEdges,
   keyEdit,
@@ -181,5 +183,20 @@ describe("editing on the timeline", () => {
     assert.deepEqual(keyEdit("ArrowRight", false, false, editableEdges("hook")), { mode: "end", delta: 0.1 });
     assert.equal(keyEdit("ArrowRight", false, true, editableEdges("sfx")), null);
     assert.equal(keyEdit("ArrowUp", false, false, visual), null);
+  });
+});
+
+describe("preview sync", () => {
+  it("shows a representative moment of the selected item", () => {
+    assert.equal(representativeTime({ start: 4, end: 6, ref: { type: "visual", key: "a" } }), 5);
+    assert.equal(representativeTime({ start: 3, end: 3.6, ref: { type: "sfx", index: 0 } }), 2.5);
+    assert.equal(representativeTime({ start: 0.2, end: 0.8, ref: { type: "sfx", index: 1 } }), 0);
+    assert.equal(representativeTime({ start: 0, end: 2, ref: { type: "hook" } }), 0);
+    assert.equal(representativeTime({ start: 0, end: 15, ref: { type: "music" } }), null);
+  });
+  it("uses the preview's half-open interval", () => {
+    assert.equal(activeAt(4, 6, 4), true);
+    assert.equal(activeAt(4, 6, 6), false);
+    assert.equal(activeAt(4, 6, 3.99), false);
   });
 });

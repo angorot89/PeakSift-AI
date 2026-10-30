@@ -279,3 +279,16 @@ export function keyEdit(key: string, shift: boolean, alt: boolean, edges: Edges)
   if (alt) return edges.end ? { mode: "end", delta: sign * step } : null;
   return edges.move ? { mode: "move", delta: sign * step } : edges.end ? { mode: "end", delta: sign * step } : null;
 }
+
+/** Where the preview goes when an item is selected: the middle of a visual (it is on screen),
+ * just before a sound effect (so it is heard when playing), the start of the hook; music and
+ * captions keep the current time. */
+export function representativeTime(item: Pick<TimelineItem, "start" | "end" | "ref">): number | null {
+  if (item.ref.type === "visual") return (item.start + item.end) / 2;
+  if (item.ref.type === "sfx") return Math.max(0, item.start - 0.5);
+  if (item.ref.type === "hook") return 0;
+  return null;
+}
+
+/** Whether an item is playing at `t` — the same half-open interval the preview uses. */
+export const activeAt = (start: number, end: number, t: number) => t >= start && t < end;
