@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, Palette, Plus, Shapes, Star } from "lucide-react";
+import { Clapperboard, ImageIcon, Palette, Plus, RotateCcw, Shapes, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { BrandPreview, type PreviewEdit } from "@/components/app/brand/brand-preview";
@@ -14,6 +14,7 @@ import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { errorMessage } from "@/lib/api";
@@ -22,6 +23,7 @@ import {
   deleteBrand,
   getBrandLayout,
   listBrands,
+  listTemplates,
   logoUrl,
   updateBrand,
   type Brand,
@@ -29,7 +31,7 @@ import {
   type BrandLayout,
   type BrandLogo,
 } from "@/lib/brand";
-import { CORNER_LABELS, emphasisReadable, SIZE_LABELS, type LogoCorner, type LogoSize } from "@/lib/brand-rules";
+import { CORNER_LABELS, emphasisReadable, SIZE_LABELS, textOn, type LogoCorner, type LogoSize } from "@/lib/brand-rules";
 import { getCaptionStyles, type CaptionStyles } from "@/lib/captions";
 
 type Draft = {
@@ -105,8 +107,8 @@ function Glossary() {
   return (
     <ul className="mb-8 grid gap-3 sm:grid-cols-3" aria-label="How Brand Studio works">
       {items.map(({ icon: Icon, title, text }) => (
-        <li key={title} className="flex gap-3 rounded-xl border border-border bg-surface/60 p-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-accent-soft">
+        <li key={title} className="flex gap-3 rounded-block border border-border bg-surface/60 p-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent/12 text-accent-soft">
             <Icon aria-hidden="true" className="size-[18px]" />
           </span>
           <span className="min-w-0">
@@ -129,6 +131,49 @@ function Row({ label, children, hint }: { label: string; children: ReactNode; hi
   );
 }
 
+/** One brand in the library: its colour and logo, its name, whether it is the default, and how
+ * many templates use it. Pressing it opens it in the editor below. */
+function BrandCard({ brand, templates, selected, onPick }: { brand: Brand; templates: number | null; selected: boolean; onPick: () => void }) {
+  return (
+    <li className="min-w-0">
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onPick}
+        className={`flex min-h-16 w-full items-center gap-3 rounded-block border p-3 text-left transition-[border-color,background-color] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+          selected ? "border-accent/55 bg-accent/[0.08]" : "border-border bg-surface-2/50 hover:border-border-strong hover:bg-surface-2"
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-block ring-1 ring-white/15"
+          style={{ background: brand.primary_color }}
+        >
+          {brand.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a private, session-authenticated image
+            <img src={logoUrl(brand.logo)} alt="" className="size-9 object-contain" />
+          ) : (
+            <span className="text-lg font-bold" style={{ color: textOn(brand.primary_color) }}>
+              {brand.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold text-foreground">{brand.name}</span>
+            {brand.is_default ? <StatusPill tone="accent">Default</StatusPill> : null}
+          </span>
+          {templates !== null ? (
+            <span className="mt-0.5 block text-caption text-subtle">
+              {templates} template{templates === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </span>
+      </button>
+    </li>
+  );
+}
+
 export function BrandStudioView({ templates }: { templates?: ReactNode }) {
   const toast = useToast();
   const [brands, setBrands] = useState<Brand[] | null>(null);
@@ -142,6 +187,7 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [usage, setUsage] = useState<Record<string, number> | null>(null);
 
   const pick = useCallback((brand: Brand | null) => {
     const next = brand ? fromBrand(brand) : { ...NEW_DRAFT };
@@ -162,6 +208,17 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
         if (list.length) pick(list[0]);
       })
       .catch((failure: unknown) => !cancelled && setLoadError(errorMessage(failure)));
+    // How many templates use each brand (the library shows it; nothing depends on it).
+    listTemplates()
+      .then((list) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        for (const template of list) {
+          if (template.brand) counts[template.brand.id] = (counts[template.brand.id] ?? 0) + 1;
+        }
+        setUsage(counts);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -240,47 +297,79 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
   return (
     <div>
       <PageHeader
-        title="Brand Studio"
-        description="Set up how your Shorts look and how they're edited once — every new Short can start from it."
+        size="hero"
+        title={
+          <>
+            Brand <span className="text-accent-soft">Studio</span>
+          </>
+        }
+        description="How your Shorts look and how they're edited — set it up once, and every new Short can start from it."
       />
       <Glossary />
       {loadError ? <InlineAlert title="Brand Studio couldn't load">{loadError}</InlineAlert> : null}
 
       <section aria-labelledby="brand-heading" className="mb-12">
-        <SectionHeader
-          id="brand-heading"
-          title="Your brand"
-          description="How your Shorts look. Used by your templates; changing it never alters Shorts you already made."
-          actions={
-            brands && brands.length > 0 ? (
-              <Button variant="secondary" size="sm" onClick={() => pick(null)} disabled={selected === "new"}>
-                <Plus aria-hidden="true" className="size-4" /> New brand
-              </Button>
-            ) : null
-          }
-        />
-        {brands === null && !loadError ? <Skeleton className="h-96 rounded-2xl" /> : null}
+        {brands === null && !loadError ? <Skeleton className="h-96 rounded-card" /> : null}
         {brands !== null && brands.length === 0 && selected === null ? (
-          <EmptyState
-            icon={Palette}
-            title="No brand yet"
-            description="Choose your colours and logo once. Your templates and Shorts can then use them."
-            action={<Button onClick={() => pick(null)}>Create your brand</Button>}
-          />
-        ) : null}
-        {brands !== null && brands.length > 1 && selected !== "new" ? (
-          <div className="mb-4">
-            <SegmentedControl
-              label="Brand"
-              options={brands.map((b) => ({ value: b.id, label: `${b.name}${b.is_default ? " (default)" : ""}` }))}
-              value={selected ?? brands[0].id}
-              onChange={(id) => pick(brands.find((b) => b.id === id) ?? null)}
+          <>
+            <SectionHeader id="brand-heading" title="Your brand" description="How your Shorts look. Used by your templates; changing it never alters Shorts you already made." />
+            <EmptyState
+              icon={Palette}
+              title="No brand yet"
+              description="Choose your colours and logo once. Your templates and Shorts can then use them."
+              action={<Button onClick={() => pick(null)}>Create your brand</Button>}
             />
-          </div>
+          </>
         ) : null}
 
-        {selected !== null && spec && layout ? (
-          <Card className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {brands !== null && (brands.length > 0 || selected !== null) ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="min-w-0 space-y-6">
+              {brands.length > 0 ? (
+                <Card>
+                  <SectionHeader
+                    id="brand-heading"
+                    title="Your brand library"
+                    description="How your Shorts look. Changing a brand never alters Shorts you already made."
+                    actions={
+                      <Button variant="secondary" size="sm" onClick={() => pick(null)} disabled={selected === "new"}>
+                        <Plus aria-hidden="true" className="size-4" /> New brand
+                      </Button>
+                    }
+                  />
+                  <ul aria-label="Brands" className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                    {brands.map((brand) => (
+                      <BrandCard
+                        key={brand.id}
+                        brand={brand}
+                        templates={usage ? (usage[brand.id] ?? 0) : null}
+                        selected={selected === brand.id}
+                        onPick={() => pick(brand)}
+                      />
+                    ))}
+                  </ul>
+                </Card>
+              ) : (
+                <h2 id="brand-heading" className="sr-only">
+                  Your brand
+                </h2>
+              )}
+              {selected !== null && spec && layout ? (
+                <Card>
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-section">{selected === "new" ? "New brand" : "Edit brand"}</h3>
+                <p className="mt-1 text-sm text-muted">Colours, logo and the line on your end card.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {dirty ? <StatusPill tone="warning">Unsaved changes</StatusPill> : null}
+                {dirty && selected !== "new" ? (
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setDraft(saved)}>
+                    <RotateCcw aria-hidden="true" /> Reset
+                  </Button>
+                ) : null}
+              </div>
+            </div>
             <form
               className="min-w-0 space-y-6"
               onSubmit={(event) => {
@@ -310,7 +399,15 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
                 status={emphasisStatus}
               />
               <Row label="Logo" hint="From your images. Transparent PNGs look best. Logos keep their shape and stay inside the safe area.">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="checkerboard flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-block border border-border">
+                    {draft.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- a private, session-authenticated image
+                      <img src={logoUrl(draft.logo)} alt="" className="size-11 object-contain" />
+                    ) : (
+                      <ImageIcon aria-hidden="true" className="size-5 text-subtle" />
+                    )}
+                  </span>
                   <span className="min-w-0 truncate text-sm text-muted">{draft.logo ? draft.logo.name : "No logo"}</span>
                   <Button type="button" variant="secondary" size="sm" onClick={() => setPicker(true)}>
                     {draft.logo ? "Change logo" : "Choose logo"}
@@ -382,10 +479,21 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
                 ) : null}
               </div>
             </form>
-            <div className="lg:sticky lg:top-6 lg:self-start">
-              <BrandPreview spec={spec} layout={layout} brand={preview} edit={SAMPLE_EDIT} />
+                </Card>
+              ) : null}
             </div>
-          </Card>
+            {selected !== null && spec && layout ? (
+              <aside aria-labelledby="preview-heading" className="xl:sticky xl:top-6 xl:self-start">
+                <Card>
+                  <h2 id="preview-heading" className="text-section">
+                    Live preview
+                  </h2>
+                  <p className="mt-1 mb-4 text-sm text-muted">How your brand looks on a Short. The rendered Short is the final result.</p>
+                  <BrandPreview spec={spec} layout={layout} brand={preview} edit={SAMPLE_EDIT} />
+                </Card>
+              </aside>
+            ) : null}
+          </div>
         ) : null}
       </section>
 

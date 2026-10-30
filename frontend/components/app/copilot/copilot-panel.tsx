@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Lightbulb, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, ChevronRight, Lightbulb, RotateCcw, Sparkles, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   type KeyboardEvent,
@@ -18,6 +18,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Spinner } from "@/components/ui/progress";
+import { StatusPill } from "@/components/ui/status-pill";
 import { useToast } from "@/components/ui/toast";
 import { ApiError, errorMessage } from "@/lib/api";
 import { generateClip } from "@/lib/clips";
@@ -234,16 +235,15 @@ export function CopilotPanel() {
   const scopeLabel = context?.scope ?? scopes[key] ?? "Your workspace";
   const facts = context && context.scope === scopeLabel ? context.facts : [];
   const waiting = pending && pending.key === key ? pending : null;
-  const header = (
-    <div className="min-w-0">
-      <p className="truncate text-caption text-subtle" title={[scopeLabel, ...facts].join(" · ")}>
-        {[scopeLabel, ...facts].join(" · ")}
-      </p>
-    </div>
-  );
-
   const body = (
     <div className="flex flex-col gap-4">
+      <div className="rounded-block border border-border bg-surface-2/60 px-3.5 py-3">
+        <p className="truncate text-sm font-medium text-foreground">{scopeLabel}</p>
+        {facts.length ? <p className="mt-0.5 truncate text-caption text-subtle">{facts.join(" · ")}</p> : null}
+        <p className="mt-2">
+          <StatusPill tone="success">Answers from your own data</StatusPill>
+        </p>
+      </div>
       {status && !status.available ? (
         <InlineAlert tone="info" title="PeakSift's local assistant isn't available right now">
           Everything else works as usual. Questions still get PeakSift&apos;s own next step.
@@ -269,7 +269,7 @@ export function CopilotPanel() {
           ))}
           {waiting ? (
             <li>
-              <article aria-label="Your question" dir="auto" className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm text-foreground">
+              <article aria-label="Your question" dir="auto" className="ml-auto max-w-[85%] rounded-card rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm text-foreground">
                 {waiting.text}
               </article>
             </li>
@@ -308,6 +308,7 @@ export function CopilotPanel() {
       disabled={!!pending}
       placeholder={scope.projectId ? "Ask about this project…" : "Ask about your projects and Shorts…"}
     />
+      <p className="text-caption text-subtle">PeakSift can get things wrong — check before you publish.</p>
     </div>
   );
 
@@ -347,7 +348,6 @@ export function CopilotPanel() {
           open={open}
           onClose={closeCopilot}
           title="Ask PeakSift"
-          description={[scopeLabel, ...facts].join(" · ")}
           placement="full"
           footer={composerBlock}
           headerActions={clearButton}
@@ -364,15 +364,15 @@ export function CopilotPanel() {
     <>
       <aside
         aria-label="Ask PeakSift"
-        className="fixed inset-y-0 right-0 z-40 flex w-[min(26rem,100vw)] animate-sheet-right flex-col border-l border-border bg-surface shadow-2xl"
+        className="fixed inset-y-0 right-0 z-40 flex w-[min(28rem,100vw)] animate-sheet-right flex-col border-l border-border bg-surface shadow-raised"
       >
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent-soft">
-            <Sparkles className="size-4" />
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-block bg-accent/15 text-accent-soft">
+            <Sparkles className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-title">Ask PeakSift</h2>
-            {header}
+            <h2 className="text-section">Ask PeakSift</h2>
+            <p className="truncate text-caption text-subtle">Your project-aware assistant</p>
           </div>
           {clearButton}
           <IconButton aria-label="Close Ask PeakSift" size="sm" onClick={closeCopilot}>
@@ -411,16 +411,21 @@ function Welcome({
           you decide and click.
         </p>
       </div>
-      <ul className="flex flex-col gap-2" aria-label="Suggested questions">
+      <p className="text-caption font-medium tracking-wide text-subtle uppercase">Try asking</p>
+      <ul className="grid gap-2 sm:grid-cols-2" aria-label="Suggested questions">
         {starters(page, hasSource).map((text) => (
-          <li key={text}>
+          <li key={text} className="min-w-0">
             <button
               type="button"
               disabled={disabled}
               onClick={() => onAsk(text)}
-              className="flex min-h-11 w-full items-center rounded-xl border border-border bg-surface-2 px-3.5 py-2 text-left text-sm text-foreground transition-colors hover:border-border-strong hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
+              className="group flex min-h-14 w-full items-center gap-3 rounded-block border border-border bg-surface-2/70 px-3.5 py-2.5 text-left text-sm text-foreground transition-[border-color,background-color] hover:border-accent/40 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
             >
-              {text}
+              <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent/12 text-accent-soft">
+                <Lightbulb className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1 text-pretty">{text}</span>
+              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5" />
             </button>
           </li>
         ))}
@@ -456,7 +461,7 @@ function Message({
 }) {
   if (message.role === "user") {
     return (
-      <article aria-label="Your question" className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm break-words whitespace-pre-wrap text-foreground">
+      <article aria-label="Your question" className="ml-auto max-w-[85%] rounded-card rounded-br-md bg-accent/15 px-3.5 py-2.5 text-sm break-words whitespace-pre-wrap text-foreground">
         {message.content}
       </article>
     );
@@ -469,7 +474,7 @@ function Message({
         {message.content}
       </p>
       {message.suggestion ? (
-        <div className="rounded-xl border border-accent/25 bg-accent/[0.05] px-3.5 py-2.5">
+        <div className="rounded-block border border-accent/30 bg-accent/[0.06] px-3.5 py-2.5">
           <p className="text-caption font-medium text-accent-soft">Suggestion</p>
           <p dir="auto" className="mt-0.5 text-sm text-pretty text-foreground">{message.suggestion}</p>
         </div>
@@ -477,15 +482,17 @@ function Message({
       {message.cards.length ? (
         <ul className="space-y-2" aria-label="Short ideas">
           {message.cards.map((card, index) => (
-            <li key={`${card.time}-${index}`} className="rounded-xl border border-border bg-surface-2 px-3.5 py-3">
-              <p className="flex items-start gap-2 text-sm font-medium text-foreground">
-                <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
+            <li key={`${card.time}-${index}`} className="rounded-block border border-border bg-surface-2/70 px-3.5 py-3.5 shadow-card">
+              <p className="flex items-start gap-2.5 text-sm font-semibold text-foreground">
+                <span aria-hidden="true" className="tabular flex size-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-caption text-accent-soft">
+                  {index + 1}
+                </span>
                 <span dir="auto" className="min-w-0 break-words">{card.title}</span>
               </p>
-              <p className="mt-1 text-caption text-subtle">
-                {[card.time, card.angle, card.style ? `Suggested style: ${card.style[0].toUpperCase()}${card.style.slice(1)}` : null]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <p className="mt-2 flex flex-wrap gap-1.5">
+                {card.time ? <StatusPill tone="info">{card.time}</StatusPill> : null}
+                {card.angle ? <StatusPill tone="neutral">{card.angle}</StatusPill> : null}
+                {card.style ? <StatusPill tone="accent">{`Style: ${card.style[0].toUpperCase()}${card.style.slice(1)}`}</StatusPill> : null}
               </p>
               {card.why ? <p dir="auto" className="mt-1 text-small text-pretty text-muted">{card.why}</p> : null}
               {card.note ? <p className="mt-1 text-small text-amber-200">{card.note}</p> : null}
@@ -574,7 +581,7 @@ function Composer({
       <label htmlFor={id} className="sr-only">
         Ask PeakSift
       </label>
-      <div className="flex items-end gap-2 rounded-2xl border border-border-strong bg-surface-2 p-1.5 focus-within:border-accent/60">
+      <div className="flex items-end gap-2 rounded-block border border-border-strong bg-surface-2 p-1.5 focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgb(249_115_22/0.15)]">
         <textarea
           ref={inputRef}
           id={id}
@@ -592,7 +599,7 @@ function Composer({
           variant="secondary"
           aria-label="Send question"
           disabled={disabled || !value.trim() || charCount(value) > QUESTION_MAX}
-          className="shrink-0 bg-foreground text-background hover:bg-zinc-200 disabled:bg-surface-3 disabled:text-subtle"
+          className="shrink-0 disabled:bg-surface-3 disabled:text-subtle disabled:shadow-none"
         >
           <ArrowUp aria-hidden="true" />
         </IconButton>
