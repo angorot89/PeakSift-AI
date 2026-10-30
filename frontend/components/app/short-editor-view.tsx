@@ -31,6 +31,7 @@ import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from 
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
+import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/timeline";
 import { VisualsLayer } from "@/components/app/editor/visuals-layer";
 import { VisualsPanel } from "@/components/app/editor/visuals-panel";
 import { PageHeader } from "@/components/app/page-header";
@@ -1060,7 +1061,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         {/* Settings: everything the server accepts, nothing it does not, in five tool groups. */}
         <aside
           aria-label="Edit settings"
-          className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
+          className="flex flex-col self-start rounded-card border border-border bg-surface shadow-card lg:sticky lg:top-20 lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-6rem)]"
         >
           <div className="space-y-3 border-b border-border px-4 pt-4 pb-3 sm:px-5">
             <div className="flex items-center justify-between gap-3">
@@ -1264,8 +1265,25 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           </div>
         </aside>
 
+        {/* The timeline: the visual map of this Short (preview only; the rendered Short plays on its own). */}
+        {mode === "preview" ? (
+          <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-2">
+            <EditorTimeline
+              duration={clip.duration_seconds}
+              video={previewVideo}
+              footer={
+                (brand?.end_card as { seconds?: number } | undefined)?.seconds
+                  ? `Your end card adds ${(brand?.end_card as { seconds: number }).seconds} s after the clip; it appears in the rendered Short, not in this preview.`
+                  : undefined
+              }
+            >
+              <VideoTrack src={clipContentUrl(clip.id)} />
+            </EditorTimeline>
+          </div>
+        ) : null}
+
         {/* Versions of this clip, named by their settings. */}
-        <section aria-labelledby="versions-heading" className="min-w-0 lg:col-start-1 lg:row-start-2">
+        <section aria-labelledby="versions-heading" className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-3">
           <div className="mb-3 flex items-baseline justify-between">
             <h2 id="versions-heading" className="text-sm font-medium text-muted">
               Versions{edits && edits.length > 0 ? <span className="tabular text-subtle"> · {edits.length}</span> : null}
