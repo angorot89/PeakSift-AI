@@ -92,6 +92,15 @@ feature-gated **Morocco Mode preview** (UI architecture only — no Moroccan dat
 "Not available yet") and a 330/330 browser audit; see
 [docs/creator-experience.md](docs/creator-experience.md) and [docs/design-system.md](docs/design-system.md).
 
+**Visual timeline & editor pass: implementation complete locally, pending CI/merge/release**
+(stacked PRs #247–#255 on top of the unmerged UI/UX stack; not merged, not tagged): the Short
+editor's timeline — a duration-aware scale, an animation-frame playhead, seeking by click, drag
+or keyboard, Video / Opening / Visuals / Captions / Sound / Music tracks derived from the edit's
+settings, drag, resize and snapping of supported timing with validation and keyboard editing,
+preview sync, tooltips and an honest render state, panels that follow the selection, phones and
+touch screens, and a real-render release gate (`scripts/timeline_acceptance.py`); see
+[docs/editor-timeline.md](docs/editor-timeline.md).
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,
@@ -123,6 +132,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Semantic assets: `app/models/semantic.py` (`VisualSemanticIndex`, `AssetEmbedding`, pgvector `vector(512)`), `app/services/semantic/` (contract, vectors, images, clip_onnx, fake, registry, indexing, sampling, lifecycle, search, matching, benchmark), `app/workers/semantic_tasks.py`, `app/cli/semantic.py`, `scripts/fetch_semantic_model.py` (pinned files + sha256), `scripts/semantic_benchmark.py`, `scripts/semantic_search_probe.py`; frontend `lib/visual-search.ts`, `components/app/use-visual-search.ts`. Model weights are never committed or downloaded automatically; creator media never leaves the server
 - Creator workspace: `app/services/workspace_summary.py` + `app/api/workspace.py` (`/workspace/home`, `/projects/{id}/summary`; not to be confused with `app/services/workspace.py`, the job scratch directories); frontend `components/app/app-shell.tsx`, `home-view.tsx`, `project/`, `create/`, `components/ui/` (design system), `lib/navigation.ts`, `lib/workspace*.ts`, `lib/status.ts`, `lib/moments.ts`, `lib/editor-tools.ts`, `lib/upload-batch.ts`
 - Performance analytics: `app/models/performance.py`, `app/models/insight.py`, `app/services/performance/` (provenance, content, metrics, provider, youtube, fake, factory, sync, lifecycle, summary, normalization, insights, profile, retention), `app/api/performance.py`, `app/workers/performance_tasks.py` (Celery beat schedule), `app/cli/performance.py`, `scripts/insights_benchmark.py`; frontend `/analytics`, `components/app/analytics*`, `lib/performance*.ts`
+- Editor timeline: `frontend/lib/timeline.ts` (scale, items, drag, snapping, sync, render state; unit-tested), `lib/reveal.ts`, `components/app/editor/timeline/` (`timeline.tsx`, `tracks.tsx`), `backend/scripts/timeline_acceptance.py` (real-render gate)
 - Visual shell and primitives: `app/globals.css` (tokens), `components/ui/` (`video-frame.tsx`, `peak-art.tsx`, `status-pill.tsx`), `components/app/app-shell.tsx`, `shell-search.tsx`, `page-header.tsx`; Morocco Mode preview `lib/morocco.ts`, `components/app/morocco/`
 - Creator Copilot: `app/models/copilot.py` (`CopilotThread`, `CopilotMessage`),
   `app/services/copilot/` (context, history, prompt, contract, provider, answers, safety, ideas,
@@ -171,6 +181,14 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   unused visuals, nothing published, requests to act, ideas without a video) is answered by
   `answers.py`, not the model. Never claim performance, virality or causation; observed patterns
   keep their wording. Conversations are per project, one question at a time, clearable.
+- Editor timeline: it shows the edit, it does not own it — items are derived from the editor's
+  settings (`timelineItems`) and every change goes through the same setters the forms use (no
+  second state; the server validates again at render). Only timing the edit supports may change
+  (`editableEdges`); invalid moves go back with the reason, never get repaired. Playhead and
+  "playing" marks update the DOM from one animation-frame clock (no React render per frame);
+  timeline and preview use the same cue rule (`cueAt`). Selecting never scrolls the page
+  (`revealInPanel`). Keyboard paths exist for every drag; 44 px targets on touch. Not an NLE: no
+  splitting, ripple, keyframes or extra tracks.
 - Brands and templates are preferences; renders read only the edit snapshot. An edit's `brand`
   section appears only when used (old fingerprints unchanged); plans freeze the template version
   and brand, and a template or brand change never touches an existing plan or edit. Colours are
@@ -185,7 +203,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
 - Smart reframing: positions are fractions of the display-oriented source (x right, y down). Detector output is untrusted until `normalize_detection`; "no face" (empty list) and "detector broken" (`DetectorUnavailable`/`DetectorFailure` → failed analysis) must stay distinct. Every tuning value is server configuration in the versioned snapshot. Persisted keyframes are re-validated before rendering and only module-formatted numbers reach the filtergraph. Never load a detector at import or startup, never download or commit model weights, and never describe the feature as speaker detection.
 - Tests: Celery eager mode, mocked speech models, a fake OpenAI client, a fake ONNX session, moto and a live MinIO for S3 (`TEST_S3_*`, required in CI), a mocked YouTube and the deterministic fake metrics provider (`PERFORMANCE_PROVIDER=fake`); CI sets `HF_HUB_OFFLINE=1`, never has an API key or Google credentials, never downloads a model and never calls Google.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/editor-timeline.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

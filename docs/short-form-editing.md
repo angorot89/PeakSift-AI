@@ -24,6 +24,9 @@ V0.6 does **not** include:
 - Custom fonts, brand kits or watermarks.
 - Publishing to TikTok, YouTube or Instagram.
 
+The editor's timeline (tracks, playhead, drag and resize, preview sync) is described in
+[editor-timeline.md](editor-timeline.md).
+
 ## Pipeline
 
 ```
