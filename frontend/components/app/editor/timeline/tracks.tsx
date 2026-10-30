@@ -1,10 +1,10 @@
 "use client";
 
 import { Captions, ImageIcon, Music, Plus, Sparkles, Type, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { Waveform } from "@/components/app/editor/audio-timeline";
 import { TimelineTrack, useTimelineScale } from "@/components/app/editor/timeline/timeline";
-import type { PreviewCue } from "@/lib/caption-timing";
+import { cueAt, type PreviewCue } from "@/lib/caption-timing";
 import {
   captionRegions,
   dragTimes,
@@ -151,6 +151,8 @@ export function ItemBlock({
   const common = {
     type: "button" as const,
     "data-timeline-item": item.id,
+    "data-start": item.start,
+    "data-end": item.kind === "sfx" ? Math.max(item.end, item.start + 0.25) : item.end,
     "aria-label": label + hint,
     "aria-pressed": selected,
     title: label,
@@ -184,7 +186,7 @@ export function ItemBlock({
         >
           <span
             aria-hidden="true"
-            className={`size-3 rotate-45 rounded-[3px] border transition-transform duration-150 group-hover:scale-125 group-focus-visible:ring-2 group-focus-visible:ring-accent ${
+            className={`size-3 rotate-45 rounded-[3px] border transition-transform duration-150 group-hover:scale-125 group-data-[active=true]:scale-150 group-data-[active=true]:bg-success/70 group-focus-visible:ring-2 group-focus-visible:ring-accent ${
               ghost?.problem ? "border-danger bg-danger/40" : KIND_STYLE.sfx
             } ${selected || ghost ? "scale-125 ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""}`}
           />
@@ -211,7 +213,7 @@ export function ItemBlock({
       <button
         {...common}
         {...handlers}
-        className={`group absolute z-10 flex min-w-1.5 touch-none items-center gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${
+        className={`group absolute z-10 flex min-w-1.5 touch-none items-center data-[active=true]:shadow-[0_0_0_1px_rgb(255_255_255/0.35),0_0_16px_-4px_currentColor] data-[active=true]:brightness-125 gap-1.5 overflow-hidden rounded-control border px-2 text-left text-caption font-medium whitespace-nowrap transition-[box-shadow,filter] duration-150 outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-accent ${vertical} ${
           ghost?.problem ? "border-danger bg-danger/25 text-rose-50" : KIND_STYLE[item.kind]
         } ${selected || ghost ? "ring-2 ring-accent ring-offset-1 ring-offset-surface" : ""} ${ghost ? "shadow-raised" : ""} ${
           edit?.edges.move ? "cursor-grab active:cursor-grabbing" : ""
@@ -364,7 +366,7 @@ export function CaptionsTrack({
   onSelect: () => void;
   onAdd: () => void;
 }) {
-  const { duration } = useTimelineScale();
+  const { duration, seek } = useTimelineScale();
   if (!enabled) {
     return (
       <TimelineTrack label="Captions" icon={Captions}>
@@ -374,6 +376,16 @@ export function CaptionsTrack({
   }
   const regions = captionRegions(cues ?? []);
   const timed = (cues ?? []).some((c) => c.timed);
+  const lines = cues ?? [];
+  // A click shows the caption line under the pointer from its start (the same line the preview
+  // shows there), or seeks to that moment between lines.
+  const showLine = (event: MouseEvent<HTMLButtonElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = ((event.clientX - box.left) / Math.max(1, box.width)) * duration;
+    const index = cueAt(lines, at);
+    seek(index >= 0 ? lines[index].start + 0.02 : at);
+    onSelect();
+  };
   return (
     <TimelineTrack label="Captions" icon={Captions}>
       <button
@@ -381,7 +393,7 @@ export function CaptionsTrack({
         data-timeline-item="captions"
         aria-pressed={selected}
         aria-label={`Captions: ${(cues ?? []).length} lines${timed ? ", timed word by word" : ""}`}
-        onClick={onSelect}
+        onClick={showLine}
         className={`absolute inset-0 z-10 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${selected ? "bg-white/[0.04]" : ""}`}
       >
         {regions.map((region) => (
@@ -395,7 +407,20 @@ export function CaptionsTrack({
             }}
           />
         ))}
-        {timed ? <WordTicks cues={cues ?? []} /> : null}
+        {lines.map((cue) => (
+          <span
+            key={`${cue.start}-${cue.end}`}
+            aria-hidden="true"
+            data-start={cue.start}
+            data-end={cue.end}
+            className="absolute inset-y-3 rounded-[4px] transition-colors duration-150 data-[active=true]:bg-white/45"
+            style={{
+              left: `${fractionAt(cue.start, duration) * 100}%`,
+              width: `${Math.max(0, fractionAt(cue.end, duration) - fractionAt(cue.start, duration)) * 100}%`,
+            }}
+          />
+        ))}
+        {timed ? <WordTicks cues={lines} /> : null}
         {cues === null ? <span className="absolute inset-y-0 left-2 flex items-center text-caption text-subtle">Loading captions…</span> : null}
       </button>
     </TimelineTrack>

@@ -4,6 +4,7 @@ import { Film, type LucideIcon } from "lucide-react";
 import { createContext, useContext, useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { setMediaTime } from "@/lib/use-audio-preview";
 import {
+  activeAt,
   canvasWidth,
   filmFrameCount,
   filmFrameTimes,
@@ -201,6 +202,12 @@ export function EditorTimeline({
     const x = fractionAt(t, safe) * width;
     if (playhead.current) playhead.current.style.transform = `translateX(${x}px)`;
     if (readout.current) readout.current.textContent = timecode(t);
+    // What is playing now: items, sound effects and the caption line on screen (attributes only;
+    // React does not re-render on every frame).
+    for (const element of scroller.current?.querySelectorAll<HTMLElement>("[data-start]") ?? []) {
+      const on = activeAt(Number(element.dataset.start), Number(element.dataset.end), t);
+      if ((element.dataset.active === "true") !== on) element.dataset.active = on ? "true" : "false";
+    }
     if (handle.current) {
       handle.current.setAttribute("aria-valuenow", t.toFixed(1));
       handle.current.setAttribute("aria-valuetext", `${timecode(t)} of ${timecode(safe)}`);
