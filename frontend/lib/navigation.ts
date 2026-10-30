@@ -29,6 +29,7 @@ export const clipHref = (projectId: string, clipId: string) => `/projects/${proj
 /** The global destination a path belongs to (a project is part of Projects). */
 export function activeGlobal(pathname: string): GlobalKey | null {
   if (pathname === "/home" || pathname.startsWith("/home/")) return "home";
+  if (pathname === "/morocco" || pathname.startsWith("/morocco/")) return "home"; // Morocco Mode extends Home
   if (pathname === "/projects" || pathname.startsWith("/projects/")) return "projects";
   if (pathname === "/analytics" || pathname.startsWith("/analytics/")) return "analytics";
   if (pathname === "/brand" || pathname.startsWith("/brand/")) return "brand";
