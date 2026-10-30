@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { ModeSwitch } from "@/components/app/morocco/morocco-views";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -31,6 +32,7 @@ import { editContentUrl } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { useStoredFlag } from "@/lib/use-stored-flag";
+import { moroccoPreviewEnabled } from "@/lib/morocco";
 import { videoContentUrl } from "@/lib/videos";
 import {
   clock,
@@ -368,7 +370,13 @@ function Returning({ home }: { home: Home }) {
             New project
           </ButtonLink>
         }
-      />
+      >
+        {moroccoPreviewEnabled() ? (
+          <div className="mt-6">
+            <ModeSwitch current="global" />
+          </div>
+        ) : null}
+      </PageHeader>
 
       <GettingStarted home={home} />
 

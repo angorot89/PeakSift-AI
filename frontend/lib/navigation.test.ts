@@ -9,6 +9,7 @@ const C = "3f1c0a1e-0000-4000-8000-000000000002";
 describe("global navigation", () => {
   it("knows which destination a path belongs to", () => {
     assert.equal(activeGlobal("/home"), "home");
+    assert.equal(activeGlobal("/morocco/kit"), "home");
     assert.equal(activeGlobal("/projects"), "projects");
     assert.equal(activeGlobal(`/projects/${P}/clips/${C}`), "projects");
     assert.equal(activeGlobal("/analytics/abc"), "analytics");
