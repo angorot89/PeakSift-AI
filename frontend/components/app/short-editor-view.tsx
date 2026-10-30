@@ -1290,6 +1290,12 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   {spec ? (
                     <PresetCards spec={spec} value={preset} onChange={edit(setPreset)} name={`${id}-preset`} disabled={!captions} />
                   ) : null}
+                  {typeof brand?.caption_emphasis === "string" ? (
+                    <p className="flex items-center gap-2 rounded-block border border-border bg-surface-2/60 px-3 py-2 text-small text-muted">
+                      <span aria-hidden="true" className="size-4 shrink-0 rounded-full ring-1 ring-white/20" style={{ background: brand.caption_emphasis }} />
+                      The spoken word uses your brand colour.
+                    </p>
+                  ) : null}
                   <PositionPicker
                     value={position}
                     onChange={edit(setPosition)}
@@ -1353,6 +1359,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 onUploaded={visualUploaded}
                 elements={visuals}
                 onChange={edit(setVisuals)}
+                selected={timelineSelected?.startsWith("visual:") ? timelineSelected.slice("visual:".length) : null}
+                onSelect={(key) => setTimelineSelected(key ? `visual:${key}` : null)}
               />
             </div>
             <div {...toolPanelProps(`${id}-tool`, "sound", tool === "sound")} className="focus-visible:outline-none">
@@ -1369,6 +1377,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 duration={clip.duration_seconds}
                 video={previewVideo}
                 onUploaded={audioUploaded}
+                selectedCue={timelineSelected?.startsWith("sfx:") ? Number(timelineSelected.slice("sfx:".length)) : null}
               />
             </div>
             <div {...toolPanelProps(`${id}-tool`, "brand", tool === "brand")} className="focus-visible:outline-none">

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Info, Music2, Pause, Play, Plus, Trash2, Upload, Volume2, Waves } from "lucide-react";
-import { AudioTimeline, heardPeaks, Waveform } from "@/components/app/editor/audio-timeline";
+import { Waveform } from "@/components/app/editor/audio-timeline";
 import { ControlGroup, InlineCheck, OptionCard } from "@/components/app/editor/controls";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ProgressBar } from "@/components/ui/progress";
@@ -155,6 +155,7 @@ export function AudioPanel({
   duration,
   video,
   onUploaded,
+  selectedCue = null,
 }: {
   projectId: string;
   value: AudioRequest;
@@ -165,6 +166,8 @@ export function AudioPanel({
   duration: number;
   video: HTMLVideoElement | null;
   onUploaded: (asset: AudioAsset) => void;
+  /** The sound effect selected on the timeline (highlighted and scrolled into view). */
+  selectedCue?: number | null;
 }) {
   const id = useId();
   const listening = useAssetListening();
@@ -209,7 +212,6 @@ export function AudioPanel({
     return `Plays ${formatClock(start)}–${formatClock(start + timeline.plays)} of the track`;
   })();
   const ducking = value.music?.ducking ?? "off";
-  const musicPeaks = value.music && chosen && waveforms[chosen.id] ? heardPeaks(waveforms[chosen.id], value.music, chosen.duration_seconds, duration) : null;
   const effectLimitHint = limits ? `Effects up to ${limits.sfx_max_duration_seconds} s` : undefined;
 
   return (
@@ -376,7 +378,13 @@ export function AudioPanel({
             {value.sfx.map((cue, index) => {
               const asset = byId.get(cue.asset_id);
               return (
-                <li key={index} className="space-y-2 rounded-xl border border-border bg-surface-2/50 p-3">
+                <li
+                  key={index}
+                  ref={(node) => {
+                    if (node && index === selectedCue) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                  }}
+                  className={`space-y-2 rounded-block border bg-surface-2/50 p-3 transition-colors ${index === selectedCue ? "border-accent/60 ring-1 ring-accent/30" : "border-border"}`}
+                >
                   <div className="flex items-center gap-2">
                     <span aria-hidden="true" className="tabular flex size-6 shrink-0 items-center justify-center rounded-md border border-emerald-300/60 bg-emerald-400/15 text-caption font-semibold text-emerald-100">
                       {index + 1}
@@ -447,20 +455,6 @@ export function AudioPanel({
         </div>
         {!effects.length ? <p className="text-caption text-subtle">Upload a short sound to place it. {effectLimitHint}</p> : null}
       </ControlGroup>
-
-      {value.music || value.sfx.length ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Audio timeline</p>
-          <AudioTimeline
-            duration={duration}
-            video={video}
-            musicPeaks={musicPeaks}
-            cues={value.sfx.map((cue, index) => ({ key: `${index}`, label: byId.get(cue.asset_id)?.display_name ?? "Sound effect", at: cue.at_seconds }))}
-            onMoveCue={(index, at) => setCue(index, { at_seconds: Math.min(Math.max(0, at), duration) })}
-          />
-          <p className="text-caption text-subtle">Drag a numbered marker or use the arrow keys to move an effect. Click the strip to jump the preview.</p>
-        </div>
-      ) : null}
 
       <SwitchRow
         label="Normalize final mix"

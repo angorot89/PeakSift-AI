@@ -3,6 +3,7 @@
 import { Palette, Shapes } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -155,6 +156,9 @@ export function BrandPanel({
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
+          <ButtonLink href="/brand" variant="ghost" size="sm">
+            Open Brand Studio
+          </ButtonLink>
           {brand ? (
             <Button size="sm" variant="secondary" onClick={() => onBrand(null, origin?.template ? { template: origin.template } : null)}>
               Remove branding
