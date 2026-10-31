@@ -176,10 +176,12 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   untrusted DATA; its JSON is parsed by `contract.parse_reply` (unknown types and invented handles
   dropped, text cleaned, labels written by PeakSift) and screened by `safety.py` (an answer
   claiming an action is never shown; repeated instructions and unknown times are removed).
+  Sentences naming an internal term (keys and handles of the view, unknown identifiers, JSON,
+  `null`) are removed by `safety.drop_internal_terms`, learnt from the data rather than listed.
   Actions are navigation or Create Short only and are re-checked when clicked — never publish,
   delete or change anything from the Copilot. What PeakSift knows exactly (next step, top pick,
-  unused visuals, nothing published, requests to act, ideas without a video) is answered by
-  `answers.py`, not the model. Never claim performance, virality or causation; observed patterns
+  unused visuals, nothing published, what has worked, how published Shorts are doing, requests
+  to act, ideas without a video) is answered by `answers.py`, not the model. Never claim performance, virality or causation; observed patterns
   keep their wording. Conversations are per project, one question at a time, clearable.
 - Editor timeline: it shows the edit, it does not own it — items are derived from the editor's
   settings (`timelineItems`) and every change goes through the same setters the forms use (no

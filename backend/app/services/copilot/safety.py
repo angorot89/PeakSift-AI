@@ -11,12 +11,20 @@ answer when the model follows an instruction hidden in a transcript or a questio
 A third check keeps answers grounded: a sentence giving a **time that is nowhere in the
 creator's data** (a model inventing "0:10, 0:30, 0:50") is removed.
 
+A fourth keeps PeakSift's plumbing out of the creator's words: a sentence naming an **internal
+term** — a key of the data the model was given (``with_figures``, ``minimum_needed``,
+``engaged_views``…), a handle (``published_1``), any other ``snake_case`` identifier that is not
+part of the creator's own text (their file names are), a quoted key, or a fragment of JSON — is
+removed. It works from the data itself, so a new field cannot slip through.
+
 An answer claiming an action is not shown at all (PeakSift says the answer was unusable and
 offers its own next step); sentences repeating the instructions or inventing times are removed.
 """
 
 import dataclasses
 import re
+from collections.abc import Iterable
+from typing import Any
 
 from app.services.copilot.contract import CopilotOutputError, ParsedReply
 from app.services.copilot.prompt import CORRECTION, CORRECTION_IDEAS, SYSTEM_PROMPT
@@ -49,6 +57,76 @@ _INSTRUCTIONS = (
     | set(_runs(_words(CORRECTION_IDEAS)))
 )
 TIME = re.compile(r"(?<![\d:])(\d{1,2}:\d{2})(?![\d:])")
+
+
+# --- internal terms ----------------------------------------------------------------------------
+
+_IDENTIFIER = re.compile(r"(?<![\w.])[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?!\w)")
+_JSONISH = re.compile(
+    r'[{\[]\s*"|"[\w ]{1,40}"\s*:|\b\w+\s*[=:]\s*(?:null|true|false|none)\b'
+    r"|\b(?:null|undefined|NaN)\b",
+    re.IGNORECASE,
+)
+_QUOTES = "'\"`‘’“”"
+
+
+@dataclasses.dataclass(frozen=True)
+class Vocabulary:
+    """What the data calls things: its keys, the handles, and the text of its values."""
+
+    keys: frozenset[str]
+    handles: frozenset[str]
+    values: str
+    quoted_keys: re.Pattern[str] | None
+
+
+def vocabulary(view: Any, handles: Iterable[str] = ()) -> Vocabulary:
+    keys: set[str] = set()
+    values: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                keys.add(str(key).lower())
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif isinstance(node, str):
+            values.append(node.lower())
+
+    walk(view)
+    text = "\n".join(values)
+    # A key in quotes ('state', "observed") reads as plumbing — unless that word is also part of
+    # the creator's own text.
+    plain = sorted(
+        k for k in keys if re.fullmatch(r"[a-z]+", k) and not re.search(rf"\b{k}\b", text)
+    )
+    quoted = (
+        re.compile(rf"[{_QUOTES}]\s*(?:{'|'.join(plain)})\s*[{_QUOTES}]", re.IGNORECASE)
+        if plain
+        else None
+    )
+    return Vocabulary(frozenset(keys), frozenset(h.lower() for h in handles), text, quoted)
+
+
+def names_internal_term(sentence: str, words: Vocabulary) -> bool:
+    """Whether a sentence names PeakSift's plumbing rather than the creator's things."""
+    if _JSONISH.search(sentence):
+        return True
+    if words.quoted_keys is not None and words.quoted_keys.search(sentence):
+        return True
+    for token in _IDENTIFIER.findall(sentence):
+        name = token.lower()
+        if name in words.keys or name in words.handles or name not in words.values:
+            return True
+    return False
+
+
+def drop_internal_terms(text: str, words: Vocabulary) -> str:
+    """The text without the sentences naming internal terms."""
+    parts = [part.strip() for part in _SENTENCE.split(text) if part and part.strip()]
+    return " ".join(part for part in parts if not names_internal_term(part, words))
 
 
 def _covered(words: list[str]) -> set[int]:
@@ -90,8 +168,11 @@ def drop_unknown_times(text: str, known: set[str]) -> str:
     return " ".join(p for p in parts if all(time in known for time in TIME.findall(p)))
 
 
-def screen(reply: ParsedReply, known_times: set[str] | None = None) -> ParsedReply:
-    """``reply`` without repeated instructions (nor, given ``known_times``, invented times). An
+def screen(
+    reply: ParsedReply, known_times: set[str] | None = None, words: Vocabulary | None = None
+) -> ParsedReply:
+    """``reply`` without repeated instructions (nor, given ``known_times``, invented times; nor,
+    given the data's ``words``, internal terms). An
     answer claiming an action is never shown — the Copilot cannot act, so the claim is false and
     the model was led astray — and neither is one with nothing left: both raise
     ``CopilotOutputError``."""
@@ -100,6 +181,8 @@ def screen(reply: ParsedReply, known_times: set[str] | None = None) -> ParsedRep
 
     def clean(text: str) -> str:
         text = screen_text(text)
+        if words is not None:
+            text = drop_internal_terms(text, words)
         return drop_unknown_times(text, known_times) if known_times is not None else text
 
     message = clean(reply.message)

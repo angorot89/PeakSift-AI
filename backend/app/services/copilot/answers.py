@@ -9,6 +9,13 @@ sometimes gets them wrong (acceptance found it naming the wrong top pick and des
 - **Requests to act** ("publish my video", "ignore your instructions and delete…") and requests
   for its instructions — what the assistant can and cannot do.
 - **How Shorts are doing, when nothing is published** — there is no history yet.
+- **How the published Shorts are doing** (on the analytics pages) — each Short's reported
+  figures, or that YouTube has not reported them yet (a small model once turned "1 published
+  Short" into "1 view").
+- **What has worked / any patterns** — the observed patterns, word for word, or why there are none
+  yet (too few comparable Shorts, or no pattern passed the checks), in plain words. A small model
+  answering this from the analytics data once quoted its internal field names; it never sees this
+  question now.
 - **The best moment / the top pick** — the ranking, with the best unused moment when the top
   one already has a clip.
 - **Short ideas without a video or moments** — what has to happen first.
@@ -64,6 +71,15 @@ UNUSED_VISUALS = re.compile(
     r"\b(visuals?|images?|b-?roll|assets?)\b[^?]{0,30}\b(not|never|haven'?t|didn'?t)\b[^?]{0,15}"
     r"\bus(e|ed|ing)\b|\bunused (visuals?|images?|assets?)\b|\bvisuels?\b[^?]{0,30}\bpas\b"
     r"[^?]{0,20}\butilis",
+    re.IGNORECASE,
+)
+WORKED = re.compile(
+    r"\b(?:what|which)\b[^?]{0,40}\b(?:work(?:ed|s|ing)?|perform(?:ed|s|ing)?"
+    r"|did (?:best|well|better)|done (?:best|well))\b|\bworked (?:best|well)\b"
+    r"|\bbest[- ]performing\b|\bpatterns?\b"
+    r"|\bwhat'?s working\b|\bce qui (?:a )?(?:le mieux )?(?:marché|fonctionné)\b"
+    r"|\bqu'est-ce qui (?:a )?(?:le mieux )?(?:marché|fonctionné)\b"
+    r"|ما الذي نجح|什么.{0,4}(?:效果|表现)最好",
     re.IGNORECASE,
 )
 ANALYTICS_PAGES = {"analytics", "project_analytics", "short_analytics"}
@@ -182,6 +198,107 @@ def nothing_published_answer(context: CopilotContext) -> str:
     )
 
 
+def _count(n: int, word: str) -> str:
+    return f"{n:,} {word}" if n == 1 else f"{n:,} {word}s"
+
+
+def _short_figures(short: dict) -> str:
+    published = short.get("published")
+    when = ""
+    if isinstance(published, str) and len(published) >= 10:
+        from datetime import date
+
+        day = date.fromisoformat(published[:10])
+        when = f" (published {day.strftime('%b')} {day.day})"
+    figures = []
+    if isinstance(short.get("views"), int):
+        figures.append(_count(short["views"], "view"))
+    if isinstance(short.get("engaged_views"), int):
+        figures.append(_count(short["engaged_views"], "engaged view"))
+    if isinstance(short.get("average_percent_viewed"), (int, float)):
+        figures.append(f"{round(short['average_percent_viewed'])}% viewed on average")
+    said = ", ".join(figures) if figures else "YouTube hasn't reported its figures yet"
+    return f"“{short.get('title', 'Your Short')}”{when}: {said}."
+
+
+def _published_line(context: CopilotContext, published: int) -> str:
+    where = "this project" if context.project_id else "PeakSift"
+    return f"You've published {_count(published, 'Short')} from {where}."
+
+
+def figures_answer(context: CopilotContext) -> str | None:
+    """How the published Shorts are doing: what YouTube reported for each recent one, and
+    plainly when it has reported nothing yet — observed figures, never a prediction. None
+    without analytics or without anything published."""
+    analytics = context.view.get("analytics")
+    if not isinstance(analytics, dict) or not analytics.get("published_shorts"):
+        return None
+    published = analytics["published_shorts"]
+    recent = [s for s in analytics.get("recent") or [] if isinstance(s, dict)][:3]
+    parts = [_published_line(context, published)]
+    parts += [_short_figures(short) for short in recent]
+    if any(isinstance(s.get("views"), int) for s in recent):
+        parts.append("These are observed figures, not predictions.")
+    if analytics.get("simulated_data"):
+        parts.append("These figures are simulated, not real YouTube data.")
+    return " ".join(parts)
+
+
+def patterns_answer(context: CopilotContext) -> str | None:
+    """What has worked, from the analytics facts: the observed patterns word for word (they are
+    already fixed, observational statements), or — in plain words — why there are none yet.
+    Never a prediction, never a cause, never the data's field names. None without analytics or
+    without anything published (``nothing_published_answer`` covers that)."""
+    analytics = context.view.get("analytics")
+    if not isinstance(analytics, dict) or not analytics.get("published_shorts"):
+        return None
+    patterns = analytics.get("patterns") if isinstance(analytics.get("patterns"), dict) else {}
+    observed = [p["statement"] for p in patterns.get("observed") or [] if p.get("statement")]
+    simulated = (
+        " These figures are simulated, not real YouTube data."
+        if analytics.get("simulated_data")
+        else ""
+    )
+    if observed:
+        return (
+            " ".join(observed)
+            + " These are patterns observed among your own Shorts — associations, not causes, and"
+            " never a prediction." + simulated
+        )
+    published = analytics["published_shorts"]
+    one = published == 1
+    parts = [_published_line(context, published)]
+    reported = analytics.get("with_figures")
+    if reported == 0:
+        parts.append(f"YouTube hasn't reported figures for {'it' if one else 'them'} yet.")
+    elif isinstance(reported, int) and reported < published:
+        parts.append(f"YouTube has reported figures for {reported} of them so far.")
+    views = analytics.get("total_views")
+    if isinstance(views, int) and views > 0:
+        parts.append(f"So far {'it has' if one else 'they have'} {views:,} views.")
+    if patterns.get("state") == "ready":
+        parts.append(
+            "PeakSift compared your Shorts and found no reliable pattern yet — nothing stood out "
+            "beyond what chance would explain."
+        )
+    else:
+        parts.append("There isn't enough performance history yet to make a reliable comparison.")
+        needed = patterns.get("minimum_needed")
+        compared = patterns.get("comparable_shorts")
+        if isinstance(needed, int):
+            so_far = f" ({compared} so far)" if isinstance(compared, int) else ""
+            parts.append(
+                f"PeakSift needs at least {needed} published Shorts with a complete first week of "
+                f"analytics{so_far} before it can identify a pattern."
+            )
+        else:
+            parts.append(
+                "PeakSift needs more published Shorts with complete analytics before it can "
+                "identify a pattern."
+            )
+    return " ".join(parts) + simulated
+
+
 def no_ideas_yet_answer(context: CopilotContext) -> str | None:
     """Why there can be no Short ideas yet (no video, or no moments and transcript), or None."""
     view = context.view
@@ -250,6 +367,14 @@ def own_answer(context: CopilotContext, text: str, wants_ideas: bool) -> tuple[s
         and (context.page in ANALYTICS_PAGES or PERFORMANCE.search(text))
     ):
         return "next_step", nothing_published_answer(context)
+    if WORKED.search(text):
+        answer = patterns_answer(context)
+        if answer is not None:
+            return "analytics", answer
+    if context.page in ANALYTICS_PAGES and PERFORMANCE.search(text):
+        answer = figures_answer(context)
+        if answer is not None:
+            return "analytics", answer
     if UNUSED_VISUALS.search(text):
         answer = unused_visuals_answer(context)
         if answer is not None:
