@@ -117,7 +117,8 @@ def ask(
             build_messages(context, text, turns, ideas=want_ideas), ideas=want_ideas
         )
         known_times = set(safety.TIME.findall(context.view_json()))
-        parsed = safety.screen(parse_reply(reply.data, context.targets), known_times)
+        words = safety.vocabulary(context.view, context.targets)
+        parsed = safety.screen(parse_reply(reply.data, context.targets), known_times, words)
         raw_ideas = reply.data.get("ideas")
         status, content = "ok", complete(parsed.message, context)
         if FRAGMENT.fullmatch(content) and not want_ideas:  # "You don": a reply cut off
@@ -188,6 +189,8 @@ def _own_actions(db: Session, user: User, context: CopilotContext, kind: str) ->
             proposal = ProposedAction("use_template", target, str(context.targets[clip].id))
             return offer(db, user, [proposal])
         return offer(db, user, [ProposedAction("open_template", target)])
+    if kind == "analytics" and "analytics" in context.targets:
+        return offer(db, user, [ProposedAction("open_analytics", context.targets["analytics"])])
     if kind == "assets" and "project" in context.targets:
         return offer(db, user, [ProposedAction("open_assets", context.targets["project"])])
     if kind.startswith("moment:") and kind[7:] in context.targets:
