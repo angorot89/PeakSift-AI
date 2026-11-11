@@ -4,6 +4,7 @@ import { AnalyticsView } from "@/components/app/analytics-view";
 import { useProject } from "@/components/app/project/project-frame";
 import { ProjectOverview } from "@/components/app/project/project-overview";
 import { ClipsSection, SourceSection } from "@/components/app/source-video";
+import { ProjectSounds } from "@/components/app/project/project-sounds";
 import { VisualLibrary } from "@/components/app/visual-library";
 
 export function ProjectOverviewPage() {
@@ -22,7 +23,12 @@ export function ProjectClipsPage() {
 
 export function ProjectAssetsPage() {
   const { project } = useProject();
-  return <VisualLibrary projectId={project.id} />;
+  return (
+    <div className="space-y-10">
+      <VisualLibrary projectId={project.id} />
+      <ProjectSounds projectId={project.id} />
+    </div>
+  );
 }
 
 export function ProjectAnalyticsPage() {
