@@ -131,3 +131,25 @@ def test_darija_captions_render_inside_the_frame_with_their_own_spelling(tmp_pat
     )[0]
     cols = np.nonzero(ink(frame))[1]
     assert len(cols) > 500 and cols.min() >= MARGIN_H - 30 and cols.max() <= 1080 - MARGIN_H + 30
+
+
+def test_the_darija_quality_set_holds():
+    """scripts/darija_quality.py: every line of the manual set is detected as expected and only
+    sentences open a Short, with the line's own words."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("darija_quality", "scripts/darija_quality.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for line, expected, offered in module.LINES:
+        result = module.row(line)
+        assert result["guess"].language == expected, line
+        assert bool(result["ideas"]) == offered, line
+
+
+@pytest.mark.parametrize("text", [
+    "Katherine and I went to the park with the kids today.",
+    "Le kayak est un sport que je pratique avec mes amis.",
+])  # fmt: skip
+def test_darija_verb_markers_do_not_claim_english_or_french(text):
+    assert language.detect(text).language in ("english", "french")
