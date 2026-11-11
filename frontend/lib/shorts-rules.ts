@@ -1,0 +1,308 @@
+// The Shorts library's rules in one place (no React, no fetch; unit-tested with node --test):
+// what each status is called, how it filters, sorts and searches, which actions are valid, and
+// where they go. The server derives each Short's status (services/shorts_library.py); this file
+// only puts it into the creator's words.
+
+import type { StatusTone } from "./status.ts";
+
+export type ShortStatus =
+  | "draft"
+  | "rendering"
+  | "ready"
+  | "publishing"
+  | "on_youtube"
+  | "published"
+  | "failed"
+  | "needs_attention";
+
+export type PublishState =
+  | "not_published"
+  | "preparing"
+  | "uploading"
+  | "processing"
+  | "on_youtube"
+  | "published"
+  | "stalled"
+  | "failed";
+
+export type ShortReason = "render_failed" | "render_stalled" | "clip_failed" | "clip_stalled" | "publish_failed" | "publish_stalled";
+
+export type ShortItem = {
+  id: string;
+  kind: "short" | "draft";
+  status: ShortStatus;
+  reason: ShortReason | null;
+  title: string;
+  edit_id: string | null;
+  clip_id: string;
+  project: { id: string; name: string };
+  source: { id: string; filename: string };
+  duration_seconds: number | null;
+  /** What can be previewed: the rendered Short, the moment's cut, or nothing yet. */
+  preview: "short" | "clip" | null;
+  version: { number: number; count: number } | null;
+  /** The template version and brand this Short was made with (recorded with it). */
+  template: { id: string | null; name: string; version: number | null } | null;
+  brand: { name: string } | null;
+  auto_edit: boolean;
+  /** A draft whose Auto Edit is prepared and waiting for review. */
+  plan_ready: boolean;
+  publish: {
+    state: PublishState;
+    platform: string | null;
+    published_at: string | null;
+    uploaded_at: string | null;
+    privacy: string | null;
+    simulated: boolean;
+    video_url: string | null;
+    job_id: string | null;
+  };
+  /** Latest reported figures; null fields are "not reported", never 0. */
+  performance: {
+    content_id: string;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    observed_at: string | null;
+    simulated: boolean;
+    analytics_through: string | null;
+  } | null;
+  created_at: string;
+  updated_at: string;
+  rendered_at: string | null;
+};
+
+export type ShortDetail = ShortItem & {
+  moment: { start_time: number; end_time: number; rank: number; category: string };
+  versions: { id: string; number: number; status: ShortStatus; created_at: string }[];
+  render: { error_message: string | null; file_size: number | null; progress_percent: number };
+  auto_edit_plan_id: string | null;
+};
+
+export type ShortsLibrary = { shorts: ShortItem[]; truncated: boolean };
+
+// --- status words -----------------------------------------------------------------------------
+
+export type FilterKey = "all" | "drafts" | "ready" | "published" | "attention";
+
+const STATUS: Record<ShortStatus, { label: string; tone: StatusTone; filter: FilterKey | null }> = {
+  draft: { label: "Draft", tone: "info", filter: "drafts" },
+  rendering: { label: "Rendering", tone: "processing", filter: null },
+  ready: { label: "Ready", tone: "accent", filter: "ready" },
+  publishing: { label: "Publishing", tone: "processing", filter: null },
+  on_youtube: { label: "On YouTube", tone: "success", filter: "published" },
+  published: { label: "Published", tone: "success", filter: "published" },
+  failed: { label: "Failed", tone: "danger", filter: "attention" },
+  needs_attention: { label: "Needs attention", tone: "warning", filter: "attention" },
+};
+
+export function statusLabel(status: ShortStatus): { label: string; tone: StatusTone } {
+  const { label, tone } = STATUS[status] ?? { label: "Needs attention", tone: "warning" as const };
+  return { label, tone };
+}
+
+/** One sentence on what is happening or what went wrong, in the creator's words. */
+export function statusDetail(item: Pick<ShortItem, "status" | "reason" | "publish" | "plan_ready" | "kind">): string {
+  switch (item.reason) {
+    case "render_failed":
+      return "This version couldn't be rendered. Open it in the editor to try again.";
+    case "render_stalled":
+      return "Rendering stopped responding. Open it in the editor to render it again.";
+    case "clip_failed":
+      return "The moment couldn't be cut from your video. Try again from the project's moments.";
+    case "clip_stalled":
+      return "Cutting the moment stopped responding. Try again from the project's moments.";
+    case "publish_failed":
+      return "The YouTube upload didn't finish. Review it and try again.";
+    case "publish_stalled":
+      return "The YouTube upload stopped responding. You can resume it.";
+  }
+  switch (item.status) {
+    case "draft":
+      return item.plan_ready ? "Auto Edit is ready for you to review." : "Not edited yet.";
+    case "rendering":
+      return item.kind === "draft" ? "Cutting the moment from your video…" : "Rendering your Short…";
+    case "ready":
+      return "Rendered and ready to publish or download.";
+    case "publishing":
+      return publishStage(item.publish.state);
+    case "on_youtube":
+      return "Uploaded to YouTube. PeakSift can't see when YouTube finishes processing it.";
+    case "published":
+      return "Published on YouTube.";
+    default:
+      return "";
+  }
+}
+
+/** Real stages only — no invented percentages. */
+export function publishStage(state: PublishState): string {
+  switch (state) {
+    case "preparing":
+      return "Preparing upload…";
+    case "uploading":
+      return "Uploading…";
+    case "processing":
+      return "Processing on YouTube…";
+    case "on_youtube":
+      return "On YouTube";
+    case "published":
+      return "Published";
+    case "stalled":
+      return "Upload stalled";
+    case "failed":
+      return "Upload didn't finish";
+    default:
+      return "Not published";
+  }
+}
+
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const longDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+/** "Oct 18" this year, "Oct 18, 2025" otherwise. */
+export function dayLabel(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  return (date.getFullYear() === now.getFullYear() ? shortDate : longDate).format(date);
+}
+
+/** The card's last line: where it went and when, or what is happening. */
+export function contextLine(item: ShortItem, now: Date = new Date()): string {
+  const publish = item.publish;
+  if (item.status === "published" && publish.published_at) {
+    return `YouTube · Published ${dayLabel(publish.published_at, now)}${publish.simulated ? " (simulated)" : ""}`;
+  }
+  if (item.status === "on_youtube") {
+    return `YouTube · Uploaded${publish.uploaded_at ? ` ${dayLabel(publish.uploaded_at, now)}` : ""}${publish.simulated ? " (simulated)" : ""}`;
+  }
+  if (item.status === "publishing") return `YouTube · ${publishStage(publish.state)}`;
+  if (item.status === "draft") return item.plan_ready ? "Auto Edit ready to review" : `Started ${dayLabel(item.created_at, now)}`;
+  if (item.status === "rendering") return statusDetail(item);
+  return `Updated ${dayLabel(item.updated_at, now)}`;
+}
+
+// --- filters, search and sort -----------------------------------------------------------------
+
+export const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "drafts", label: "Drafts" },
+  { key: "ready", label: "Ready" },
+  { key: "published", label: "Published" },
+  { key: "attention", label: "Needs attention" },
+];
+
+export function matchesFilter(item: ShortItem, filter: FilterKey): boolean {
+  return filter === "all" || STATUS[item.status]?.filter === filter;
+}
+
+export function filterCounts(items: ShortItem[]): Record<FilterKey, number> {
+  const counts: Record<FilterKey, number> = { all: items.length, drafts: 0, ready: 0, published: 0, attention: 0 };
+  for (const item of items) {
+    const key = STATUS[item.status]?.filter;
+    if (key) counts[key] += 1;
+  }
+  return counts;
+}
+
+const fold = (text: string) => text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+
+/** Every word of the query appears in the title, the project or the source file's name. */
+export function matchesSearch(item: ShortItem, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const haystack = fold(`${item.title} ${item.project.name} ${item.source.filename}`);
+  return words.every((word) => haystack.includes(word));
+}
+
+export type SortKey = "updated" | "newest" | "oldest" | "published";
+
+export const SORTS: { key: SortKey; label: string }[] = [
+  { key: "updated", label: "Recently updated" },
+  { key: "newest", label: "Newest" },
+  { key: "oldest", label: "Oldest" },
+  { key: "published", label: "Recently published" },
+];
+
+const time = (iso: string | null) => (iso ? Date.parse(iso) : Number.NEGATIVE_INFINITY);
+const onYouTubeAt = (item: ShortItem) => time(item.publish.published_at ?? item.publish.uploaded_at);
+
+export function sortShorts(items: ShortItem[], sort: SortKey): ShortItem[] {
+  const by: Record<SortKey, (a: ShortItem, b: ShortItem) => number> = {
+    updated: (a, b) => time(b.updated_at) - time(a.updated_at),
+    newest: (a, b) => time(b.created_at) - time(a.created_at),
+    oldest: (a, b) => time(a.created_at) - time(b.created_at),
+    // Published first, most recent first; the rest keep their most recent activity order.
+    published: (a, b) => onYouTubeAt(b) - onYouTubeAt(a) || time(b.updated_at) - time(a.updated_at),
+  };
+  return [...items].sort((a, b) => by[sort](a, b) || a.id.localeCompare(b.id));
+}
+
+export function visibleShorts(items: ShortItem[], filter: FilterKey, query: string, sort: SortKey): ShortItem[] {
+  return sortShorts(items.filter((item) => matchesFilter(item, filter) && matchesSearch(item, query)), sort);
+}
+
+// --- where things go --------------------------------------------------------------------------
+
+export const shortHref = (id: string) => `/shorts/${id}`;
+export const editorHref = (item: Pick<ShortItem, "project" | "clip_id" | "edit_id">) =>
+  `/projects/${item.project.id}/clips/${item.clip_id}${item.edit_id ? `?edit=${item.edit_id}` : ""}`;
+export const createHref = (item: Pick<ShortItem, "project" | "clip_id">) => `/projects/${item.project.id}/clips/${item.clip_id}/create`;
+export const autoEditHref = (item: Pick<ShortItem, "project" | "clip_id">) => `/projects/${item.project.id}/clips/${item.clip_id}/auto-edit`;
+export const momentsHref = (item: Pick<ShortItem, "project">) => `/projects/${item.project.id}/clips`;
+export const analyticsHref = (contentId: string) => `/analytics/${contentId}`;
+
+/** Where "continue editing" goes: the waiting Auto Edit, the guided creation, or the editor. */
+export function continueHref(item: ShortItem): string {
+  if (item.kind === "draft") return item.plan_ready ? autoEditHref(item) : createHref(item);
+  return editorHref(item);
+}
+
+export type ShortAction = "continue" | "publish" | "performance" | "fix_render" | "fix_publish" | "retry_cut" | "edit" | "download" | "analytics" | "project";
+
+/** The one primary action for a state (null while there is nothing to do but wait). */
+export function primaryAction(item: ShortItem): { action: ShortAction; label: string } | null {
+  switch (item.status) {
+    case "draft":
+      return { action: "continue", label: "Continue editing" };
+    case "ready":
+      return { action: "publish", label: "Publish" };
+    case "published":
+    case "on_youtube":
+      return { action: "performance", label: "View performance" };
+    case "failed":
+    case "needs_attention":
+      if (item.reason === "publish_failed" || item.reason === "publish_stalled") return { action: "fix_publish", label: "Fix issue" };
+      if (item.reason === "clip_failed" || item.reason === "clip_stalled") return { action: "retry_cut", label: "Fix issue" };
+      return { action: "fix_render", label: "Fix issue" };
+    default:
+      return null;
+  }
+}
+
+/** The overflow menu: only actions valid now (no disabled entries). */
+export function menuActions(item: ShortItem): { action: ShortAction; label: string }[] {
+  const actions: { action: ShortAction; label: string }[] = [];
+  if (item.kind === "short") actions.push({ action: "edit", label: "Edit" });
+  else if (item.status === "draft") actions.push({ action: "continue", label: "Continue editing" });
+  if (item.kind === "short" && item.preview === "short") actions.push({ action: "download", label: "Download" });
+  if (item.status === "ready") actions.push({ action: "publish", label: "Publish" });
+  if (item.performance) actions.push({ action: "analytics", label: "View analytics" });
+  actions.push({ action: "project", label: "Open project" });
+  return actions;
+}
+
+/** "Short: Lava jump — Published, 0:42, from Speedrun Fails": a card's accessible name. */
+export function cardLabel(item: ShortItem): string {
+  const parts = [`${item.title}`, statusLabel(item.status).label];
+  if (item.duration_seconds) parts.push(clock(item.duration_seconds));
+  return `${parts.join(", ")}, from ${item.project.name}`;
+}
+
+/** "0:42" / "1:05:09". */
+export function clock(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}

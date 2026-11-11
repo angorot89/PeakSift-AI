@@ -27,6 +27,7 @@ from app.api.publish_jobs import edit_router as publish_edit_router
 from app.api.publish_jobs import job_router as publish_job_router
 from app.api.publishing import router as publishing_router
 from app.api.reframe import router as reframe_router
+from app.api.shorts import router as shorts_router
 from app.api.transcriptions import router as transcriptions_router
 from app.api.video_content import router as video_content_router
 from app.api.videos import router as videos_router
@@ -67,6 +68,7 @@ ROUTERS = (
     publish_job_router,
     performance_router,
     workspace_router,
+    shorts_router,
     brand_router,
     copilot_router,
 )
