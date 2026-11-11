@@ -2,7 +2,7 @@
 
 import { CheckCircle2, CirclePlay, Unplug } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   AnalyticsPermissionNote,
   ConnectAnalyticsButton,
@@ -11,6 +11,7 @@ import {
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Dialog } from "@/components/ui/dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
@@ -24,8 +25,12 @@ import {
   getYouTubeStatus,
   isGoogleConsentUrl,
   startYouTubeConnection,
+  forgetReturnPath,
+  peekReturnPath,
 } from "@/lib/publishing";
 import { useApi } from "@/lib/use-api";
+
+const noSubscription = () => () => {};
 
 /** Account settings: the YouTube connection used for publishing. */
 export function SettingsView() {
@@ -38,6 +43,15 @@ export function SettingsView() {
     return analyticsOutcome(query);
   }, [params]);
   const { data, error, loading, reload } = useApi(getYouTubeStatus);
+  // Connected from a Short or the editor: go back there. A failure stays here, with a way back.
+  const stored = useSyncExternalStore(noSubscription, peekReturnPath, () => null);
+  const back = params.get("youtube") !== null ? stored : null;
+  useEffect(() => {
+    if (back && params.get("youtube") === "connected") {
+      forgetReturnPath();
+      router.replace(back);
+    }
+  }, [back, params, router]);
   const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -115,6 +129,7 @@ export function SettingsView() {
             <InlineAlert
               tone={outcome.ok ? "info" : "warning"}
               title={outcome.title}
+              action={back ? <ButtonLink href={back} variant="secondary">Back to your Short</ButtonLink> : undefined}
             >
               {outcome.message}
             </InlineAlert>

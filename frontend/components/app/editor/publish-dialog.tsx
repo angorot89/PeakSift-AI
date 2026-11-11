@@ -14,6 +14,7 @@ import { errorMessage } from "@/lib/api";
 import {
   bytes,
   characters,
+  connectYouTube,
   DESCRIPTION_MAX_BYTES,
   getPublishJob,
   getPublishPanel,
@@ -48,36 +49,28 @@ const STEP_INDEX: Record<string, number> = {
 export function PublishToYouTube({
   editId,
   editName,
-  label = "Publish to YouTube",
-  variant = "secondary",
-  onClose,
+  returnTo,
 }: {
   editId: string;
   editName: string;
-  label?: string;
-  variant?: "primary" | "secondary";
-  /** Called when the dialog closes (a publish may have started). */
-  onClose?: () => void;
+  /** Where to come back to after connecting YouTube (the page this dialog is on). */
+  returnTo?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const close = () => {
-    setOpen(false);
-    onClose?.();
-  };
   return (
     <>
-      <Button variant={variant} onClick={() => setOpen(true)} aria-haspopup="dialog">
-        {variant === "primary" ? <Send aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}
-        {label}
+      <Button variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        <CirclePlay aria-hidden="true" />
+        Publish to YouTube
       </Button>
-      <Dialog open={open} onClose={close} title="Publish to YouTube" description={editName}>
-        <PublishBody editId={editId} onClose={close} />
+      <Dialog open={open} onClose={() => setOpen(false)} title="Publish to YouTube" description={editName}>
+        <PublishBody editId={editId} onClose={() => setOpen(false)} returnTo={returnTo} />
       </Dialog>
     </>
   );
 }
 
-function PublishBody({ editId, onClose }: { editId: string; onClose: () => void }) {
+export function PublishBody({ editId, onClose, returnTo }: { editId: string; onClose: () => void; returnTo?: string }) {
   const [panel, setPanel] = useState<PublishPanel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [job, setJob] = useState<PublishJob | null>(null);
@@ -119,7 +112,13 @@ function PublishBody({ editId, onClose }: { editId: string; onClose: () => void 
       <InlineAlert
         tone="info"
         title={reconnect ? "Reconnect your YouTube account" : "Connect a YouTube account"}
-        action={<ButtonLink href="/settings#youtube">{reconnect ? "Reconnect" : "Connect"} in Settings</ButtonLink>}
+        action={
+          returnTo ? (
+            <ConnectButton returnTo={returnTo} reconnect={reconnect} />
+          ) : (
+            <ButtonLink href="/settings#youtube">{reconnect ? "Reconnect" : "Connect"} in Settings</ButtonLink>
+          )
+        }
       >
         {reconnect
           ? "Google no longer accepts PeakSift's access (it was removed or expired)."
@@ -136,6 +135,32 @@ function PublishBody({ editId, onClose }: { editId: string; onClose: () => void 
   }
   if (job) return <JobProgress job={job} onChange={setJob} onClose={onClose} onNew={() => setJob(null)} />;
   return <PublishForm editId={editId} panel={panel} onPublished={setJob} />;
+}
+
+/** Opens Google's consent; afterwards the browser comes back to `returnTo`. */
+function ConnectButton({ returnTo, reconnect }: { returnTo: string; reconnect: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="space-y-2">
+      <Button
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await connectYouTube(returnTo);
+          } catch (failure) {
+            setError(errorMessage(failure));
+            setBusy(false);
+          }
+        }}
+        disabled={busy}
+      >
+        {busy ? "Opening Google…" : reconnect ? "Reconnect YouTube" : "Connect YouTube"}
+      </Button>
+      <FormError>{error}</FormError>
+    </div>
+  );
 }
 
 function PublishForm({

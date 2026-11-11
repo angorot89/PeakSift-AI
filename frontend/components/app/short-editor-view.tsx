@@ -1162,7 +1162,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     Download short
                   </a>
                   {publishing?.enabled ? (
-                    <PublishToYouTube editId={selected.id} editName={renderedName} />
+                    <PublishToYouTube editId={selected.id} editName={renderedName} returnTo={`/projects/${project.id}/clips/${clip.id}?edit=${selected.id}`} />
                   ) : null}
                   <Button variant="secondary" onClick={() => setMode("preview")}>
                     <Plus aria-hidden="true" />

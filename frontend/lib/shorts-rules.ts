@@ -3,6 +3,7 @@
 // where they go. The server derives each Short's status (services/shorts_library.py); this file
 // only puts it into the creator's words.
 
+import type { PublishJob, PublishPanel } from "./publishing-rules.ts";
 import type { StatusTone } from "./status.ts";
 
 export type ShortStatus =
@@ -305,4 +306,96 @@ export function clock(seconds: number): string {
   const m = Math.floor((total % 3600) / 60);
   const s = String(total % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+// --- the Short's publishing panel -------------------------------------------------------------
+
+export type PublishingView = {
+  state: PublishState;
+  pill: { label: string; tone: StatusTone };
+  /** The connection, in words. */
+  connection: string;
+  stage: string;
+  /** The one action that fits now (nothing while an upload runs or once YouTube has it). */
+  action: "connect" | "publish" | "publish_again" | null;
+  reconnect: boolean;
+  showMetadata: boolean;
+  publishedOn: "published" | "uploaded" | null;
+  date: string | null;
+};
+
+/** A publish attempt's state in the library's terms (same rules as the server's). */
+export function jobState(job: PublishJob): PublishState {
+  switch (job.status) {
+    case "published":
+      return "published";
+    case "uploaded":
+    case "processing":
+      return job.awaiting_processing ? "processing" : "on_youtube";
+    case "failed":
+    case "provider_failed":
+      return "failed";
+    case "uploading":
+      return job.is_stale ? "stalled" : "uploading";
+    default:
+      return job.is_stale ? "stalled" : "preparing";
+  }
+}
+
+const PILLS: Record<PublishState, { label: string; tone: StatusTone }> = {
+  not_published: { label: "Not published", tone: "neutral" },
+  preparing: { label: "Publishing", tone: "processing" },
+  uploading: { label: "Publishing", tone: "processing" },
+  processing: { label: "Publishing", tone: "processing" },
+  on_youtube: { label: "On YouTube", tone: "success" },
+  published: { label: "Published", tone: "success" },
+  stalled: { label: "Stalled", tone: "warning" },
+  failed: { label: "Failed", tone: "danger" },
+};
+
+const HELD: PublishState[] = ["published", "on_youtube", "processing"];
+
+/**
+ * What the publishing panel shows. `job` is the newest attempt (it updates live); once YouTube
+ * has the video from an earlier attempt, that outranks it — exactly like the library's status.
+ */
+export function publishingView(short: Pick<ShortItem, "publish">, panel: PublishPanel, job: PublishJob | null): PublishingView {
+  const held = HELD.includes(short.publish.state) && (!job || job.id !== short.publish.job_id);
+  const state = held || !job ? short.publish.state : jobState(job);
+  const connection = panel.connection;
+  const connected = connection?.status === "connected";
+  const connectionText = !panel.enabled
+    ? "Publishing isn't enabled on this server"
+    : !connection
+      ? "Not connected"
+      : connected
+        ? connection.account_title
+          ? `Connected · ${connection.account_title}`
+          : "Connected"
+        : "Needs reconnecting";
+  let action: PublishingView["action"] = null;
+  const settled = state === "not_published" || state === "failed";
+  if (panel.enabled && settled) {
+    if (!connected) action = "connect";
+    else if (state === "not_published" && panel.edit_ready) action = "publish";
+    else if (state === "failed" && job && !job.retryable) action = "publish_again";
+  }
+  const publishedOn = state === "published" ? "published" : state === "on_youtube" ? "uploaded" : null;
+  const date =
+    state === "published"
+      ? (job?.status === "published" ? job.published_at : null) ?? short.publish.published_at
+      : state === "on_youtube"
+        ? (job && jobState(job) === "on_youtube" ? job.completed_at : null) ?? short.publish.uploaded_at
+        : null;
+  return {
+    state,
+    pill: PILLS[state],
+    connection: connectionText,
+    stage: publishStage(state),
+    action,
+    reconnect: Boolean(connection && !connected),
+    showMetadata: Boolean(job) && state !== "not_published",
+    publishedOn,
+    date,
+  };
 }
