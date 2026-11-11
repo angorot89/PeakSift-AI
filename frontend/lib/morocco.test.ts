@@ -1,7 +1,7 @@
 // Run with: npm test (node's built-in test runner; no extra dependencies).
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { KIT_TABS, kitFilters, kitMatches, kitTab, localFirst, MODES, MOROCCO_SECTIONS } from "./morocco.ts";
+import { defaultMode, defaultModeLabel, KIT_TABS, kitFilters, kitMatches, kitTab, localFirst, MODES, MOROCCO_SECTIONS } from "./morocco.ts";
 
 describe("Morocco Mode", () => {
   it("shows only what really exists — never trends, figures or invented media", () => {
@@ -14,6 +14,11 @@ describe("Morocco Mode", () => {
 
   it("switches between Global and Morocco Mode, which keeps Global", () => {
     assert.deepEqual(MODES.map((m) => [m.market, m.href]), [["global", "/home"], ["ma", "/morocco"]]);
+    // The saved default for new projects, shown beside the switch whichever page is open.
+    assert.equal(defaultMode("ma"), "morocco");
+    assert.equal(defaultMode("global"), "global");
+    assert.equal(defaultMode(undefined), "global");
+    assert.equal(defaultModeLabel(defaultMode("ma")), "Morocco Mode");
   });
 
   it("has a kit with four tabs, opening on visuals by default", () => {

@@ -10,6 +10,7 @@ import {
   Feather,
   ImageIcon,
   Info,
+  Languages,
   Music,
   Palette,
   Pencil,
@@ -242,8 +243,17 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
   const notes = plan.explanations?.notes ?? [];
   const note = plannerNote(plan.confidence);
   const template = plan.explanations?.template;
+  const market = plan.explanations?.market;
   return (
     <div className="space-y-5">
+      {market && market.code !== "global" ? (
+        <p className="flex items-start gap-2 text-sm text-muted">
+          <Languages aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
+          <span>
+            Made for {market.name} Mode: your local visuals come first when they match as well as a Global one. Global stays available.
+          </span>
+        </p>
+      ) : null}
       {template ? (
         <p className="flex items-start gap-2 rounded-xl border border-accent/30 bg-accent/[0.05] px-3.5 py-2.5 text-sm text-foreground">
           <Palette aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />

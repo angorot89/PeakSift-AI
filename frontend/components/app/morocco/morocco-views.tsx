@@ -31,7 +31,7 @@ import { errorMessage } from "@/lib/api";
 import { labelLine, labelsOf } from "@/lib/asset-labels";
 import { listTemplates, listTemplateStarters } from "@/lib/brand";
 import { getLocalAssets, getMarkets, setDefaultMarket, type KitAsset, type Markets } from "@/lib/markets";
-import { KIT_TABS, kitFilters, kitMatches, kitTab, MODES, MOROCCO_SECTIONS, type KitTab, type MoroccoSectionKey } from "@/lib/morocco";
+import { defaultMode, defaultModeLabel, KIT_TABS, kitFilters, kitMatches, kitTab, MODES, MOROCCO_SECTIONS, type KitTab, type MoroccoSectionKey } from "@/lib/morocco";
 import { useApi } from "@/lib/use-api";
 import { visualThumbnailUrl } from "@/lib/visuals";
 
@@ -51,16 +51,19 @@ const loadFormats = () => listTemplateStarters("ma");
  * existing projects or Shorts) and opens that mode. Morocco Mode always includes Global. */
 export function ModeSwitch({ current }: { current: "global" | "morocco" }) {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const saved = defaultMode(user?.default_market);
   async function choose(mode: (typeof MODES)[number]) {
-    if (mode.key === current) return;
+    if (mode.key === current && mode.key === saved) return;
     setBusy(mode.key);
     setError(null);
     try {
-      setUser(await setDefaultMarket(mode.market));
-      router.push(mode.href);
+      // Saves the default for new projects (existing projects never change), then opens the mode.
+      if (mode.key !== saved) setUser(await setDefaultMarket(mode.market));
+      if (mode.key !== current) router.push(mode.href);
+      setBusy(null);
     } catch (failure) {
       setError(errorMessage(failure));
       setBusy(null);
@@ -86,6 +89,7 @@ export function ModeSwitch({ current }: { current: "global" | "morocco" }) {
         ))}
       </div>
       <StatusPill tone="success">Global library included</StatusPill>
+      <p className="text-small text-muted">New projects: {defaultModeLabel(saved)}</p>
       {error ? <p role="alert" className="text-small text-rose-300">{error}</p> : null}
     </div>
   );

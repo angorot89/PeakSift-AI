@@ -289,6 +289,7 @@ export function HookPanel({
             <input
               type="text"
               value={text}
+              dir="auto"
               onChange={(e) => onText(e.target.value)}
               placeholder="What this clip is about"
               aria-invalid={tooLong || length === 0}

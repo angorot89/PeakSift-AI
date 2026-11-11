@@ -85,5 +85,10 @@ def test_a_short_freezes_the_market_it_was_made_in(client, db_session):
     # A Global Short keeps exactly the provenance it had before markets (none).
     other = client.post(base, json={"layout": "fit", "captions_enabled": False}).json()
     assert other["origin"] is None
+    # The Shorts library shows what was recorded: "Made for Morocco" — nothing for Global.
+    shorts = {s["edit_id"]: s for s in client.get("/shorts").json()["shorts"]}
+    assert shorts[edit["id"]]["market"] == {"code": "ma", "name": "Morocco"}
+    assert shorts[other["id"]]["market"] is None
+    assert client.get(f"/shorts/{edit['id']}").json()["market"]["name"] == "Morocco"
     user = db_session.scalar(select(User).where(User.email == "frozen@example.com"))
     assert user.default_market == "global"

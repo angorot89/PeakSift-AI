@@ -108,3 +108,20 @@ def test_sounds_carry_labels_and_the_kit_lists_only_your_local_assets(client, tm
     sign_up(client, "not-sounds@example.com")
     assert client.get("/markets/ma/assets").json()["assets"] == []
     assert client.patch(base, json={"market": "global"}).status_code == 404
+
+
+def test_labels_are_owner_scoped_and_errors_never_echo_what_was_sent(client, tmp_path):
+    sign_up(client, "labels-owner@example.com")
+    project = create_project(client, "Owner")["id"]
+    pic = visual(client, project, tmp_path, "rabat.jpg")
+    bad = label(client, project, pic["id"], market="ma", location="Paris-not-in-list")
+    assert bad.status_code == 422 and "Paris-not-in-list" not in bad.text
+    long_note = label(client, project, pic["id"], origin="licensed", license_note="x" * 301)
+    assert long_note.status_code == 422 and "x" * 50 not in long_note.text
+    assert label(client, project, pic["id"], storage_key="elsewhere").status_code == 422
+    ok = label(client, project, pic["id"], origin="licensed", license_note="  Own   shoot, 2026 ")
+    assert ok.json()["license_note"] == "Own shoot, 2026"  # whitespace tidied, words kept
+    client.cookies.clear()
+    sign_up(client, "labels-other@example.com")
+    assert label(client, project, pic["id"], market="global").status_code == 404
+    assert client.get("/markets/ma/assets", params={"kind": "visual"}).json()["assets"] == []
