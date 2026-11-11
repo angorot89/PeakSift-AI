@@ -64,6 +64,7 @@ class ShortTemplate(Base):
         ),
         CheckConstraint("version >= 1", name="ck_short_templates_version"),
         CheckConstraint("jsonb_typeof(config) = 'object'", name="ck_short_templates_config"),
+        CheckConstraint("market IN ('global', 'ma')", name="ck_short_templates_market"),
     )  # fmt: skip
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -78,6 +79,9 @@ class ShortTemplate(Base):
     recipe: Mapped[str | None] = mapped_column(String(16))
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # The market a template was made for (a curated Morocco format, or "global"). A label for
+    # ordering and display only: every template works in every market.
+    market: Mapped[str] = mapped_column(String(8), default="global", server_default="global")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

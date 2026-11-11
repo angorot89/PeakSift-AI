@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BLANK, freeHookPositions, resolved, sameSettings, settingsFromEditor, startFrom, summary } from "./template-rules.ts";
 
-const PUNCHY = { recipe: "punchy" as const, label: "Punchy", description: "", config: { ...BLANK, caption_preset: "punch" as const, caption_position: "bottom" as const, hook_style: "headline" as const, hook_seconds: 2 } };
+const PUNCHY = { key: "punchy", market: "global", recipe: "punchy" as const, label: "Punchy", description: "", config: { ...BLANK, caption_preset: "punch" as const, caption_position: "bottom" as const, hook_style: "headline" as const, hook_seconds: 2 } };
 
 describe("template settings", () => {
   it("resolve empty settings from the starting style for the preview", () => {
