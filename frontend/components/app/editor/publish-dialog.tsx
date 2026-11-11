@@ -45,16 +45,33 @@ const STEP_INDEX: Record<string, number> = {
 };
 
 /** "Publish to YouTube" beside Download: the reviewed metadata, then the real job state. */
-export function PublishToYouTube({ editId, editName }: { editId: string; editName: string }) {
+export function PublishToYouTube({
+  editId,
+  editName,
+  label = "Publish to YouTube",
+  variant = "secondary",
+  onClose,
+}: {
+  editId: string;
+  editName: string;
+  label?: string;
+  variant?: "primary" | "secondary";
+  /** Called when the dialog closes (a publish may have started). */
+  onClose?: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const close = () => {
+    setOpen(false);
+    onClose?.();
+  };
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog">
-        <CirclePlay aria-hidden="true" />
-        Publish to YouTube
+      <Button variant={variant} onClick={() => setOpen(true)} aria-haspopup="dialog">
+        {variant === "primary" ? <Send aria-hidden="true" /> : <CirclePlay aria-hidden="true" />}
+        {label}
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Publish to YouTube" description={editName}>
-        <PublishBody editId={editId} onClose={() => setOpen(false)} />
+      <Dialog open={open} onClose={close} title="Publish to YouTube" description={editName}>
+        <PublishBody editId={editId} onClose={close} />
       </Dialog>
     </>
   );
