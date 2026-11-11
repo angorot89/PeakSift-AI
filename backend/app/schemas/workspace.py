@@ -60,6 +60,9 @@ class ShortSummary(BaseModel):
     duration_seconds: float | None
     # YouTube confirmed the upload (a publish job reached "published"); never an upload in flight.
     published: bool = False
+    # The Shorts library's one status: draft, rendering, ready, publishing, on_youtube,
+    # published, failed or needs_attention (services/shorts_library.py).
+    short_status: str
     created_at: datetime
     updated_at: datetime
 

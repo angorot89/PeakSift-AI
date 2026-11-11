@@ -31,6 +31,7 @@ import { FrameTag, VideoFrame } from "@/components/ui/video-frame";
 import { editContentUrl } from "@/lib/edits";
 import { formatDuration } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+import { shortHref, statusLabel } from "@/lib/shorts";
 import { useStoredFlag } from "@/lib/use-stored-flag";
 import { moroccoPreviewEnabled } from "@/lib/morocco";
 import { videoContentUrl } from "@/lib/videos";
@@ -38,7 +39,6 @@ import {
   clock,
   continueVisual,
   displayName,
-  editorLink,
   getHome,
   gettingStarted,
   relativeTime,
@@ -249,7 +249,7 @@ function ShortTile({ short }: { short: HomeShort }) {
   return (
     <li className="min-w-0">
       <Link
-        href={editorLink(short.project_id, short.clip_id, short.edit_id)}
+        href={shortHref(short.edit_id)}
         className="group block rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <VideoFrame
@@ -259,15 +259,9 @@ function ShortTile({ short }: { short: HomeShort }) {
           className="rounded-card border border-border transition-[border-color] group-hover:border-border-strong"
         >
           <span className="absolute top-2 left-2">
-            {short.published ? (
-              <StatusPill tone="success" overlay>
-                Published
-              </StatusPill>
-            ) : (
-              <StatusPill tone="accent" overlay>
-                Ready
-              </StatusPill>
-            )}
+            <StatusPill tone={statusLabel(short.short_status).tone} overlay>
+              {statusLabel(short.short_status).label}
+            </StatusPill>
           </span>
           {short.duration_seconds ? <FrameTag className="right-2 bottom-2">{formatDuration(short.duration_seconds)}</FrameTag> : null}
         </VideoFrame>
@@ -409,6 +403,7 @@ function Returning({ home }: { home: Home }) {
           id="shorts-heading"
           title="Recent Shorts"
           description={home.recent_shorts.length ? "Finished and ready to publish or download." : "Your finished Shorts will show up here."}
+          actions={home.recent_shorts.length ? <ViewAll href="/shorts">View all Shorts</ViewAll> : null}
         />
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7">
           {home.recent_shorts.map((short) => (

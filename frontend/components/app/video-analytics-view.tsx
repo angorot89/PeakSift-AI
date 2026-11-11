@@ -8,6 +8,7 @@ import { DailyChart } from "@/components/app/analytics/daily-chart";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,6 +97,11 @@ export function VideoAnalyticsView() {
         description={`Published ${formatDate(video.published_at)}${video.privacy ? ` · ${video.privacy}` : ""}`}
         action={
           <>
+            {video.edit_id ? (
+              <ButtonLink href={`/shorts/${video.edit_id}`} variant="secondary">
+                Open Short
+              </ButtonLink>
+            ) : null}
             {video.video_url ? (
               <a href={video.video_url} target="_blank" rel="noopener noreferrer"
                  className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted hover:text-foreground">

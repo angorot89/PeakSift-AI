@@ -153,19 +153,19 @@ CASES = [
         "short ready",
         {**detected(3), "shorts": shorts(short("ready"))},
         "short-ready",
-        f"/projects/{P}/clips/{CLIP}?edit={EDIT}",
+        f"/shorts/{EDIT}",
     ),
     (
         "upload failed",
         {**detected(3), "shorts": shorts(short("ready")), "published": published(failed=1)},
         "upload-failed",
-        f"/projects/{P}/clips/{CLIP}?edit={EDIT}",
+        f"/shorts/{EDIT}",
     ),
     (
         "uploading",
         {**detected(3), "shorts": shorts(short("ready")), "published": published(working=1)},
         "uploading",
-        f"/projects/{P}/clips/{CLIP}?edit={EDIT}",
+        f"/shorts/{EDIT}",
     ),
     (
         "analytics without a job",

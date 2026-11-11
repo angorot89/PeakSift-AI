@@ -309,3 +309,22 @@ def test_a_short_says_whether_performance_can_be_shown(client, db_session):
     assert analytics["connected"] is False and analytics["analytics_access"] is False
     assert set(analytics) == {"enabled", "connected", "connection_status", "analytics_access",
                               "simulated"}  # fmt: skip
+
+
+def test_home_and_the_project_speak_the_librarys_status(client, db_session):
+    sign_up(client, "agree@example.com")
+    user = me(db_session, "agree@example.com")
+    data = ready_clip(db_session, "agree@example.com")
+    first = version(db_session, data["clip"], 0)
+    second = version(db_session, data["clip"], 1)
+    job(db_session, user, first, "uploaded", provider_video_id="ccccccccccc",
+        provider_processing_status="unknown", completed_at=NOW)  # fmt: skip
+    job(db_session, user, second, "failed", error_code="network", error_message="Lost.")
+    library = {item["id"]: item["status"] for item in client.get("/shorts").json()["shorts"]}
+    home = {s["edit_id"]: s for s in client.get("/workspace/home").json()["recent_shorts"]}
+    project_id = data["clip"].video.project_id
+    recent = client.get(f"/projects/{project_id}/summary").json()["shorts"]["recent"]
+    for summary in [*home.values(), *recent]:
+        assert summary["short_status"] == library[summary["edit_id"]]
+    assert library[str(first.id)] == "on_youtube" and home[str(first.id)]["published"] is False
+    assert library[str(second.id)] == "needs_attention"

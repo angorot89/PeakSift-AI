@@ -240,7 +240,7 @@ def resolve_action(
         return Resolution("navigate", routes.auto_edit(owner, plan.clip_id))
     if target_kind == "short":
         edit, owner = _short(db, user, target_id)
-        return Resolution("navigate", routes.editor(owner, edit.clip_id, edit_id=edit.id))
+        return Resolution("navigate", routes.short(edit.id))
     raise ActionUnavailable("This step isn't available.")
 
 

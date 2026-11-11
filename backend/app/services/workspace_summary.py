@@ -17,6 +17,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     AutoEditPlan,
     AutoEditStatus,
@@ -32,6 +33,7 @@ from app.models import (
     Video,
 )
 from app.services.next_action import continue_items, next_action
+from app.services.shorts_library import publication, short_status
 
 TOP_CANDIDATES = 3
 RECENT_SHORTS = 3
@@ -48,20 +50,22 @@ def _counts(rows) -> dict[str, int]:
     return {status: count for status, count in rows}
 
 
-def _published(db: Session, edit_ids: list[uuid.UUID]) -> set[uuid.UUID]:
-    """The edits YouTube has confirmed as published (never an upload still in flight)."""
-    if not edit_ids:
-        return set()
-    return set(
-        db.scalars(
-            select(PublishJob.edit_id).where(
-                PublishJob.edit_id.in_(edit_ids), PublishJob.status == "published"
-            )
-        ).all()
-    )
+def _publications(db: Session, edit_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[PublishJob]]:
+    """Each edit's publish jobs, newest first (one query)."""
+    jobs: dict[uuid.UUID, list[PublishJob]] = {}
+    if edit_ids:
+        for job in db.scalars(
+            select(PublishJob)
+            .where(PublishJob.edit_id.in_(edit_ids))
+            .order_by(PublishJob.created_at.desc(), PublishJob.id)
+        ):
+            jobs.setdefault(job.edit_id, []).append(job)
+    return jobs
 
 
-def _short(edit: ClipEdit, title: str, published: set[uuid.UUID]) -> dict:
+def _short(edit: ClipEdit, title: str, jobs: dict[uuid.UUID, list[PublishJob]]) -> dict:
+    settings = get_settings()
+    publish = publication(jobs.get(edit.id, []), settings)
     return {
         "edit_id": edit.id,
         "clip_id": edit.clip_id,
@@ -71,7 +75,10 @@ def _short(edit: ClipEdit, title: str, published: set[uuid.UUID]) -> dict:
         "captions_enabled": edit.captions_enabled,
         "caption_style": edit.caption_style,
         "duration_seconds": edit.duration_seconds,
-        "published": edit.id in published,
+        # YouTube confirmed it (never an upload still in flight).
+        "published": publish.state == "published",
+        # The Shorts library's one creator-level status (services/shorts_library.py).
+        "short_status": short_status(edit, publish, settings)[0],
         "created_at": edit.created_at,
         "updated_at": edit.updated_at,
     }
@@ -194,7 +201,7 @@ def project_summary(db: Session, project: Project) -> dict:
             .limit(RECENT_SHORTS)
         ).all()
         activity.extend(edit.updated_at for edit, _ in recent)
-        published = _published(db, [edit.id for edit, _ in recent])
+        published = _publications(db, [edit.id for edit, _ in recent])
         summary["shorts"] = {
             "total": sum(edit_counts.values()),
             "ready": edit_counts.get("ready", 0),
@@ -268,7 +275,7 @@ def home(db: Session, user_id: uuid.UUID) -> dict:
         .order_by(ClipEdit.updated_at.desc())
         .limit(HOME_SHORTS)
     ).all()
-    published = _published(db, [edit.id for edit, *_ in shorts])
+    published = _publications(db, [edit.id for edit, *_ in shorts])
     return {
         "continue_items": continue_items(summaries),
         "projects": summaries[:HOME_PROJECTS],
