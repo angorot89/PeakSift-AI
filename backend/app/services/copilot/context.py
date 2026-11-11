@@ -50,6 +50,7 @@ from app.models import (
 )
 from app.services.clip_detection.labels import moment_label
 from app.services.copilot.branding import branding_view
+from app.services.copilot.market import market_view
 
 PAGES = (
     "home",
@@ -349,6 +350,10 @@ def build_context(
             select(ClipEdit).where(ClipEdit.id == edit_id, ClipEdit.clip_id == clip_id)
         )
     view["branding"] = branding_view(db, user, handles, Target, edit)
+    # V1.8: market facts (Morocco Mode) — only in a local market's project, or when asked.
+    market = market_view(db, user, project, question, clip if project is not None else None)
+    if market is not None:
+        view["market"] = market
 
     view = _fit(view)
     return CopilotContext(
