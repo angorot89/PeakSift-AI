@@ -33,6 +33,7 @@ from app.schemas.visual_asset import (
     VisualSearchResults,
     VisualUploadLimits,
 )
+from app.services import asset_labels, markets
 from app.services.branding.profiles import brands_using_logo
 from app.services.media_deletion import delete_visual_asset, edits_using_visual_asset
 from app.services.semantic.indexing import TooManyAttempts
@@ -201,9 +202,11 @@ def search_visuals(
             status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Type what you are looking for",
         )
+    local = project.market if markets.market(project.market).is_local else None
     outcome = search_project(
-        db, project.id, query, get_settings(), kind=kind.value if kind else None, limit=limit
-    )
+        db, project.id, query, get_settings(), kind=kind.value if kind else None, limit=limit,
+        local_market=local,
+    )  # fmt: skip
     return VisualSearchResults(
         query=query,
         visual_search_used=outcome.visual_used,
@@ -220,6 +223,7 @@ def search_visuals(
                         else None
                     ),
                 ),
+                local=local is not None and match.asset.market == local,
             )
             for match in outcome.matches
         ],
@@ -264,6 +268,11 @@ def update_visual(asset: OwnedVisual, body: VisualAssetUpdate, db: DbSession) ->
     """Rename an asset or describe and tag it (words that help match B-roll suggestions).
     The file itself never changes."""
     try:
+        changes = body.model_dump(exclude_unset=True, include=set(asset_labels.FIELDS))
+        if changes:
+            labels = asset_labels.clean_labels("visual", asset_labels.read(asset), changes)
+            for name, value in labels.items():
+                setattr(asset, name, value)
         if body.display_name is not None:
             asset.display_name = clean_display_name(body.display_name)
         if body.description is not None:
@@ -272,6 +281,10 @@ def update_visual(asset: OwnedVisual, body: VisualAssetUpdate, db: DbSession) ->
             asset.tags = clean_tags(body.tags)
     except UploadValidationError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from None
+    except ValueError as error:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from None
     db.commit()
     return _read(asset)
 

@@ -208,8 +208,11 @@ def rank_assets(
     assets: Iterable[VisualAsset],
     visual: dict[uuid.UUID, VisualScore],
     thresholds: Thresholds | None,
+    local_market: str | None = None,
 ) -> list[AssetMatch]:
-    """Hybrid matches for ``query`` among ``assets``, strongest first (non-matches left out)."""
+    """Hybrid matches for ``query`` among ``assets``, strongest first (non-matches left out).
+    With ``local_market``, assets local to that market come first **within** a strength tier:
+    a strong Global match still ranks above a possible local one (never suppressed)."""
     matches: list[AssetMatch] = []
     for asset in assets:
         score = visual.get(asset.id) if thresholds is not None else None
@@ -237,6 +240,7 @@ def rank_assets(
     matches.sort(
         key=lambda match: (
             -_RANK[match.strength],
+            0 if local_market and match.asset.market == local_market else 1,
             -match.combined_score,
             -(match.similarity or 0.0),
             -(match.asset.created_at.timestamp() if match.asset.created_at else 0.0),
@@ -303,6 +307,7 @@ def search_project(
     *,
     kind: str | None = None,
     limit: int = 20,
+    local_market: str | None = None,
 ) -> SearchOutcome:
     """Hybrid search of one project's visuals. Never raises for the model: without it, names,
     descriptions and tags still match (``visual_used`` False)."""
@@ -336,5 +341,5 @@ def search_project(
                 used = True
         except (EmbeddingUnavailable, EmbeddingFailure) as error:
             logger.warning("Visual search query fell back to metadata: %s", error.code)
-    matches = rank_assets(query, assets, visual, thresholds if used else None)
+    matches = rank_assets(query, assets, visual, thresholds if used else None, local_market)
     return SearchOutcome(matches[:limit], used, preparing)

@@ -55,6 +55,15 @@ class VisualAsset(Base):
         # The same file uploaded twice to one project is one asset.
         UniqueConstraint("project_id", "sha256", name="uq_visual_assets_content"),
         CheckConstraint("kind IN ('image', 'video')", name="ck_visual_assets_kind"),
+        CheckConstraint(
+            "origin IN ('creator_upload', 'company_owned', 'licensed', 'public_domain', 'cc0')",
+            name="ck_visual_assets_origin",
+        ),
+        CheckConstraint(
+            "origin <> 'licensed' OR (license_note IS NOT NULL AND length(license_note) > 0)",
+            name="ck_visual_assets_license_note",
+        ),
+        CheckConstraint("market IN ('global', 'ma')", name="ck_visual_assets_market"),
         CheckConstraint("length(display_name) > 0", name="ck_visual_assets_display_name"),
         CheckConstraint("file_size > 0", name="ck_visual_assets_file_size"),
         CheckConstraint("width > 0 AND height > 0", name="ck_visual_assets_dimensions"),
@@ -100,6 +109,16 @@ class VisualAsset(Base):
     # Optional creator-written words that help match B-roll suggestions (never sent anywhere).
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     tags: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
+
+    # V1.8 labels (services/asset_labels.py), all chosen by the creator: how they have the right
+    # to use it, whether it is local to a market, a category and — local only — a location.
+    origin: Mapped[str] = mapped_column(
+        String(16), default="creator_upload", server_default="creator_upload"
+    )
+    license_note: Mapped[str | None] = mapped_column(String(300))
+    market: Mapped[str] = mapped_column(String(8), default="global", server_default="global")
+    category: Mapped[str | None] = mapped_column(String(32))
+    location: Mapped[str | None] = mapped_column(String(32))
 
     # A small preview image (bounded size), stored next to the asset in private storage.
     thumbnail_storage_key: Mapped[str | None] = mapped_column(String(255), unique=True)
