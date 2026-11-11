@@ -28,6 +28,15 @@ def analytics(published_id: uuid.UUID | None = None) -> str:
     return f"/analytics/{published_id}" if published_id else "/analytics"
 
 
+def shorts() -> str:
+    return "/shorts"
+
+
+def short(short_id: uuid.UUID) -> str:
+    """One Short (a version id) or draft (a clip id)."""
+    return f"/shorts/{short_id}"
+
+
 def project(project_id: uuid.UUID, section: str = "") -> str:
     """``section``: "" (Overview), "source", "clips", "assets" or "analytics"."""
     return f"/projects/{project_id}" + (f"/{section}" if section else "")
