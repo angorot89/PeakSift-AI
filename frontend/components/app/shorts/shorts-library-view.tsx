@@ -79,6 +79,7 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <SegmentedControl
+          wrap
           label="Show"
           options={FILTERS.map((f) => ({ value: f.key, label: f.label, count: counts[f.key] }))}
           value={filter}
