@@ -28,9 +28,11 @@ from app.schemas.brand import (
     TemplateStarterRead,
     TemplateUpdate,
 )
+from app.services import markets
 from app.services.auto_edit.recipes import current_recipe
 from app.services.branding import profiles, templates
 from app.services.branding.colors import emphasis_readable
+from app.services.branding.market_starters import market_starters
 from app.services.branding.profiles import BrandProblem
 from app.services.branding.template_config import TemplateConfig
 from app.services.clip_edit.brand import layout_summary
@@ -208,6 +210,7 @@ def template_read(template: ShortTemplate) -> TemplateRead:
         config=_settings(template),
         version=template.version,
         is_default=template.is_default,
+        market=template.market,
         created_at=template.created_at,
         updated_at=template.updated_at,
     )
@@ -229,13 +232,29 @@ def _owned_template(db, user, template_id: uuid.UUID) -> ShortTemplate:
 
 
 @router.get("/template-starters", response_model=list[TemplateStarterRead])
-def template_starters(current_user: CurrentUser) -> list[TemplateStarterRead]:
-    """Clean, Punchy, Story and Minimal as starting points (each recipe's own defaults)."""
+def template_starters(
+    current_user: CurrentUser, market: str | None = None
+) -> list[TemplateStarterRead]:
+    """Clean, Punchy, Story and Minimal as starting points (each recipe's own defaults). With
+    ``?market=ma``, that market's curated formats come first — the Global starters are always
+    there too (a market adds formats, it never hides Global ones)."""
     out = []
+    try:
+        profile = markets.market(market)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Unknown market") from None
+    for starter in market_starters(profile.code):
+        out.append(
+            TemplateStarterRead(
+                key=starter.key, market=starter.market, recipe=starter.recipe,
+                label=starter.label, description=starter.description, config=starter.config(),
+            )
+        )  # fmt: skip
     for name in templates.STARTERS:
         recipe = current_recipe(name)
         out.append(
             TemplateStarterRead(
+                key=name,
                 recipe=name,
                 label=recipe.label,
                 description=recipe.description,

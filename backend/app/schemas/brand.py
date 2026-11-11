@@ -77,6 +77,8 @@ class TemplateCreate(BaseModel):
     # The settings (see branding/template_config.py); omitted → the recipe's defaults.
     config: dict[str, Any] | None = None
     is_default: bool = False
+    # V1.8: the market the template is made for ("global", or e.g. "ma" for a Morocco format).
+    market: str = "global"
 
 
 class TemplateUpdate(BaseModel):
@@ -106,6 +108,7 @@ class TemplateRead(BaseModel):
     config: dict[str, Any]
     version: int
     is_default: bool
+    market: str = "global"
     created_at: datetime
     updated_at: datetime
 
@@ -115,3 +118,7 @@ class TemplateStarterRead(BaseModel):
     label: str
     description: str
     config: dict[str, Any]
+    # V1.8: the starter's key (a recipe's name, or a curated market format such as
+    # "ma_vox_pop") and the market it was curated for.
+    key: str = ""
+    market: str = "global"

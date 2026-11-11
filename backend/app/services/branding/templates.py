@@ -19,6 +19,7 @@ from app.models.short_template import (
     TEMPLATE_NAME_MAX_LENGTH,
     TEMPLATE_RECIPES,
 )
+from app.services import markets
 from app.services.auto_edit.recipes import current_recipe
 from app.services.branding.profiles import BrandProblem, owned_brand
 from app.services.branding.template_config import TemplateConfig
@@ -51,6 +52,13 @@ def _recipe(value: object) -> str | None:
     if value not in TEMPLATE_RECIPES:
         raise BrandProblem(422, "Unknown starting style")
     return str(value)
+
+
+def _market(value: object) -> str:
+    try:
+        return markets.market(str(value) if value else None).code
+    except ValueError:
+        raise BrandProblem(422, "Unknown market") from None
 
 
 def config_of(data: object) -> dict:
@@ -143,6 +151,7 @@ def create_template(db: Session, user: User, data: dict) -> ShortTemplate:
         brand_profile_id=_brand_id(db, user, data.get("brand_profile_id")),
         config=snapshot,
         version=1,
+        market=_market(data.get("market")),
     )
     if data.get("is_default"):
         _clear_default(db, user, None)
