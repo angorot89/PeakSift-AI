@@ -1161,6 +1161,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     <Download aria-hidden="true" />
                     Download short
                   </a>
+                  <Link href={`/shorts/${selected.id}`} className={buttonClasses("secondary", "md")}>
+                    <Smartphone aria-hidden="true" />
+                    View Short
+                  </Link>
                   {publishing?.enabled ? (
                     <PublishToYouTube editId={selected.id} editName={renderedName} returnTo={`/projects/${project.id}/clips/${clip.id}?edit=${selected.id}`} />
                   ) : null}

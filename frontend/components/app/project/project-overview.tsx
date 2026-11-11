@@ -26,6 +26,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { FrameTag, VideoFrame } from "@/components/ui/video-frame";
 import { errorMessage } from "@/lib/api";
 import { editContentUrl } from "@/lib/edits";
+import { shortHref, statusLabel } from "@/lib/shorts";
 import { formatDuration } from "@/lib/format";
 import { categoryLabel } from "@/lib/moments";
 import { projectHref } from "@/lib/navigation";
@@ -36,7 +37,6 @@ import { usePolling } from "@/lib/use-polling";
 import { videoContentUrl } from "@/lib/videos";
 import {
   clock,
-  editorLink,
   getProjectSummary,
   momentLabel,
   relativeTime,
@@ -339,14 +339,25 @@ function Shorts({ summary }: { summary: ProjectSummary }) {
   if (!shorts.length) return null;
   return (
     <section aria-labelledby="overview-shorts-heading">
-      <SectionHeader id="overview-shorts-heading" title="Generated Shorts" />
+      <SectionHeader
+        id="overview-shorts-heading"
+        title="Generated Shorts"
+        actions={
+          <Link
+            href={`/shorts?q=${encodeURIComponent(summary.name)}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-control px-1 text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            View in Shorts
+          </Link>
+        }
+      />
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {shorts.map((short) => {
-          const status = short.published ? { tone: "success" as const, label: "Published" } : humanStatus(short.status);
+          const status = statusLabel(short.short_status);
           return (
             <li key={short.edit_id} className="min-w-0">
               <Link
-                href={editorLink(summary.id, short.clip_id, short.edit_id)}
+                href={shortHref(short.edit_id)}
                 className="group block rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <VideoFrame
