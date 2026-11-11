@@ -1,10 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUser, DbSession, Storage
-from app.models import Project
+from app.models import Project, Transcription, TranscriptSegment, Video
 from app.schemas.project import (
     MediaDeletionRead,
     ProjectCreate,
@@ -12,7 +12,7 @@ from app.schemas.project import (
     ProjectRead,
     ProjectUpdate,
 )
-from app.services import markets
+from app.services import language, markets
 from app.services.media_deletion import delete_project as delete_project_and_media
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -75,6 +75,28 @@ def update_project(
         setattr(project, name, value)
     db.commit()
     return project
+
+
+@router.get("/{project_id}/language")
+def project_language(project_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> dict:
+    """The project's content language: the creator's choice (which always wins) and, from its
+    newest transcript, what the speech is *likely* in — never a certainty."""
+    project = get_project(project_id, current_user, db)
+    text = db.execute(
+        select(func.string_agg(TranscriptSegment.text, " "))
+        .join(Transcription, Transcription.id == TranscriptSegment.transcription_id)
+        .join(Video, Video.id == Transcription.video_id)
+        .where(Video.project_id == project.id, Transcription.status == "completed")
+    ).scalar()
+    guess = language.detect(text or "")
+    chosen = project.content_language
+    return {
+        "chosen": chosen,
+        "detected": {**guess.read(), "label": language.label(guess)},
+        "effective": chosen
+        if chosen != "auto"
+        else (guess.language if guess.language != "unknown" else None),
+    }
 
 
 @router.delete("/{project_id}", response_model=MediaDeletionRead)

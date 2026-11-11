@@ -25,6 +25,7 @@ from pathlib import PurePosixPath
 from app.models import VisualAsset
 from app.services.broll.grounding import stem
 from app.services.broll.validation import query_words
+from app.services.language import fold
 
 TAG_WEIGHT = 1.0
 NAME_WEIGHT = 0.9
@@ -36,7 +37,8 @@ _WORD = re.compile(r"[^\W\d_][\w'’]*", re.UNICODE)
 
 
 def _stems(text: str) -> set[str]:
-    return {stem(word) for word in _WORD.findall(text) if len(word) > 1}
+    # Compared folded ("café" ↔ "cafe", Arabic letter variants unified); never stored.
+    return {stem(word) for word in _WORD.findall(fold(text)) if len(word) > 1}
 
 
 @dataclass(frozen=True)
@@ -58,7 +60,7 @@ class AssetTerms:
 
 
 def match_score(query: str, terms: AssetTerms) -> float:
-    words = {stem(word) for word in query_words(query)}
+    words = {stem(word) for word in query_words(fold(query))}
     if not words:
         return 0.0
     total = 0.0
