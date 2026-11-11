@@ -78,6 +78,8 @@ export type ShortDetail = ShortItem & {
   versions: { id: string; number: number; status: ShortStatus; created_at: string }[];
   render: { error_message: string | null; file_size: number | null; progress_percent: number };
   auto_edit_plan_id: string | null;
+  /** Whether performance can be shown for this creator (and whether it is simulated). */
+  analytics: ShortAnalyticsAccess;
 };
 
 export type ShortsLibrary = { shorts: ShortItem[]; truncated: boolean };
@@ -398,4 +400,66 @@ export function publishingView(short: Pick<ShortItem, "publish">, panel: Publish
     publishedOn,
     date,
   };
+}
+
+// --- the Short's performance ------------------------------------------------------------------
+
+export type ShortAnalyticsAccess = {
+  enabled: boolean;
+  connected: boolean;
+  connection_status: string | null;
+  analytics_access: boolean;
+  simulated: boolean;
+};
+
+type Daily = { date: string; watch_time_seconds: number | null; subscribers_gained: number | null };
+type Detail = { processed_through: string | null; counters_observed_at: string | null; daily: Daily[] };
+
+function reportingDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/** How fresh the figures are, or why there are none — always one plain line. */
+export function performanceFreshness(access: ShortAnalyticsAccess | null, detail: Detail | null): string {
+  if (!access || !access.enabled) return "Analytics isn't available on this server.";
+  if (!access.connected || !access.analytics_access) return "Analytics not connected. Connect read-only analytics in Settings to see how this Short is doing.";
+  if (access.connection_status !== "connected") return "Analytics paused. Reconnect YouTube in Settings to update it.";
+  if (detail?.processed_through) return `Updated through ${reportingDay(detail.processed_through)} (YouTube's processed days; recent days may still change).`;
+  return "Waiting for YouTube data. Processed figures usually arrive 2–3 days after publishing.";
+}
+
+/** "1 h 12 min" / "35 min" / "48 s". */
+export function watchTime(seconds: number): string {
+  const total = Math.round(seconds);
+  if (total < 60) return `${total} s`;
+  const h = Math.floor(total / 3600);
+  const m = Math.round((total % 3600) / 60);
+  return h ? `${h} h ${m} min` : `${m} min`;
+}
+
+/** Totals over the days YouTube reported ("—" when no day reported the figure) and the first
+ * seven reporting days, for the chart. */
+export function performanceTotals(detail: Detail): { watchTime: string; subscribers: string; firstWeek: Set<string> } {
+  let time: number | null = null;
+  let subscribers: number | null = null;
+  for (const day of detail.daily) {
+    if (day.watch_time_seconds !== null) time = (time ?? 0) + day.watch_time_seconds;
+    if (day.subscribers_gained !== null) subscribers = (subscribers ?? 0) + day.subscribers_gained;
+  }
+  const days = [...new Set(detail.daily.map((day) => day.date))].sort().slice(0, 7);
+  return {
+    watchTime: time === null ? "—" : watchTime(time),
+    subscribers: subscribers === null ? "—" : new Intl.NumberFormat("en").format(subscribers),
+    firstWeek: new Set(days),
+  };
+}
+
+type InsightLike = { id: string; statement: string; dismissed: boolean; group: { id: string }[]; comparison: { id: string }[] };
+
+/** Observed patterns whose evidence includes this Short (never dismissed ones, at most two). */
+export function relatedInsights<T extends InsightLike>(insights: { insights: T[] }, contentId: string): T[] {
+  return insights.insights
+    .filter((insight) => !insight.dismissed && insight.group.some((short) => short.id === contentId))
+    .slice(0, 2);
 }

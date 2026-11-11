@@ -56,7 +56,7 @@ export function DailyChart({
           <div
             role="list"
             aria-label={title}
-            className="relative flex items-end border-b border-border-strong"
+            className="relative flex items-end border-b border-border-strong pointer-coarse:overflow-x-auto"
             style={{ height: HEIGHT, gap: GAP }}
             onPointerLeave={() => setActive(null)}
           >
@@ -73,7 +73,7 @@ export function DailyChart({
                   onPointerEnter={() => setActive(index)}
                   onFocus={() => setActive(index)}
                   onBlur={() => setActive(null)}
-                  className="group flex h-full min-w-0 flex-1 items-end justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-accent"
+                  className="group flex h-full min-w-0 flex-1 items-end justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-w-11"
                 >
                   {point.value === null ? (
                     <span className="mb-0.5 h-px w-full max-w-6 bg-border-strong" />

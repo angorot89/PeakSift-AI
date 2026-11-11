@@ -57,7 +57,9 @@ DETAIL_SNAPSHOTS = 60
 DETAIL_SYNCS = 10
 
 
-def _access(db, user_id: uuid.UUID) -> AnalyticsAccessRead:
+def analytics_access(db, user_id: uuid.UUID) -> AnalyticsAccessRead:
+    """Whether this creator's analytics can be shown (server switch, connection, the read-only
+    grant) and whether figures are simulated. Shared with the Short's page."""
     settings = get_settings()
     connection = connections.get_connection(db, user_id)
     return AnalyticsAccessRead(
@@ -146,7 +148,7 @@ def performance_overview(current_user: CurrentUser, db: DbSession) -> Performanc
     contents = summary.user_contents(db, current_user.id)
     comparisons = _comparisons(db, current_user.id)
     return PerformanceOverviewRead(
-        access=_access(db, current_user.id),
+        access=analytics_access(db, current_user.id),
         videos=[VideoPerformanceRead(**v) for v in _summaries(db, contents, comparisons)],
         baselines=[BaselineRead(**vars(b), reliable=b.reliable) for b in comparisons.baselines],
     )
@@ -197,7 +199,7 @@ def video_performance(
 def refresh_video_performance(content_id: uuid.UUID, current_user: CurrentUser, db: DbSession):
     content = _owned(db, content_id, current_user.id)
     settings = get_settings()
-    access = _access(db, current_user.id)
+    access = analytics_access(db, current_user.id)
     if not access.enabled:
         raise HTTPException(
             status.HTTP_409_CONFLICT, detail="Analytics is not enabled on this server"
