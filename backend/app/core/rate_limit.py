@@ -53,6 +53,7 @@ DEFAULT_LIMITS: dict[str, Limit] = {
     "oauth_start": Limit(10, HOUR),
     "publish_start": Limit(30, HOUR),
     "analytics_refresh": Limit(60, HOUR),
+    "hook_ideas": Limit(120, HOUR),  # each language request may ask the local model
     # Copilot questions: a short burst, then a steady hourly budget (each asks the local model).
     "copilot_minute": Limit(6, 60),
     "copilot_hour": Limit(120, HOUR),
