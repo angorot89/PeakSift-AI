@@ -49,6 +49,7 @@ from app.schemas.auto_edit import (
     AutoEditRecipeRead,
     PerformanceContextRead,
 )
+from app.services import markets
 from app.services.auto_edit import state
 from app.services.auto_edit.config import AutoEditRequest
 from app.services.auto_edit.fingerprint import source_fingerprint
@@ -488,7 +489,15 @@ def _origin(plan: AutoEditPlan) -> dict:
         }  # fmt: skip
         if template.get("brand"):
             origin["brand"] = {"name": template["brand"]}
+    market = (plan.explanation_snapshot or {}).get("market") or _project_market(plan)
+    if market:  # the market the plan was made in, frozen with the Short
+        origin["market"] = market
     return origin
+
+
+def _project_market(plan: AutoEditPlan) -> dict | None:
+    project = plan.clip.video.project
+    return markets.snapshot(project.market, project.content_language)
 
 
 def _accept_suggestions(db: DbSession, plan: AutoEditPlan) -> None:

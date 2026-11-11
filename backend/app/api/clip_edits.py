@@ -39,6 +39,7 @@ from app.models import (
 )
 from app.schemas.clip_edit import ClipEditPage, ClipEditRead, EditRequest
 from app.schemas.project import MediaDeletionRead
+from app.services import markets
 from app.services.clip_edit.composition import supports_captions, supports_visuals
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
@@ -376,6 +377,10 @@ def _origin(db: DbSession, video: Video, body: EditRequest, config: EditConfig) 
             }  # fmt: skip
     if config.brand is not None:
         origin["brand"] = {"name": config.brand.name}
+    project = video.project
+    market = markets.snapshot(project.market, project.content_language)
+    if market is not None:  # frozen: a later market change never rewrites this Short
+        origin["market"] = market
     return origin or None
 
 

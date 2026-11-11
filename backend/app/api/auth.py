@@ -12,7 +12,8 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
-from app.schemas.user import SessionRead, UserCreate, UserLogin, UserRead
+from app.schemas.user import PreferencesUpdate, SessionRead, UserCreate, UserLogin, UserRead
+from app.services import markets
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -88,6 +89,20 @@ def logout(response: Response) -> None:
 
 @router.get("/me", response_model=UserRead)
 def me(current_user: CurrentUser) -> User:
+    return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+def update_preferences(body: PreferencesUpdate, current_user: CurrentUser, db: DbSession) -> User:
+    """Change the creator's preferences (the default market for new projects)."""
+    if body.default_market is not None:
+        try:
+            current_user.default_market = markets.market(body.default_market).code
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Unknown market"
+            ) from None
+    db.commit()
     return current_user
 
 
