@@ -1,5 +1,5 @@
 import { apiFetch, postJson } from "@/lib/api";
-import type { PublishJob, PublishMetadata, PublishPanel, YouTubeStatus } from "@/lib/publishing-rules";
+import { isGoogleConsentUrl, safeReturnPath, type PublishJob, type PublishMetadata, type PublishPanel, type YouTubeStatus } from "@/lib/publishing-rules";
 
 export * from "@/lib/publishing-rules";
 
@@ -18,3 +18,38 @@ export const getPublishJob = (jobId: string) => apiFetch<PublishJob>(`/publish-j
 export const retryPublishJob = (jobId: string) =>
   postJson<PublishJob>(`/publish-jobs/${jobId}/retry`, {});
 
+
+// --- connect, then come back --------------------------------------------------------------------
+
+const RETURN_KEY = "peaksift.youtube.return";
+
+/** Start Google's consent and remember where to come back to (a Short or an editor of this app). */
+export async function connectYouTube(returnTo?: string): Promise<void> {
+  const { authorization_url } = await startYouTubeConnection();
+  if (!isGoogleConsentUrl(authorization_url)) throw new Error("Unexpected sign-in address.");
+  const back = safeReturnPath(returnTo);
+  try {
+    if (back) window.sessionStorage.setItem(RETURN_KEY, back);
+    else window.sessionStorage.removeItem(RETURN_KEY);
+  } catch {
+    // storage unavailable: the creator comes back to Settings, which links on
+  }
+  window.location.assign(authorization_url); // Google sends the browser back to /settings
+}
+
+/** The Short or editor to return to after connecting (null when there is none). */
+export function peekReturnPath(): string | null {
+  try {
+    return safeReturnPath(window.sessionStorage.getItem(RETURN_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function forgetReturnPath(): void {
+  try {
+    window.sessionStorage.removeItem(RETURN_KEY);
+  } catch {
+    // nothing stored
+  }
+}
