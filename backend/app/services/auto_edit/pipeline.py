@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.models import AutoEditPlan, AutoEditStatus
+from app.services import markets
 from app.services.auto_edit import state
 from app.services.auto_edit.config import AutoEditRequest
 from app.services.auto_edit.contract import AutoEditPlanner, PlannerError
@@ -156,9 +157,29 @@ def _with_context_notes(validated: ValidatedPlan, gathered: Gathered) -> dict:
     notes = list(explanations.get("notes", []))
     if gathered.music_missing:
         notes.insert(0, "The music you chose is no longer available, so no music was added.")
+    if gathered.market is not None:
+        explanations["market"] = gathered.market  # frozen with the plan (and its Short)
+        note = market_note(validated, gathered)
+        if note:
+            notes.append(note)
     explanations["notes"] = notes
     explanations["used_suggestions"] = list(validated.used_suggestion_ids)
     return explanations
+
+
+def market_note(validated: ValidatedPlan, gathered: Gathered) -> str | None:
+    """What Morocco Mode did with the visuals, in plain words (None when nothing was placed)."""
+    visuals = validated.configuration.visuals
+    placed = {element.asset_id for element in visuals.elements} if visuals else set()
+    if not placed:
+        return None
+    local = markets.market(gathered.market["code"]).local_label or gathered.market["name"]
+    if placed & gathered.local_assets:
+        return f"{gathered.market['name']} Mode put your {local} visuals first for this Short."
+    return (
+        f"No strong {local} visual matched these moments, so PeakSift used one from your "
+        "Global library."
+    )
 
 
 def _confidence(

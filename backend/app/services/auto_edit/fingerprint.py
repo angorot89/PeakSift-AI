@@ -48,6 +48,9 @@ class VisualAssetFacts:
     # V1.3: the asset's current visual-search index ("ready:<id>"), when one exists — a plan
     # made before an asset was searchable by what it shows is not reused afterwards.
     semantic: str | None = None
+    # V1.8: the market the asset is local to, when it is local (a relabelled asset reorders
+    # local-first matches, so the plan is not reused).
+    market: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,8 @@ class PlanSources:
     audio_assets: tuple[AudioAssetFacts, ...] = field(default_factory=tuple)
     # V1.3: the matching model and its thresholds version, when visual search is on.
     matching: str | None = None
+    # V1.8: the project's local market (Morocco Mode), when it is not Global.
+    market: str | None = None
 
     def canonical(self) -> dict[str, Any]:
         """Order-independent, rounded form: equal facts give equal JSON."""
@@ -89,8 +94,11 @@ class PlanSources:
         data["visual_assets"] = sorted(
             (
                 _without_empty(
-                    {**asdict(a), "tags": sorted(a.tags), "duration": _round(a.duration)},
-                    "semantic",
+                    _without_empty(
+                        {**asdict(a), "tags": sorted(a.tags), "duration": _round(a.duration)},
+                        "semantic",
+                    ),
+                    "market",
                 )
                 for a in self.visual_assets
             ),
@@ -100,7 +108,7 @@ class PlanSources:
             ({**asdict(a), "duration": _round(a.duration)} for a in self.audio_assets),
             key=lambda a: a["id"],
         )
-        return _without_empty(data, "matching")
+        return _without_empty(_without_empty(data, "matching"), "market")
 
 
 def _without_empty(data: dict[str, Any], key: str) -> dict[str, Any]:
