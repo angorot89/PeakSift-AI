@@ -19,7 +19,9 @@ the system's (no "worker", "provider", "candidate", "pipeline", "fingerprint" or
 | `/projects/[id]/clips/[clipId]/create` | **Create a Short — Start**: Auto Edit (recommended) or start manually; shows the clip being cut when needed. |
 | `/projects/[id]/clips/[clipId]/auto-edit` | **Create a Short — Style and Review**: recipe cards, preparing, the reviewed draft. `?new=1` starts a new draft. |
 | `/projects/[id]/clips/[clipId]` | **Edit Short**: the editor. `?edit=` opens a version, `?plan=` a draft, `?tool=` a tool group. |
-| `/analytics`, `/analytics/[id]` | How are my Shorts doing?; one Short. |
+| `/shorts` | **Shorts**: every Short and draft the creator made, with one status each, filters, search and sort ([shorts-library.md](shorts-library.md)). |
+| `/shorts/[id]` | **One Short**: preview, status and its one next action, details as made, versions, publishing in place and performance. |
+| `/analytics`, `/analytics/[id]` | How are my Shorts doing?; one Short's figures (with **Open Short**). |
 | `/settings` | YouTube publishing and analytics access. |
 
 The app shell (`components/app/app-shell.tsx`) has a collapsible sidebar on large screens and a
