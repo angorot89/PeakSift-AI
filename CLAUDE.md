@@ -101,6 +101,15 @@ preview sync, tooltips and an honest render state, panels that follow the select
 touch screens, and a real-render release gate (`scripts/timeline_acceptance.py`); see
 [docs/editor-timeline.md](docs/editor-timeline.md).
 
+**Shorts Library & Publishing Center: implementation complete locally, pending CI/merge/release**
+(stacked PRs #257–#264 on top of the unmerged #256; not merged, not tagged): the Short as a
+first-class object — `/shorts` (every Short and draft with one creator-level status derived in
+`services/shorts_library.py`, filters, search, sort, valid actions only), `/shorts/[id]` (player,
+the state's one next action, provenance as recorded, versions, a publishing panel with
+connect-and-return, real stages and safe retry, and performance from V1.4 analytics), Home, the
+project, Analytics, the editor and the next step leading to it, phones and accessibility; see
+[docs/shorts-library.md](docs/shorts-library.md).
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,
@@ -132,6 +141,13 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Semantic assets: `app/models/semantic.py` (`VisualSemanticIndex`, `AssetEmbedding`, pgvector `vector(512)`), `app/services/semantic/` (contract, vectors, images, clip_onnx, fake, registry, indexing, sampling, lifecycle, search, matching, benchmark), `app/workers/semantic_tasks.py`, `app/cli/semantic.py`, `scripts/fetch_semantic_model.py` (pinned files + sha256), `scripts/semantic_benchmark.py`, `scripts/semantic_search_probe.py`; frontend `lib/visual-search.ts`, `components/app/use-visual-search.ts`. Model weights are never committed or downloaded automatically; creator media never leaves the server
 - Creator workspace: `app/services/workspace_summary.py` + `app/api/workspace.py` (`/workspace/home`, `/projects/{id}/summary`; not to be confused with `app/services/workspace.py`, the job scratch directories); frontend `components/app/app-shell.tsx`, `home-view.tsx`, `project/`, `create/`, `components/ui/` (design system), `lib/navigation.ts`, `lib/workspace*.ts`, `lib/status.ts`, `lib/moments.ts`, `lib/editor-tools.ts`, `lib/upload-batch.ts`
 - Performance analytics: `app/models/performance.py`, `app/models/insight.py`, `app/services/performance/` (provenance, content, metrics, provider, youtube, fake, factory, sync, lifecycle, summary, normalization, insights, profile, retention), `app/api/performance.py`, `app/workers/performance_tasks.py` (Celery beat schedule), `app/cli/performance.py`, `scripts/insights_benchmark.py`; frontend `/analytics`, `components/app/analytics*`, `lib/performance*.ts`
+- Shorts library: `app/services/shorts_library.py` (the one status derivation: `publication`,
+  `short_status`, `draft_status`; library and detail queries), `app/api/shorts.py`
+  (`GET /shorts`, `GET /shorts/{id}`), `app/schemas/shorts.py`; frontend `/shorts`,
+  `/shorts/[shortId]`, `components/app/shorts/` (library view, card, detail view, publishing and
+  performance panels), `lib/shorts.ts`, `lib/shorts-rules.ts` (status words, filters, search,
+  sort, actions, publishing and performance views), `scripts/shorts_acceptance.py` (read-only
+  release gate)
 - Editor timeline: `frontend/lib/timeline.ts` (scale, items, drag, snapping, sync, render state; unit-tested), `lib/reveal.ts`, `components/app/editor/timeline/` (`timeline.tsx`, `tracks.tsx`), `backend/scripts/timeline_acceptance.py` (real-render gate)
 - Visual shell and primitives: `app/globals.css` (tokens), `components/ui/` (`video-frame.tsx`, `peak-art.tsx`, `status-pill.tsx`), `components/app/app-shell.tsx`, `shell-search.tsx`, `page-header.tsx`; Morocco Mode preview `lib/morocco.ts`, `components/app/morocco/`
 - Creator Copilot: `app/models/copilot.py` (`CopilotThread`, `CopilotMessage`),
@@ -191,6 +207,15 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   timeline and preview use the same cue rule (`cueAt`). Selecting never scrolls the page
   (`revealInPanel`). Keyboard paths exist for every drag; 44 px targets on touch. Not an NLE: no
   splitting, ripple, keyframes or extra tracks.
+- Shorts library: a Short is one rendered version (`ClipEdit`); a draft is a clip without a
+  version. Its creator-level status is derived only in `services/shorts_library.py` and worded
+  only in `lib/shorts-rules.ts` — never re-derive status words on a page. Never call an upload
+  "Published" before YouTube confirmed it (`on_youtube`); a video YouTube has outranks a later
+  failed attempt; real stages only, no guessed percentages. Provenance shows the template and
+  brand recorded with the version (`origin`), never today's template. Show only valid actions
+  (no disabled menus); nothing publishes without the creator's click; the connect return address
+  must pass `safeReturnPath`. Figures only as reported ("—" otherwise). Library queries stay a
+  fixed number of statements (tested).
 - Brands and templates are preferences; renders read only the edit snapshot. An edit's `brand`
   section appears only when used (old fingerprints unchanged); plans freeze the template version
   and brand, and a template or brand change never touches an existing plan or edit. Colours are
@@ -205,7 +230,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
 - Smart reframing: positions are fractions of the display-oriented source (x right, y down). Detector output is untrusted until `normalize_detection`; "no face" (empty list) and "detector broken" (`DetectorUnavailable`/`DetectorFailure` → failed analysis) must stay distinct. Every tuning value is server configuration in the versioned snapshot. Persisted keyframes are re-validated before rendering and only module-formatted numbers reach the filtergraph. Never load a detector at import or startup, never download or commit model weights, and never describe the feature as speaker detection.
 - Tests: Celery eager mode, mocked speech models, a fake OpenAI client, a fake ONNX session, moto and a live MinIO for S3 (`TEST_S3_*`, required in CI), a mocked YouTube and the deterministic fake metrics provider (`PERFORMANCE_PROVIDER=fake`); CI sets `HF_HUB_OFFLINE=1`, never has an API key or Google credentials, never downloads a model and never calls Google.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/editor-timeline.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/editor-timeline.md`, `docs/shorts-library.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

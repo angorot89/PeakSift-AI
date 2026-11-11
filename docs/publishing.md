@@ -63,6 +63,14 @@ creates the same video twice, and reports only what actually happened. Operator 
 3. A SHA-256 **fingerprint** over the connection, edit and metadata makes the request
    idempotent: the same request — even sent twice at once — returns the existing job.
 
+4. On a Short's page (`/shorts/{id}`) the **Publishing** panel shows the connection, the real
+   state and the reviewed title and visibility, and offers the one action that fits (Connect
+   YouTube, Publish, Retry/Resume, Publish again, Open on YouTube). **Connect YouTube** from a
+   Short (or the editor's dialog) comes back to it after Google's consent: the browser keeps the
+   return address in its tab's session storage, and `/settings?youtube=connected` follows it only
+   when it is a Short or an editor of this app (`safeReturnPath`). The OAuth flow itself — scopes,
+   state, callback to `/settings` — is unchanged. See [shorts-library.md](shorts-library.md).
+
 ## The pipeline
 
 ```
