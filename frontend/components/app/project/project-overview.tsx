@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useProject } from "@/components/app/project/project-frame";
+import { ProjectMarketControl } from "@/components/app/project/project-market";
 import { ErrorState } from "@/components/app/states";
 import { VideoUpload } from "@/components/app/video-upload";
 import { Button } from "@/components/ui/button";
@@ -388,7 +389,7 @@ function Shorts({ summary }: { summary: ProjectSummary }) {
 
 /** The project's landing page: where it is, the next step, its source, moments and Shorts. */
 export function ProjectOverview() {
-  const { project } = useProject();
+  const { project, reload: reloadProject } = useProject();
   const load = useCallback(() => getProjectSummary(project.id), [project.id]);
   const { data, error, loading, reload } = useApi(load);
   const [live, setLive] = useState<ProjectSummary | null>(null);
@@ -438,6 +439,9 @@ export function ProjectOverview() {
           ) : null}
         </div>
       ) : null}
+      <div className="max-w-2xl">
+        <ProjectMarketControl project={project} onChange={() => reloadProject()} />
+      </div>
     </div>
   );
 }

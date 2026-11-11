@@ -1,93 +1,110 @@
-// Morocco Mode (preview): the UI architecture for Global + Moroccan intelligence. Pure rules, no
-// React; unit-tested with node --test.
+// Morocco Mode (V1.8): Global PeakSift plus Moroccan context. Pure rules, no React; unit-tested
+// with node --test.
 //
-// Morocco Mode *extends* Global — every Global tool and library stays available. No Moroccan
-// data source exists yet (no Darija hooks, sound library, trends or local assets), so every
-// Morocco capability is "not available yet" and says so; nothing here is generated or invented.
-// When a real source lands, its capability flips to available and its section shows real data.
+// Morocco Mode *extends* Global — every Global tool, template and asset stays available. Each
+// section shows only what really exists: the creator's own Moroccan visuals and sounds, the
+// curated Morocco formats, hook ideas from the clip's own words. Nothing is called "trending":
+// PeakSift has no trend source, and no figures, places or sounds are invented.
 
-/** The preview is off unless the build enables it (NEXT_PUBLIC_MOROCCO_MODE_PREVIEW=1). */
-export function moroccoPreviewEnabled(value: string | undefined = process.env.NEXT_PUBLIC_MOROCCO_MODE_PREVIEW): boolean {
-  return value === "1" || value === "true";
-}
+export type MoroccoSectionKey = "darija_hooks" | "local_templates" | "local_assets" | "local_sounds" | "ask";
 
-export type MoroccoCapabilityKey = "darija_hooks" | "local_sounds" | "local_trends" | "local_templates" | "local_assets" | "clip_suggestions";
-
-export type MoroccoCapability = {
-  key: MoroccoCapabilityKey;
+export type MoroccoSection = {
+  key: MoroccoSectionKey;
   title: string;
-  /** What it will do, in creator words. */
+  /** What it does today, in creator words. */
   promise: string;
-  /** False until a real data source exists; the UI then shows "Not available yet". */
-  available: boolean;
-  /** What works today in Global instead (always a real page). */
-  today: { label: string; href: string } | null;
+  /** Where it lives. */
+  href: string;
+  cta: string;
 };
 
-export const MOROCCO_CAPABILITIES: MoroccoCapability[] = [
+export const MOROCCO_SECTIONS: MoroccoSection[] = [
   {
     key: "darija_hooks",
-    title: "Darija hook ideas",
-    promise: "Opening lines in Darija — Arabic script or Latin letters — grounded in your clip's own words.",
-    available: false,
-    today: { label: "Write your own opening in the editor (Arabic script works)", href: "/projects" },
-  },
-  {
-    key: "local_sounds",
-    title: "Moroccan sound library",
-    promise: "Music, ambience and reactions from Morocco, cleared for your Shorts.",
-    available: false,
-    today: { label: "Upload sounds you own to a project", href: "/projects" },
-  },
-  {
-    key: "local_trends",
-    title: "What Moroccan audiences watch",
-    promise: "Topics and formats doing well with Moroccan viewers.",
-    available: false,
-    today: null,
+    title: "Darija hooks",
+    promise: "Opening lines from your clip's own words, in Arabic script or Latin letters — never Darija you didn't say.",
+    href: "/projects",
+    cta: "Open a Short's editor → Opening → Hook ideas",
   },
   {
     key: "local_templates",
-    title: "Templates for Moroccan content",
-    promise: "Caption styles and hooks made for Darija and mixed-script captions.",
-    available: false,
-    today: { label: "Use your own templates", href: "/brand" },
+    title: "Morocco content styles",
+    promise: "Curated formats like Vox Pop, Darija Reaction and Food & Place Review, built from settings PeakSift already has.",
+    href: "/morocco/kit?tab=templates",
+    cta: "Explore the formats",
   },
   {
     key: "local_assets",
-    title: "Moroccan visuals",
-    promise: "B-roll and images of Moroccan places and culture, matched to your clip first — with global alternatives next to them.",
-    available: false,
-    today: { label: "Search the visuals you uploaded", href: "/projects" },
+    title: "Local visuals",
+    promise: "Your own Moroccan images and B-roll come first when they match a moment — with Global alternatives right after.",
+    href: "/morocco/kit?tab=visuals",
+    cta: "See your Moroccan visuals",
   },
   {
-    key: "clip_suggestions",
-    title: "Morocco-aware suggestions",
-    promise: "Which moments fit a Moroccan audience, which also travel globally, and why.",
-    available: false,
-    today: { label: "Ask PeakSift about your moments", href: "/home" },
+    key: "local_sounds",
+    title: "Local sounds",
+    promise: "Café, street and market ambience, transitions and reactions you made, own or licensed.",
+    href: "/morocco/kit?tab=sounds",
+    cta: "See your Moroccan sounds",
+  },
+  {
+    key: "ask",
+    title: "Ask PeakSift in Morocco Mode",
+    promise: "“Do I have a Moroccan visual for this?”, “Which Morocco template fits this clip?”, “Can I keep this in French?”",
+    href: "/projects",
+    cta: "Ask from any project",
   },
 ];
 
-export const capability = (key: MoroccoCapabilityKey) => MOROCCO_CAPABILITIES.find((c) => c.key === key)!;
+export type KitTab = "visuals" | "sounds" | "hooks" | "templates";
 
-export type KitTab = "images" | "broll" | "sounds" | "hooks" | "templates";
-
-/** The Creator Kit's library tabs and the capability each depends on. */
-export const KIT_TABS: { key: KitTab; label: string; needs: MoroccoCapabilityKey }[] = [
-  { key: "images", label: "Images", needs: "local_assets" },
-  { key: "broll", label: "B-roll", needs: "local_assets" },
-  { key: "sounds", label: "Sounds", needs: "local_sounds" },
-  { key: "hooks", label: "Hooks", needs: "darija_hooks" },
-  { key: "templates", label: "Templates", needs: "local_templates" },
+export const KIT_TABS: { key: KitTab; label: string }[] = [
+  { key: "visuals", label: "Visuals" },
+  { key: "sounds", label: "Sounds" },
+  { key: "hooks", label: "Hooks" },
+  { key: "templates", label: "Templates" },
 ];
 
-/** Place and topic filters ship only with data behind them: none until a local library exists. */
-export function kitFilters(capabilities: MoroccoCapability[] = MOROCCO_CAPABILITIES): string[] {
-  return capabilities.find((c) => c.key === "local_assets")?.available ? ["All"] : [];
+export const kitTab = (value: string | null): KitTab => KIT_TABS.find((t) => t.key === value)?.key ?? "visuals";
+
+type Labelled = { category: string | null; location?: string | null };
+
+/** Filters come only from the metadata the creator's assets really carry (empty when none). */
+export function kitFilters(assets: Labelled[], categoryNames: Record<string, string>): { key: string; label: string }[] {
+  const seen = new Map<string, string>();
+  for (const asset of assets) {
+    if (asset.category) seen.set(`category:${asset.category}`, categoryNames[asset.category] ?? asset.category);
+    if (asset.location) seen.set(`location:${asset.location}`, asset.location);
+  }
+  return [...seen].map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+type Searchable = Labelled & { display_name: string; tags?: string[]; description?: string };
+
+const fold = (text: string) => text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase();
+
+/** A kit item matches every word of the query (name, tags, description, category, location) and
+ * the chosen filter. */
+export function kitMatches(item: Searchable, query: string, filter: string | null, categoryNames: Record<string, string>): boolean {
+  if (filter) {
+    const [kind, value] = filter.split(":");
+    if (kind === "category" && item.category !== value) return false;
+    if (kind === "location" && item.location !== value) return false;
+  }
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const haystack = fold(
+    [item.display_name, ...(item.tags ?? []), item.description ?? "", item.category ? categoryNames[item.category] ?? "" : "", item.location ?? ""].join(" "),
+  );
+  return words.every((word) => haystack.includes(word));
 }
 
 /** Local first, then global: the order matches are shown in (a stable sort; nothing is dropped). */
 export function localFirst<T extends { local: boolean }>(items: T[]): T[] {
   return [...items.filter((item) => item.local), ...items.filter((item) => !item.local)];
 }
+
+/** Where the mode switch leads, and the default market it saves. */
+export const MODES = [
+  { key: "global", market: "global", href: "/home", label: "Global" },
+  { key: "morocco", market: "ma", href: "/morocco", label: "Morocco Mode" },
+] as const;

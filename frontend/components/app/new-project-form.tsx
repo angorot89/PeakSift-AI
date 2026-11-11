@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -14,8 +14,11 @@ import { PROJECT_NAME_MAX_LENGTH, createProject } from "@/lib/projects";
 
 export function NewProjectForm() {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
+  const params = useSearchParams();
   const [name, setName] = useState("");
+  // Preselected from ?market= (Morocco Mode's button) or the creator's default; always changeable.
+  const [market, setMarket] = useState(params.get("market") === "ma" || user?.default_market === "ma" ? "ma" : "global");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +39,7 @@ export function NewProjectForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const project = await createProject(trimmed);
+      const project = await createProject(trimmed, market);
       router.push(`/projects/${project.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) setUser(null);
@@ -65,6 +68,34 @@ export function NewProjectForm() {
           onChange={(e) => setName(e.target.value)}
           error={fieldError}
         />
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Made for</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              { value: "global", label: "Global", hint: "Every Global tool and library" },
+              { value: "ma", label: "Morocco Mode", hint: "Global plus Moroccan context" },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className="flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-border px-3 py-2.5 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+              >
+                <input
+                  type="radio"
+                  name="market"
+                  value={option.value}
+                  checked={market === option.value}
+                  onChange={() => setMarket(option.value)}
+                  className="mt-0.5 accent-[var(--color-accent)]"
+                />
+                <span>
+                  <span className="block font-medium">{option.label}</span>
+                  <span className="block text-xs text-muted">{option.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted">You can change it later. The language of your videos is a separate choice.</p>
+        </fieldset>
         <FormError>{error}</FormError>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Link

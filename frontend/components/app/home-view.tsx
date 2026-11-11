@@ -33,7 +33,6 @@ import { formatDuration } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { shortHref, statusLabel } from "@/lib/shorts";
 import { useStoredFlag } from "@/lib/use-stored-flag";
-import { moroccoPreviewEnabled } from "@/lib/morocco";
 import { videoContentUrl } from "@/lib/videos";
 import {
   clock,
@@ -365,11 +364,9 @@ function Returning({ home }: { home: Home }) {
           </ButtonLink>
         }
       >
-        {moroccoPreviewEnabled() ? (
-          <div className="mt-6">
-            <ModeSwitch current="global" />
-          </div>
-        ) : null}
+        <div className="mt-6">
+          <ModeSwitch current="global" />
+        </div>
       </PageHeader>
 
       <GettingStarted home={home} />
