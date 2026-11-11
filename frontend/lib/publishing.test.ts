@@ -5,6 +5,7 @@ import {
   bytes,
   characters,
   connectionOutcome,
+  safeReturnPath,
   isActive,
   isGoogleConsentUrl,
   metadataProblems,
@@ -112,5 +113,19 @@ describe("connecting", () => {
       assert.ok(outcome?.message);
     }
     assert.equal(connectionOutcome(new URLSearchParams("")), null);
+  });
+});
+
+describe("coming back after connecting", () => {
+  const ID = "3f1c0a1e-0000-4000-8000-000000000001";
+  it("returns only to a Short or an editor of this app", () => {
+    assert.equal(safeReturnPath(`/shorts/${ID}`), `/shorts/${ID}`);
+    assert.equal(safeReturnPath(`/projects/${ID}/clips/${ID}?edit=${ID}`), `/projects/${ID}/clips/${ID}?edit=${ID}`);
+    assert.equal(safeReturnPath(`/projects/${ID}/clips/${ID}`), `/projects/${ID}/clips/${ID}`);
+  });
+  it("drops anything else", () => {
+    for (const path of ["https://evil.example/shorts/x", "//evil.example", `/shorts/${ID}/../../settings`, "/shorts/not-an-id", `/shorts/${ID}?next=https://evil.example`, "", null]) {
+      assert.equal(safeReturnPath(path), null, String(path));
+    }
   });
 });

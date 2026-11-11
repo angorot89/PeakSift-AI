@@ -4,8 +4,8 @@ import { Download, FolderOpen, Pencil, Send, Smartphone, TrendingUp } from "luci
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { PageHeader } from "@/components/app/page-header";
+import { PublishingPanel } from "@/components/app/shorts/publishing-panel";
 import { previewAt, previewSrc, useShortAction } from "@/components/app/shorts/short-card";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -169,7 +169,7 @@ function Versions({ short }: { short: ShortDetail }) {
 }
 
 /** Status, its one-line explanation and the state's one primary action. */
-function StatusCard({ short, onAction, onChange }: { short: ShortDetail; onAction: (action: ShortAction) => void; onChange: () => void }) {
+function StatusCard({ short, onAction }: { short: ShortDetail; onAction: (action: ShortAction) => void }) {
   const status = statusLabel(short.status);
   const primary = primaryAction(short);
   const Icon = primary ? ACTION_ICONS[primary.action] : undefined;
@@ -189,14 +189,12 @@ function StatusCard({ short, onAction, onChange }: { short: ShortDetail; onActio
       </p>
       {short.render.error_message && short.status === "failed" ? (
         <details className="mt-2 text-small text-subtle">
-          <summary className="cursor-pointer text-muted">Details</summary>
+          <summary className="inline-flex cursor-pointer items-center text-muted pointer-coarse:min-h-11">Details</summary>
           <p className="mt-1 break-words">{short.render.error_message}</p>
         </details>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        {primary && (primary.action === "publish" || primary.action === "fix_publish") && short.edit_id ? (
-          <PublishToYouTube editId={short.edit_id} editName={short.title} label={primary.label} variant="primary" onClose={onChange} />
-        ) : primary ? (
+        {primary ? (
           <Button onClick={() => onAction(primary.action)}>
             {Icon ? <Icon aria-hidden="true" /> : null}
             {primary.label}
@@ -271,7 +269,17 @@ export function ShortDetailView() {
       </>
     );
   }
-  const onAction = (action: ShortAction) => run(short, action);
+  const onAction = (action: ShortAction) => {
+    if ((action === "publish" || action === "fix_publish") && short.kind === "short") {
+      // Publishing happens in place, in the panel below: bring it into view and focus its action.
+      const panel = document.getElementById("publishing");
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      panel?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      panel?.querySelector<HTMLElement>("[data-publish-action]")?.focus({ preventScroll: true });
+      return;
+    }
+    run(short, action);
+  };
   return (
     <>
       <PageHeader title={short.title} back={{ href: "/shorts", label: "Shorts" }} description={`${short.kind === "draft" ? "Draft" : "Short"} from ${short.project.name}`} />
@@ -280,7 +288,9 @@ export function ShortDetailView() {
           <Preview short={short} />
         </div>
         <div className="space-y-6">
-          <StatusCard short={short} onAction={onAction} onChange={() => void poll()} />
+          <StatusCard short={short} onAction={onAction} />
+          {/* A new publishing state (an upload finished, a retry started) reloads the panel. */}
+          <PublishingPanel key={short.publish.state} short={short} onChange={() => void poll()} />
           <Provenance short={short} />
           <Versions short={short} />
         </div>
