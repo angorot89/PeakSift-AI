@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
+import { PerformancePanel } from "@/components/app/shorts/performance-panel";
 import { PublishingPanel } from "@/components/app/shorts/publishing-panel";
 import { previewAt, previewSrc, useShortAction } from "@/components/app/shorts/short-card";
 import { ErrorState } from "@/components/app/states";
@@ -278,6 +279,11 @@ export function ShortDetailView() {
       panel?.querySelector<HTMLElement>("[data-publish-action]")?.focus({ preventScroll: true });
       return;
     }
+    if (action === "performance" && document.getElementById("performance")) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById("performance")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      return;
+    }
     run(short, action);
   };
   return (
@@ -292,6 +298,7 @@ export function ShortDetailView() {
           {/* A new publishing state (an upload finished, a retry started) reloads the panel. */}
           <PublishingPanel key={short.publish.state} short={short} onChange={() => void poll()} />
           <Provenance short={short} />
+          <PerformancePanel short={short} />
           <Versions short={short} />
         </div>
       </div>

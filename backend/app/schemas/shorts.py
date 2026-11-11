@@ -6,6 +6,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
+from app.schemas.performance import AnalyticsAccessRead
+
 
 class ShortProject(BaseModel):
     id: uuid.UUID
@@ -112,3 +114,5 @@ class ShortDetailRead(ShortRead):
     versions: list[ShortVersionRead]
     render: ShortRender
     auto_edit_plan_id: uuid.UUID | None
+    # Whether performance can be shown for this creator (and whether it is simulated).
+    analytics: AnalyticsAccessRead

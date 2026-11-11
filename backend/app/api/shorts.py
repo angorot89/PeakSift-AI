@@ -11,6 +11,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DbSession
+from app.api.performance import analytics_access
 from app.core.config import get_settings
 from app.schemas.shorts import ShortDetailRead, ShortsLibraryRead
 from app.services import shorts_library
@@ -28,4 +29,4 @@ def short(short_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> dict
     found = shorts_library.detail(db, current_user.id, short_id, get_settings())
     if found is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short not found")
-    return found
+    return {**found, "analytics": analytics_access(db, current_user.id)}

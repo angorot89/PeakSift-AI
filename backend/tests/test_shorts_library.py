@@ -299,3 +299,13 @@ def test_the_library_costs_the_same_queries_for_one_short_or_many(client, db_ses
     statements.clear()
     assert len(client.get("/shorts").json()["shorts"]) == 8
     assert len(statements) == one
+
+
+def test_a_short_says_whether_performance_can_be_shown(client, db_session):
+    sign_up(client, "access@example.com")
+    edit = version(db_session, ready_clip(db_session, "access@example.com")["clip"])
+    analytics = client.get(f"/shorts/{edit.id}").json()["analytics"]
+    # No YouTube connection, and analytics switched off on this server: nothing to show.
+    assert analytics["connected"] is False and analytics["analytics_access"] is False
+    assert set(analytics) == {"enabled", "connected", "connection_status", "analytics_access",
+                              "simulated"}  # fmt: skip
