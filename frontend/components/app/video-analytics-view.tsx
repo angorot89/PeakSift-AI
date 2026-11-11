@@ -57,8 +57,10 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3">
       <dt className="text-xs text-subtle">{label}</dt>
-      <dd className="tabular mt-1 text-xl font-semibold text-foreground">{value}</dd>
-      {note ? <p className="mt-0.5 text-caption text-subtle">{note}</p> : null}
+      <dd className="mt-1">
+        <span className="tabular block text-xl font-semibold text-foreground">{value}</span>
+        {note ? <span className="mt-0.5 block text-caption text-subtle">{note}</span> : null}
+      </dd>
     </div>
   );
 }
@@ -133,7 +135,7 @@ export function VideoAnalyticsView() {
           title="Early windows"
           description="The same early windows for every short, in YouTube's reporting days from the day of publication (so “day of publication” is roughly the first 24 hours). Only complete windows are compared with your other shorts."
         >
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Early windows (scrolls sideways)">
             <table className="w-full min-w-[520px] text-left text-sm">
               <caption className="sr-only">Early windows</caption>
               <thead className="text-xs text-subtle">
@@ -194,7 +196,7 @@ export function VideoAnalyticsView() {
                   YouTube changed how views are counted during this period; each day below shows the definition in force. Engaged views kept one definition throughout.
                 </p>
               ) : null}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Daily figures (scrolls sideways)">
                 <table className="w-full min-w-[560px] text-left text-sm">
                   <caption className="sr-only">Daily figures</caption>
                   <thead className="text-xs text-subtle">

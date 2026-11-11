@@ -9,7 +9,10 @@ import {
   matchesSearch,
   menuActions,
   primaryAction,
+  performanceFreshness,
+  performanceTotals,
   publishingView,
+  relatedInsights,
   type ShortItem,
   type ShortStatus,
   statusDetail,
@@ -185,5 +188,33 @@ describe("the publishing panel", () => {
     const view = publishingView(short({ status: "on_youtube" }), connected, job({ status: "uploaded", completed_at: "2026-11-10T00:00:00Z" }));
     assert.equal(view.pill.label, "On YouTube");
     assert.equal(view.publishedOn, "uploaded");
+  });
+});
+
+describe("the Short's performance", () => {
+  const ready = { enabled: true, connected: true, connection_status: "connected", analytics_access: true, simulated: false };
+  it("says why there are no figures, or how fresh they are", () => {
+    assert.match(performanceFreshness({ ...ready, enabled: false }, null), /isn't available/);
+    assert.match(performanceFreshness({ ...ready, analytics_access: false }, null), /Analytics not connected/);
+    assert.match(performanceFreshness({ ...ready, connection_status: "needs_reconnect" }, null), /Reconnect/);
+    assert.match(performanceFreshness(ready, { processed_through: null, counters_observed_at: null, daily: [] }), /Waiting for YouTube data/);
+    assert.match(performanceFreshness(ready, { processed_through: "2026-10-20", counters_observed_at: null, daily: [] }), /^Updated through Oct 20/);
+  });
+  it("adds up only what YouTube reported", () => {
+    const day = (date: string, w: number | null, s: number | null) => ({ date, watch_time_seconds: w, subscribers_gained: s });
+    const none = performanceTotals({ processed_through: null, counters_observed_at: null, daily: [day("2026-10-01", null, null)] });
+    assert.equal(none.watchTime, "—");
+    assert.equal(none.subscribers, "—");
+    const days = Array.from({ length: 9 }, (_, i) => day(`2026-10-${String(i + 1).padStart(2, "0")}`, 600, i === 0 ? null : 1));
+    const totals = performanceTotals({ processed_through: "2026-10-09", counters_observed_at: null, daily: days });
+    assert.equal(totals.watchTime, "1 h 30 min");
+    assert.equal(totals.subscribers, "8");
+    assert.equal(totals.firstWeek.size, 7);
+    assert.ok(totals.firstWeek.has("2026-10-07") && !totals.firstWeek.has("2026-10-08"));
+  });
+  it("shows only observed patterns that include this Short", () => {
+    const insight = (id: string, group: string[], dismissed = false) => ({ id, statement: id, dismissed, group: group.map((g) => ({ id: g })), comparison: [] });
+    const found = relatedInsights({ insights: [insight("a", ["c1", "c2"]), insight("b", ["c3"]), insight("c", ["c1"], true)] }, "c1");
+    assert.deepEqual(found.map((i) => i.id), ["a"]);
   });
 });
