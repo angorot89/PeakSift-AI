@@ -1,11 +1,12 @@
 // Pure navigation rules (no React): the global destinations, the sections inside a project,
 // and which one a path belongs to. Unit-tested with node --test.
 
-export type GlobalKey = "home" | "projects" | "analytics" | "brand" | "settings";
+export type GlobalKey = "home" | "projects" | "shorts" | "analytics" | "brand" | "settings";
 
 export const GLOBAL_NAV: { key: GlobalKey; href: string; label: string }[] = [
   { key: "home", href: "/home", label: "Home" },
   { key: "projects", href: "/projects", label: "Projects" },
+  { key: "shorts", href: "/shorts", label: "Shorts" },
   { key: "analytics", href: "/analytics", label: "Analytics" },
   { key: "brand", href: "/brand", label: "Brand Studio" },
 ];
@@ -31,6 +32,7 @@ export function activeGlobal(pathname: string): GlobalKey | null {
   if (pathname === "/home" || pathname.startsWith("/home/")) return "home";
   if (pathname === "/morocco" || pathname.startsWith("/morocco/")) return "home"; // Morocco Mode extends Home
   if (pathname === "/projects" || pathname.startsWith("/projects/")) return "projects";
+  if (pathname === "/shorts" || pathname.startsWith("/shorts/")) return "shorts";
   if (pathname === "/analytics" || pathname.startsWith("/analytics/")) return "analytics";
   if (pathname === "/brand" || pathname.startsWith("/brand/")) return "brand";
   if (pathname === "/settings" || pathname.startsWith("/settings/")) return "settings";
