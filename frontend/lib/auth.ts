@@ -4,6 +4,8 @@ export type User = {
   id: string;
   email: string;
   created_at: string;
+  /** Where new projects are made for by default ("global" or a market such as "ma"). */
+  default_market?: string;
 };
 
 export type Credentials = { email: string; password: string };

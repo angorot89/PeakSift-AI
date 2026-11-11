@@ -36,6 +36,15 @@ class UserRead(BaseModel):
     id: uuid.UUID
     email: str
     created_at: datetime
+    # Where new projects are made for by default ("global" or a market such as "ma").
+    default_market: str = "global"
+
+
+class PreferencesUpdate(BaseModel):
+    """The creator's preferences. Changing the default market never changes existing projects
+    or Shorts."""
+
+    default_market: str | None = None
 
 
 class SessionRead(BaseModel):

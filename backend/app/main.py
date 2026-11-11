@@ -21,6 +21,7 @@ from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
 from app.api.copilot import router as copilot_router
 from app.api.health import router as health_router
+from app.api.markets import router as markets_router
 from app.api.performance import router as performance_router
 from app.api.projects import router as projects_router
 from app.api.publish_jobs import edit_router as publish_edit_router
@@ -69,6 +70,7 @@ ROUTERS = (
     performance_router,
     workspace_router,
     shorts_router,
+    markets_router,
     brand_router,
     copilot_router,
 )
