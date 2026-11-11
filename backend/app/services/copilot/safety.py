@@ -57,6 +57,9 @@ _GENERALIZATION = re.compile(
     r"only|usually|generally|typically|sont|aiment|adorent|préfèrent|détestent|veulent|"
     r"toujours|jamais)\b"
     rf"|\b(?:all|most|every|tous les|la plupart des)\s+{_GROUP}"
+    # Audience claims: "may appeal to Moroccans", "popular among Arab viewers".
+    rf"|\b(?:appeal\w*|resonat\w*|relatable|popular|plaire|parler)\s+(?:to|with|among|aux?)\s+"
+    rf"{_GROUP}"
     # Arabic script: "the Moroccans / Arabs / Muslims" + a Darija or Arabic verb or adverb.
     r"|(?:^|\s)(?:كل\s+)?(?:المغاربة|العرب|المسلمين|المسلمون|الأمازيغ)\s+"
     r"(?:ك\w+|ي\w+|دايما|ديما|عمرهم|ما\s*\w+|كلهم|بزاف)",

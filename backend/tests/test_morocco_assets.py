@@ -125,3 +125,21 @@ def test_labels_are_owner_scoped_and_errors_never_echo_what_was_sent(client, tmp
     sign_up(client, "labels-other@example.com")
     assert label(client, project, pic["id"], market="global").status_code == 404
     assert client.get("/markets/ma/assets", params={"kind": "visual"}).json()["assets"] == []
+
+
+def test_the_creators_category_and_place_count_like_tags():
+    """V1.8 journey: a photo labelled Café · Casablanca, named casa-cafe-morning.jpg with no
+    tags, was not found by "Casablanca café". The creator's own labels now count like tags."""
+    from types import SimpleNamespace
+
+    from app.services.broll.matching import MIN_SCORE, AssetTerms, match_score
+
+    def asset(**labels):
+        return SimpleNamespace(id="a", display_name="casa-cafe-morning.jpg", tags=[],
+                               description=None, **labels)  # fmt: skip
+
+    labelled = AssetTerms.of(asset(category="cafe", location="Casablanca"))
+    assert match_score("Casablanca café", labelled) >= MIN_SCORE
+    plain = AssetTerms.of(asset(category=None, location=None))
+    assert match_score("Casablanca café", plain) < MIN_SCORE  # unchanged without labels
+    assert match_score("software dashboard", labelled) == 0

@@ -225,9 +225,10 @@ def to_arabic(text: str) -> str:
     out = []
     for word in text.lower().split():
         i, letters = 0, []
+        spelled = any(ch.isalpha() for ch in word)  # "3lach" spells with digits; "2" is a number
         while i < len(word):
             for latin, arabic in _TO_ARABIC:
-                if word.startswith(latin, i) and not (latin.isdigit() and word.isdigit()):
+                if word.startswith(latin, i) and not (latin.isdigit() and not spelled):
                     letters.append(arabic)
                     i += len(latin)
                     break

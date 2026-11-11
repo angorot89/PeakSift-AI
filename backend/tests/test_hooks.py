@@ -143,3 +143,9 @@ def test_the_api_offers_transcript_ideas_and_asked_for_languages(client, db_sess
     client.cookies.clear()
     sign_up(client, "nothooks@example.com")
     assert client.get(base).status_code == 404
+
+
+def test_numbers_stay_numbers_when_spelling_darija_in_arabic_script():
+    """V1.8 quality set: "part 2?" became "بارت ء؟" — a number is not a letter."""
+    assert hooks.to_arabic("wach nzidou part 2?").endswith(" 2؟")
+    assert hooks.to_arabic("3lach") == "علاش"  # digits inside a word still spell

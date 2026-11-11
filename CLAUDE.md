@@ -16,8 +16,8 @@ Long-term:
 ## Global + Morocco Mode
 
 - **Global** is the base experience, available to everyone.
-- **Morocco Mode** (future) *extends* Global — it is not a separate app. Morocco Mode users keep all Global tools and libraries, plus: Darija-aware AI analysis, Moroccan humor and cultural context, Moroccan sound effects and creator assets, local memes/reactions, Moroccan caption styles, Morocco-specific clip suggestions, and local trend/context intelligence.
-- **Do not implement Morocco Mode** until its milestone is explicitly started. Only its UI architecture exists, as a preview behind `NEXT_PUBLIC_MOROCCO_MODE_PREVIEW` (`lib/morocco.ts`, `/morocco`, `/morocco/kit`): every Moroccan capability is "Not available yet". Never show invented Darija hooks, sounds, trends, assets or figures; a capability turns on only with a real data source.
+- **Morocco Mode** (V1.8) *extends* Global — it is not a separate app and never hides a Global tool, template or asset. It adds only what is real: Darija hooks from the creator's own words, curated Morocco formats on existing settings, the creator's own Moroccan visuals and sounds (local-first, Global kept), market-aware Auto Edit and Ask PeakSift answers (see [docs/morocco-mode.md](docs/morocco-mode.md)). Market (`global`/`ma`) and content language are separate.
+- Never show invented Darija, sounds, trends, places, assets, figures or audience claims; nothing is "trending" (there is no trend source — `MarketTrendProvider` is documentation only). Do not add other markets, trend sources or model-written Darija until explicitly instructed.
 
 ## Current state
 
@@ -88,8 +88,8 @@ templates, hardening and a real-render release gate; see [docs/brand-studio.md](
 primitives (`VideoFrame`, `PeakArt`, tinted status pills), a new app shell, Home and the project
 workspace (creator workflow, moment cards with real frames), the editor (Template/Brand chips, a
 Brand tool), Brand Studio library cards, Ask PeakSift tiles and idea cards, creator analytics, a
-feature-gated **Morocco Mode preview** (UI architecture only — no Moroccan data, every capability
-"Not available yet") and a 330/330 browser audit; see
+feature-gated **Morocco Mode preview** (UI architecture only; superseded by V1.8) and a 330/330
+browser audit; see
 [docs/creator-experience.md](docs/creator-experience.md) and [docs/design-system.md](docs/design-system.md).
 
 **Visual timeline & editor pass: implementation complete locally, pending CI/merge/release**
@@ -110,6 +110,17 @@ connect-and-return, real stages and safe retry, and performance from V1.4 analyt
 project, Analytics, the editor and the next step leading to it, phones and accessibility; see
 [docs/shorts-library.md](docs/shorts-library.md).
 
+**V1.8 Morocco Mode: implementation complete locally, pending CI/merge/release** (stacked PRs
+#265–#274 on top of the unmerged #264; not merged, not tagged): markets and content languages
+(`global`/`ma`, creator default, per project, frozen in each Short), hedged language detection
+with Darija markers, grounded hook ideas (the clip's own lines; Darija across scripts by
+transliteration only; the local model rewrites only French ↔ English), seven curated Morocco
+formats, creator-labelled assets (origin with licence, market, category, location) with
+local-first search inside strength tiers, market-aware Auto Edit, Ask PeakSift's own Morocco
+answers with a stereotype screen, the live `/morocco` and Creator Kit, and the release gates
+(`scripts/morocco_acceptance.py`, `scripts/darija_quality.py`); see
+[docs/morocco-mode.md](docs/morocco-mode.md).
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,
@@ -117,7 +128,7 @@ audience demographics, competitor or cross-creator benchmarking, scraping), A/B 
 automatic title changes, collaboration, billing, custom model training,
 stock media, internet image
 search or generated imagery, image generation or editing, video generation, facial identity recognition, OCR, zoom/pan or keyframed visuals,
-split screen, speaker diarization or active-speaker detection, generic object tracking, dynamic zoom, keyframe/timeline editor, manual caption timing or per-word positioning, custom fonts, a graphic design tool or motion graphics, template marketplaces or generated branding, transitions beyond a fade, music or sound-effect libraries, generative audio, stem separation, beat-synced editing, a multitrack/DAW timeline, publishing to platforms other than YouTube, scheduled or multi-platform publishing, comments, thumbnails, editing or deleting published videos, Kubernetes or multi-region deployment, Morocco Mode, payments) until explicitly instructed.
+split screen, speaker diarization or active-speaker detection, generic object tracking, dynamic zoom, keyframe/timeline editor, manual caption timing or per-word positioning, custom fonts, a graphic design tool or motion graphics, template marketplaces or generated branding, transitions beyond a fade, music or sound-effect libraries, generative audio, stem separation, beat-synced editing, a multitrack/DAW timeline, publishing to platforms other than YouTube, scheduled or multi-platform publishing, comments, thumbnails, editing or deleting published videos, Kubernetes or multi-region deployment, other markets, market trends or trend sources, Darija written by a model, payments) until explicitly instructed.
 
 ## Stack (as built)
 
@@ -149,7 +160,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   sort, actions, publishing and performance views), `scripts/shorts_acceptance.py` (read-only
   release gate)
 - Editor timeline: `frontend/lib/timeline.ts` (scale, items, drag, snapping, sync, render state; unit-tested), `lib/reveal.ts`, `components/app/editor/timeline/` (`timeline.tsx`, `tracks.tsx`), `backend/scripts/timeline_acceptance.py` (real-render gate)
-- Visual shell and primitives: `app/globals.css` (tokens), `components/ui/` (`video-frame.tsx`, `peak-art.tsx`, `status-pill.tsx`), `components/app/app-shell.tsx`, `shell-search.tsx`, `page-header.tsx`; Morocco Mode preview `lib/morocco.ts`, `components/app/morocco/`
+- Visual shell and primitives: `app/globals.css` (tokens), `components/ui/` (`video-frame.tsx`, `peak-art.tsx`, `status-pill.tsx`), `components/app/app-shell.tsx`, `shell-search.tsx`, `page-header.tsx`
 - Creator Copilot: `app/models/copilot.py` (`CopilotThread`, `CopilotMessage`),
   `app/services/copilot/` (context, history, prompt, contract, provider, answers, safety, ideas,
   actions, service), `app/services/next_action.py`, `app/services/strategy.py`,
@@ -163,6 +174,14 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   (real-render release gate); frontend `/brand`, `components/app/brand/`,
   `components/app/editor/brand-strip.tsx`, `brand-logo-layer.tsx`, `lib/brand.ts`,
   `lib/brand-rules.ts`, `lib/template-rules.ts`
+- Morocco Mode: `app/services/markets.py` (market profiles, `snapshot`), `language.py` (hedged
+  detection, matching-only folding), `hooks.py` (transcript ideas, transliteration, reliable-pair
+  rewrites, `check`), `asset_labels.py`, `branding/market_starters.py`, `copilot/market.py`,
+  `app/api/markets.py`, `hooks.py`; `scripts/morocco_acceptance.py` (real-model, real-render
+  release gate), `scripts/darija_quality.py` (manual set); frontend `/morocco`, `/morocco/kit`,
+  `components/app/morocco/`, `editor/hook-ideas.tsx`, `project/project-market.tsx`,
+  `project/project-sounds.tsx`, `asset-labels-form.tsx`, `lib/morocco.ts`, `lib/markets.ts`,
+  `lib/hooks*.ts`, `lib/asset-labels.ts`
 - Audio & sound design: `app/models/audio_asset.py`, `app/services/audio_assets.py` (upload validation, probing, waveform), `app/services/audio_mix/` (config, plan, ducking, loudness, mixer); user-supplied audio only — never commit audio files or fetch audio from the internet; test audio is generated with FFmpeg
 
 ## Conventions
@@ -216,6 +235,16 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   (no disabled menus); nothing publishes without the creator's click; the connect return address
   must pass `safeReturnPath`. Figures only as reported ("—" otherwise). Library queries stay a
   fixed number of statements (tested).
+- Morocco Mode: market and language are separate; a market's facts appear in plan
+  fingerprints, Copilot views, provenance and search order only when set (Global unchanged).
+  Darija reaches a creator only as their own words — verbatim, or transliterated between scripts
+  and labelled "check the spelling"; the model never writes Darija and rewrites only reliable
+  pairs, each result checked. Formats are curated (never "trending"); assets carry the creator's
+  origin (licensed needs its licence), market, category and a location from the market's list —
+  never guessed from pixels. Local first only *within* a strength tier; Auto Edit places strong
+  matches only. Ask PeakSift answers market facts itself, never speaks for an audience, and
+  `safety.drop_generalizations` removes stereotypes. Right-to-left creator text uses
+  `dir="auto"`. No flags or national colours; the mode is said in words.
 - Brands and templates are preferences; renders read only the edit snapshot. An edit's `brand`
   section appears only when used (old fingerprints unchanged); plans freeze the template version
   and brand, and a template or brand change never touches an existing plan or edit. Colours are
@@ -230,7 +259,7 @@ split screen, speaker diarization or active-speaker detection, generic object tr
 - Clip rendering: boundaries always come from the persisted candidate, never from the request; re-encode (never `-c copy`); write to the attempt's temp file, validate with ffprobe, rename atomically, and only then mark `ready` in the same commit as `storage_key`. Every pipeline commit checks the fencing token. Clip media is private and served only through the owner-checked Range endpoints.
 - Smart reframing: positions are fractions of the display-oriented source (x right, y down). Detector output is untrusted until `normalize_detection`; "no face" (empty list) and "detector broken" (`DetectorUnavailable`/`DetectorFailure` → failed analysis) must stay distinct. Every tuning value is server configuration in the versioned snapshot. Persisted keyframes are re-validated before rendering and only module-formatted numbers reach the filtergraph. Never load a detector at import or startup, never download or commit model weights, and never describe the feature as speaker detection.
 - Tests: Celery eager mode, mocked speech models, a fake OpenAI client, a fake ONNX session, moto and a live MinIO for S3 (`TEST_S3_*`, required in CI), a mocked YouTube and the deterministic fake metrics provider (`PERFORMANCE_PROVIDER=fake`); CI sets `HF_HUB_OFFLINE=1`, never has an API key or Google credentials, never downloads a model and never calls Google.
-- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/editor-timeline.md`, `docs/shorts-library.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
+- Read `README.md`, `docs/architecture.md`, `docs/clip-detection.md`, `docs/clip-generation.md`, `docs/short-form-editing.md`, `docs/editor-timeline.md`, `docs/shorts-library.md`, `docs/smart-reframing.md`, `docs/dynamic-captions.md`, `docs/audio-sound-design.md`, `docs/broll-visual-enrichment.md`, `docs/auto-edit.md`, `docs/semantic-assets.md`, `docs/performance-analytics.md`, `docs/creator-experience.md`, `docs/design-system.md`, `docs/creator-copilot.md`, `docs/brand-studio.md`, `docs/morocco-mode.md`, `docs/production.md`, `docs/publishing.md`, `docs/youtube-setup.md`, `deploy/README.md`, `backend/README.md` and `frontend/README.md` before changing the corresponding area.
 
 ## Working rules
 

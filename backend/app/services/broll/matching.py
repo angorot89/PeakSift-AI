@@ -6,7 +6,8 @@ on its own it still answers when visual search is off or not ready. No internet,
 
 A suggestion says *what* would help ("toothpick bridge model"); the project's library may
 already hold it. Each asset is described by its name (without the extension, split on
-``-``, ``_``, ``.`` and spaces), its optional description and its tags. A suggestion's
+``-``, ``_``, ``.`` and spaces), its optional description and its tags (since V1.8 with the
+category and place the creator labelled it with). A suggestion's
 subject words (``validation.query_words``) are compared with those words on the same short
 stems grounding uses (``bridge`` ↔ "bridges", ``launch`` ↔ "launched"):
 
@@ -23,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from app.models import VisualAsset
+from app.services.asset_labels import VISUAL_CATEGORIES
 from app.services.broll.grounding import stem
 from app.services.broll.validation import query_words
 from app.services.language import fold
@@ -51,9 +53,14 @@ class AssetTerms:
     @classmethod
     def of(cls, asset: VisualAsset) -> "AssetTerms":
         name = PurePosixPath(asset.display_name).stem
+        # V1.8: the category and place the creator chose are their own labels, so they count
+        # like tags ("Casablanca café" finds a photo labelled Café · Casablanca). Unlabelled
+        # assets match exactly as before.
+        category = getattr(asset, "category", None)
+        labels = [VISUAL_CATEGORIES.get(category, ""), getattr(asset, "location", None) or ""]
         return cls(
             asset_id=str(asset.id),
-            tags=frozenset(s for tag in (asset.tags or []) for s in _stems(str(tag))),
+            tags=frozenset(s for tag in [*(asset.tags or []), *labels] for s in _stems(str(tag))),
             name=frozenset(_stems(" ".join(_SPLIT.split(name)))),
             description=frozenset(_stems(asset.description or "")),
         )

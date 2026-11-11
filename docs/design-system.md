@@ -72,3 +72,12 @@ Previews are the creator's own media: a source frame on project cards and the so
 at each moment's start on moment cards and Continue cards, the rendered Short on Short tiles and
 analytics rows. Ratios are fixed (16:9 projects and moments, 9:16 Shorts); frames load only when
 scrolled into view. No stock or generated photos are committed to imitate the reference pack.
+
+## Markets and right-to-left text
+
+Morocco Mode (V1.8) uses the same tokens and primitives — no flags, zellige, national colours or a
+second theme. The mode is said in words ("Morocco Mode", "Made for: Morocco Mode", "Global library
+included"), local items carry a plain "Local" / "Curated" pill, and Global alternatives are always
+listed right after local ones. Creator text may be Arabic script: transcript lines, moment titles
+and excerpts, hook ideas, the hook field and the caption/hook preview set `dir="auto"` so each line
+takes its own direction (and punctuation) while the layout stays left-to-right.
