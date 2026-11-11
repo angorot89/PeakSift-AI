@@ -159,7 +159,7 @@ export function PublishingPanel({ short, onChange }: { short: ShortDetail; onCha
                 : "Review the details and publish again."}
               {job?.error_message ? (
                 <details className="mt-1.5">
-                  <summary className="inline-flex cursor-pointer items-center text-small pointer-coarse:min-h-11">Details</summary>
+                  <summary className="inline-flex cursor-pointer items-center text-small pointer-coarse:min-h-11 pointer-coarse:min-w-11">Details</summary>
                   <p className="mt-1 text-small break-words">{job.error_message}</p>
                 </details>
               ) : null}

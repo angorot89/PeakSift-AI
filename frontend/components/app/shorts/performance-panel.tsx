@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Lightbulb } from "lucide-react";
+import { BarChart3, Lightbulb, Link2 } from "lucide-react";
 import { useCallback } from "react";
 import { DailyChart } from "@/components/app/analytics/daily-chart";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -16,7 +16,7 @@ import {
   positionText,
   type VideoPerformanceDetail,
 } from "@/lib/performance";
-import { analyticsHref, performanceFreshness, performanceTotals, relatedInsights, type ShortDetail } from "@/lib/shorts";
+import { analyticsHref, analyticsReady, performanceFreshness, performanceTotals, relatedInsights, type ShortDetail } from "@/lib/shorts";
 import { useApi } from "@/lib/use-api";
 
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -106,12 +106,20 @@ export function PerformancePanel({ short }: { short: ShortDetail }) {
       title="Performance"
       description={freshness}
       actions={
-        contentId ? (
-          <ButtonLink href={analyticsHref(contentId)} variant="secondary" size="sm">
-            <BarChart3 aria-hidden="true" />
-            Full analytics
-          </ButtonLink>
-        ) : null
+        <>
+          {short.analytics.enabled && !analyticsReady(short.analytics) ? (
+            <ButtonLink href="/settings#youtube" variant="secondary" size="sm">
+              <Link2 aria-hidden="true" />
+              Connect analytics
+            </ButtonLink>
+          ) : null}
+          {contentId ? (
+            <ButtonLink href={analyticsHref(contentId)} variant="secondary" size="sm">
+              <BarChart3 aria-hidden="true" />
+              Full analytics
+            </ButtonLink>
+          ) : null}
+        </>
       }
     >
       {!contentId ? (

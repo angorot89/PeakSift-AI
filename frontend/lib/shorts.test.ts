@@ -196,7 +196,12 @@ describe("the Short's performance", () => {
   it("says why there are no figures, or how fresh they are", () => {
     assert.match(performanceFreshness({ ...ready, enabled: false }, null), /isn't available/);
     assert.match(performanceFreshness({ ...ready, analytics_access: false }, null), /Analytics not connected/);
-    assert.match(performanceFreshness({ ...ready, connection_status: "needs_reconnect" }, null), /Reconnect/);
+    // History collected before stays, and says so.
+    assert.equal(
+      performanceFreshness({ ...ready, analytics_access: false }, { processed_through: "2026-11-09", counters_observed_at: null, daily: [] }),
+      "Analytics not connected. Showing what was collected through Nov 9.",
+    );
+    assert.match(performanceFreshness({ ...ready, connection_status: "needs_reconnect" }, null), /paused: reconnect YouTube/);
     assert.match(performanceFreshness(ready, { processed_through: null, counters_observed_at: null, daily: [] }), /Waiting for YouTube data/);
     assert.match(performanceFreshness(ready, { processed_through: "2026-10-20", counters_observed_at: null, daily: [] }), /^Updated through Oct 20/);
   });
