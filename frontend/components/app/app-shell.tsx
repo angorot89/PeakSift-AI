@@ -12,6 +12,7 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
+  Smartphone,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import { useStoredFlag } from "@/lib/use-stored-flag";
 const ICONS: Record<GlobalKey, LucideIcon> = {
   home: Home,
   projects: FolderOpen,
+  shorts: Smartphone,
   analytics: BarChart3,
   brand: Palette,
   settings: Settings,
