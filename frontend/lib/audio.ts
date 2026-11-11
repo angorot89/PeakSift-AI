@@ -16,6 +16,12 @@ export type AudioAsset = {
   codec: string;
   container: string;
   created_at: string;
+  /** V1.8 labels (absent from older responses). */
+  origin?: string;
+  license_note?: string | null;
+  market?: string;
+  category?: string | null;
+  location?: string | null;
 };
 
 /** Peak amplitude per bucket, 0-100 % of full scale, evenly spread over the duration. */
@@ -31,6 +37,9 @@ export type AudioUploadLimits = {
 const base = (projectId: string) => `/projects/${projectId}/audio-assets`;
 
 export const listAudio = (projectId: string) => apiFetch<AudioAsset[]>(base(projectId));
+/** Label a sound (origin, market, category); the file never changes. */
+export const updateAudio = (projectId: string, assetId: string, labels: Record<string, unknown>) =>
+  apiFetch<AudioAsset>(`${base(projectId)}/${assetId}`, { method: "PATCH", body: JSON.stringify(labels) });
 
 export const getWaveform = (projectId: string, assetId: string) =>
   apiFetch<AudioWaveform>(`${base(projectId)}/${assetId}/waveform`);
