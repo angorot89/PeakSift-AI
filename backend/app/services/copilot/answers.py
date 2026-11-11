@@ -33,6 +33,7 @@ import re
 from app.services.copilot.branding import branding_answer
 from app.services.copilot.context import CopilotContext
 from app.services.copilot.ideas import IDEA_WORDS
+from app.services.copilot.market import market_answer
 
 WHAT_NEXT = re.compile(
     r"\bwhat\b[^?]{0,40}\b(do|work on|finish)\b[^?]{0,20}\b(next|now|first)\b"
@@ -353,6 +354,9 @@ def own_answer(context: CopilotContext, text: str, wants_ideas: bool) -> tuple[s
         return "none", INSTRUCTIONS_ANSWER
     if ACT.search(text):
         return "next_step", ACT_ANSWER
+    local = market_answer(context.view, text)
+    if local is not None:
+        return local
     branded = branding_answer(context.view, text, has_clip=current_clip(context) is not None)
     if branded is not None:
         return branded
