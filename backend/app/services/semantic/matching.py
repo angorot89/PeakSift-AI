@@ -63,8 +63,11 @@ def match_queries(
     settings: Settings,
     *,
     limit: int = MAX_SUGGESTION_MATCHES,
+    local_market: str | None = None,
 ) -> QueryMatches:
-    """Hybrid matches of each query among ``assets`` (all of one project)."""
+    """Hybrid matches of each query among ``assets`` (all of one project). With
+    ``local_market``, assets local to it come first within a strength tier (a strong Global match
+    still ranks above a weaker local one)."""
     queries = list(dict.fromkeys(queries))
     identity = configured_identity(settings)
     thresholds = thresholds_for(identity)
@@ -89,9 +92,9 @@ def match_queries(
             visual = {}
     return QueryMatches(
         {
-            query: rank_assets(query, assets, visual.get(query, {}), thresholds if used else None)[
-                :limit
-            ]
+            query: rank_assets(
+                query, assets, visual.get(query, {}), thresholds if used else None, local_market
+            )[:limit]
             for query in queries
         },
         used,

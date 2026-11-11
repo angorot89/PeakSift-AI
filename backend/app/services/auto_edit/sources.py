@@ -45,6 +45,7 @@ from app.models import (
     TranscriptionStatus,
     VisualAsset,
 )
+from app.services import markets
 from app.services.auto_edit.config import AutoEditRequest
 from app.services.auto_edit.contract import (
     MUSIC_HANDLE,
@@ -94,6 +95,9 @@ class Gathered:
     context: AutoEditContext
     broll_method: str | None  # local_ai / keyword / keyword_fallback, when suggestions exist
     music_missing: bool  # the creator chose a track that is no longer available
+    # V1.8: the market snapshot (Morocco Mode) and which visual assets are local to it.
+    market: dict | None = None
+    local_assets: frozenset[str] = frozenset()
 
 
 def _present(storage: StorageProvider, key: str | None) -> bool:
@@ -225,7 +229,12 @@ def gather(
     present: dict[str, bool] = {}
     options: list[BrollOption] = []
     suggestion_ids: dict[str, str] = {}
-    found = match_queries(db, project_id, [s.query for s in suggestions], library, settings)
+    project = clip.video.project
+    profile = markets.market(project.market)
+    local = profile.code if profile.is_local else None
+    found = match_queries(
+        db, project_id, [s.query for s in suggestions], library, settings, local_market=local
+    )
     for index, suggestion in enumerate(suggestions, start=1):
         handle = f"suggestion_{index}"
         suggestion_ids[handle] = str(suggestion.id)
@@ -384,14 +393,18 @@ def gather(
                 duration=asset.duration_seconds,
                 has_alpha=bool(asset.has_alpha),
                 semantic=semantic_fact(asset),
+                market=asset.market if asset.market != "global" else None,
             )
             for asset in library
         ),
         audio_assets=tuple(audio_facts),
+        market=local,
     )
     return Gathered(
         sources=sources,
         context=context,
         broll_method=broll_method(analysis) if analysis is not None else None,
         music_missing=music_missing,
+        market=markets.snapshot(project.market, project.content_language),
+        local_assets=frozenset(str(a.id) for a in library if local and a.market == local),
     )
