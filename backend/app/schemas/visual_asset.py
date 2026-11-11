@@ -44,6 +44,13 @@ class VisualAssetRead(BaseModel):
     tags: list[str]
     created_at: datetime
     visual_search: VisualSearchRead | None = None
+    # V1.8 labels: how the creator may use it, local market, category, location (see
+    # services/asset_labels.py).
+    origin: str = "creator_upload"
+    license_note: str | None = None
+    market: str = "global"
+    category: str | None = None
+    location: str | None = None
 
 
 class VisualMatchRead(BaseModel):
@@ -57,6 +64,8 @@ class VisualMatchRead(BaseModel):
 class VisualSearchHit(BaseModel):
     asset: VisualAssetRead
     match: VisualMatchRead
+    # In a local market's project: the asset is local to that market (shown first in its tier).
+    local: bool = False
 
 
 class VisualSearchResults(BaseModel):
@@ -88,3 +97,8 @@ class VisualAssetUpdate(BaseModel):
         ]
         | None
     ) = None
+    origin: str | None = None
+    license_note: Annotated[str, Field(max_length=600)] | None = None
+    market: str | None = None
+    category: str | None = None
+    location: str | None = None

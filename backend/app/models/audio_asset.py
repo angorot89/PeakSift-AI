@@ -45,6 +45,15 @@ class AudioAsset(Base):
         # The same file uploaded twice for the same purpose in one project is one asset.
         UniqueConstraint("project_id", "kind", "sha256", name="uq_audio_assets_content"),
         CheckConstraint("kind IN ('music', 'sfx')", name="ck_audio_assets_kind"),
+        CheckConstraint(
+            "origin IN ('creator_upload', 'company_owned', 'licensed', 'public_domain', 'cc0')",
+            name="ck_audio_assets_origin",
+        ),
+        CheckConstraint(
+            "origin <> 'licensed' OR (license_note IS NOT NULL AND length(license_note) > 0)",
+            name="ck_audio_assets_license_note",
+        ),
+        CheckConstraint("market IN ('global', 'ma')", name="ck_audio_assets_market"),
         CheckConstraint("length(display_name) > 0", name="ck_audio_assets_display_name"),
         CheckConstraint("file_size > 0", name="ck_audio_assets_file_size"),
         CheckConstraint("duration_seconds > 0", name="ck_audio_assets_duration"),
@@ -76,6 +85,16 @@ class AudioAsset(Base):
 
     # Bounded peak amplitudes (0-100 % of full scale) for a waveform display; never PCM.
     waveform_peaks: Mapped[list[Any]] = mapped_column(JSONB)
+
+    # V1.8 labels (services/asset_labels.py), all chosen by the creator: how they have the right
+    # to use it, whether it is local to a market, a category and — local only — a location.
+    origin: Mapped[str] = mapped_column(
+        String(16), default="creator_upload", server_default="creator_upload"
+    )
+    license_note: Mapped[str | None] = mapped_column(String(300))
+    market: Mapped[str] = mapped_column(String(8), default="global", server_default="global")
+    category: Mapped[str | None] = mapped_column(String(32))
+    location: Mapped[str | None] = mapped_column(String(32))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

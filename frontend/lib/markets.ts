@@ -11,7 +11,35 @@ export type MarketProfile = {
   locations: string[];
 };
 
-export type Markets = { markets: MarketProfile[]; content_languages: { code: string; label: string }[] };
+type Labelled = { code: string; label: string }[];
+
+export type Markets = {
+  markets: MarketProfile[];
+  content_languages: Labelled;
+  asset_origins: Labelled;
+  visual_categories: Labelled;
+  audio_categories: Labelled;
+};
+
+/** The creator's assets marked local to a market, across their projects (the Creator Kit). */
+export type KitAsset = {
+  id: string;
+  project: { id: string; name: string };
+  kind: string;
+  display_name: string;
+  duration_seconds: number | null;
+  origin: string;
+  license_note: string | null;
+  market: string;
+  category: string | null;
+  location: string | null;
+  has_thumbnail?: boolean;
+  description?: string;
+  tags?: string[];
+};
+
+export const getLocalAssets = (market: string, kind: "visual" | "audio") =>
+  apiFetch<{ market: string; kind: string; assets: KitAsset[] }>(`/markets/${market}/assets?kind=${kind}`);
 
 export const getMarkets = () => apiFetch<Markets>("/markets");
 

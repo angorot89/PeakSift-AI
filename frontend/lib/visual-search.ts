@@ -24,7 +24,8 @@ export type VisualMatch = {
   best_frame_time: number | null;
 };
 
-export type VisualSearchHit<A> = { asset: A; match: VisualMatch };
+/** `local`: in a local market's project, the asset is local to that market. */
+export type VisualSearchHit<A> = { asset: A; match: VisualMatch; local?: boolean };
 
 export type VisualSearchResults<A> = {
   query: string;
@@ -131,6 +132,17 @@ export function splitByStrength<T extends { match?: Pick<VisualMatch, "strength"
     best: hits.filter((hit) => hit.match?.strength === "strong"),
     more: hits.filter((hit) => hit.match?.strength !== "strong"),
   };
+}
+
+/** In a local market: the strong matches split into local ones and Global ones (each in the
+ * server's order); weaker matches stay below both, so a strong Global match is never buried
+ * under a weaker local one. Without local hits there is nothing to split. */
+export function splitLocal<T extends { local?: boolean; match?: Pick<VisualMatch, "strength"> | null }>(
+  hits: T[],
+): { local: T[]; global: T[]; more: T[] } | null {
+  if (!hits.some((hit) => hit.local)) return null;
+  const { best, more } = splitByStrength(hits);
+  return { local: best.filter((hit) => hit.local), global: best.filter((hit) => !hit.local), more };
 }
 
 /** Whether search by what visuals show can be offered as such (at least one asset is ready). */
