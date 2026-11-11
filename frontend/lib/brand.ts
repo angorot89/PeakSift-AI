@@ -109,11 +109,21 @@ export type Template = {
   config: TemplateSettings;
   version: number;
   is_default: boolean;
+  /** The market it was made for ("global", or "ma" for a Morocco format); works everywhere. */
+  market?: string;
   created_at: string;
   updated_at: string;
 };
 
-export type TemplateStarter = { recipe: TemplateRecipe; label: string; description: string; config: TemplateSettings };
+export type TemplateStarter = {
+  /** A recipe's name, or a curated market format ("ma_vox_pop"). */
+  key: string;
+  market: string;
+  recipe: TemplateRecipe;
+  label: string;
+  description: string;
+  config: TemplateSettings;
+};
 
 export type TemplateInput = {
   name: string;
@@ -122,11 +132,14 @@ export type TemplateInput = {
   brand_profile_id: string | null;
   config: TemplateSettings;
   is_default?: boolean;
+  market?: string;
 };
 
 export const listTemplates = () => apiFetch<Template[]>("/brand/templates");
 export const getTemplate = (id: string) => apiFetch<Template>(`/brand/templates/${id}`);
-export const listTemplateStarters = () => apiFetch<TemplateStarter[]>("/brand/template-starters");
+/** The Global starters; with a market, its curated formats first (Global ones always included). */
+export const listTemplateStarters = (market?: string) =>
+  apiFetch<TemplateStarter[]>(`/brand/template-starters${market && market !== "global" ? `?market=${market}` : ""}`);
 export const createTemplate = (input: TemplateInput) => postJson<Template>("/brand/templates", input);
 export const updateTemplate = (id: string, changes: Partial<TemplateInput>) =>
   apiFetch<Template>(`/brand/templates/${id}`, { method: "PATCH", body: JSON.stringify(changes) });

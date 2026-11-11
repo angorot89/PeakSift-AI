@@ -121,10 +121,11 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [picked, setPicked] = useState(Boolean(templateId) || Boolean(start));
+  const [market, setMarket] = useState("global");
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getCaptionStyles(), getBrandLayout(), listBrands(), listTemplateStarters(), templateId ? getTemplate(templateId) : Promise.resolve(null)])
+    Promise.all([getCaptionStyles(), getBrandLayout(), listBrands(), listTemplateStarters(start?.startsWith("ma_") ? "ma" : undefined), templateId ? getTemplate(templateId) : Promise.resolve(null)])
       .then(([styles, numbers, brandList, starterList, template]) => {
         if (cancelled) return;
         setSpec(styles);
@@ -141,9 +142,17 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
           setMeta(m);
           setSavedMeta(m);
         } else {
-          const starter = starterList.find((s) => s.recipe === start) ?? null;
+          const starter = starterList.find((s) => s.key === start) ?? starterList.find((s) => s.recipe === start) ?? null;
           setSettings(startFrom(starter));
-          setMeta((m) => ({ ...m, recipe: starter?.recipe ?? null, brandId: defaultBrand }));
+          // A curated market format starts named after itself (the creator can rename it).
+          const curated = starter && starter.market !== "global";
+          setMeta((m) => ({
+            ...m,
+            recipe: starter?.recipe ?? null,
+            brandId: defaultBrand,
+            ...(curated ? { name: starter.label, description: starter.description } : {}),
+          }));
+          setMarket(starter?.market ?? "global");
         }
       })
       .catch((failure: unknown) => !cancelled && setLoadError(errorMessage(failure)));
@@ -152,7 +161,7 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
     };
   }, [templateId, start]);
 
-  const starter = starters?.find((s) => s.recipe === meta.recipe)?.config ?? null;
+  const starter = starters?.find((s) => s.recipe === meta.recipe && s.market === "global")?.config ?? null;
   const view = resolved(settings, starter);
   const brand = brands?.find((b) => b.id === meta.brandId) ?? null;
   const dirty = savedMeta === null || !sameSettings(settings, savedSettings) || JSON.stringify(meta) !== JSON.stringify(savedMeta);
@@ -196,6 +205,7 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
       brand_profile_id: meta.brandId,
       config: settings,
       is_default: meta.isDefault,
+      ...(existing ? {} : { market }),
     };
     try {
       const result = existing ? await updateTemplate(existing.id, input) : await createTemplate(input);
