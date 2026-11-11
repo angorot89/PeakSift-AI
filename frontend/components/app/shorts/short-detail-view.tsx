@@ -190,7 +190,7 @@ function StatusCard({ short, onAction }: { short: ShortDetail; onAction: (action
       </p>
       {short.render.error_message && short.status === "failed" ? (
         <details className="mt-2 text-small text-subtle">
-          <summary className="inline-flex cursor-pointer items-center text-muted pointer-coarse:min-h-11">Details</summary>
+          <summary className="inline-flex cursor-pointer items-center text-muted pointer-coarse:min-h-11 pointer-coarse:min-w-11">Details</summary>
           <p className="mt-1 break-words">{short.render.error_message}</p>
         </details>
       ) : null}
@@ -290,7 +290,12 @@ export function ShortDetailView() {
     <>
       <PageHeader title={short.title} back={{ href: "/shorts", label: "Shorts" }} description={`${short.kind === "draft" ? "Draft" : "Short"} from ${short.project.name}`} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
-        <div className="mx-auto w-full max-w-60 sm:max-w-xs lg:sticky lg:top-6 lg:max-w-none">
+        <div
+          className={`mx-auto w-full sm:max-w-xs lg:sticky lg:top-6 lg:max-w-none ${
+            // A still (not yet rendered) stays small on phones so the next step stays in view.
+            short.preview === "short" ? "max-w-60" : "max-w-44"
+          }`}
+        >
           <Preview short={short} />
         </div>
         <div className="space-y-6">

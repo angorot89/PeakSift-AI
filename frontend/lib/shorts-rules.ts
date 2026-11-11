@@ -420,11 +420,18 @@ function reportingDay(iso: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/** Whether new figures can arrive (otherwise the panel offers to connect analytics). */
+export const analyticsReady = (access: ShortAnalyticsAccess | null) =>
+  Boolean(access?.enabled && access.connected && access.analytics_access && access.connection_status === "connected");
+
 /** How fresh the figures are, or why there are none — always one plain line. */
 export function performanceFreshness(access: ShortAnalyticsAccess | null, detail: Detail | null): string {
-  if (!access || !access.enabled) return "Analytics isn't available on this server.";
-  if (!access.connected || !access.analytics_access) return "Analytics not connected. Connect read-only analytics in Settings to see how this Short is doing.";
-  if (access.connection_status !== "connected") return "Analytics paused. Reconnect YouTube in Settings to update it.";
+  const kept = detail?.processed_through ? ` Showing what was collected through ${reportingDay(detail.processed_through)}.` : "";
+  if (!access || !access.enabled) return `Analytics isn't available on this server.${kept}`;
+  if (!access.connected || !access.analytics_access) {
+    return `Analytics not connected.${kept || " Connect read-only analytics in Settings to see how this Short is doing."}`;
+  }
+  if (access.connection_status !== "connected") return `Analytics paused: reconnect YouTube in Settings to update it.${kept}`;
   if (detail?.processed_through) return `Updated through ${reportingDay(detail.processed_through)} (YouTube's processed days; recent days may still change).`;
   return "Waiting for YouTube data. Processed figures usually arrive 2–3 days after publishing.";
 }

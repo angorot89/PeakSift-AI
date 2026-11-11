@@ -7,15 +7,22 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   size = "md",
+  wrap = false,
 }: {
   label: string;
   options: readonly { value: T; label: string; count?: number; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   size?: "sm" | "md";
+  /** Wrap onto a second line instead of scrolling sideways (when every option must stay visible). */
+  wrap?: boolean;
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex max-w-full overflow-x-auto rounded-control border border-border bg-surface-2 p-0.5 [scrollbar-width:none]">
+    <div
+      role="group"
+      aria-label={label}
+      className={`inline-flex max-w-full rounded-control border border-border bg-surface-2 p-0.5 ${wrap ? "flex-wrap" : "overflow-x-auto [scrollbar-width:none]"}`}
+    >
       {options.map((option) => {
         const pressed = option.value === value;
         return (
