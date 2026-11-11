@@ -18,3 +18,13 @@ export const getMarkets = () => apiFetch<Markets>("/markets");
 /** The default market for new projects (never changes existing projects or Shorts). */
 export const setDefaultMarket = (market: string) =>
   apiFetch<User>("/auth/me", { method: "PATCH", body: JSON.stringify({ default_market: market }), headers: { "Content-Type": "application/json" } });
+
+/** A project's content language: the creator's choice (which wins) and a hedged detection. */
+export type ProjectLanguage = {
+  chosen: string;
+  detected: { language: string; confidence: "likely" | "possible"; scripts: string[]; languages: string[]; label: string };
+  /** What PeakSift works with: the choice, else the detection (null when it can't tell). */
+  effective: string | null;
+};
+
+export const getProjectLanguage = (projectId: string) => apiFetch<ProjectLanguage>(`/projects/${projectId}/language`);
