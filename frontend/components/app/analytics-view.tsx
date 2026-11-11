@@ -131,6 +131,14 @@ function VideoRow({
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
+          {video.edit_id ? (
+            <Link
+              href={`/shorts/${video.edit_id}`}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+            >
+              Open Short
+            </Link>
+          ) : null}
           {video.video_url ? (
             <a
               href={video.video_url}

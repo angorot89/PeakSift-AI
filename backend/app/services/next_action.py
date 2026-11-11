@@ -171,17 +171,13 @@ def next_action(p: dict[str, Any]) -> NextAction:
             "upload-failed",
             "A YouTube upload needs attention",
             "Open the Short to see what happened and try again.",
-            routes.editor(pid, ready["clip_id"], edit_id=ready["edit_id"]),
+            routes.short(ready["edit_id"]),
             "attention",
             "Open the Short",
             short_step,
         )
     if published_n["working"] > 0:
-        href = (
-            routes.editor(pid, ready["clip_id"], edit_id=ready["edit_id"])
-            if ready
-            else routes.project(pid, "clips")
-        )
+        href = routes.short(ready["edit_id"]) if ready else routes.project(pid, "clips")
         return NextAction(
             "uploading",
             "Uploading to YouTube",
@@ -196,7 +192,7 @@ def next_action(p: dict[str, Any]) -> NextAction:
             "short-ready",
             "Your Short is ready",
             "Publish it to YouTube or download it.",
-            routes.editor(pid, ready["clip_id"], edit_id=ready["edit_id"]),
+            routes.short(ready["edit_id"]),
             "action",
             "Publish or download",
             short_step,

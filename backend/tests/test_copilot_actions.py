@@ -115,9 +115,7 @@ def test_actions_are_rechecked_when_clicked(client, db_session):
         ],
         page="overview",
     ).answer
-    assert resolve(client, answer.id, 1).json()["href"] == routes.editor(
-        project_id, clip.id, edit_id=edit.id
-    )
+    assert resolve(client, answer.id, 1).json()["href"] == routes.short(edit.id)
     db_session.delete(edit)
     candidate = db_session.get(ClipCandidate, clip.candidate_id)
     candidate.decision = "dismissed"

@@ -2,6 +2,8 @@
 // creator should take, the continue-working cards on Home, and where the project is in the
 // workflow. Facts come from GET /projects/{id}/summary; nothing here invents state.
 
+import type { ShortStatus } from "./shorts-rules.ts";
+
 export type SourceSummary = { id: string; filename: string; status: string; duration_seconds: number | null };
 export type CandidateSummary = {
   id: string;
@@ -24,6 +26,8 @@ export type ShortSummary = {
   duration_seconds: number | null;
   /** YouTube confirmed the upload; never an upload still in flight. */
   published: boolean;
+  /** The Shorts library's one status (lib/shorts-rules.ts puts it into words). */
+  short_status: ShortStatus;
   created_at: string;
   updated_at: string;
 };
