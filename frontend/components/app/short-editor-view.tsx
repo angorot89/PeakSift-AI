@@ -29,6 +29,7 @@ import { CaptionLayer, type HookPreview } from "@/components/app/editor/caption-
 import { CaptionSwitch, LayoutPicker, PositionPicker } from "@/components/app/editor/controls";
 import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from "@/components/app/editor/preview-stage";
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
+import { HookIdeas } from "@/components/app/editor/hook-ideas";
 import { PublishToYouTube } from "@/components/app/editor/publish-dialog";
 import { VersionList } from "@/components/app/editor/versions";
 import { EditorTimeline, VideoTrack } from "@/components/app/editor/timeline/timeline";
@@ -1353,6 +1354,23 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               ) : (
                 <Skeleton className="h-24 rounded-xl" />
               )}
+              <div className="mt-4">
+                <HookIdeas
+                  projectId={project.id}
+                  videoId={clip.video_id}
+                  clipId={clip.id}
+                  market={project.market}
+                  language={project.content_language === "auto" ? null : project.content_language}
+                  onUse={(text) => {
+                    touched.current = true;
+                    if (!hookOn) {
+                      if (captions && hookPosition === position) setHookPosition(position === "top" ? "center" : "top");
+                      setHookOn(true);
+                    }
+                    setHookText(text);
+                  }}
+                />
+              </div>
             </div>
             <div {...toolPanelProps(`${id}-tool`, "visuals", tool === "visuals")} className="focus-visible:outline-none">
               <VisualsPanel
