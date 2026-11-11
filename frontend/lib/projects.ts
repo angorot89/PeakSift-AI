@@ -6,6 +6,9 @@ export type Project = {
   id: string;
   name: string;
   status: ProjectStatus;
+  /** The market its Shorts are made for ("global", "ma") and the language its videos are in. */
+  market: string;
+  content_language: string;
   created_at: string;
   updated_at: string;
 };
@@ -18,7 +21,11 @@ export const isProjectId = (value: string) => UUID_PATTERN.test(value);
 
 export const listProjects = () => apiFetch<Project[]>("/projects");
 export const getProject = (id: string) => apiFetch<Project>(`/projects/${id}`);
-export const createProject = (name: string) => postJson<Project>("/projects", { name });
+export const createProject = (name: string, market?: string) =>
+  postJson<Project>("/projects", market ? { name, market } : { name });
+/** An explicit change of market or language; Shorts already made keep theirs. */
+export const updateProject = (id: string, changes: { market?: string; content_language?: string }) =>
+  apiFetch<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(changes), headers: { "Content-Type": "application/json" } });
 
 export type MediaDeletion = {
   media_files_removed: number;

@@ -9,6 +9,16 @@ ProjectName = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 
 class ProjectCreate(BaseModel):
     name: ProjectName
+    # Optional: the creator's default market and "auto" language when left out.
+    market: str | None = None
+    content_language: str | None = None
+
+
+class ProjectUpdate(BaseModel):
+    """An explicit change by the creator. Existing Shorts keep the market they were made with."""
+
+    market: str | None = None
+    content_language: str | None = None
 
 
 class ProjectRead(BaseModel):
@@ -17,6 +27,8 @@ class ProjectRead(BaseModel):
     id: uuid.UUID
     name: str
     status: str
+    market: str = "global"
+    content_language: str = "auto"
     created_at: datetime
     updated_at: datetime
 
