@@ -83,7 +83,7 @@ export function ShortCard({ item }: { item: ShortItem }) {
   }));
   const youtube = item.publish.platform === "youtube" && (item.status === "published" || item.status === "on_youtube" || item.status === "publishing");
   return (
-    <li className="group/card relative min-w-0">
+    <li className="group/card @container relative min-w-0">
       <Link
         href={shortHref(item.id)}
         aria-label={cardLabel(item)}
@@ -109,22 +109,20 @@ export function ShortCard({ item }: { item: ShortItem }) {
           ) : null}
           {item.duration_seconds ? <FrameTag className="right-2 bottom-2">{clock(item.duration_seconds)}</FrameTag> : null}
         </VideoFrame>
-        <span aria-hidden="true" className="mt-2.5 block">
+        <span aria-hidden="true" className="mt-2.5 block pr-8 pointer-coarse:pr-10">
           <span className="line-clamp-2 text-sm font-medium text-pretty break-words text-foreground">{item.title}</span>
           <span className="mt-0.5 block truncate text-caption text-subtle">{item.project.name}</span>
-          <span className="mt-1 flex items-center gap-1 text-caption text-muted">
-            {youtube ? <CirclePlay className="size-3.5 shrink-0 text-subtle" /> : null}
-            <span className="truncate">{contextLine(item)}</span>
+          <span className="mt-1 flex items-start gap-1 text-caption text-muted">
+            {youtube ? <CirclePlay className="mt-px size-3.5 shrink-0 text-subtle" /> : null}
+            <span className="line-clamp-2">{contextLine(item)}</span>
           </span>
         </span>
       </Link>
-      <Menu
-        label={`Actions for ${item.title}`}
-        trigger={<MoreHorizontal aria-hidden="true" />}
-        items={items}
-        className="absolute top-2 right-2"
-        triggerClassName="inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white backdrop-blur-sm transition-colors hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11 [&_svg]:size-4"
-      />
+      {/* Beside the title, just under the 9:16 frame (100cqw × 16/9 is the frame's height): next
+          to the card link, not inside it, and always visible — no hover needed. */}
+      <div className="absolute top-[calc(100cqw*16/9+0.375rem)] -right-1.5">
+        <Menu label={`Actions for ${item.title}`} trigger={<MoreHorizontal aria-hidden="true" />} items={items} />
+      </div>
     </li>
   );
 }
