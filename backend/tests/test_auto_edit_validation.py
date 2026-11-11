@@ -196,6 +196,20 @@ def test_without_word_timing_captions_use_phrases():
     assert plan.configuration.caption_track_id is None
 
 
+@pytest.mark.parametrize("sentence", [
+    "Selected punchy preset for clear word-synced captions.",
+    "Each spoken word lights up as it is said.",
+    "Highlights the active word for energy.",
+])  # fmt: skip
+def test_phrase_timed_captions_are_never_described_as_word_synced(sentence):
+    plan = validate(context=ctx(caption_track_id=None), explanations__captions=sentence)
+    assert plan.explanations["sections"]["captions"]["reason"] == (
+        "Captions follow the transcript phrases (word timing is not generated yet)."
+    )
+    aligned = validate(explanations__captions=sentence)  # truly word synced: the sentence stays
+    assert aligned.explanations["sections"]["captions"]["reason"] == sentence
+
+
 def test_without_any_timing_captions_are_left_out():
     caps = Capabilities(True, "high", False, False, True, True)
     plan = validate(context=ctx(capabilities=caps, caption_track_id=None))

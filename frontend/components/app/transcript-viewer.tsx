@@ -125,7 +125,7 @@ export function TranscriptViewer({ projectId, videoId, total, footnote }: Props)
               >
                 {formatTimestamp(segment.start)}
               </time>
-              <p className="min-w-0 text-sm leading-relaxed break-words text-foreground/90">{segment.text}</p>
+              <p dir="auto" className="min-w-0 text-sm leading-relaxed break-words text-foreground/90">{segment.text}</p>
             </li>
           ))}
         </ol>

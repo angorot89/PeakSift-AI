@@ -189,6 +189,13 @@ def _layout(proposal, context, recipe, notes) -> tuple[dict[str, Any], dict[str,
     return fields, {"choice": LAYOUT_LABELS[mode], "reason": reason}
 
 
+_WORD_TIMING_CLAIM = re.compile(
+    r"word[- ]?(?:synced|sync|by[- ]word|timed|timing|level|aligned)|\b(?:each|every)\s+"
+    r"(?:spoken\s+)?word|highlight|karaoke",
+    re.IGNORECASE,
+)
+
+
 def _captions(proposal, context, recipe, notes) -> tuple[dict[str, Any], dict[str, str]]:
     caps = context.capabilities
     choice = proposal.captions
@@ -226,6 +233,10 @@ def _captions(proposal, context, recipe, notes) -> tuple[dict[str, Any], dict[st
         if timing == CaptionTiming.ALIGNED_WORD.value
         else "Captions follow the transcript phrases (word timing is not generated yet)."
     )
+    # A planner's sentence about timing must match it: phrase-timed captions are never called
+    # word synced or said to highlight each word (V1.8 QA found exactly that).
+    claims_words = bool(_WORD_TIMING_CLAIM.search(proposal.explanations.captions))
+    consistent = timing == CaptionTiming.ALIGNED_WORD.value or not claims_words
     return (
         {
             "captions_enabled": True,
@@ -236,7 +247,9 @@ def _captions(proposal, context, recipe, notes) -> tuple[dict[str, Any], dict[st
         },
         {
             "choice": f"{preset.title()} captions · {position} · {timing_label}",
-            "reason": _explanation(proposal.explanations.captions, unchanged, server),
+            "reason": _explanation(
+                proposal.explanations.captions, unchanged and consistent, server
+            ),
         },
     )
 

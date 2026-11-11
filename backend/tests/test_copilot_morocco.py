@@ -116,3 +116,35 @@ def test_the_model_is_told_never_to_stereotype():
     assert "Never generalize about people, places, a country, a culture or a religion" in (
         SYSTEM_PROMPT
     )  # fmt: skip
+
+
+GENERALIZATIONS = [
+    "Moroccans love café content.", "Moroccan audiences always watch at night.",
+    "Most Moroccans speak Darija.", "Arab viewers tend to like long intros.",
+    "Les Marocains préfèrent le français.", "المغاربة كيحبو القهوة",
+    "كل المغاربة دايما فالقهوة", "العرب يفضلون الفيديوهات الطويلة",
+]  # fmt: skip
+FACTS = [
+    "Your Moroccan visuals come first.", "You have 1 Moroccan visual (“casa-cafe.jpg”).",
+    "Morocco Mode never changes your language.", "The people in your clip are laughing.",
+    "هاد الفيديو على القهوة ف كازا",
+]  # fmt: skip
+
+
+def test_generalizations_about_people_are_screened_out_facts_stay():
+    from app.services.copilot.safety import drop_generalizations, generalizes
+
+    assert all(generalizes(s) for s in GENERALIZATIONS)
+    assert not any(generalizes(s) for s in FACTS)
+    text = "Moroccans love café content. Your clip opens with a question."
+    assert drop_generalizations(text) == "Your clip opens with a question."
+
+
+def test_a_model_answer_never_reaches_the_creator_with_a_stereotype(client, db_session,
+                                                                    monkeypatch):  # fmt: skip
+    sign_up(client, "copilot-stereo@example.com")
+    project, _ = project_with(db_session, "copilot-stereo@example.com")
+    use(monkeypatch, {"message": "Moroccans always love café stories. Your video asks people "
+                                 "about their favourite café."})  # fmt: skip
+    answer = ask(client, "What is this video about?", "assets", project_id=project.id)
+    assert answer["content"] == "Your video asks people about their favourite café."

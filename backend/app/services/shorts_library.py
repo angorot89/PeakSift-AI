@@ -160,6 +160,14 @@ def _origin(edit: ClipEdit) -> tuple[dict | None, dict | None, bool]:
     )  # fmt: skip
 
 
+def _market(edit: ClipEdit) -> dict | None:
+    """The local market a version was made for (V1.8), as recorded with it; None for Global."""
+    market = (edit.origin or {}).get("market")
+    if not isinstance(market, dict) or not market.get("name") or market.get("code") == "global":
+        return None
+    return {"code": market.get("code"), "name": market["name"]}
+
+
 def _publish_read(
     published: Publication, content: PublishedContent | None, settings: Settings
 ) -> dict[str, Any]:
@@ -309,7 +317,8 @@ def _short_items(db: Session, rows: list[_Row], settings: Settings) -> list[dict
             "duration_seconds": edit.duration_seconds if ready else row.clip.duration_seconds,
             "preview": "short" if ready else ("clip" if row.clip.status == "ready" else None),
             "version": {"number": row.number, "count": row.count},
-            "template": template, "brand": brand, "auto_edit": auto_edit, "plan_ready": False,
+            "template": template, "brand": brand, "market": _market(edit), "auto_edit": auto_edit,
+            "plan_ready": False,
             "publish": _publish_read(published, content, settings),
             "performance": _performance(content, counters.get(content.id) if content else None),
             "created_at": edit.created_at, "updated_at": updated,

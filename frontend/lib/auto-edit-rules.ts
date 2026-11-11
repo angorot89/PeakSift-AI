@@ -16,6 +16,8 @@ export type PlanExplanations = {
   notes: string[];
   /** V1.7: the template (and brand) the plan started from. */
   template?: { id: string; name: string; version: number; brand: string | null; summary: string };
+  /** V1.8: the market the plan was made for, frozen with it. */
+  market?: { code: string; name: string };
 };
 
 /** What a plan was based on, in plain values (never a score). */

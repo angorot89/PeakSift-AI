@@ -108,3 +108,10 @@ export const MODES = [
   { key: "global", market: "global", href: "/home", label: "Global" },
   { key: "morocco", market: "ma", href: "/morocco", label: "Morocco Mode" },
 ] as const;
+
+/** The mode a creator's saved default market stands for (new projects start in it). */
+export const defaultMode = (market: string | null | undefined): (typeof MODES)[number]["key"] =>
+  MODES.find((mode) => mode.market === market)?.key ?? "global";
+
+export const defaultModeLabel = (key: (typeof MODES)[number]["key"]): string =>
+  MODES.find((mode) => mode.key === key)!.label;
