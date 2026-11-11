@@ -1,5 +1,6 @@
 "use client";
 
+import { AssetLabelsForm } from "@/components/app/asset-labels-form";
 import { CheckCircle2, CircleAlert, Film, Image as ImageIcon, Images, Loader, RotateCcw, Search, Trash2, Upload as UploadIcon, UploadCloud, X } from "lucide-react";
 import { type DragEvent, type FormEvent, type ReactNode, useCallback, useId, useMemo, useRef, useState } from "react";
 import { EmptyState, ErrorState } from "@/components/app/states";
@@ -36,6 +37,7 @@ import {
   searchStateLabel,
   searchText,
   splitByStrength,
+  splitLocal,
   STRENGTH_LABEL,
   updateVisual,
   uploadVisual,
@@ -54,7 +56,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "video", label: "Videos" },
 ];
 
-type Shown = { asset: VisualAsset; match?: VisualMatch };
+type Shown = { asset: VisualAsset; match?: VisualMatch; local?: boolean };
 type Preview = { asset: VisualAsset; startAt: number | null };
 
 type Upload = {
@@ -105,7 +107,7 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
     const latest = new Map(assets.map((a) => [a.id, a]));
     return (search.results?.results ?? [])
       .filter((hit) => latest.has(hit.asset.id))
-      .map((hit) => ({ asset: latest.get(hit.asset.id) ?? hit.asset, match: hit.match }));
+      .map((hit) => ({ asset: latest.get(hit.asset.id) ?? hit.asset, match: hit.match, local: hit.local }));
   }, [assets, filter, text, search.results, search.error]);
   const note = text && !search.error ? searchNote(search.results) : null;
 
@@ -147,6 +149,9 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
   const byContent = canSearchByContent(assets.map((a) => a.visual_search));
   const preparing = assets.some((a) => isPreparing(a.visual_search?.state));
   const tiers = text ? splitByStrength(shown) : { best: [], more: shown };
+  // In a local market (Morocco Mode): local strong matches first, then Global ones; weaker
+  // matches stay below both.
+  const local = text ? splitLocal(shown) : null;
   const open = ({ asset, match }: Shown) => setPreview({ asset, startAt: match?.best_frame_time ?? null });
   const drop = useFileDrop(busy, addFiles);
 
@@ -219,7 +224,12 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
             </p>
             {shown.length ? (
               <div className="space-y-5" aria-busy={search.searching}>
-                {tiers.best.length ? (
+                {local ? (
+                  <>
+                    {local.local.length ? <AssetGrid title="Local matches" projectId={projectId} items={local.local} onOpen={open} /> : null}
+                    {local.global.length ? <AssetGrid title="Global alternatives" projectId={projectId} items={local.global} onOpen={open} /> : null}
+                  </>
+                ) : tiers.best.length ? (
                   <AssetGrid title="Best matches" projectId={projectId} items={tiers.best} onOpen={open} />
                 ) : null}
                 {tiers.more.length ? (
@@ -719,6 +729,11 @@ function PreviewDialog({
             ) : null}
             <VisualSearchDetails projectId={projectId} asset={asset} onRetried={onRetried} />
             <DetailsForm projectId={projectId} asset={asset} onUpdated={onUpdated} />
+            <AssetLabelsForm
+              family="visual"
+              asset={asset}
+              onSave={async (changes) => onUpdated(await updateVisual(projectId, asset.id, changes))}
+            />
             {error ? <InlineAlert title="This visual could not be deleted">{error}</InlineAlert> : null}
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
               {confirming ? (

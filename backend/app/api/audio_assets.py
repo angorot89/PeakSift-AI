@@ -30,8 +30,14 @@ from app.api.videos import OwnedProject
 from app.core.config import get_settings
 from app.core.rate_limit import per_user
 from app.models import AudioAsset, AudioAssetKind
-from app.schemas.audio_asset import AudioAssetRead, AudioUploadLimits, AudioWaveformRead
+from app.schemas.audio_asset import (
+    AudioAssetRead,
+    AudioAssetUpdate,
+    AudioUploadLimits,
+    AudioWaveformRead,
+)
 from app.schemas.project import MediaDeletionRead
+from app.services import asset_labels
 from app.services.audio_assets import ACCEPTED_EXTENSIONS, store_audio_upload
 from app.services.media_deletion import delete_audio_asset, edits_using_asset
 from app.services.video_upload import UploadValidationError, check_declared_size
@@ -110,6 +116,21 @@ def list_audio(
 
 @router.get("/{asset_id}", response_model=AudioAssetRead)
 def get_audio(asset: OwnedAudioAsset) -> AudioAsset:
+    return asset
+
+
+@router.patch("/{asset_id}", response_model=AudioAssetRead)
+def update_audio(asset: OwnedAudioAsset, body: AudioAssetUpdate, db: DbSession) -> AudioAsset:
+    """Label a sound: where it comes from (with its licence when licensed), whether it is local
+    to a market, its category. The file never changes."""
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        labels = asset_labels.clean_labels("audio", asset_labels.read(asset), changes)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    for name, value in labels.items():
+        setattr(asset, name, value)
+    db.commit()
     return asset
 
 

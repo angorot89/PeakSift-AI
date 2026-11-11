@@ -1,3 +1,4 @@
+import type { AssetLabels } from "@/lib/asset-labels";
 import { API_URL, ApiError, apiFetch, messageFrom } from "@/lib/api";
 import type { VisualAsset, VisualKind } from "@/lib/visual-rules";
 import { searchText, type VisualSearchResults } from "@/lib/visual-search";
@@ -47,7 +48,7 @@ export const deleteVisual = (projectId: string, assetId: string) =>
 export const updateVisual = (
   projectId: string,
   assetId: string,
-  details: { display_name?: string; description?: string; tags?: string[] },
+  details: { display_name?: string; description?: string; tags?: string[] } & Partial<AssetLabels>,
 ) => apiFetch<VisualAsset>(`${base(projectId)}/${assetId}`, { method: "PATCH", body: JSON.stringify(details) });
 
 /** Owner-only streams (session cookie, same-site): the stored file and its small preview. */

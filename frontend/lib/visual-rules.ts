@@ -26,6 +26,12 @@ export type VisualAsset = {
   created_at: string;
   /** Whether it can be found by what it shows (absent from older responses). */
   visual_search?: VisualSearchStatus | null;
+  /** V1.8 labels, chosen by the creator (absent from older responses). */
+  origin?: string;
+  license_note?: string | null;
+  market?: string;
+  category?: string | null;
+  location?: string | null;
 };
 
 export type VisualFilter = "all" | VisualKind;
