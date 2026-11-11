@@ -31,7 +31,7 @@ mirror the render's proportions.
 | `SectionHeader` | a section's heading, one line of context, and its actions |
 | `Dialog` | modal dialogs and sheets (`placement` center, left, bottom) on the native `<dialog>`: inert page, Escape closes, focus returns to the trigger, backdrop closes |
 | `Menu` | a menu button: arrow keys, Home/End, Escape and Tab close, focus returns |
-| `SegmentedControl` | a few mutually exclusive views or filters (pressed buttons) |
+| `SegmentedControl` | a few mutually exclusive views or filters (pressed buttons); `wrap` when every option must stay visible on phones (the Shorts library) |
 | `ToolTabs` | tool groups that swap one panel (WAI-ARIA tabs: Left/Right/Home/End; panels stay mounted; a dot marks "in use" or "needs attention") |
 | `Tooltip` | hover/focus description for icon-only controls; never the only way to information |
 | `useToast` | brief confirmation of a small completed action; problems stay inline |
@@ -47,7 +47,10 @@ mirror the render's proportions.
 `lib/status.ts` turns internal job states into creator words: **Waiting** (queued) ·
 a recognisable working step (**Transcribing**, **Finding moments**, **Rendering**, otherwise
 **Processing**) · **Ready** · **Needs attention** (failed, or a job that stopped reporting).
-Unknown internal states read **Processing**, never their raw name.
+Unknown internal states read **Processing**, never their raw name. A **Short**'s status has its own
+words, derived once on the server (`services/shorts_library.py`) and worded once in
+`lib/shorts-rules.ts`: Draft · Rendering · Ready · Publishing · On YouTube · Published · Failed ·
+Needs attention ([shorts-library.md](shorts-library.md)).
 
 ## Hierarchy
 
@@ -57,7 +60,7 @@ details and exact numbers sit behind a disclosure.
 
 ## The app shell
 
-A sidebar with Home, Projects (and the recent projects), Analytics, Brand Studio and Settings —
+A sidebar with Home, Projects (and the recent projects), Shorts, Analytics, Brand Studio and Settings —
 the current one in a warm highlight — then **Ask PeakSift** low in the sidebar and the account
 chip (Settings, Log out) at its foot. Phones get a top bar (menu, search, Ask PeakSift) and the
 same sidebar as a sheet. No notification bell, plan label or counts: PeakSift has no data for

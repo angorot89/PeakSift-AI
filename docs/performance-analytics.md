@@ -30,7 +30,7 @@ Operator setup: [youtube-setup.md](youtube-setup.md#analytics-optional-v14). Cre
 | Auto Edit performance context | `profile.py`, `app/services/auto_edit/` (config, contract, ollama, fallback) |
 | Deleting collected metrics | `retention.py` |
 | API | `app/api/performance.py`, `/auto-edit/performance-context` |
-| UI | `/analytics`, `/analytics/[id]`, Settings → YouTube → Analytics access, the Auto Edit composer |
+| UI | `/analytics`, `/analytics/[id]`, a Short's **Performance** section (`/shorts/[id]`, [shorts-library.md](shorts-library.md)), Settings → YouTube → Analytics access, the Auto Edit composer |
 
 ## Permission: an explicit, read-only upgrade
 

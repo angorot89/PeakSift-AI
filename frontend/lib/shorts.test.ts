@@ -223,3 +223,41 @@ describe("the Short's performance", () => {
     assert.deepEqual(found.map((i) => i.id), ["a"]);
   });
 });
+
+describe("state matrix: no contradictory status or action", () => {
+  const states: [ShortStatus, ShortItem["reason"], ShortItem["preview"], ShortItem["kind"]][] = [
+    ["draft", null, "clip", "draft"],
+    ["rendering", null, "clip", "short"],
+    ["rendering", null, null, "draft"],
+    ["failed", "render_failed", "clip", "short"],
+    ["failed", "clip_failed", null, "draft"],
+    ["needs_attention", "render_stalled", "clip", "short"],
+    ["ready", null, "short", "short"],
+    ["publishing", null, "short", "short"],
+    ["needs_attention", "publish_failed", "short", "short"],
+    ["needs_attention", "publish_stalled", "short", "short"],
+    ["on_youtube", null, "short", "short"],
+    ["published", null, "short", "short"],
+  ];
+  for (const [status, reason, preview, kind] of states) {
+    it(`${status}${reason ? ` (${reason})` : ""}, ${kind}`, () => {
+      const item = short({ status, reason, preview, kind, edit_id: kind === "draft" ? null : "e1" });
+      const primary = primaryAction(item);
+      const menu = menuActions(item).map((a) => a.action);
+      // Publish only for a rendered Short not yet on YouTube.
+      if (primary?.action === "publish" || menu.includes("publish")) assert.equal(status, "ready");
+      // Download only when there is a rendered file.
+      if (menu.includes("download")) assert.equal(preview, "short");
+      // Performance only once it is on YouTube.
+      if (primary?.action === "performance") assert.ok(status === "published" || status === "on_youtube");
+      // Working states wait (no primary action); problems always have one.
+      if (status === "rendering" || status === "publishing") assert.equal(primary, null);
+      if (status === "failed" || status === "needs_attention") assert.ok(primary?.label === "Fix issue");
+      // A draft is never "edited" as a version, and every state can open its project.
+      if (kind === "draft") assert.ok(!menu.includes("edit"));
+      assert.ok(menu.includes("project"));
+      // The words never claim more than the state.
+      assert.ok(!(status !== "published" && /^Published/.test(statusLabel(status).label)));
+    });
+  }
+});
