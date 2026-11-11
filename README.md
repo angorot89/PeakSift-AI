@@ -8,7 +8,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 
 ## Current status
 
-**Milestones 1–10 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7, Dynamic Captions & Creator Polish V0.8, Audio & Sound Design V0.9, Production & Publishing V1.0 — released as v1.0.0). **V1.1 B-roll & Visual Enrichment: implementation complete, pending CI/merge/release** (stacked pull requests waiting for GitHub Actions; not merged or tagged). **V1.2 Auto Edit & Creator Intelligence: implementation complete locally, pending CI/merge/release** (stacked on V1.1). **V1.3 Semantic Asset Intelligence: implementation complete locally, pending CI/merge/release** (stacked on V1.2). **V1.4 Performance Analytics & Learning: implementation complete locally, pending CI/merge/release** (stacked on V1.3). **V1.5 Creator Experience & Modern Workspace: implementation complete locally, pending CI/merge/release** (stacked on V1.4). **V1.6 Creator Copilot & Content Strategy: implementation complete locally, pending CI/merge/release** (stacked on V1.5). **V1.7 Brand Studio & Reusable Templates: implementation complete locally, pending CI/merge/release** (stacked on V1.6). **Visual UI/UX overhaul: implementation complete locally, pending CI/merge/release** (stacked on V1.7; warm, preview-first screens on the same data, and a feature-gated Morocco Mode preview with no Moroccan data yet). **Visual timeline & editor pass: implementation complete locally, pending CI/merge/release** (stacked on the UI/UX overhaul). What exists today:
+**Milestones 1–10 are complete** (Foundation V0.1, Video Upload V0.2, Transcription V0.3, AI Clip Detection V0.4, Clip Generation V0.5, Short-form Editing V0.6, Smart Reframing V0.7, Dynamic Captions & Creator Polish V0.8, Audio & Sound Design V0.9, Production & Publishing V1.0 — released as v1.0.0). **V1.1 B-roll & Visual Enrichment: implementation complete, pending CI/merge/release** (stacked pull requests waiting for GitHub Actions; not merged or tagged). **V1.2 Auto Edit & Creator Intelligence: implementation complete locally, pending CI/merge/release** (stacked on V1.1). **V1.3 Semantic Asset Intelligence: implementation complete locally, pending CI/merge/release** (stacked on V1.2). **V1.4 Performance Analytics & Learning: implementation complete locally, pending CI/merge/release** (stacked on V1.3). **V1.5 Creator Experience & Modern Workspace: implementation complete locally, pending CI/merge/release** (stacked on V1.4). **V1.6 Creator Copilot & Content Strategy: implementation complete locally, pending CI/merge/release** (stacked on V1.5). **V1.7 Brand Studio & Reusable Templates: implementation complete locally, pending CI/merge/release** (stacked on V1.6). **Visual UI/UX overhaul: implementation complete locally, pending CI/merge/release** (stacked on V1.7; warm, preview-first screens on the same data, and a feature-gated Morocco Mode preview with no Moroccan data yet). **Visual timeline & editor pass: implementation complete locally, pending CI/merge/release** (stacked on the UI/UX overhaul). **Shorts Library & Publishing Center** and **V1.8 Morocco Mode: implementation complete locally, pending CI/merge/release** (stacked in that order; Morocco Mode adds markets and content languages, Darija hooks from the creator's own words, curated Morocco formats and local-first creator assets on top of everything in Global — see [docs/morocco-mode.md](docs/morocco-mode.md)). What exists today:
 
 - A landing page.
 - Email/password accounts: register, log in, log out, with an HttpOnly session cookie.
@@ -43,7 +43,7 @@ PeakSift AI is a short-form clipping and creation platform. Creators bring long-
 | Feature                                                              | Milestone |
 | -------------------------------------------------------------------- | --------- |
 | Creator intelligence & metadata, more publishing destinations        | later     |
-| Stock or global asset libraries, Morocco Mode                        | later     |
+| Stock or global asset libraries, market trends, other markets        | later     |
 
 The dashboard's Videos and Clips cards do not show counts yet. Smart reframing follows visible faces only — no speaker identification, object tracking, zoom or split screen — and word timing is as accurate as the speech recognizer's word timestamps (no manual timing editor); audio ducking follows the clip's overall loudness (no voice isolation), and there is no timeline editor, custom fonts or music library; publishing is YouTube only (see [Known limitations](#known-limitations)).
 
@@ -302,11 +302,11 @@ Every push to `main` and every pull request runs [GitHub Actions](.github/workfl
 
 Development happens on feature branches merged through pull requests; see [CLAUDE.md](CLAUDE.md#git-workflow).
 
-## Localization: Global + Morocco Mode (future)
+## Localization: Global + Morocco Mode
 
-PeakSift will ship a **Global** experience available to everyone.
+**Global** is the experience available to everyone.
 
-**Morocco Mode** is a planned future localization layer that *extends* the Global experience — users keep every Global tool and library, plus Darija-aware analysis, Moroccan cultural context, local sound effects and creator assets, and Morocco-specific clip suggestions. It is not a separate app, and **it is not implemented**: only its UI architecture exists, as a preview behind `NEXT_PUBLIC_MOROCCO_MODE_PREVIEW`, where every Moroccan capability reads "Not available yet".
+**Morocco Mode** (V1.8) *extends* Global — creators keep every Global tool, template and library, plus: a project market and content language (Darija, Arabic, French, English or mixed; detection is a hedged hint), hook ideas from the clip's own words (Darija in Arabic script or Latin letters by transliteration, never written by a model), seven curated Morocco formats, their own Moroccan visuals and sounds with origin and licence labels (local first in search and Auto Edit, Global alternatives kept), and Ask PeakSift answers about all of it. Nothing is called trending and no audience claims are made. Details, acceptance results and the licensing report: [docs/morocco-mode.md](docs/morocco-mode.md).
 
 ## Repository structure
 

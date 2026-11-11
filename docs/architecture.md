@@ -276,11 +276,11 @@ Timestamps are timezone-aware. Project `status` is currently always `created`. V
 Backend ──▶ Object storage (source videos, generated clips, edited shorts)
 ```
 
-No milestone after V1.0 has been defined. Possible later work — creator intelligence and metadata, more publishing destinations and scheduling, asset libraries, Morocco Mode — is not committed scope (see [milestones.md](milestones.md)). Production operation and YouTube publishing are described in [production.md](production.md) and [publishing.md](publishing.md).
+No milestone after V1.0 has been defined. Possible later work — creator intelligence and metadata, more publishing destinations and scheduling, asset libraries, market trends — is not committed scope (see [milestones.md](milestones.md)). Production operation and YouTube publishing are described in [production.md](production.md) and [publishing.md](publishing.md).
 
 ## Localization
 
-The Global experience is the base. Morocco Mode, when built, extends it (additional analysis context and asset libraries) rather than forking it. No localization code exists yet.
+The Global experience is the base. Morocco Mode (V1.8) extends it rather than forking it: a market is a profile (`app/services/markets.py`), not a code path, and its facts enter fingerprints, views, provenance and search order only when set — see [morocco-mode.md](morocco-mode.md).
 
 ## Principles
 

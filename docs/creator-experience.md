@@ -156,25 +156,29 @@ behaviour (PRs #239–#246):
   numbered idea cards with fact chips, the warm composer and "PeakSift can get things wrong".
 - **Analytics** — "How are my Shorts doing?", freshness, figure tiles ("—" when unreported) and
   each Short with its real thumbnail. No deltas or predictions.
-- **Morocco Mode (preview)** — see below.
+- **Morocco Mode** — see below.
 
 Browser audit: **330/330** (19 surfaces × 1440/1280/1024/768/430/390/375: axe WCAG 2.1 AA, overflow,
 44 px touch targets on phones, console errors). Functional regression on the redesigned build: the
 fresh-creator journey (sign-up → brand → template → upload → Create a Short → Auto Edit → render →
 download), the brand release gate (13/13) and the Copilot acceptance with the local model (17/17).
 
-### Morocco Mode (preview)
+### Morocco Mode
 
-Morocco Mode **extends** Global — it never replaces it. Its UI architecture exists behind
-`NEXT_PUBLIC_MOROCCO_MODE_PREVIEW` (off by default; the routes return 404 without it):
+Morocco Mode **extends** Global — it never replaces it. Since V1.8 it is live (no flag):
 
-- `/morocco` — *Create Shorts for Morocco*, the **Global / Morocco Mode** switch with **Global library
-  included**, and what Morocco Mode adds;
-- `/morocco/kit` — the **Creator Kit**: a local library (Images, B-roll, Sounds, Hooks, Templates),
-  suggestions for a clip, and **local + global match** (Moroccan matches first, then global).
+- the **Global / Morocco Mode** switch on Home (also for a fresh creator) and `/morocco` shows
+  "New projects: …" and saves the creator's default for new projects only; **Global library
+  included** is always shown;
+- `/morocco` — what Morocco Mode adds (Darija hooks, content styles, local visuals, local sounds, Ask
+  PeakSift), the curated formats ("Curated by PeakSift … — not trends"), the creator's Moroccan
+  visuals and sounds with honest empty states, and Browse the Global library;
+- `/morocco/kit` — the **Creator Kit**: Visuals · Sounds · Hooks · Templates, search and filters
+  only from the creator's own metadata;
+- projects: "Made for" on creation, a Market and language card on the overview, Source and market
+  labels on visuals and sounds, "Local matches" / "Global alternatives" in search, Hook ideas in
+  the editor's Opening tool, and "Made for: Morocco Mode" on Shorts made there.
 
-No Moroccan data source exists yet — no Darija hooks, sound library, audience trends or local
-assets — so every capability reads **Not available yet** and links to what works in Global today.
-Nothing is generated, curated as if real, or invented; no place or topic filters ship without a
-library behind them. The capabilities live in `lib/morocco.ts` (unit-tested); a real source flips
-its capability to available. Darija transcription accuracy has not been measured.
+Nothing is called trending; there are no flags or national colours (the mode is said in words).
+Right-to-left creator text uses `dir="auto"`. Browser audit (V1.8): Morocco creator 133/133 and
+Global creator 42/42 at all seven widths. See [morocco-mode.md](morocco-mode.md).

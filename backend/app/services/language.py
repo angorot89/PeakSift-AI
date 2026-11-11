@@ -13,7 +13,8 @@ Conservative on purpose:
 
 The word lists are small, common function words and markers, not a dictionary; Darija shares
 many words with Arabic and French, so detection weighs markers that are typical of Darija
-(واش، ديال، بزاف، دابا… / wach, dyal, bzaf, daba…) and Arabizi digits used as letters (3, 7, 9).
+(واش، ديال، بزاف، دابا… / wach, dyal, bzaf, daba…), Arabizi digits used as letters (3, 7, 9) and,
+since the V1.8 quality set, Arabizi verbs with the ka- prefix ("kanqra", "katji").
 """
 
 import re
@@ -25,6 +26,9 @@ LATIN_LETTER = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]")
 WORD = re.compile(r"[\w'’]+", re.UNICODE)
 # Arabizi: Latin words that use 2, 3, 5, 7 or 9 as letters ("3lach", "7ta", "9alb", "sa7bi").
 ARABIZI = re.compile(r"^(?=.*[a-z])(?=.*[23579])[a-z23579']+$")
+# Darija verbs in Latin letters carry a ka- prefix with a person marker ("kanqra", "katji",
+# "kaybghiw"): ka + n/t/y + a consonant. A marker like the others, never proof on its own.
+DARIJA_VERB = re.compile(r"^ka[nty][bcdfghjklmnpqrstvwxz23579][a-z23579']+$")
 ARABIC_DIACRITICS = re.compile(r"[ؐ-ًؚ-ٰٟۖ-ۭـ]")
 
 DARIJA_ARABIC = frozenset(
@@ -35,7 +39,8 @@ DARIJA_ARABIC = frozenset(
 DARIJA_LATIN = frozenset(
     "wach wash dyal dial dyali dyalk bzaf bzzaf daba chno chnou chnu 3lach 3lash ghadi kayn kayen "
     "kayna mzyan mezyan wakha safi hadchi hadshi hadi had bghit bghina khoya zwin zwina nta nti "
-    "hit machi fin kifach kifash kidayr labas 3afak ch7al bla makaynch 3ndi fhad 7ta 7tta".split()
+    "hit machi fin kifach kifash kidayr labas 3afak ch7al bla makaynch 3ndi fhad 7ta 7tta kolchi "
+    "koulchi chwiya chwia rah lyoum".split()
 )  # fmt: skip
 ARABIC_STANDARD = frozenset(
     "هذا هذه الذي التي الذين ليس سوف لقد إن أن هل لكن كان يكون نحن هم ذلك عندما".split()
@@ -115,7 +120,9 @@ def detect(text: str) -> LanguageGuess:
     if len(words) < MIN_WORDS:
         return LanguageGuess("unknown", "possible", found_scripts)
     counts = {
-        "darija": sum(w in _DARIJA or bool(ARABIZI.match(w)) for w in words),
+        "darija": sum(
+            w in _DARIJA or bool(ARABIZI.match(w)) or bool(DARIJA_VERB.match(w)) for w in words
+        ),
         "arabic": sum(w in _ARABIC for w in words),
         "french": sum(w in _FRENCH for w in words),
         "english": sum(w in _ENGLISH for w in words),

@@ -80,6 +80,10 @@ function Welcome() {
             Create your first project
           </ButtonLink>
         </div>
+        {/* V1.8: Morocco Mode is discoverable from the first visit (Global stays the default). */}
+        <div className="mt-6">
+          <ModeSwitch current="global" />
+        </div>
       </div>
       <ol className="relative mt-12 grid gap-3 sm:grid-cols-3">
         {steps.map((step, index) => (

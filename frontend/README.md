@@ -141,7 +141,7 @@ lib/
   template-rules.ts # Template settings: starters, summaries, settings from an editor draft (unit-tested)
   timeline.ts      # Editor timeline: scale, ticks, items from the edit, drag/resize/snap, sync, tooltips, render state (unit-tested)
   reveal.ts        # Reveal a settings card inside the panel without scrolling the page
-  morocco.ts       # Morocco Mode preview: the flag, capabilities (all unavailable until real data), Kit tabs (unit-tested)
+  morocco.ts       # Morocco Mode: sections, mode switch, Creator Kit tabs, filters from real metadata, local first (unit-tested)
   command-menu.ts  # The command menu's commands, filtering, question detection and shortcut (unit-tested)
   status.ts        # Waiting / Processing / Ready / Needs attention status language (unit-tested)
   moments.ts       # Moment filters, their queries, counts and empty states (unit-tested)

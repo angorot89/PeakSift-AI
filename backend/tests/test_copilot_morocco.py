@@ -2,6 +2,8 @@
 the project's language, the clip's own Darija lines, the Global library — is answered without
 the model; Global projects get no market facts; another creator's assets never count."""
 
+import pytest
+
 from app.models import AudioAsset, Project, Transcription, TranscriptSegment, VisualAsset
 from app.services.copilot.prompt import SYSTEM_PROMPT
 from tests.test_clip_edit_api import ready_clip, sign_up
@@ -148,3 +150,46 @@ def test_a_model_answer_never_reaches_the_creator_with_a_stereotype(client, db_s
                                  "about their favourite café."})  # fmt: skip
     answer = ask(client, "What is this video about?", "assets", project_id=project.id)
     assert answer["content"] == "Your video asks people about their favourite café."
+
+
+@pytest.mark.parametrize("question", [
+    "Is this good content for Moroccans?", "Will Moroccans like this?",
+    "Est-ce que ça va plaire aux Marocains ?", "واش هاد الفيديو غادي يعجب المغاربة؟",
+])  # fmt: skip
+def test_peaksift_never_speaks_for_an_audience(client, db_session, monkeypatch, question):
+    """V1.8 acceptance found the local model answering "This content may appeal to Moroccans".
+    PeakSift answers these itself: no prediction, no claim about a group, the project's facts."""
+    sign_up(client, "copilot-audience@example.com")
+    project, clip = project_with(db_session, "copilot-audience@example.com")
+    fake = use(monkeypatch)
+    answer = ask(client, question, "editor", project_id=project.id, clip_id=clip.id)["content"]
+    assert answer.startswith("PeakSift can't tell how Moroccan viewers — or any audience — will")
+    assert "1 Moroccan visual ready" in answer and not fake.calls
+
+
+def test_audience_claims_from_the_model_are_screened_out():
+    from app.services.copilot.safety import generalizes
+
+    assert generalizes("This content may appeal to Moroccans due to its local setting.")
+    assert generalizes("It could be popular among Arab viewers.")
+    assert not generalizes("The café in your clip is popular with the people you interviewed.")
+
+
+def test_openings_in_morocco_mode_are_the_clips_own_lines(client, db_session, monkeypatch):
+    """V1.8 acceptance found the local model extending a moment title into an opening ("…, I
+    still wonder…"). In a local market's project PeakSift answers with the clip's own lines."""
+    sign_up(client, "copilot-opening@example.com")
+    project, clip = project_with(db_session, "copilot-opening@example.com")
+    fake = use(monkeypatch)
+    ids = {"project_id": project.id, "clip_id": clip.id}
+    answer = ask(client, "Write an opening line for this Short.", "editor", **ids)["content"]
+    assert answer.startswith("From your clip's own words: “") and DARIJA[0] in answer
+    assert not fake.calls
+    client.cookies.clear()
+    sign_up(client, "copilot-opening-global@example.com")
+    plain, plain_clip = project_with(db_session, "copilot-opening-global@example.com",
+                                     market="global", local=False)  # fmt: skip
+    fake = use(monkeypatch, {"message": "Try opening with the question you ask."})
+    ask(client, "Write an opening line for this Short.", "editor", project_id=plain.id,
+        clip_id=plain_clip.id)  # fmt: skip
+    assert fake.calls  # Global projects keep the assistant's answer, as before V1.8

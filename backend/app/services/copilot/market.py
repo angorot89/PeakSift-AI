@@ -13,7 +13,10 @@ answered here, deterministically, in plain words:
 - "Give me 3 Darija hooks" — the clip's own Darija lines (quoted from the transcript), or a
   plain no when the clip is not in Darija (PeakSift never writes Darija the creator did not say);
 - "What can I use from the Global library?" — the Global visuals, sounds and templates;
-- "Use local assets if they fit" — what Morocco Mode already does, and where.
+- "Use local assets if they fit" — what Morocco Mode already does, and where;
+- "Write an opening line" — the clip's own lines, never an opening the model wrote;
+- "Is this good for Moroccans?" / "Will Moroccans like this?" — PeakSift never predicts how an
+  audience reacts or speaks for a group: it says so, with the project's facts.
 
 No stereotypes, places, slang, prices or audience claims: only names, counts and the creator's
 own words. Answers are in English, like PeakSift's other own answers.
@@ -59,6 +62,21 @@ GLOBAL_LIBRARY = re.compile(
 )
 USE_LOCAL = re.compile(r"use (my )?(local|moroccan|morocco) (asset|visual|sound|b-roll)",
                        re.IGNORECASE)  # fmt: skip
+AUDIENCE = re.compile(
+    r"(good|right|great|work|land|appeal|resonate|popular|like|enjoy|love|watch|connect|plai|aime|"
+    r"march|bon)\w*\b.*"
+    r"\b(moroccans|moroccan (audience|viewers|people|public)|people in morocco|marocains|"
+    r"le public marocain|المغاربة|الجمهور المغربي)"
+    r"|\b(will|would|do|are)\s+(moroccans|moroccan (audiences?|viewers|people))\b"
+    r"|(يعجب|تعجب|يحبو|مناسب|زوين|مزيان).*(المغاربة|الجمهور المغربي)",
+    re.IGNORECASE,
+)
+OPENING = re.compile(
+    r"\b(write|give|suggest|propose|need|want|make|draft|any|écris|donne|propose|trouve|"
+    r"اكتب|عطيني|اقترح)\w*\b.*\b(opening|hooks?|accroches?|intro line|first line|"
+    r"première phrase|بداية|هوك)\b",
+    re.IGNORECASE,
+)
 MAX_NAMES = 8
 FORMAT_FOR_CATEGORY = {
     "story": "Local Storytime", "humor": "Darija Reaction", "reaction": "Darija Reaction",
@@ -138,6 +156,17 @@ def market_answer(view: dict, text: str):
         return None
     local = facts["local_market"]
     adjective = {"Morocco": "Moroccan"}.get(local, local)
+    if AUDIENCE.search(text):
+        visuals = facts["local_visual_total"]
+        return "none", (
+            f"PeakSift can't tell how {adjective} viewers — or any audience — will react, and "
+            "it never predicts performance or speaks for a group of people. What it can tell "
+            f"you: this project is made for {local}, set to "
+            + (facts["language"].lower() if facts["language"] != "Detect from the video"
+               else "detect its language")
+            + f", with {visuals} {adjective} visual{'s' if visuals != 1 else ''} ready. After "
+            "you publish, Analytics shows how your own Shorts are doing."
+        )  # fmt: skip
     if KEEP_LANGUAGE.search(text):
         chosen = facts["language"]
         setting = "detect its language" if chosen == markets.CONTENT_LANGUAGES["auto"] else chosen
@@ -160,6 +189,19 @@ def market_answer(view: dict, text: str):
         return "none", (
             f"From your clip's own words: {quoted} In the editor's Opening tool, Hook ideas can "
             "also show them in the other script."
+        )
+    if OPENING.search(text) and not TEMPLATE_FIT.search(text):
+        ideas = hooks.transcript_ideas(" ".join(_clip_lines(view)))
+        if not ideas:
+            return "none", (
+                "Your clip has no sentence that works as an opening yet. PeakSift offers "
+                "openings only from your own words — write one in the editor's Opening tool."
+            )
+        quoted = " ".join(f"“{i.text}”" for i in ideas[:3])
+        return "none", (
+            f"From your clip's own words: {quoted} PeakSift offers openings only from what you "
+            "said; the editor's Opening tool shows them as Hook ideas, in another script or "
+            "language where it can do that faithfully."
         )
     if TEMPLATE_FIT.search(text):
         formats = facts["curated_formats"]

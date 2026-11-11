@@ -396,6 +396,25 @@ Delivered:
   (`scripts/brand_acceptance.py`: a branded Short checked by size, codecs, duration, loudness
   and a silent end card, then byte-identical after the template changes)
 
+## V1.8 — Morocco Mode
+
+Goal: Global PeakSift with Moroccan context, from real sources only (see
+[morocco-mode.md](morocco-mode.md)).
+
+- Markets and content languages: `global`/`ma` (creator default, per project, frozen in each
+  Short), languages auto/darija/arabic/french/english/mixed; hedged detection
+- Darija hooks: the clip's own lines; the other script by transliteration only; the local model
+  rewrites only French ↔ English, each result checked
+- Seven curated Morocco formats on existing template settings (not trends)
+- Creator-labelled assets (origin with licence, market, category, location) and local sounds;
+  local first within strength tiers, Global kept; labels searchable
+- Market-aware Auto Edit (weak local hint, notes, frozen market) and Ask PeakSift (own answers,
+  no audience claims, stereotype screen)
+- Live `/morocco` and Creator Kit, project market controls, provenance, right-to-left text
+- Acceptance: `scripts/morocco_acceptance.py` (31/31), Morocco journey (23/23),
+  `scripts/darija_quality.py` (16/16), audits 133/133 and 42/42; `MarketTrendProvider` is
+  documentation only
+
 ## Roadmap status
 
 - V0.1 Foundation — COMPLETE
@@ -416,6 +435,7 @@ Delivered:
 - V1.5 Creator Experience & Modern Workspace — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.6 Creator Copilot & Content Strategy — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
 - V1.7 Brand Studio & Reusable Templates — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release
+- V1.8 Morocco Mode — IMPLEMENTATION COMPLETE LOCALLY, pending CI/merge/release (see [morocco-mode.md](morocco-mode.md))
 
 No later milestone has been defined or started.
 
@@ -426,5 +446,5 @@ No later milestone has been defined or started.
 - Licensed music and sound-effect libraries, beat-synced editing
 - Custom fonts and a caption timing editor
 - Global asset libraries
-- Morocco Mode (localization layer extending Global). Before any Moroccan accuracy claim, benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio — none of that has been tested yet.
+- Morocco Mode beyond V1.8: Darija speech-recognition accuracy (benchmark Darija, Arabic/French code-switching, Moroccan names, local slang and noisy streamer audio before any claim), a licensed market-signal source behind the documented `MarketTrendProvider` contract, other markets.
 - Additional localization
