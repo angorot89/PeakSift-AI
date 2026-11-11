@@ -17,6 +17,11 @@ term** — a key of the data the model was given (``with_figures``, ``minimum_ne
 part of the creator's own text (their file names are), a quoted key, or a fragment of JSON — is
 removed. It works from the data itself, so a new field cannot slip through.
 
+A fifth keeps answers free of stereotypes (V1.8): a sentence **generalizing about a people, a
+country, a culture, a religion or an audience** ("Moroccans love…", "Arab viewers always…", "les
+Marocains préfèrent…") is removed. Morocco Mode adds context from the creator's own words and
+assets, never claims about who people are or what they like.
+
 An answer claiming an action is not shown at all (PeakSift says the answer was unusable and
 offers its own next step); sentences repeating the instructions or inventing times are removed.
 """
@@ -37,6 +42,24 @@ _CLAIM = re.compile(
     r"public)\b"
     r"|\b(?:j['’]ai|nous avons)\s+(?:déjà\s+|bien\s+)?(?:publié|supprimé|mis en ligne|partagé|"
     r"renommé|programmé)",
+    re.IGNORECASE,
+)
+_GROUP = (
+    r"(?:moroccans|moroccan (?:people|audiences?|viewers|users|women|men|youth|families|"
+    r"creators|culture)|(?:the )?people (?:of|in) morocco|everyone in morocco|"
+    r"arabs|arab (?:people|audiences?|viewers|women|men|culture)|muslims|africans|berbers|"
+    r"amazigh people|north africans|(?:les )?marocains|(?:les )?marocaines|le public marocain|"
+    r"les arabes|les musulmans|المغاربة)"
+)
+_GENERALIZATION = re.compile(
+    rf"\b{_GROUP}\s+(?:\w+\s+){{0,2}}?(?:are|is|love|loves|hate|hates|always|never|tend|"
+    r"prefer|prefers|like|likes|enjoy|enjoys|want|wants|can't|cannot|don't|do not|won't|all|"
+    r"only|usually|generally|typically|sont|aiment|adorent|préfèrent|détestent|veulent|"
+    r"toujours|jamais)\b"
+    rf"|\b(?:all|most|every|tous les|la plupart des)\s+{_GROUP}"
+    # Arabic script: "the Moroccans / Arabs / Muslims" + a Darija or Arabic verb or adverb.
+    r"|(?:^|\s)(?:كل\s+)?(?:المغاربة|العرب|المسلمين|المسلمون|الأمازيغ)\s+"
+    r"(?:ك\w+|ي\w+|دايما|ديما|عمرهم|ما\s*\w+|كلهم|بزاف)",
     re.IGNORECASE,
 )
 _RUN = 8  # consecutive words shared with the instructions
@@ -160,6 +183,17 @@ def screen_text(text: str) -> str:
     )
 
 
+def generalizes(sentence: str) -> bool:
+    """Whether the sentence generalizes about a people, culture, religion or audience."""
+    return bool(_GENERALIZATION.search(sentence))
+
+
+def drop_generalizations(text: str) -> str:
+    """The text without sentences generalizing about people (stereotypes)."""
+    parts = [part.strip() for part in _SENTENCE.split(text) if part and part.strip()]
+    return " ".join(part for part in parts if not generalizes(part))
+
+
 def drop_unknown_times(text: str, known: set[str]) -> str:
     """The text without sentences giving a time that is not in the creator's data."""
     if all(time in known for time in TIME.findall(text)):
@@ -180,7 +214,7 @@ def screen(
         raise CopilotOutputError("The answer claimed an action")
 
     def clean(text: str) -> str:
-        text = screen_text(text)
+        text = drop_generalizations(screen_text(text))
         if words is not None:
             text = drop_internal_terms(text, words)
         return drop_unknown_times(text, known_times) if known_times is not None else text

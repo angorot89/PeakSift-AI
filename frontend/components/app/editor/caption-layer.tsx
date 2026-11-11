@@ -200,7 +200,7 @@ export function CaptionLayer({
             }}
           >
             {cue.lines.map((line, l) => (
-              <div key={l}>
+              <div key={l} dir="auto">
                 <span style={textCss(look, spec)}>
                   {line.map((word, w) => {
                     const text = look.uppercase ? word.text.toUpperCase() : word.text;
@@ -225,7 +225,7 @@ export function CaptionLayer({
             className="caption-in text-balance"
             style={{ maxWidth: cw(Math.min(hookLook.max_line_width, spec.output_width - 2 * hookPlace.margin_h - 2 * hookLook.outline), spec.output_width) }}
           >
-            <span style={{ ...textCss(hookLook, spec), whiteSpace: "normal" }}>{hook.text}</span>
+            <span dir="auto" style={{ ...textCss(hookLook, spec), whiteSpace: "normal" }}>{hook.text}</span>
           </div>
         </div>
       ) : null}
@@ -290,7 +290,7 @@ export function CaptionSampleLayer({
       {look && lines.length ? (
         <div className="absolute text-center" style={placementCss(place.alignment, place.margin_v + boxInset(look, place.alignment), place.margin_h, spec)}>
           {lines.map((line, l) => (
-            <div key={l}>
+            <div key={l} dir="auto">
               <span style={textCss(look, spec)}>
                 {line.map((word, w) => {
                   const text = look.uppercase ? word.toUpperCase() : word;
@@ -310,7 +310,7 @@ export function CaptionSampleLayer({
       {hook && hookLook && hookPlace && hook.text ? (
         <div className="absolute flex justify-center text-center" style={placementCss(hookPlace.alignment, hookPlace.margin_v + boxInset(hookLook, hookPlace.alignment), hookPlace.margin_h, spec)}>
           <div className="text-balance" style={{ maxWidth: cw(Math.min(hookLook.max_line_width, spec.output_width - 2 * hookPlace.margin_h - 2 * hookLook.outline), spec.output_width) }}>
-            <span style={{ ...textCss(hookLook, spec), whiteSpace: "normal" }}>{hook.text}</span>
+            <span dir="auto" style={{ ...textCss(hookLook, spec), whiteSpace: "normal" }}>{hook.text}</span>
           </div>
         </div>
       ) : null}

@@ -48,6 +48,8 @@ export type EditRequest = {
 export type EditOrigin = {
   template?: { id: string; name: string; version: number };
   brand?: { name: string };
+  /** V1.8: the market it was made for, frozen with it. */
+  market?: { code: string; name: string };
   auto_edit_plan_id?: string;
 };
 

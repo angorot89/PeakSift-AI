@@ -36,6 +36,13 @@ class ShortBrand(BaseModel):
     name: str
 
 
+class ShortMarket(BaseModel):
+    """The local market this Short was made for (V1.8; recorded with it). None for Global."""
+
+    code: str
+    name: str
+
+
 class ShortPublish(BaseModel):
     state: str
     platform: str | None
@@ -75,6 +82,7 @@ class ShortRead(BaseModel):
     version: ShortVersion | None
     template: ShortTemplate | None
     brand: ShortBrand | None
+    market: ShortMarket | None = None
     auto_edit: bool
     plan_ready: bool
     publish: ShortPublish

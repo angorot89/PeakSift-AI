@@ -45,6 +45,8 @@ export type ShortItem = {
   /** The template version and brand this Short was made with (recorded with it). */
   template: { id: string | null; name: string; version: number | null } | null;
   brand: { name: string } | null;
+  /** V1.8: the local market it was made for, as recorded (absent or null for Global). */
+  market?: { code: string; name: string } | null;
   auto_edit: boolean;
   /** A draft whose Auto Edit is prepared and waiting for review. */
   plan_ready: boolean;

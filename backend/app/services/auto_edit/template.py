@@ -158,6 +158,83 @@ def _audio(fields, template: TemplateConfig) -> None:
     )
 
 
+SECTION_FIELDS = {
+    "layout": ("layout",),
+    "captions": ("captions_enabled", "caption_style", "caption_position", "caption_timing"),
+    "hook": ("hook_enabled", "hook_text", "hook_style", "hook_position", "hook_duration"),
+    "visuals": ("visuals",),
+    "audio": ("audio",),
+}
+
+
+def _same(before: dict[str, Any], after: dict[str, Any], key: str) -> bool:
+    a, b = before[key], after[key]
+    if key == "audio":
+        a, b = (x.snapshot() if x is not None else None for x in (a, b))
+    return a == b
+
+
+def _audio_choice(mix: AudioMix | None) -> str:
+    parts = ["Original audio" + (", normalized" if mix is None or mix.normalize else "")]
+    if mix is not None and mix.music is not None:
+        parts.append(f"music {mix.music.gain_db:g} dB with {mix.music.ducking.value} ducking")
+    if mix is not None and mix.sfx:
+        parts.append(f"{len(mix.sfx)} transition sound{'s' if len(mix.sfx) > 1 else ''}")
+    return ", ".join(parts)
+
+
+def _describe(sections: dict, before: dict, after: dict, name: str) -> dict:
+    """The plan's sections as rendered: a section the template changed is described from the
+    final settings and credited to the template — never the planner's words about a setting it
+    no longer has (e.g. "headline style" for a template's boxed hook)."""
+    reason = f"Set by your {name} template."
+    for section, keys in SECTION_FIELDS.items():
+        if all(_same(before, after, key) for key in keys):
+            continue
+        old = sections.get(section) or {}
+        if section == "layout":
+            sections[section] = {"choice": LAYOUT_LABELS[after["layout"]], "reason": reason}
+        elif section == "captions":
+            if not after["captions_enabled"]:
+                sections[section] = {"choice": "No captions", "reason": reason}
+            else:
+                timing = (
+                    "word synced"
+                    if after["caption_timing"] == CaptionTiming.ALIGNED_WORD.value
+                    else "phrase timed"
+                )
+                sections[section] = {
+                    "choice": f"{after['caption_style'].title()} captions · "
+                    f"{after['caption_position']} · {timing}",
+                    "reason": reason,
+                }
+        elif section == "hook":
+            if not after["hook_enabled"]:
+                sections[section] = {"choice": "No hook", "reason": reason}
+            else:
+                sections[section] = {
+                    "choice": f"“{after['hook_text']}” · {after['hook_duration']:g} s · "
+                    f"{after['hook_position']}",
+                    # The words are still the clip's own; only how they look changed.
+                    "reason": f"The clip's own words, styled by your {name} template.",
+                }
+        elif section == "visuals":
+            visuals: VisualsConfig | None = after["visuals"]
+            count = len(visuals.elements) if visuals else 0
+            if not count:
+                sections[section] = {"choice": "No visuals", "reason": reason}
+            else:
+                items = (old.get("items") or [])[:count]
+                sections[section] = {
+                    "choice": f"{count} visual{'s' if count > 1 else ''}",
+                    "reason": reason,
+                    **({"items": items} if items else {}),
+                }
+        else:
+            sections[section] = {"choice": _audio_choice(after["audio"]), "reason": reason}
+    return sections
+
+
 def apply_template(
     validated: ValidatedPlan, template: dict[str, Any], context: AutoEditContext
 ) -> ValidatedPlan:
@@ -184,6 +261,12 @@ def apply_template(
             "Some of your template's settings don't fit this clip, so Auto Edit's own choices "
             "were kept."
         ]
+    explanations["sections"] = _describe(
+        dict(explanations.get("sections") or {}),
+        _fields(validated.configuration),
+        _fields(configuration),
+        template["name"],
+    )
     explanations["template"] = {
         "id": template["id"],
         "name": template["name"],

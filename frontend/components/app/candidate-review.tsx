@@ -267,7 +267,7 @@ function MomentCard({
               {categoryLabel(candidate.category)}
             </span>
           </div>
-          <h3 className="mt-1.5 text-section text-balance break-words text-foreground">{candidate.title}</h3>
+          <h3 dir="auto" className="mt-1.5 text-section text-balance break-words text-foreground">{candidate.title}</h3>
           <div className="mt-0.5">{times}</div>
           <blockquote className="mt-3 border-l-2 border-accent/60 pl-3 text-sm leading-relaxed text-pretty text-foreground">
             {candidate.hook}
@@ -294,7 +294,7 @@ function MomentCard({
                 ))}
               </ul>
               {candidate.transcript_excerpt ? (
-                <blockquote className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
+                <blockquote dir="auto" className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
                   {candidate.transcript_excerpt}
                 </blockquote>
               ) : null}

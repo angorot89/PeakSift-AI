@@ -70,11 +70,37 @@ def test_the_template_wins_over_the_planner_and_the_recipe():
     assert "Your template uses no B-roll" in plan.explanations["notes"][-1]
 
 
+def test_sections_the_template_changed_describe_the_render_not_the_planner():
+    """V1.8 QA: a Vox Pop plan said "We used the headline style" over a boxed hook. A section
+    the template changed is described from the final settings and credited to the template."""
+    plain = validate()
+    plan = applied(
+        template(framing="blur_background", caption_preset="minimal", caption_position="center",
+                 hook_style="boxed", hook_seconds=1.5, broll="none")
+    )  # fmt: skip
+    sections, got = plan.explanations["sections"], snapshot(plan)
+    assert sections["captions"]["choice"].startswith("Minimal captions · center")
+    assert sections["captions"]["reason"] == "Set by your Punchy Gaming template."
+    hook = got["hook"]
+    assert sections["hook"]["choice"] == f"“{hook['text']}” · 1.5 s · {hook['position']}"
+    assert (
+        sections["hook"]["reason"] == "The clip's own words, styled by your Punchy Gaming template."
+    )
+    assert sections["visuals"] == {
+        "choice": "No visuals",
+        "reason": "Set by your Punchy Gaming template.",
+    }
+    assert sections["layout"]["choice"] == "Blur background"
+    # A section the template left alone keeps the planner's (validated) explanation.
+    assert sections["audio"] == plain.explanations["sections"]["audio"]
+
+
 def test_empty_settings_keep_the_planners_choices_with_the_brand():
     plain = validate()
     plan = applied(template(brand=None))
     assert {k: v for k, v in snapshot(plan).items()} == plain.configuration.snapshot()
     assert plan.explanations["template"]["summary"] == "Started from your Punchy Gaming template."
+    assert plan.explanations["sections"] == plain.explanations["sections"]
 
 
 def test_what_a_template_cannot_force_falls_back_with_a_note():

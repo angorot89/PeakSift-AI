@@ -1,6 +1,6 @@
 "use client";
 
-import { Palette, Shapes } from "lucide-react";
+import { Languages, Palette, Shapes } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -42,6 +42,13 @@ export function OriginChips({ origin, brand }: { origin: EditOrigin | null; bran
         <span className="text-subtle">Brand:</span>
         <span className="truncate font-medium text-foreground">{brandName ?? "None"}</span>
       </span>
+      {origin?.market && origin.market.code !== "global" ? (
+        <span className={chip}>
+          <Languages aria-hidden="true" className="size-4 shrink-0 text-subtle" />
+          <span className="text-subtle">Made for:</span>
+          <span className="truncate font-medium text-foreground">{origin.market.name} Mode</span>
+        </span>
+      ) : null}
     </span>
   );
 }

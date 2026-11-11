@@ -122,6 +122,7 @@ function Provenance({ short }: { short: ShortDetail }) {
           )}
         </Row>
         <Row label="Brand">{short.brand ? short.brand.name : <span className="text-muted">None</span>}</Row>
+        {short.market ? <Row label="Made for">{short.market.name} Mode</Row> : null}
         {short.kind === "short" ? <Row label="Made with">{short.auto_edit ? "Auto Edit, then the editor" : "The editor"}</Row> : null}
         <Row label="Duration">{short.duration_seconds ? <span className="tabular">{clock(short.duration_seconds)}</span> : "—"}</Row>
         <Row label="Created">{dayLabel(short.created_at)}</Row>
