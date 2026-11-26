@@ -129,6 +129,15 @@ way to upload.
 - **The Shorts library.** A waiting post has not happened, so it never changes a Short's status:
   the Short stays *Ready* until the upload starts.
 
+- **Posting times.** `GET`/`PUT /posting-slots`: the weekly times the creator likes to post at,
+  as weekday + wall-clock time in their own IANA time zone (`users.posting_slots`,
+  `users.posting_timezone`; at most 28). `services/publishing/slots.py` turns them into the next
+  free times in UTC, each with that day's own offset so 19:00 stays 19:00 when the clocks
+  change, skipping any slot a scheduled post already holds or that is less than ten minutes
+  away. They are a preference, never automation: the Schedule page shows the free slots and
+  offers each ready Short its next one, and the creator still reviews the post in the dialog.
+  Saving new times does not move posts that are already scheduled.
+
 Scheduled posts need the beat process. The production stack already runs one
 (`deploy/docker-compose.prod.yml`, service `beat`); locally run
 `celery -A app.workers.celery_app beat` next to the worker.

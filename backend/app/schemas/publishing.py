@@ -75,6 +75,23 @@ class CalendarRead(BaseModel):
     connection_ready: bool
 
 
+class PostingSlot(BaseModel):
+    weekday: int = Field(ge=0, le=6)  # 0 = Monday
+    time: str = Field(pattern=r"^\d{2}:\d{2}$")
+
+
+class PostingSlotsUpdate(BaseModel):
+    timezone: str = Field(min_length=1, max_length=64)  # an IANA name, from the browser
+    slots: list[PostingSlot] = Field(max_length=100)
+
+
+class PostingSlotsRead(BaseModel):
+    timezone: str | None
+    slots: list[PostingSlot]
+    # The next free slot times (UTC): not in the past and not taken by a scheduled post.
+    upcoming: list[datetime]
+
+
 class PublishDefaults(BaseModel):
     title: str
     description: str

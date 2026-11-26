@@ -73,7 +73,18 @@ export function PublishToYouTube({
   );
 }
 
-export function PublishBody({ editId, onClose, returnTo }: { editId: string; onClose: () => void; returnTo?: string }) {
+export function PublishBody({
+  editId,
+  onClose,
+  returnTo,
+  initialWhen,
+}: {
+  editId: string;
+  onClose: () => void;
+  returnTo?: string;
+  /** Open on "Schedule for later" with this time (a datetime-local value), e.g. the next posting slot. */
+  initialWhen?: string;
+}) {
   const [panel, setPanel] = useState<PublishPanel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [job, setJob] = useState<PublishJob | null>(null);
@@ -152,7 +163,7 @@ export function PublishBody({ editId, onClose, returnTo }: { editId: string; onC
     );
   }
   if (job) return <JobProgress job={job} onChange={setJob} onClose={onClose} onNew={() => setJob(null)} />;
-  return <PublishForm editId={editId} panel={panel} onPublished={setJob} />;
+  return <PublishForm editId={editId} panel={panel} onPublished={setJob} initialWhen={initialWhen} />;
 }
 
 /** Opens Google's consent; afterwards the browser comes back to `returnTo`. */
@@ -185,10 +196,12 @@ function PublishForm({
   editId,
   panel,
   onPublished,
+  initialWhen,
 }: {
   editId: string;
   panel: PublishPanel;
   onPublished: (job: PublishJob) => void;
+  initialWhen?: string;
 }) {
   const id = useId();
   const [title, setTitle] = useState(panel.defaults.title);
@@ -199,8 +212,8 @@ function PublishForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // When: now, or at a time the creator picks (their local time).
-  const [later, setLater] = useState(false);
-  const [when, setWhen] = useState(() => toLocalInput(suggestedTime(new Date())));
+  const [later, setLater] = useState(Boolean(initialWhen));
+  const [when, setWhen] = useState(() => initialWhen ?? toLocalInput(suggestedTime(new Date())));
 
   const metadata = { title, description, tags: parseTags(tagText), privacy, made_for_kids: madeForKids };
   const problems = metadataProblems(metadata);

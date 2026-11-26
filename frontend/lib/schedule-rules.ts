@@ -104,3 +104,45 @@ export function postState(job: {
       return { label: "Not published", tone: "attention" };
   }
 }
+
+// --- posting times ----------------------------------------------------------------------------
+
+export type Slot = { weekday: number; time: string };
+
+export const WEEKDAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+export const MAX_SLOTS = 28;
+export const MAX_SLOTS_PER_DAY = 4;
+
+const sameSlot = (a: Slot, b: Slot) => a.weekday === b.weekday && a.time === b.time;
+const bySlot = (a: Slot, b: Slot) => a.weekday - b.weekday || a.time.localeCompare(b.time);
+
+/** "19:30"-style 24-hour times only (what `<input type="time">` gives). */
+export const isSlotTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+/** The slots with one more, in week order; unchanged when it is a duplicate, invalid or over a limit. */
+export function addSlot(slots: Slot[], slot: Slot): Slot[] {
+  if (!isSlotTime(slot.time) || slots.some((other) => sameSlot(other, slot))) return slots;
+  if (slots.length >= MAX_SLOTS) return slots;
+  if (slots.filter((other) => other.weekday === slot.weekday).length >= MAX_SLOTS_PER_DAY) return slots;
+  return [...slots, slot].sort(bySlot);
+}
+
+export const removeSlot = (slots: Slot[], slot: Slot): Slot[] => slots.filter((other) => !sameSlot(other, slot));
+
+/** Every day gets the times of `weekday` (replacing what the other days had). */
+export function copyDayToAll(slots: Slot[], weekday: number): Slot[] {
+  const times = slots.filter((slot) => slot.weekday === weekday).map((slot) => slot.time);
+  return WEEKDAY_LABELS.flatMap((_, day) => times.map((time) => ({ weekday: day, time }))).sort(bySlot);
+}
+
+/** "19:30" as the creator's locale writes a time ("7:30 PM"). */
+export function slotTimeLabel(time: string, locale?: string): string {
+  const [hour, minute] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, hour, minute).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+}
+
+/** How often the creator posts with these slots: "3 posts a week". */
+export function slotsSummary(slots: Slot[]): string {
+  if (!slots.length) return "No posting times yet";
+  return `${slots.length} post${slots.length === 1 ? "" : "s"} a week`;
+}
