@@ -48,20 +48,20 @@ export function ClipVideo({ clip, className = "" }: { clip: RealClip; className?
         loop
         playsInline
         preload="none"
-        aria-label={`A Short made with PeakSift from a ${clip.kind.toLowerCase()}`}
+        aria-label={clip.title ?? `A ${clip.kind.toLowerCase()} Short`}
         className="size-full object-cover"
       />
       {!autoplay ? (
         <button
           type="button"
           onClick={() => setStarted(true)}
-          aria-label={`Play the ${clip.kind.toLowerCase()} Short`}
+          aria-label={`Play “${clip.title ?? clip.kind}”`}
           className="absolute top-1/2 left-1/2 flex size-14 -translate-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
         >
           <Play aria-hidden="true" className="size-6 fill-white" />
         </button>
       ) : null}
-      {clip.platform ? <PlatformBadge platform={clip.platform} className="absolute top-[4%] right-[5%] size-8" /> : null}
+      {clip.platform ? <PlatformBadge platform={clip.platform} className="absolute right-[5%] bottom-[3%] size-7" /> : null}
     </span>
   );
 }

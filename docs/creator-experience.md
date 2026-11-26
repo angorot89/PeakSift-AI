@@ -210,8 +210,10 @@ Policy** drafts (`/terms`, `/privacy-policy`) describe what PeakSift really does
 legal review" notice and leave the company details as [placeholders]. The site also has a 404
 page, `sitemap.xml`, `robots.txt` (the signed-in app is disallowed), a share image and
 `NEXT_PUBLIC_SITE_URL`. Real Shorts made with PeakSift go in `public/clips/` and
-`components/landing/clips.ts`; with four or more, the "Made for" row plays them instead of the
-drawings. Deliberately not made: montage, emote and schedule makers, a clip downloader, a mobile
+`components/landing/clips.ts` (`REAL_CLIPS`); with four or more, the "Made for" row plays them
+instead of the drawings. "Shorts from our own channels" (`TEAM_CLIPS`) shows six real Shorts the
+team made for its own YouTube channels (code- and Blender-animated, no real people), web-encoded
+to 720 px without audio, labelled as the team's work and never as "made with PeakSift". Deliberately not made: montage, emote and schedule makers, a clip downloader, a mobile
 app, workspaces, careers and competitor comparisons — PeakSift has no such product. Tokens and rules:
 [design-system.md](design-system.md). Behaviour, copy rules and data are unchanged; the look
 described in the next section is superseded.
