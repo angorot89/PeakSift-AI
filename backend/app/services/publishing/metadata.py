@@ -109,9 +109,16 @@ def _check_text(field_name: str, text: str, *, allow_newlines: bool) -> None:
             raise MetadataError(field_name, "Remove control characters")
 
 
-def fingerprint(*, connection_id: uuid.UUID, edit_id: uuid.UUID, metadata: PublishMetadata) -> str:
-    """Identifies one publish request: the same connection, edit and metadata is the same
-    job (requested twice, it is not uploaded twice)."""
+def fingerprint(
+    *,
+    connection_id: uuid.UUID,
+    edit_id: uuid.UUID,
+    metadata: PublishMetadata,
+    options: dict | None = None,
+) -> str:
+    """Identifies one publish request: the same connection, edit, metadata and platform
+    options is the same job (requested twice, it is not uploaded twice). Options are part of
+    it only when there are any, so every existing fingerprint is unchanged."""
     payload = {
         "connection": str(connection_id),
         "edit": str(edit_id),
@@ -122,6 +129,8 @@ def fingerprint(*, connection_id: uuid.UUID, edit_id: uuid.UUID, metadata: Publi
         "made_for_kids": metadata.made_for_kids,
         "category": DEFAULT_CATEGORY_ID,
     }
+    if options:
+        payload["options"] = options
     encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()
 

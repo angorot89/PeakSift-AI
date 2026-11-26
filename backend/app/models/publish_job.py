@@ -100,6 +100,7 @@ class PublishJob(Base):
             "octet_length(description) <= 5000", name="ck_publish_jobs_description_length"
         ),
         CheckConstraint("jsonb_typeof(tags) = 'array'", name="ck_publish_jobs_tags"),
+        CheckConstraint("jsonb_typeof(options) = 'object'", name="ck_publish_jobs_options"),
         CheckConstraint(
             "progress_percent >= 0 AND progress_percent <= 100", name="ck_publish_jobs_progress"
         ),
@@ -136,6 +137,11 @@ class PublishJob(Base):
     privacy: Mapped[str] = mapped_column(String(16), default=Privacy.PRIVATE)
     made_for_kids: Mapped[bool] = mapped_column(Boolean, default=False)
     category_id: Mapped[str] = mapped_column(String(8))
+    # What the creator chose that only this platform has (TikTok: visibility level, comment /
+    # duet / stitch, commercial disclosure). Empty for YouTube. Validated before it is stored.
+    options: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
     fingerprint: Mapped[str] = mapped_column(String(64))
 
     status: Mapped[str] = mapped_column(String(32), default=PublishStatus.QUEUED)

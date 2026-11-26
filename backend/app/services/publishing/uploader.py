@@ -64,7 +64,12 @@ def run_upload(
                 progress = provider.query_upload(auth, session_uri, source.size)
             else:
                 offset = progress.confirmed_bytes
-                length = min(chunk_bytes, source.size - offset)
+                planned = getattr(provider, "chunk_length", None)
+                length = (
+                    planned(session_uri, offset, source.size)  # the platform's declared plan
+                    if planned is not None
+                    else min(chunk_bytes, source.size - offset)
+                )
                 data = source.read(offset, length)
                 if len(data) != length:
                     raise OSError("the source returned fewer bytes than requested")

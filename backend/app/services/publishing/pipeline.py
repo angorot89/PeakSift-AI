@@ -230,6 +230,7 @@ def _execute(
         category_id=job.category_id,
         size_bytes=size,
         content_type=edit.content_type or "video/mp4",
+        options=dict(job.options or {}),
     )
     key = edit.storage_key
 

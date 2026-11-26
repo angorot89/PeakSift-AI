@@ -122,6 +122,34 @@ jobs, and checked by the database on all three.
   `GET /publishing/platforms` returns them with the creator's connection to each. A platform is
   never listed before it works.
 
+## TikTok (provider and authorization; not yet offered to creators)
+
+`services/publishing/tiktok.py` implements the provider contract on TikTok's Content Posting
+API (direct post, `FILE_UPLOAD`), and `tiktok_oauth.py` its authorization. Both are tested
+against a mock of the documented endpoints (`tests/tiktok_mock.py`); **neither has run against
+TikTok itself**, which needs a TikTok developer app. Until the routes and the dialog exist,
+TikTok is not in the platform registry and no creator can reach it.
+
+- **Authorization.** Login Kit for Web, scope `video.publish` only. Single-use, user-bound,
+  hashed, ten-minute state, never shared with YouTube's. TikTok's web flow has no PKCE.
+  Redirect URIs must be https.
+- **Refresh tokens rotate.** Every refresh returns a new refresh token and kills the old one;
+  the pipeline stores the new one before using the access token.
+- **Upload.** `video/init` returns a `publish_id` and an `upload_url` (valid one hour); they
+  and the chunk plan are the encrypted session. Chunks follow the plan declared at init
+  (`chunk_plan`: 5–64 MB, `floor(size / chunk)` chunks, the last carries the remainder; under
+  5 MB is one request), so the uploader asks the provider for each chunk's length. A resumed
+  upload asks `status/fetch` how many bytes TikTok holds; an expired URL means a new session.
+- **Result.** `PUBLISH_COMPLETE` is the only state called published. The id PeakSift keeps is
+  the `publish_id`, which is not a public video id — no link is built from it.
+- **What the creator chooses** travels in `publish_jobs.options` (validated, part of the
+  fingerprint when present): `privacy_level` from the levels TikTok offers that creator
+  (`creator_info`), never defaulted; comment, duet and stitch off unless chosen; commercial
+  content disclosure. The caption is the reviewed description (at most 2200 UTF-16 units),
+  refused rather than cut.
+- **Before TikTok's audit** a client may only post privately (`SELF_ONLY`) to private accounts,
+  for a handful of accounts a day. PeakSift reports those refusals in plain words.
+
 ## Scheduled publishing
 
 A creator can publish now or pick a time. A scheduled post is an ordinary publish job in the

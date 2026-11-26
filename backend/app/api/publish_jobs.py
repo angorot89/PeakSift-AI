@@ -93,7 +93,8 @@ def _retryable(job: PublishJob) -> bool:
 def _read(job: PublishJob) -> PublishJobRead:
     video_id = job.provider_video_id
     simulated = bool(video_id) and job.provider == "youtube" and video_id.startswith("fake-")
-    real = video_id and not simulated
+    # A link only where the id is a public video id: TikTok's is a publish id, not a video's.
+    real = video_id and not simulated and job.provider == "youtube"
     return PublishJobRead(
         id=job.id,
         edit_id=job.edit_id,

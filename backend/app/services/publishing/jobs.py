@@ -41,16 +41,21 @@ def request_publish(
     metadata: PublishMetadata,
     task_id: str,
     scheduled_at: datetime | None = None,
+    options: dict | None = None,
+    platform: str = "YouTube",
 ) -> tuple[PublishJob, bool]:
     """``(job, created)``. Raises :class:`PublishRefused` for an unready edit or account."""
     if edit.status != ClipEditStatus.READY or not edit.storage_key:
         raise PublishRefused("edit_not_ready", "Render the short before publishing it")
     if connection is None:
-        raise PublishRefused("not_connected", "Connect a YouTube account first")
+        raise PublishRefused("not_connected", f"Connect a {platform} account first")
     if connection.status != ConnectionStatus.CONNECTED:
-        raise PublishRefused("needs_reconnect", "Reconnect your YouTube account to publish")
+        raise PublishRefused("needs_reconnect", f"Reconnect your {platform} account to publish")
 
-    key = fingerprint(connection_id=connection.id, edit_id=edit.id, metadata=metadata)
+    options = dict(options or {})
+    key = fingerprint(
+        connection_id=connection.id, edit_id=edit.id, metadata=metadata, options=options
+    )
     existing = _by_fingerprint(db, user_id, key)
     if existing is not None:
         return existing, False
@@ -65,6 +70,7 @@ def request_publish(
         privacy=metadata.privacy.value,
         made_for_kids=metadata.made_for_kids,
         category_id=DEFAULT_CATEGORY_ID,
+        options=options,
         fingerprint=key,
         # A scheduled job waits; the scheduler gives it its token when it releases it.
         status=PublishStatus.SCHEDULED if scheduled_at else PublishStatus.QUEUED,

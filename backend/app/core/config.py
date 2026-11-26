@@ -308,6 +308,15 @@ class Settings(BaseSettings):
     publishing_provider: Literal["youtube", "fake"] = "youtube"
     # Bytes per resumable-upload request; Google requires multiples of 256 KiB. Default 8 MiB.
     youtube_upload_chunk_bytes: int = Field(default=8 * 1024 * 1024, ge=256 * 1024)
+    # --- TikTok (Content Posting API, direct post) ---------------------------------------
+    # Off unless explicitly enabled; when on, the settings below are validated at startup.
+    tiktok_publishing_enabled: bool = False
+    tiktok_client_key: str = ""
+    tiktok_client_secret: SecretStr | None = None
+    # The API's /publishing/tiktok/callback URL, exactly as registered with TikTok (https only).
+    tiktok_oauth_redirect_uri: str = ""
+    # Bytes per upload request. TikTok accepts 5 MB to 64 MB per chunk. Default 10 MiB.
+    tiktok_upload_chunk_bytes: int = Field(default=10 * 1024 * 1024, ge=5 * 1024 * 1024)
     # A publish whose heartbeat is older than this is stalled (retryable).
     publish_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     publish_max_attempts: int = Field(default=5, ge=1)
@@ -415,6 +424,37 @@ class Settings(BaseSettings):
         return [p.strip() for p in self.trusted_proxies.split(",") if p.strip()]
 
 
+def _tiktok_problems(settings: "Settings", key: object) -> list[str]:
+    """What is wrong with the TikTok settings, by name only (nothing when it is switched off)."""
+    problems: list[str] = []
+    if settings.tiktok_upload_chunk_bytes > 64_000_000:
+        problems.append("TIKTOK_UPLOAD_CHUNK_BYTES must be at most 64000000 (64 MB)")
+    if not settings.tiktok_publishing_enabled:
+        return problems
+    if key is None:
+        problems.append("PUBLISHING_TOKEN_ENCRYPTION_KEY is required when publishing is enabled")
+    if not settings.tiktok_client_key:
+        problems.append("TIKTOK_CLIENT_KEY is required when TikTok publishing is enabled")
+    if (
+        settings.tiktok_client_secret is None
+        or not settings.tiktok_client_secret.get_secret_value()
+    ):
+        problems.append("TIKTOK_CLIENT_SECRET is required when TikTok publishing is enabled")
+    redirect = urlsplit(settings.tiktok_oauth_redirect_uri)
+    if (
+        redirect.scheme != "https"  # TikTok accepts https redirect URIs only
+        or not redirect.hostname
+        or redirect.query
+        or redirect.fragment
+        or redirect.username
+        or not redirect.path.endswith("/publishing/tiktok/callback")
+    ):
+        problems.append(
+            "TIKTOK_OAUTH_REDIRECT_URI must be the API's https /publishing/tiktok/callback URL"
+        )
+    return problems
+
+
 def publishing_problems(settings: "Settings") -> list[str]:
     """Why the publishing settings cannot work (names only, never values)."""
     from app.services.publishing.tokens import TokenKeyError, decode_key, parse_previous_keys
@@ -441,6 +481,7 @@ def publishing_problems(settings: "Settings") -> list[str]:
         problems.append("YOUTUBE_ANALYTICS_ENABLED needs YOUTUBE_PUBLISHING_ENABLED")
     if settings.youtube_upload_chunk_bytes % (256 * 1024):
         problems.append("YOUTUBE_UPLOAD_CHUNK_BYTES must be a multiple of 262144 (256 KiB)")
+    problems.extend(_tiktok_problems(settings, key))
     if not settings.youtube_publishing_enabled:
         return problems
     if key is None:

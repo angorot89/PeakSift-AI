@@ -17,9 +17,10 @@ Every failure is a :class:`PublishProviderError` with one of the normalized
 can help.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class PublishErrorCode(StrEnum):
@@ -97,6 +98,9 @@ class VideoRequest:
     category_id: str
     size_bytes: int
     content_type: str = "video/mp4"
+    # What the creator chose that only this platform has (e.g. TikTok's visibility level and
+    # interaction switches). Validated values only; a provider ignores what it does not know.
+    options: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -143,3 +147,7 @@ class PublishingProvider(Protocol):
     ) -> UploadProgress: ...
 
     def video_status(self, auth: ProviderAuth, video_id: str) -> VideoStatus: ...
+
+    # Optional: ``chunk_length(session_uri, offset, total) -> int``. A platform whose chunks
+    # must follow a plan declared when the session was opened (TikTok) says how long the next
+    # request must be; without it the uploader sends its configured chunk size.
