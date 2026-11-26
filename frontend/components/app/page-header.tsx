@@ -2,7 +2,6 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ShellSearch } from "@/components/app/shell-search";
-import { PeakArt } from "@/components/ui/peak-art";
 
 type PageHeaderProps = {
   title: ReactNode;
@@ -10,8 +9,7 @@ type PageHeaderProps = {
   action?: ReactNode;
   /** A back link (href + label) rendered above the title. */
   back?: { href: string; label: string };
-  /** "hero" for a destination's front page (Home, Analytics, Brand Studio): a larger title and
-   * the decorative peak art. */
+  /** "hero" for a destination's front page (Home, Analytics, Brand Studio): a larger title. */
   size?: "page" | "hero";
   /** Extra content under the title row (e.g. the workflow stepper). */
   children?: ReactNode;
@@ -22,7 +20,6 @@ type PageHeaderProps = {
 export function PageHeader({ title, description, action, back, size = "page", children }: PageHeaderProps) {
   return (
     <header className="relative mb-8">
-      {size === "hero" ? <PeakArt /> : null}
       <div className="relative grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
         <div className="min-w-0">
           {back ? (

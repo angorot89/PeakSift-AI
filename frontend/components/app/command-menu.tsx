@@ -159,7 +159,7 @@ function MenuBody({
             const headingId = `${listId}-${group.replace(/\s+/g, "-")}`;
             return (
               <div key={group} role="group" aria-labelledby={headingId} className="flex flex-col">
-                <p id={headingId} className="px-2 pb-1 text-xs font-medium tracking-wide text-subtle uppercase">
+                <p id={headingId} className="px-2 pb-1 text-xs font-medium text-subtle">
                   {group}
                 </p>
                 {items.map((command) => {
@@ -173,7 +173,7 @@ function MenuBody({
                       aria-selected={selected}
                       onMouseMove={() => position !== current && setActive(position)}
                       onClick={() => run(command)}
-                      className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm pointer-coarse:min-h-11 ${
+                      className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-control px-2 py-1.5 text-sm pointer-coarse:min-h-11 ${
                         selected ? "bg-white/[0.08] text-foreground" : "text-muted"
                       }`}
                     >

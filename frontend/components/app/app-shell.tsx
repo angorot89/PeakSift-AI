@@ -74,13 +74,13 @@ function NavLink({
       } ${nested ? "min-h-9 pl-11 pr-2.5 text-small" : "min-h-11 px-3 text-[0.9375rem]"} ${
         active
           ? nested
-            ? "bg-white/[0.06] font-medium text-foreground"
+            ? "bg-surface-2 font-medium text-foreground"
             : "nav-active font-medium text-foreground"
-          : "text-muted hover:bg-white/[0.045] hover:text-foreground"
+          : "text-muted hover:bg-surface hover:text-foreground"
       }`}
     >
       {nested ? null : (
-        <Icon aria-hidden="true" className={`size-5 shrink-0 ${active ? "text-accent-soft" : "text-subtle group-hover:text-muted"}`} />
+        <Icon aria-hidden="true" className={`size-5 shrink-0 ${active ? "text-foreground" : "text-subtle group-hover:text-muted"}`} />
       )}
       <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>{label}</span>
     </Link>
@@ -99,9 +99,9 @@ function AskButton({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?:
       }}
       aria-expanded={open}
       title={collapsed ? "Ask PeakSift" : undefined}
-      className={`ask-button group flex min-h-12 items-center gap-3 rounded-block px-3.5 text-[0.9375rem] font-semibold text-foreground transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+      className={`group flex min-h-11 items-center gap-3 rounded-control border px-3 text-[0.9375rem] font-medium text-foreground transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
         collapsed ? "justify-center px-0" : ""
-      } ${open ? "ask-button-open" : ""}`}
+      } ${open ? "border-accent/60 bg-surface-2" : "border-border-strong bg-surface hover:bg-surface-2"}`}
     >
       <Sparkles aria-hidden="true" className="size-5 shrink-0 text-accent-soft" />
       <span className={collapsed ? "sr-only" : "min-w-0 truncate"}>Ask PeakSift</span>
@@ -152,7 +152,7 @@ function SidebarContent({
         >
           <LogoMark className="size-8" />
           <span className={collapsed ? "sr-only" : ""}>
-            PeakSift <span className="text-accent-soft">AI</span>
+            PeakSift <span className="font-normal text-subtle">AI</span>
           </span>
         </Link>
         {onToggle ? (
@@ -201,7 +201,7 @@ function SidebarContent({
             type="button"
             onClick={onSearch}
             aria-haspopup="dialog"
-            className="flex min-h-11 items-center gap-3 rounded-control px-3 text-[0.9375rem] text-muted transition-colors hover:bg-white/[0.045] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:hidden"
+            className="flex min-h-11 items-center gap-3 rounded-control px-3 text-[0.9375rem] text-muted transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:hidden"
           >
             <Search aria-hidden="true" className="size-5 shrink-0 text-subtle" />
             Search
@@ -214,14 +214,14 @@ function SidebarContent({
             side="above"
             align="start"
             className="w-full"
-            triggerClassName={`flex min-h-14 w-full items-center gap-3 rounded-block border border-border bg-surface/70 text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            triggerClassName={`flex min-h-14 w-full items-center gap-3 rounded-control border border-border bg-surface text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               collapsed ? "justify-center px-0" : "px-2.5"
             }`}
             trigger={
               <>
                 <span
                   aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent/80 to-violet/70 text-sm font-semibold text-white uppercase ring-1 ring-white/15"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-3 text-sm font-semibold text-foreground uppercase"
                 >
                   {user.email.charAt(0)}
                 </span>
@@ -308,16 +308,16 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <ShellSearchContext.Provider value={openMenu}>
-    <div className="app-atmosphere flex min-h-dvh">
+    <div className="flex min-h-dvh bg-background">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-control focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
       >
         Skip to content
       </a>
       <aside
         aria-label="Sidebar"
-        className={`sidebar sticky top-0 hidden h-dvh shrink-0 border-r border-border px-3 py-5 transition-[width] duration-200 lg:block ${
+        className={`sticky top-0 hidden h-dvh bg-chrome shrink-0 border-r border-border px-3 py-5 transition-[width] duration-200 lg:block ${
           collapsed ? "w-[4.75rem]" : "w-64"
         }`}
       >
@@ -326,13 +326,13 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
       <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[28rem]" : ""}`}>
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-chrome px-3 lg:hidden">
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <MenuIcon aria-hidden="true" />
           </IconButton>
           <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-bold tracking-tight">
             <LogoMark className="size-7" />
-            PeakSift <span className="text-accent-soft">AI</span>
+            PeakSift <span className="font-normal text-subtle">AI</span>
           </Link>
           <IconButton aria-label="Search" aria-haspopup="dialog" onClick={openMenu} className="ml-auto">
             <Search aria-hidden="true" />

@@ -332,7 +332,7 @@ export function EditorTimeline({
               style={{ left: LABEL, width: 0 }}
             >
               <div ref={playhead} className="absolute top-0 bottom-0 will-change-transform">
-                <div className="absolute top-0 bottom-0 -left-px w-0.5 bg-accent shadow-[0_0_8px_rgb(249_115_22/0.6)]" />
+                <div className="absolute top-0 bottom-0 -left-px w-0.5 bg-accent" />
                 <div
                   ref={handle}
                   role="slider"

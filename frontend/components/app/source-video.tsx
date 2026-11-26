@@ -53,7 +53,7 @@ function SourceDetails({ video }: { video: Video }) {
           <Fact key={label} label={label} value={value} />
         ))}
       </dl>
-      <details className="group rounded-lg border border-border">
+      <details className="group rounded-control border border-border">
         <summary className="flex min-h-8 cursor-pointer list-none items-center px-3 py-2 text-xs pointer-coarse:min-h-11 text-muted transition-colors select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">Show technical details</span>
           <span className="hidden group-open:inline">Hide technical details</span>
@@ -86,7 +86,7 @@ export function SourceSection({ projectId }: { projectId: string }) {
   if (loading) {
     body = (
       <div role="status" aria-label="Loading source video" className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Skeleton className="aspect-video w-full rounded-xl" />
+        <Skeleton className="aspect-video w-full rounded-block" />
         <div className="space-y-3">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-16 w-full" />
@@ -217,8 +217,8 @@ export function ClipsSection({ projectId }: { projectId: string }) {
   if (loading) {
     return (
       <div role="status" aria-label="Loading clips" className="space-y-4">
-        <Skeleton className="h-40 w-full rounded-2xl" />
-        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-40 w-full rounded-card" />
+        <Skeleton className="h-64 w-full rounded-card" />
       </div>
     );
   }

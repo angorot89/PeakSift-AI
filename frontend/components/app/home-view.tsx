@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  ChevronRight,
   Clapperboard,
   Plus,
   Scissors,
@@ -23,7 +22,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
-import { PeakArt } from "@/components/ui/peak-art";
 import { Spinner } from "@/components/ui/progress";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,12 +64,8 @@ function Welcome() {
   ];
   return (
     <div className="relative mx-auto max-w-4xl py-6 sm:py-12">
-      <PeakArt />
       <div className="relative">
-        <p className="text-small font-medium text-accent-soft">Welcome to PeakSift</p>
-        <h1 className="mt-2 max-w-2xl text-page text-balance sm:text-display">
-          Find the moments worth <span className="text-accent-soft">clipping</span>
-        </h1>
+        <h1 className="max-w-2xl text-page text-balance sm:text-display">Find the moments worth clipping</h1>
         <p className="mt-3 max-w-xl text-lead text-pretty text-muted">
           PeakSift finds the best moments in your long videos and helps you edit them for YouTube Shorts, TikTok and Reels.
         </p>
@@ -79,7 +73,7 @@ function Welcome() {
         <QuickStart className="mt-7 max-w-2xl" />
         <p className="mt-3 text-small text-muted">
           Prefer to set things up first?{" "}
-          <Link href="/projects/new" className="text-accent-soft underline underline-offset-2 hover:text-foreground">
+          <Link href="/projects/new" className="text-foreground underline decoration-subtle underline-offset-2 hover:decoration-foreground">
             Create an empty project
           </Link>
         </p>
@@ -92,7 +86,7 @@ function Welcome() {
         {steps.map((step, index) => (
           <li key={step.title}>
             <Card className="h-full">
-              <span className="flex size-10 items-center justify-center rounded-block bg-accent/12 text-accent-soft">
+              <span className="flex size-10 items-center justify-center rounded-block bg-surface-3 text-foreground">
                 <step.icon aria-hidden="true" className="size-5" />
               </span>
               <p className="mt-4 text-title">
@@ -159,12 +153,6 @@ function ContinueCard({ item, project }: { item: ContinueItem; project: ProjectS
             <span className="block text-title text-pretty">{item.title}</span>
             <span className="mt-0.5 block truncate text-small text-subtle">{item.project_name}</span>
           </span>
-          <span
-            aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-muted transition-colors group-hover:border-border-strong group-hover:text-foreground"
-          >
-            <ChevronRight className="size-4" />
-          </span>
         </span>
         <span className="block text-sm text-pretty text-muted">{item.description}</span>
         <span className="mt-auto flex flex-wrap items-center justify-between gap-3">
@@ -181,20 +169,23 @@ export function StageBar({ project }: { project: ProjectSummary }) {
   const steps = workflowSteps(project);
   const done = steps.filter((step) => step.state === "done").length;
   const now = steps.find((step) => step.state !== "done");
+  // Done steps are quiet, the step that is up next carries the signal colour.
   return (
     <span className="block">
       <span className="flex gap-1" aria-hidden="true">
         {steps.map((step) => (
           <span
             key={step.key}
-            className={`h-1.5 flex-1 rounded-full ${
+            className={`h-1 flex-1 rounded-full ${
               step.state === "done"
-                ? "bg-accent"
+                ? "bg-subtle"
                 : step.state === "working"
-                  ? "bg-violet/70"
+                  ? "bg-violet/80"
                   : step.state === "attention"
-                    ? "bg-danger/70"
-                    : "bg-white/10"
+                    ? "bg-danger/80"
+                    : step === now
+                      ? "bg-accent"
+                      : "bg-surface-3"
             }`}
           />
         ))}
@@ -238,7 +229,7 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
             </span>
           </span>
         </span>
-        <span className="mt-auto flex items-center gap-3 rounded-block border border-border bg-surface-2/70 px-3 py-2.5">
+        <span className="mt-auto flex items-center gap-3 rounded-block bg-surface-2 px-3 py-2.5">
           <span className="min-w-0 flex-1">
             <span className="block text-caption text-subtle">Next step</span>
             <span className="block truncate text-sm font-medium text-foreground">{next.title}</span>
@@ -286,10 +277,10 @@ function CreateTile({ home }: { home: Home }) {
     <li className="min-w-0">
       <Link
         href={href}
-        className="flex aspect-[9/16] flex-col items-center justify-center gap-3 rounded-card border border-dashed border-border-strong p-4 text-center text-sm text-muted transition-colors hover:border-accent/50 hover:bg-accent/[0.04] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex aspect-[9/16] flex-col items-center justify-center gap-3 rounded-card border border-dashed border-border-strong p-4 text-center text-sm text-muted transition-colors hover:border-subtle hover:bg-surface hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <span className="flex size-11 items-center justify-center rounded-full border border-border-strong bg-surface-2">
-          <Scissors aria-hidden="true" className="size-5 text-accent-soft" />
+          <Scissors aria-hidden="true" className="size-5 text-foreground" />
         </span>
         Create a Short from any moment
       </Link>
@@ -304,7 +295,7 @@ function GettingStarted({ home }: { home: Home }) {
   if (complete || dismissed) return null;
   const done = steps.filter((step) => step.done).length;
   return (
-    <section aria-labelledby="start-heading" className="rounded-card border border-accent/30 bg-accent/[0.05] px-5 py-4">
+    <section aria-labelledby="start-heading" className="next-up rounded-card border border-border bg-surface px-5 py-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="start-heading" className="text-title">Getting started</h2>
@@ -327,7 +318,7 @@ function GettingStarted({ home }: { home: Home }) {
             >
               {step.done ? <CheckCircle2 className="size-3.5" /> : index + 1}
             </span>
-            <span className={step.done ? "text-muted line-through decoration-white/20" : "text-foreground"}>
+            <span className={step.done ? "text-muted line-through decoration-subtle/50" : "text-foreground"}>
               {step.title}
               <span className="sr-only">{step.done ? " (done)" : ""}</span>
             </span>
@@ -360,7 +351,7 @@ function Returning({ home }: { home: Home }) {
         size="hero"
         title={
           <>
-            Welcome back{name ? <>, <span className="text-accent-soft">{name}</span></> : null}
+            Welcome back{name ? `, ${name}` : ""}
           </>
         }
         description="Turn your long-form videos into Shorts worth watching."

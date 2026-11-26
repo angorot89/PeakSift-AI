@@ -353,7 +353,7 @@ function PublishForm({
           {(["private", "unlisted", "public"] as const).map((option) => (
             <label
               key={option}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
             >
               <input
                 type="radio"
@@ -377,7 +377,7 @@ function PublishForm({
           {[false, true].map((value) => (
             <label
               key={String(value)}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
             >
               <input
                 type="radio"
@@ -398,7 +398,7 @@ function PublishForm({
           {[false, true].map((value) => (
             <label
               key={String(value)}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
             >
               <input
                 type="radio"

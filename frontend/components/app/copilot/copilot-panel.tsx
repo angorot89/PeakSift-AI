@@ -367,7 +367,7 @@ export function CopilotPanel() {
         className="fixed inset-y-0 right-0 z-40 flex w-[min(28rem,100vw)] animate-sheet-right flex-col border-l border-border bg-surface shadow-raised"
       >
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-block bg-accent/15 text-accent-soft">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-block bg-surface-3 text-foreground">
             <Sparkles className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -411,7 +411,7 @@ function Welcome({
           you decide and click.
         </p>
       </div>
-      <p className="text-caption font-medium tracking-wide text-subtle uppercase">Try asking</p>
+      <p className="text-small font-medium text-subtle">Try asking</p>
       <ul className="grid gap-2 sm:grid-cols-2" aria-label="Suggested questions">
         {starters(page, hasSource).map((text) => (
           <li key={text} className="min-w-0">
@@ -421,7 +421,7 @@ function Welcome({
               onClick={() => onAsk(text)}
               className="group flex min-h-14 w-full items-center gap-3 rounded-block border border-border bg-surface-2/70 px-3.5 py-2.5 text-left text-sm text-foreground transition-[border-color,background-color] hover:border-accent/40 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
             >
-              <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-control bg-accent/12 text-accent-soft">
+              <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-control bg-surface-3 text-foreground">
                 <Lightbulb className="size-4" />
               </span>
               <span className="min-w-0 flex-1 text-pretty">{text}</span>
@@ -581,7 +581,7 @@ function Composer({
       <label htmlFor={id} className="sr-only">
         Ask PeakSift
       </label>
-      <div className="flex items-end gap-2 rounded-block border border-border-strong bg-surface-2 p-1.5 focus-within:border-accent/60 focus-within:shadow-[0_0_0_3px_rgb(249_115_22/0.15)]">
+      <div className="flex items-end gap-2 rounded-block border border-border-strong bg-surface-2 p-1.5 focus-within:border-accent/60">
         <textarea
           ref={inputRef}
           id={id}

@@ -85,7 +85,7 @@ export function AnalyticsAccessGate({ access }: { access: AnalyticsAccess }) {
     );
   }
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-surface-2 px-4 py-4">
+    <div className="space-y-4 rounded-block border border-border bg-surface-2 px-4 py-4">
       <div>
         <p className="font-medium text-foreground">Analytics access not connected</p>
         <p className="mt-0.5 text-sm text-muted">

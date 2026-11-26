@@ -65,7 +65,7 @@ import {
 } from "@/lib/visuals";
 
 const field =
-  "h-9 w-full rounded-lg border border-border bg-white/[0.03] px-2.5 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
+  "h-9 w-full rounded-control border border-border bg-white/[0.03] px-2.5 text-sm text-foreground outline-none focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40";
 
 type Chooser = { suggestion: BrollSuggestion | null; replace: string | null } | null;
 
@@ -215,7 +215,7 @@ export function VisualsPanel({
       </div>
 
       {/* --- AI suggestions --------------------------------------------------------------- */}
-      <div className="space-y-3 rounded-xl border border-border bg-surface-2/60 p-3">
+      <div className="space-y-3 rounded-block border border-border bg-surface-2/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-1.5 text-small font-medium text-foreground">
             <Sparkles aria-hidden="true" className="size-3.5 text-accent-soft" />
@@ -377,7 +377,7 @@ function SuggestionCard({
   disabled: boolean;
 }) {
   return (
-    <li className="rounded-lg border border-border bg-surface px-3 py-2.5">
+    <li className="rounded-control border border-border bg-surface px-3 py-2.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <button
@@ -532,7 +532,7 @@ function MatchPreview({
       }
     >
       <div className="space-y-3">
-        <div className={`flex max-h-[55dvh] items-center justify-center overflow-hidden rounded-xl ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
+        <div className={`flex max-h-[55dvh] items-center justify-center overflow-hidden rounded-block ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
           {asset.kind === "video" ? (
             <video
               src={visualContentUrl(projectId, asset.id)}
@@ -578,7 +578,7 @@ function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex w-full rounded-lg border border-border bg-surface-2 p-0.5 sm:w-auto">
+    <div role="group" aria-label={label} className="inline-flex w-full rounded-control border border-border bg-surface-2 p-0.5 sm:w-auto">
       {options.map((option) => (
         <button
           key={option.value}
@@ -719,7 +719,7 @@ function ElementEditor({
     <li
       ref={ref}
       onFocusCapture={onFocus}
-      className={`space-y-3 rounded-xl border bg-surface-2/40 p-3 transition-colors ${selected ? "border-accent/50" : "border-border"}`}
+      className={`space-y-3 rounded-block border bg-surface-2/40 p-3 transition-colors ${selected ? "border-accent/50" : "border-border"}`}
     >
       <div className="flex items-center gap-3">
         <span className={`flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md ${asset?.has_alpha ? "checkerboard" : "bg-black"}`}>
@@ -758,7 +758,7 @@ function ElementEditor({
             return (
               <label
                 key={mode}
-                className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center text-caption leading-tight has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-control border px-1.5 py-2 text-center text-caption leading-tight has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                   unavailable ? "cursor-not-allowed border-border opacity-50" : "border-border hover:border-border-strong"
                 }`}
                 title={unavailable ? "Overlays use images" : MODE_HINTS[mode]}

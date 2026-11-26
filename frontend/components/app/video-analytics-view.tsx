@@ -56,7 +56,7 @@ export function provenanceRows(p: Provenance): [string, string][] {
 
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-3">
+    <div className="rounded-block border border-border bg-surface px-4 py-3">
       <dt className="text-xs text-subtle">{label}</dt>
       <dd className="mt-1">
         <span className="tabular block text-xl font-semibold text-foreground">{value}</span>
@@ -81,8 +81,8 @@ export function VideoAnalyticsView() {
   if (loading && !video) {
     return (
       <div role="status" aria-label="Loading analytics" className="space-y-3">
-        <Skeleton className="h-10 w-2/3 rounded-lg" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-10 w-2/3 rounded-control" />
+        <Skeleton className="h-40 w-full rounded-block" />
       </div>
     );
   }

@@ -1,20 +1,23 @@
 # PeakSift design system
 
-One dark, warm theme (V1.5, refined by the visual overhaul that followed V1.7), evolved rather
-than replaced. Tokens live in `frontend/app/globals.css`;
+One dark theme, the **edit bay** (November 2026): neutral graphite like a video editor, so the
+creator's own frames carry the colour, and one signal colour — cue yellow — for what to do next
+and for marked moments. No glows, gradients or decorative art in the workspace. Tokens live in `frontend/app/globals.css`;
 primitives in `frontend/components/ui/`. Use them instead of one-off values in JSX.
 
 ## Tokens
 
 | Group | Tokens |
 | --- | --- |
-| Surfaces (page → raised) | a warm near-black `background` · `surface` · `surface-2` · `surface-3`; borders `border`, `border-strong`; a faint fixed warm light behind the workspace (`.app-atmosphere`) |
-| Text | `foreground` (primary) · `muted` (secondary, ≥ 7:1 on panels) · `subtle` (metadata, ≥ 4.5:1) |
-| Accent | `accent` (marks, focus) · `accent-soft` (accent text on dark) · `accent-fill` / `accent-fill-hover` with dark `accent-ink` text (≥ 8:1) — the primary action |
-| Semantic accents | `success` (done, published) · `info` (facts, drafts, links) · `violet` (working, rendering, AI) · `warning` · `danger` — only where they mean something |
-| Type scale | `text-display` 40 px (a destination's hero title) · `text-page` 32 px · `text-section` 20 px · `text-title` 15 px semibold · `text-lead` 15 px · `text-sm` 14 px (body) · `text-small` 13 px · `text-caption` 12 px |
-| Radius | `rounded-control` 10 px (buttons, inputs, menus) · `rounded-block` 14 px (inner blocks, media, tiles) · `rounded-card` 18 px (cards, panels, dialogs) · `rounded-full` pills and avatars |
-| Elevation | `shadow-card` (hairline highlight + soft drop) · `shadow-raised` (menus, panels) · `shadow-glow` (the primary action only) |
+| Surfaces (chrome → raised) | `chrome` (sidebar, phone top bar, darkest) · graphite `background` · `surface` · `surface-2` · `surface-3`; solid borders `border`, `border-strong` |
+| Text | `foreground` (primary) · `muted` (secondary, ≥ 7:1 on panels) · `subtle` (metadata, ≥ 4.5:1 on every surface) |
+| Signal | `accent` cue yellow (marks, focus, the step that is up next, selected track) · `accent-soft` (signal text on dark, slightly paler) · `accent-fill` / `accent-fill-hover` with dark `accent-ink` text (≥ 14:1) — the primary action. Never decoration |
+| Semantic colours | `success` (done, published) · `info` (facts, drafts, links) · `violet` (working, rendering, AI) · `warning` (amber, so it never reads as the signal) · `danger` — only where they mean something |
+| Type | Instrument Sans (`--font-ui`); display, page and section titles and every `h1`/`h2` are set narrow (`font-stretch: 86%`, the slate voice), body text at normal width; Geist Mono only for hex values and transcript timestamps |
+| Type scale | `text-display` 44 px (a destination's hero title) · `text-page` 34 px · `text-section` 20 px · `text-title` 15 px semibold · `text-lead` 15 px · `text-sm` 14 px (body) · `text-small` 13 px · `text-caption` 12 px |
+| Radius | tight, like hardware: `rounded-control` 6 px (buttons, inputs, menus) · `rounded-block` 8 px (inner blocks, media, tiles) · `rounded-card` 12 px (cards, panels, dialogs) · `rounded-full` pills and avatars. Tailwind's `rounded-lg/xl/2xl` are not used in the app |
+| Elevation | panels sit flat on their line (`shadow-card` is a 1 px floor); only floating things cast a shadow (`shadow-raised`: menus, dialogs, sheets); `shadow-glow` is kept as a no-op |
+| Marks | `.nav-active` (raised row + 2 px signal bar: the current destination) · `.next-up` (3 px signal bar: the one next step on a page) |
 | Spacing | Tailwind's 4 px scale only (no 13/17/23 px values) |
 | Motion | one easing (`ease-out-soft`); `animate-dialog-in`, `animate-sheet-left`/`-right`/`-up`, `animate-fade-in`; interactive cards lift 1 px; everything is reduced to an instant change under `prefers-reduced-motion` |
 
@@ -25,7 +28,7 @@ mirror the render's proportions.
 
 | Primitive | Use |
 | --- | --- |
-| `Button` / `ButtonLink` | **primary** (the warm orange action, one per region: the next step) · **secondary** · **ghost** · **danger**. 32/40/48 px; 44 px on touch screens |
+| `Button` / `ButtonLink` | **primary** (the cue-yellow action, one per region: the next step) · **secondary** · **ghost** · **danger**. 32/40/48 px; 44 px on touch screens |
 | `IconButton` | icon-only; requires `aria-label`; 36 px (44 px on touch) |
 | `Card` | the one content surface; `interactive` for a card that is a link |
 | `SectionHeader` | a section's heading, one line of context, and its actions |
@@ -37,7 +40,6 @@ mirror the render's proportions.
 | `useToast` | brief confirmation of a small completed action; problems stay inline |
 | `StatusPill` / `StatusBadge` | state in words plus a shape (never colour alone), tinted per state; `overlay` for a chip on a thumbnail |
 | `VideoFrame` / `FrameTag` | a real still from the creator's own source, clip or Short at a given second (lazy, owner-checked media URL, fixed ratio so nothing shifts) and a small label on it (length, time range) |
-| `PeakArt` | decorative SVG ridges behind a hero header (never a photograph) |
 | `PageHeader` | a page's title, back link and one primary action; `size="hero"` for a destination's front page; on large screens the search field (command menu) sits beside the action |
 | `EmptyState`, `ErrorState`, `LoadingState`, `Skeleton`, `ProgressBar`, `WorkingState`, `InlineAlert` | intentional empty, failure and working states |
 | `inputClasses`, `textareaClasses`, `selectClasses`, `Field` | one look for every input |
@@ -61,7 +63,7 @@ details and exact numbers sit behind a disclosure.
 ## The app shell
 
 A sidebar with Home, Projects (and the recent projects), Shorts, Analytics, Brand Studio and Settings —
-the current one in a warm highlight — then **Ask PeakSift** low in the sidebar and the account
+the current one raised, with the signal bar at its edge — then **Ask PeakSift** low in the sidebar and the account
 chip (Settings, Log out) at its foot. Phones get a top bar (menu, search, Ask PeakSift) and the
 same sidebar as a sheet. No notification bell, plan label or counts: PeakSift has no data for
 them.

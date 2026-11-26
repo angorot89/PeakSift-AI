@@ -117,7 +117,7 @@ function RecipeMotif({ recipe }: { recipe: RecipeName }) {
   return (
     <span
       aria-hidden="true"
-      className="relative flex aspect-[9/16] w-14 shrink-0 flex-col items-center justify-end overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(170deg,#3a3f4b,#16181d_70%)] pb-3"
+      className="relative flex aspect-[9/16] w-14 shrink-0 flex-col items-center justify-end overflow-hidden rounded-control border border-white/10 bg-[linear-gradient(170deg,#3a3f4b,#16181d_70%)] pb-3"
     >
       <span className="absolute top-[24%] left-1/2 size-4 -translate-x-1/2 rounded-full bg-white/20" />
       <span className="absolute top-[40%] left-1/2 h-5 w-8 -translate-x-1/2 rounded-t-full bg-white/10" />
@@ -255,7 +255,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
         </p>
       ) : null}
       {template ? (
-        <p className="flex items-start gap-2 rounded-xl border border-accent/30 bg-accent/[0.05] px-3.5 py-2.5 text-sm text-foreground">
+        <p className="flex items-start gap-2 rounded-block border border-accent/30 bg-accent/[0.05] px-3.5 py-2.5 text-sm text-foreground">
           <Palette aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
           <span>{template.summary}</span>
         </p>
@@ -273,14 +273,14 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
         {sections.map(({ key, title, section }) => {
           const Icon = SECTION_ICONS[key];
           return (
-          <li key={key} className="flex gap-3.5 rounded-xl border border-border bg-surface-2 px-4 py-3.5">
-            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-accent-soft">
+          <li key={key} className="flex gap-3.5 rounded-block border border-border bg-surface-2 px-4 py-3.5">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-3 text-accent-soft">
               <Icon className="size-[18px]" />
             </span>
             <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="text-caption font-medium tracking-wide text-subtle uppercase">{title}</h3>
+                <h3 className="text-small font-medium text-subtle">{title}</h3>
                 <p className="mt-0.5 text-sm font-medium break-words text-foreground">{section.choice}</p>
               </div>
               <Link
@@ -310,7 +310,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
         })}
       </ul>
       {plan.performance_hints?.length ? (
-        <section aria-labelledby={`patterns-${plan.id}`} className="rounded-xl border border-border px-4 py-3.5">
+        <section aria-labelledby={`patterns-${plan.id}`} className="rounded-block border border-border px-4 py-3.5">
           <h3 id={`patterns-${plan.id}`} className="flex items-center gap-2 text-sm font-medium text-foreground">
             <BarChart3 aria-hidden="true" className="size-4 text-muted" />
             Patterns from your shorts this plan considered
@@ -324,7 +324,7 @@ function PlanReview({ plan, editorLink }: { plan: AutoEditPlan; editorLink: stri
         </section>
       ) : null}
       {notes.length ? (
-        <section aria-labelledby={`notes-${plan.id}`} className="rounded-xl border border-border px-4 py-3.5">
+        <section aria-labelledby={`notes-${plan.id}`} className="rounded-block border border-border px-4 py-3.5">
           <h3 id={`notes-${plan.id}`} className="flex items-center gap-2 text-sm font-medium text-foreground">
             <Info aria-hidden="true" className="size-4 text-muted" />
             What Auto Edit left out or changed
@@ -385,7 +385,7 @@ function PlanHistory({
               type="button"
               onClick={() => onSelect(plan)}
               aria-current={selected ? "true" : undefined}
-              className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+              className={`flex w-full items-center justify-between gap-3 rounded-control border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
                 selected ? "border-accent/60 bg-accent/[0.06]" : "border-border bg-surface-2 hover:border-border-strong"
               }`}
             >
@@ -577,8 +577,8 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
       <>
         {header}
         <div role="status" aria-label="Loading Auto Edit" className="space-y-3">
-          <Skeleton className="h-32 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-32 rounded-card" />
+          <Skeleton className="h-64 rounded-card" />
         </div>
       </>
     );
@@ -639,7 +639,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
           </p>
         </div>
         {patterns?.available ? (
-          <div className="space-y-2 rounded-xl border border-border px-4 py-3.5">
+          <div className="space-y-2 rounded-block border border-border px-4 py-3.5">
             <label className="flex items-start gap-3 text-sm">
               <input
                 type="checkbox"
@@ -702,7 +702,7 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
     <>
       {header}
       <div className="max-w-3xl space-y-6">
-        <section aria-labelledby={`${id}-main`} className="min-w-0 rounded-2xl border border-border bg-surface">
+        <section aria-labelledby={`${id}-main`} className="min-w-0 rounded-card border border-border bg-surface">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
             <div className="min-w-0">
               <h2 id={`${id}-main`} className="text-title text-foreground">
@@ -752,8 +752,8 @@ function AutoEdit({ project, clip }: { project: Project; clip: GeneratedClip }) 
           ) : null}
         </section>
         {plans.length ? (
-          <details className="group rounded-2xl border border-border bg-surface">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent sm:px-6 [&::-webkit-details-marker]:hidden">
+          <details className="group rounded-card border border-border bg-surface">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-card px-4 py-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent sm:px-6 [&::-webkit-details-marker]:hidden">
               <span>
                 All drafts for this clip <span className="tabular text-subtle">· {plans.length}</span>
               </span>
@@ -798,7 +798,7 @@ export function AutoEditView() {
       <div role="status" aria-label="Loading Auto Edit">
         <Skeleton className="mb-3 h-4 w-32" />
         <Skeleton className="mb-8 h-8 w-56" />
-        <Skeleton className="h-96 rounded-2xl" />
+        <Skeleton className="h-96 rounded-card" />
       </div>
     );
   }

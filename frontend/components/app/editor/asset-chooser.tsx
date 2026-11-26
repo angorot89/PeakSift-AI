@@ -192,7 +192,7 @@ export function AssetChooser({
 
             <div className="space-y-2 border-t border-border pt-4">
               <label
-                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-control border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                   progress !== null ? "pointer-events-none opacity-60" : ""
                 }`}
               >
@@ -237,7 +237,7 @@ export function AssetButton({
       type="button"
       onClick={onPick}
       aria-label={`Use ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"}${found})`}
-      className="block w-full overflow-hidden rounded-lg border border-border bg-surface-2 text-left transition-colors hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="block w-full overflow-hidden rounded-control border border-border bg-surface-2 text-left transition-colors hover:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       <span className={`relative flex aspect-video items-center justify-center ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
         {asset.has_thumbnail ? (

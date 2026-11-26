@@ -70,7 +70,7 @@ function InsightCard({ insight, onChange }: { insight: Insight; onChange: (next:
     }
   }
   return (
-    <li className={`rounded-xl border border-border px-4 py-3 ${insight.dismissed ? "bg-surface opacity-70" : "bg-surface-2"}`}>
+    <li className={`rounded-block border border-border px-4 py-3 ${insight.dismissed ? "bg-surface opacity-70" : "bg-surface-2"}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-foreground">{insight.statement}</p>
         <Button variant="ghost" size="sm" onClick={toggle} disabled={busy} aria-label={insight.dismissed ? "Show this insight again" : "Hide this insight"}>
@@ -117,7 +117,7 @@ function InsightList({ data }: { data: Insights }) {
 export function InsightsPanel() {
   const { data, error, loading, reload } = useApi(getInsights);
   return (
-    <section aria-labelledby="insights-heading" className="rounded-xl border border-border bg-surface px-4 py-4">
+    <section aria-labelledby="insights-heading" className="rounded-block border border-border bg-surface px-4 py-4">
       <h3 id="insights-heading" className="flex items-center gap-2 text-title text-foreground">
         <Lightbulb aria-hidden="true" className="size-4 text-accent-soft" />
         Patterns
@@ -129,7 +129,7 @@ export function InsightsPanel() {
       </p>
       {loading && !data ? (
         <div role="status" aria-label="Loading insights">
-          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-block" />
         </div>
       ) : error || !data ? (
         <ErrorState title="Insights unavailable" message={error ?? "Try again."} onRetry={reload} />

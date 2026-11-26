@@ -174,8 +174,8 @@ export function CaptionTimingPanel({
   }
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-border bg-surface-2 p-3">
-      <fieldset className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface p-0.5">
+    <div className="space-y-2.5 rounded-block border border-border bg-surface-2 p-3">
+      <fieldset className="grid grid-cols-2 gap-1 rounded-control border border-border bg-surface p-0.5">
         <legend className="sr-only">Caption timing</legend>
         {(
           [
@@ -247,7 +247,7 @@ export function HookPanel({
   const tooLong = length > spec.hook.max_chars;
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-2 px-3.5 py-3">
+      <div className="flex items-center justify-between gap-4 rounded-block border border-border bg-surface-2 px-3.5 py-3">
         <div className="min-w-0">
           <p id={`${id}-label`} className="flex items-center gap-1.5 text-sm font-medium text-foreground">
             <Sparkles aria-hidden="true" className="size-3.5 text-accent-soft" />
@@ -294,7 +294,7 @@ export function HookPanel({
               placeholder="What this clip is about"
               aria-invalid={tooLong || length === 0}
               aria-describedby={`${id}-text-hint`}
-              className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-foreground placeholder:text-subtle focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/40"
+              className="h-10 w-full rounded-control border border-border bg-surface-2 px-3 text-sm text-foreground placeholder:text-subtle focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/40"
             />
             <span id={`${id}-text-hint`} className="block text-caption text-subtle">
               {tooLong
@@ -386,7 +386,7 @@ export function HookPanel({
 /** "Show safe area" — a real checkbox; the guide itself is labelled, never colour-only. */
 export function SafeAreaToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-small pointer-coarse:h-11 font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
+    <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-control border border-border bg-surface-2 px-2.5 text-small pointer-coarse:h-11 font-medium text-muted transition-colors hover:text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="size-3.5 accent-[var(--accent)]" />
       Safe area
     </label>

@@ -59,7 +59,7 @@ export function VersionList({
           <li
             key={edit.id}
             aria-label={`Version: ${name}`}
-            className={`flex items-center gap-3 rounded-xl border p-2.5 transition-colors ${
+            className={`flex items-center gap-3 rounded-block border p-2.5 transition-colors ${
               selected ? "border-accent/60 bg-accent/[0.05]" : "border-border bg-surface-2/50"
             }`}
           >

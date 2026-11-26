@@ -84,7 +84,7 @@ export function TikTokConnection() {
 
         {loading ? (
           <div role="status" aria-label="Loading connection">
-            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-block" />
           </div>
         ) : error || !data ? (
           <ErrorState title="Connection status unavailable" message={error ?? "Try again."} onRetry={reload} />

@@ -60,7 +60,7 @@ export function ColorField({
             setDraft(hex ?? event.target.value);
             if (hex) onChange(hex);
           }}
-          className="size-11 shrink-0 cursor-pointer rounded-lg border border-border-strong bg-transparent p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="size-11 shrink-0 cursor-pointer rounded-control border border-border-strong bg-transparent p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
         <input
           id={`${id}-hex`}

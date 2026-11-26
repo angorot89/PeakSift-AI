@@ -175,6 +175,16 @@ draft, and the editor offering to view the version already on screen.
 `GET …/clip-detection/{run_id}/candidates` · `GET /auth/session`. Existing endpoints, security
 boundaries, rendering, publishing and analytics behaviour are unchanged.
 
+## Edit bay redesign (November 2026)
+
+At the creator's request ("the overall design is bad") the warm near-black theme with orange glows
+was replaced by the **edit bay** look: neutral graphite surfaces with solid lines, the creator's
+frames as the colour, one cue-yellow signal for the next step and for marked moments, Instrument
+Sans with narrow titles, tighter radii, and no glows, gradient text or decorative peak art. The
+landing page opens on a waveform with three marked moments (labelled as an illustration) instead
+of a mock browser window. Tokens and rules: [design-system.md](design-system.md). Behaviour, copy
+rules and data are unchanged; the look described in the next section is superseded.
+
 ## Visual overhaul (after V1.7)
 
 A visual-first pass toward the reference pack (warm, dark, preview-first), on the same data and

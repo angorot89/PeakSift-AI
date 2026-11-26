@@ -91,7 +91,7 @@ export function BrandPreview({
   return (
     <figure className="flex flex-col items-center gap-3">
       <div
-        className="relative aspect-[9/16] w-full max-w-[19rem] overflow-hidden rounded-2xl border border-border shadow-lg"
+        className="relative aspect-[9/16] w-full max-w-[19rem] overflow-hidden rounded-card border border-border shadow-lg"
         style={{ containerType: "size" }}
       >
         {current === "end" ? (

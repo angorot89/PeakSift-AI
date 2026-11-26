@@ -78,7 +78,7 @@ export function ProjectFrame({ children }: { children: ReactNode }) {
       <div role="status" aria-label="Loading project">
         <Skeleton className="mb-4 h-8 w-64" />
         <Skeleton className="mb-8 h-11 w-full max-w-lg" />
-        <Skeleton className="h-72 w-full rounded-2xl" />
+        <Skeleton className="h-72 w-full rounded-card" />
       </div>
     );
   }

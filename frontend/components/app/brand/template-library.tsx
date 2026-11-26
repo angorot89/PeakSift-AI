@@ -66,7 +66,7 @@ export function TemplateLibrary() {
         }
       />
       {error ? <InlineAlert title="That didn't work">{error}</InlineAlert> : null}
-      {items === null && !error ? <Skeleton className="h-40 rounded-2xl" /> : null}
+      {items === null && !error ? <Skeleton className="h-40 rounded-card" /> : null}
       {items !== null && items.length === 0 ? (
         <EmptyState
           icon={Shapes}
@@ -80,7 +80,7 @@ export function TemplateLibrary() {
           {items.map((t) => (
             <li key={t.id} className={`${cardClasses({ padding: "md" })} flex min-w-0 flex-col gap-3`}>
               <div className="flex items-start gap-3">
-                <span aria-hidden="true" className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: t.brand?.primary_color ?? "#27272A" }}>
+                <span aria-hidden="true" className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-control" style={{ backgroundColor: t.brand?.primary_color ?? "#27272A" }}>
                   <Type className="size-4 text-white/90" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -113,7 +113,7 @@ export function TranscriptViewer({ projectId, videoId, total, footnote }: Props)
         tabIndex={0}
         role="region"
         aria-label="Transcript"
-        className="max-h-[26rem] overflow-y-auto rounded-xl border border-border bg-surface-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="max-h-[26rem] overflow-y-auto rounded-block border border-border bg-surface-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <ol className="divide-y divide-border">
           {segments.map((segment) => (

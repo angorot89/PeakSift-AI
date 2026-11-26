@@ -54,7 +54,7 @@ export function AssetLabelsForm({
 
   if (!vocab) return null;
   return (
-    <form onSubmit={save} className="space-y-3 rounded-xl border border-border p-3">
+    <form onSubmit={save} className="space-y-3 rounded-block border border-border p-3">
       <p className="text-small font-medium text-foreground">Source and market</p>
       <p className="text-xs text-muted">Only use media you made, own or have a licence for. Local assets come first in that market&apos;s searches; Global ones stay available everywhere.</p>
       <div className="grid gap-3 sm:grid-cols-2">

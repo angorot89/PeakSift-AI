@@ -34,7 +34,7 @@ const MUSIC_TERMS = "https://www.tiktok.com/legal/page/global/music-usage-confir
 const BRANDED_POLICY = "https://www.tiktok.com/legal/page/global/bc-policy/en";
 
 const check =
-  "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50";
+  "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-control border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50";
 
 /** The TikTok side of the publish dialog: connect, review the post, then its real state. */
 export function TikTokPublish({

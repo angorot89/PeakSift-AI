@@ -50,7 +50,7 @@ const FRAMING: { value: TemplateSettings["framing"]; label: string; hint: string
 function Switch({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   const id = useId();
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-2 px-3.5 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-block border border-border bg-surface-2 px-3.5 py-3">
       <div className="min-w-0">
         <p id={`${id}-label`} className="text-sm font-medium text-foreground">
           {label}
@@ -81,7 +81,7 @@ function Switch({ label, hint, checked, onChange }: { label: string; hint?: stri
 
 function Advanced({ children }: { children: ReactNode }) {
   return (
-    <details className="group rounded-xl border border-border bg-surface/60">
+    <details className="group rounded-block border border-border bg-surface/60">
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
         Advanced
         <span aria-hidden="true" className="text-subtle transition-transform group-open:rotate-90 motion-reduce:transition-none">
@@ -226,7 +226,7 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
   }
 
   if (loadError) return <InlineAlert title="The template couldn't load">{loadError}</InlineAlert>;
-  if (!spec || !layout || !starters || !brands) return <Skeleton className="h-[40rem] rounded-2xl" />;
+  if (!spec || !layout || !starters || !brands) return <Skeleton className="h-[40rem] rounded-card" />;
 
   if (!picked) {
     return (
@@ -243,7 +243,7 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
                   setMeta((m) => ({ ...m, recipe: chosen?.recipe ?? null }));
                   setPicked(true);
                 }}
-                className="flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-card border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <span className="text-title text-foreground">{item.label}</span>
                 <span className="text-sm text-muted">{item.text}</span>
@@ -394,7 +394,7 @@ export function TemplateBuilderView({ templateId, start }: { templateId?: string
 
             {tool === "sound" ? (
               <>
-                <p className="rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-sm text-muted">
+                <p className="rounded-block border border-border bg-surface-2 px-3.5 py-3 text-sm text-muted">
                   Templates never add music. When you pick music for a Short, it plays at this level.
                 </p>
                 <Choice

@@ -153,7 +153,7 @@ function RunHistory({
 }) {
   if (runs.length < 2) return null;
   return (
-    <details className="rounded-xl border border-border">
+    <details className="rounded-block border border-border">
       <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground">
         Earlier searches ({runs.length})
       </summary>
@@ -302,8 +302,8 @@ export function ClipDetectionPanel({
   } else if (providers === null || runs === null) {
     body = (
       <div role="status" aria-label="Loading moments" className="space-y-3">
-        <Skeleton className="h-9 w-80 max-w-full rounded-lg" />
-        <Skeleton className="h-40 rounded-2xl" />
+        <Skeleton className="h-9 w-80 max-w-full rounded-control" />
+        <Skeleton className="h-40 rounded-card" />
       </div>
     );
   } else if (selected === null || startingNew) {

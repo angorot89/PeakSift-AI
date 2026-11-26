@@ -108,7 +108,7 @@ function Glossary() {
     <ul className="mb-8 grid gap-3 sm:grid-cols-3" aria-label="How Brand Studio works">
       {items.map(({ icon: Icon, title, text }) => (
         <li key={title} className="flex gap-3 rounded-block border border-border bg-surface/60 p-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-accent/12 text-accent-soft">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-3 text-foreground">
             <Icon aria-hidden="true" className="size-[18px]" />
           </span>
           <span className="min-w-0">
@@ -298,11 +298,7 @@ export function BrandStudioView({ templates }: { templates?: ReactNode }) {
     <div>
       <PageHeader
         size="hero"
-        title={
-          <>
-            Brand <span className="text-accent-soft">Studio</span>
-          </>
-        }
+        title="Brand Studio"
         description="How your Shorts look and how they're edited — set it up once, and every new Short can start from it."
       />
       <Glossary />

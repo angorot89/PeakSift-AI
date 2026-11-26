@@ -94,10 +94,10 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
   return (
     <section
       aria-labelledby={headingId}
-      className={`rounded-card border border-accent/30 bg-accent/[0.05] p-4 sm:p-5 ${className}`}
+      className={`rounded-card border border-border bg-surface p-4 sm:p-5 ${className}`}
     >
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-block bg-accent/15 text-accent-soft">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-block bg-surface-3 text-foreground">
           <Sparkles aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0">
@@ -120,7 +120,7 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           className={`mt-4 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-block border border-dashed px-5 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
-            dragging ? "border-accent bg-accent/10" : "border-border-strong bg-surface/60 hover:border-accent/50 hover:bg-surface"
+            dragging ? "border-accent bg-accent/10" : "border-border-strong bg-background hover:border-subtle"
           }`}
         >
           <input
@@ -133,7 +133,7 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
           />
           <UploadCloud aria-hidden="true" className="size-6 text-accent-soft" />
           <span className="font-medium text-foreground">
-            Drop a video here, or <span className="text-accent-soft underline underline-offset-2">browse</span>
+            Drop a video here, or <span className="text-foreground underline decoration-accent decoration-2 underline-offset-4">browse</span>
           </span>
           <span id={`${inputId}-hint`} className="text-small text-muted">
             {ACCEPTED_LABEL}

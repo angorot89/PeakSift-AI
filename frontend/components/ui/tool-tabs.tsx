@@ -59,7 +59,7 @@ export function ToolTabs<K extends string>({
             }}
             className={`relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-0.5 text-caption tracking-tight font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
               selected
-                ? "bg-accent/[0.13] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]"
+                ? "bg-surface-3 text-foreground shadow-[inset_0_-2px_0_var(--accent)]"
                 : "text-muted hover:bg-surface-3/70 hover:text-foreground"
             }`}
           >

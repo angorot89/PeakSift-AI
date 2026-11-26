@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-white/[0.03] text-accent-soft">
+    <span className="flex size-10 items-center justify-center rounded-control bg-surface-2 text-foreground">
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -74,12 +74,11 @@ export function PlatformFeatures() {
     <section id="platform" className="scroll-mt-20 border-t border-border py-24">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading
-          eyebrow="The platform"
           title="More than a timestamp finder"
           description="PeakSift is being built as a complete short-form creation platform — from finding the moment to shipping the clip."
         />
 
-        <ul className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-16 grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
             <li key={feature.title} className="bg-background p-8">
               <Icon>{feature.icon}</Icon>
@@ -89,7 +88,7 @@ export function PlatformFeatures() {
           ))}
         </ul>
 
-        <p className="mt-6 text-center text-sm text-subtle">
+        <p className="mt-6 text-sm text-subtle">
           PeakSift is in active development. The capabilities above describe the
           platform we&apos;re building.
         </p>

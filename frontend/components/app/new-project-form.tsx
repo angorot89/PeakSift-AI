@@ -55,7 +55,7 @@ export function NewProjectForm() {
         title="New project"
         description="Name the recording you want to clip, then upload its source video on the next page."
       />
-      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-card border border-border bg-surface p-5 sm:p-6">
         <Field
           id="name"
           label="Project name"
@@ -77,7 +77,7 @@ export function NewProjectForm() {
             ].map((option) => (
               <label
                 key={option.value}
-                className="flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-border px-3 py-2.5 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+                className="flex min-h-11 cursor-pointer items-start gap-2 rounded-control border border-border px-3 py-2.5 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
               >
                 <input
                   type="radio"

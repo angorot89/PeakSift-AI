@@ -40,7 +40,7 @@ function Choice({
 }) {
   const body = (
     <>
-      <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${recommended ? "bg-accent/15 text-accent-soft" : "bg-surface-3 text-muted"}`}>
+      <span className={`flex size-11 shrink-0 items-center justify-center rounded-block ${recommended ? "bg-accent/15 text-accent-soft" : "bg-surface-3 text-muted"}`}>
         <Icon aria-hidden="true" className="size-5" />
       </span>
       <span className="min-w-0">
@@ -54,7 +54,7 @@ function Choice({
       </span>
     </>
   );
-  const shape = `flex h-full gap-4 rounded-2xl border p-5 text-left ${
+  const shape = `flex h-full gap-4 rounded-card border p-5 text-left ${
     recommended ? "border-accent/50 bg-accent/[0.05]" : "border-border bg-surface"
   }`;
   if (disabled) {
@@ -125,7 +125,7 @@ export function CreateShortView() {
     return (
       <div role="status" aria-label="Loading the clip" className="space-y-4">
         <Skeleton className="h-8 w-72" />
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-card" />
       </div>
     );
   }
@@ -183,7 +183,7 @@ export function CreateShortView() {
             />
           </div>
           {templates && templates.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-block border border-border bg-surface px-4 py-3 text-sm">
               <Palette aria-hidden="true" className="size-4 shrink-0 text-accent-soft" />
               {changing ? (
                 <>
@@ -222,7 +222,7 @@ export function CreateShortView() {
             </div>
           ) : null}
           {preparing ? (
-            <div className="rounded-2xl border border-border bg-surface p-4">
+            <div className="rounded-card border border-border bg-surface p-4">
               <WorkingState
                 label={current.status === "queued" ? "Waiting to start" : "Cutting your clip"}
                 progress={current.status === "queued" ? null : current.progress_percent}
@@ -247,7 +247,7 @@ export function CreateShortView() {
           {actionError ? <InlineAlert title="That didn't work">{actionError}</InlineAlert> : null}
         </section>
         <aside aria-label="The clip" className="min-w-0">
-          <div className="mx-auto aspect-video w-full overflow-hidden rounded-xl border border-border bg-black lg:max-w-none">
+          <div className="mx-auto aspect-video w-full overflow-hidden rounded-block border border-border bg-black lg:max-w-none">
             {ready ? (
               <video
                 controls

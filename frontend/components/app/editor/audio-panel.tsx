@@ -39,7 +39,7 @@ const FADE_CHOICES = [0, 0.5, 1, 2, 3, 5];
 const DUCKING_DEPTH: Record<Exclude<DuckingStrength, "off">, string> = { light: "about 7 dB", medium: "about 13 dB", strong: "about 19 dB" };
 
 const inputClasses =
-  "h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-sm text-foreground tabular focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/40";
+  "h-9 rounded-control border border-border bg-surface-2 px-2.5 text-sm text-foreground tabular focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/40";
 
 function SwitchRow({ label, hint, checked, onChange, icon }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void; icon?: ReactNode }) {
   const id = useId();
@@ -123,7 +123,7 @@ function UploadButton({ kind, projectId, onUploaded }: { kind: AudioKind; projec
   return (
     <div className="space-y-2">
       <label
-        className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+        className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-control border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
           progress !== null ? "pointer-events-none opacity-60" : ""
         }`}
       >
@@ -270,7 +270,7 @@ export function AudioPanel({
                   onClick={() => listen(asset)}
                   aria-label={`${playing === asset.id ? "Stop" : "Listen to"} ${asset.display_name}`}
                   aria-pressed={playing === asset.id}
-                  className="inline-flex w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+                  className="inline-flex w-10 shrink-0 items-center justify-center rounded-block border border-border bg-surface-2 text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {playing === asset.id ? <Pause aria-hidden="true" className="size-4" /> : <Play aria-hidden="true" className="size-4" />}
                 </button>
@@ -283,7 +283,7 @@ export function AudioPanel({
       </ControlGroup>
 
       {value.music && chosen ? (
-        <div className="animate-fade-in space-y-4 rounded-xl border border-border bg-surface-2/50 p-3.5">
+        <div className="animate-fade-in space-y-4 rounded-block border border-border bg-surface-2/50 p-3.5">
           <LevelSlider label="Music volume" value={value.music.gain_db} min={MUSIC_GAIN_DB.min} max={MUSIC_GAIN_DB.max} step={1} onChange={(v) => setMusic({ gain_db: v })} />
           <div className="space-y-1.5">
             <label htmlFor={`${id}-start`} className="flex items-baseline justify-between text-sm font-medium text-foreground">
@@ -405,7 +405,7 @@ export function AudioPanel({
                       type="button"
                       onClick={() => set({ sfx: value.sfx.filter((_, i) => i !== index) })}
                       aria-label={`Remove sound effect ${index + 1}`}
-                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
+                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-control text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
                     >
                       <Trash2 aria-hidden="true" className="size-4" />
                     </button>
@@ -447,7 +447,7 @@ export function AudioPanel({
                 ],
               })
             }
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-control border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus aria-hidden="true" className="size-3.5" />
             Add sound effect

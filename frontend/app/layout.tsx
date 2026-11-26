@@ -1,15 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
+import { Geist_Mono, Instrument_Sans, Noto_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// The interface face. Its width axis lets titles be set narrow (see `.text-page` in globals.css)
+// while body text keeps the normal width.
+const uiSans = Instrument_Sans({
+  variable: "--font-ui",
+  subsets: ["latin", "latin-ext"],
+  axes: ["wdth"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const uiMono = Geist_Mono({
+  variable: "--font-ui-mono",
   subsets: ["latin"],
 });
 
@@ -42,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} ${captionSans.variable} h-full antialiased`}
+      className={`${uiSans.variable} ${uiMono.variable} ${captionSans.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
         <AuthProvider>{children}</AuthProvider>

@@ -1,34 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  /* Surfaces, from the page outwards: a warm near-black page < panel < raised control < elevated. */
-  --background: #0a0a0c;
-  --surface: #121215;
-  --surface-2: #19191d;
-  --surface-3: #222227;
-  --border: rgb(255 255 255 / 0.07);
-  --border-strong: rgb(255 255 255 / 0.14);
+  /* The edit bay: neutral graphite, so the creator's own frames carry the colour. The chrome
+     (sidebar) is darkest, the page is graphite, panels and controls step up from it. Borders are
+     solid lines, not white haze. */
+  --chrome: #101113;
+  --background: #16171a;
+  --surface: #1d1e22;
+  --surface-2: #25262b;
+  --surface-3: #2e3036;
+  --border: #2a2c32;
+  --border-strong: #3b3e46;
   /* Text: primary, secondary (≥ 7:1 on panels), tertiary metadata (≥ 4.5:1). */
-  --foreground: #f7f7f8;
-  --muted: #a8a8b0;
-  --subtle: #8d8d96;
-  /* One warm brand accent: `accent` for marks and focus, `accent-soft` for text on dark,
-     `accent-fill` for the primary action (with dark `accent-ink` text, ≥ 8:1). */
-  --accent: #f97316;
-  --accent-soft: #fdba74;
-  --accent-fill: #fb9d55;
-  --accent-fill-hover: #fdb072;
-  --accent-ink: #1c0e03;
-  /* Semantic accents, only where they mean something: success (done, published, growth),
-     info (drafts, links, neutral facts), violet (working, AI, rendering). */
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #fb7185;
-  --info: #7cb4fa;
-  --violet: #a78bfa;
+  --foreground: #edeef0;
+  --muted: #a9acb4;
+  --subtle: #959aa3;
+  /* One signal colour, cue yellow, for what to do next and for peaks: `accent` for marks and
+     focus, `accent-soft` for signal text on dark, `accent-fill` for the primary action (with
+     dark `accent-ink` text, ≥ 12:1). Never decoration. */
+  --accent: #e3f25c;
+  --accent-soft: #d9e28f;
+  --accent-fill: #e3f25c;
+  --accent-fill-hover: #edf88c;
+  --accent-ink: #15170a;
+  /* Semantic colours, only where they mean something: success (done, published, growth),
+     info (drafts, links, neutral facts), violet (working, AI, rendering), warning is amber so it
+     never reads as the signal. */
+  --success: #4ad295;
+  --warning: #f5a524;
+  --danger: #f47c7c;
+  --info: #7fb2f5;
+  --violet: #a996f7;
 }
 
 @theme inline {
+  --color-chrome: var(--chrome);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -48,36 +54,37 @@
   --color-accent-ink: var(--accent-ink);
   --color-info: var(--info);
   --color-violet: var(--violet);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-ui-mono);
 
-  /* Radius scale: controls < inner blocks and media < cards and dialogs. */
-  --radius-control: 0.625rem;
-  --radius-block: 0.875rem;
-  --radius-card: 1.125rem;
+  /* Radius scale, tight like hardware: controls < inner blocks and media < cards and dialogs. */
+  --radius-control: 0.375rem;
+  --radius-block: 0.5rem;
+  --radius-card: 0.75rem;
 
-  /* Elevation: a hairline highlight and a soft drop; the accent glow only on the primary action
-     and the selected navigation item. */
-  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 32px -18px rgb(0 0 0 / 0.7);
-  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 18px 48px -20px rgb(0 0 0 / 0.85);
-  --shadow-glow: 0 8px 28px -10px rgb(249 115 22 / 0.55);
+  /* Elevation: panels sit flat on their line; only floating things (menus, dialogs, sheets)
+     cast a shadow. No glow anywhere. */
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.25);
+  --shadow-raised: 0 0 0 1px rgb(0 0 0 / 0.35), 0 18px 40px -16px rgb(0 0 0 / 0.75);
+  --shadow-glow: 0 0 #0000;
 
   /* Motion: one easing for everything that moves; durations stay short. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Type scale: display (a page's welcome), page title, section, card title, body, small, caption. */
-  --text-display: 2.5rem;
-  --text-display--line-height: 2.875rem;
-  --text-display--font-weight: 700;
-  --text-display--letter-spacing: -0.03em;
-  --text-page: 2rem;
-  --text-page--line-height: 2.375rem;
-  --text-page--font-weight: 700;
-  --text-page--letter-spacing: -0.025em;
+  /* Type scale: display (a page's welcome), page title, section, card title, body, small, caption.
+     Display, page and section titles are set narrow (`.headline`, the slate face). */
+  --text-display: 2.75rem;
+  --text-display--line-height: 3rem;
+  --text-display--font-weight: 650;
+  --text-display--letter-spacing: -0.02em;
+  --text-page: 2.125rem;
+  --text-page--line-height: 2.5rem;
+  --text-page--font-weight: 650;
+  --text-page--letter-spacing: -0.015em;
   --text-section: 1.25rem;
   --text-section--line-height: 1.75rem;
   --text-section--font-weight: 600;
-  --text-section--letter-spacing: -0.015em;
+  --text-section--letter-spacing: -0.01em;
   --text-title: 0.9375rem;
   --text-title--line-height: 1.375rem;
   --text-title--font-weight: 600;
@@ -177,46 +184,26 @@ body {
   color: var(--foreground);
 }
 
-/* The signed-in workspace: a faint warm light from the top right (the "peak" at dawn), fixed so
-   it never moves with content. Decorative only. */
-.app-atmosphere {
-  background:
-    radial-gradient(60rem 28rem at 85% -8rem, rgb(249 115 22 / 0.09), transparent 70%),
-    radial-gradient(40rem 30rem at 10% 110%, rgb(249 115 22 / 0.05), transparent 70%),
-    var(--background);
-  background-attachment: fixed;
+/* Titles are set narrow, like the writing on a slate: the one typographic voice of the product.
+   Body text stays at the normal width. */
+h1,
+h2,
+.text-display,
+.text-page,
+.text-section {
+  font-stretch: 86%;
 }
 
-/* The sidebar: a slightly lifted panel with the warm light pooling at its foot (behind Ask
-   PeakSift). */
-.sidebar {
-  background:
-    radial-gradient(18rem 16rem at 0% 100%, rgb(249 115 22 / 0.11), transparent 70%),
-    linear-gradient(rgb(18 18 21 / 0.92), rgb(14 14 17 / 0.92));
-}
-
-/* The current destination in the sidebar: a warm, quiet highlight (plus aria-current). */
+/* The current destination in the sidebar: a raised row with a signal bar at its edge — like the
+   selected track in an editor (plus aria-current). */
 .nav-active {
-  background: linear-gradient(90deg, rgb(249 115 22 / 0.16), rgb(249 115 22 / 0.05));
-  box-shadow: inset 0 0 0 1px rgb(249 115 22 / 0.28);
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* Ask PeakSift: the assistant's door, warm and always findable. */
-.ask-button {
-  background: linear-gradient(135deg, rgb(249 115 22 / 0.18), rgb(249 115 22 / 0.05));
-  box-shadow: inset 0 0 0 1px rgb(249 115 22 / 0.4), 0 10px 30px -14px rgb(249 115 22 / 0.6);
-}
-.ask-button:hover,
-.ask-button-open {
-  background: linear-gradient(135deg, rgb(249 115 22 / 0.26), rgb(249 115 22 / 0.08));
-  box-shadow: inset 0 0 0 1px rgb(253 186 116 / 0.6), 0 10px 30px -12px rgb(249 115 22 / 0.7);
-}
-
-/* The project's next best action: the one warm card on the page. */
-.next-glow {
-  background:
-    radial-gradient(28rem 14rem at 100% 0%, rgb(249 115 22 / 0.16), transparent 70%),
-    linear-gradient(160deg, rgb(249 115 22 / 0.07), var(--surface) 55%);
+/* The project's next best action: the one place on a page marked with the signal bar. */
+.next-up {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* Timestamps, durations and counters line up in columns. */
@@ -226,7 +213,7 @@ time,
 }
 
 ::selection {
-  background: rgb(249 115 22 / 0.35);
+  background: rgb(227 242 92 / 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -273,4 +260,33 @@ time,
     linear-gradient(-45deg, transparent 75%, #36363b 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* The landing page's one orchestrated moment: the recording's waveform draws in, then the marked
+   moments appear on it. Instant under reduced motion (see the rule above). */
+@keyframes hero-bar-in {
+  from {
+    transform: scaleY(0.12);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes hero-mark-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hero-bar {
+  animation: hero-bar-in 0.6s var(--ease-out-soft) both;
+}
+.hero-mark {
+  animation: hero-mark-in 0.4s var(--ease-out-soft) 0.9s both;
 }

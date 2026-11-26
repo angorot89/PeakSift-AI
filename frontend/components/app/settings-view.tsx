@@ -141,7 +141,7 @@ export function SettingsView() {
 
           {loading ? (
             <div role="status" aria-label="Loading connection">
-              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-block" />
             </div>
           ) : error || !data ? (
             <ErrorState title="Connection status unavailable" message={error ?? "Try again."} onRetry={reload} />
@@ -150,7 +150,7 @@ export function SettingsView() {
               The server operator has not configured YouTube publishing. Download your shorts and upload them yourself in the meantime.
             </InlineAlert>
           ) : connection ? (
-            <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 rounded-block border border-border bg-surface-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 text-sm">
                 <p className="flex items-center gap-2 font-medium text-foreground">
                   {connection.status === "connected" ? (
@@ -179,7 +179,7 @@ export function SettingsView() {
             </div>
           ) : null}
           {data?.enabled && data.analytics_enabled && connection?.status === "connected" ? (
-            <div id="analytics" className="space-y-3 rounded-xl border border-border px-4 py-4">
+            <div id="analytics" className="space-y-3 rounded-block border border-border px-4 py-4">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-medium text-foreground">Analytics access</p>
                 <p className={`text-sm ${connection.analytics_access ? "text-emerald-300" : "text-muted"}`}>
@@ -202,7 +202,7 @@ export function SettingsView() {
             </div>
           ) : null}
           {!loading && !error && data?.enabled && !connection ? (
-            <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-block border border-dashed border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted">No YouTube account is connected.</p>
               <Button onClick={connect} disabled={busy !== null}>
                 <CirclePlay aria-hidden="true" />

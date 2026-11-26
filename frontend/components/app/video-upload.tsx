@@ -87,8 +87,8 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
-          dragging ? "border-accent bg-accent/5" : "border-border-strong hover:border-white/30 hover:bg-surface-2/50"
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-block border border-dashed px-6 py-10 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+          dragging ? "border-accent bg-accent/5" : "border-border-strong hover:border-subtle hover:bg-surface"
         } ${busy ? "pointer-events-none opacity-60" : ""}`}
       >
         <input
@@ -100,11 +100,11 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
           className="sr-only"
           aria-describedby={`${inputId}-hint`}
         />
-        <span className="mb-1 flex size-10 items-center justify-center rounded-xl bg-surface-3 text-accent-soft">
+        <span className="mb-1 flex size-10 items-center justify-center rounded-block bg-surface-3 text-foreground">
           <UploadCloud aria-hidden="true" className="size-5" />
         </span>
         <span className="font-medium text-foreground">
-          Drop a video here, or <span className="text-accent-soft underline underline-offset-2">browse</span>
+          Drop a video here, or <span className="text-foreground underline decoration-accent decoration-2 underline-offset-4">browse</span>
         </span>
         <span id={`${inputId}-hint`} className="text-sm text-muted">
           {ACCEPTED_LABEL}. One long-form source video per project for now.
@@ -112,7 +112,7 @@ export function VideoUpload({ projectId, onUploaded, onCancel }: VideoUploadProp
       </label>
 
       {file ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-block border border-border bg-surface-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="font-medium break-all text-foreground">{file.name}</p>
             <p className="text-sm text-muted">{formatBytes(file.size)}</p>

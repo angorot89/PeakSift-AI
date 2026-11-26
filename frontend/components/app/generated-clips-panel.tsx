@@ -24,9 +24,9 @@ function ClipStatus({ clip }: { clip: GeneratedClip }) {
 function ClipRow({ clip, shorts, projectId }: { clip: GeneratedClip; shorts: ShortCounts | undefined; projectId: string }) {
   const ready = clip.status === "ready";
   return (
-    <li className="flex flex-col gap-3 rounded-xl border border-border bg-surface-2/40 p-3 sm:flex-row sm:items-center">
+    <li className="flex flex-col gap-3 rounded-block border border-border bg-surface-2/40 p-3 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-black">
+        <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-control border border-border bg-black">
           {ready ? (
             // A real frame of the rendered clip as its thumbnail (owner-only stream).
             <video
@@ -157,7 +157,7 @@ export function GeneratedClipsPanel({
     >
       {clips === null ? (
         <div role="status" aria-label="Loading your clips" className="space-y-2">
-          <Skeleton className="h-20 rounded-xl" />
+          <Skeleton className="h-20 rounded-block" />
         </div>
       ) : ordered.length === 0 ? (
         <EmptyState

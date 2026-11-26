@@ -940,7 +940,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   let action;
   if (matchActive && match) {
     action = (
-      <div className="rounded-xl border border-border bg-surface-2 p-3.5">
+      <div className="rounded-block border border-border bg-surface-2 p-3.5">
         <WorkingState
           label={editStageLabel(match).replace("…", "")}
           progress={match.status === "queued" ? null : match.progress_percent}
@@ -951,7 +951,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     );
   } else if (match?.status === "ready" && mode === "rendered" && selected?.id === match.id) {
     action = (
-      <p className="rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-center text-small text-muted">
+      <p className="rounded-block border border-border bg-surface-2 px-3.5 py-3 text-center text-small text-muted">
         This version is on screen. Change any setting to make another.
       </p>
     );
@@ -1091,15 +1091,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       <div className="grid gap-6 max-lg:pb-16 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_440px] xl:gap-8">
         {/* Stage: the video is the focal point. */}
         <section aria-label="Stage" ref={stageRef} className="min-w-0 scroll-mt-20 lg:col-start-1 lg:row-start-1">
-          <div className="rounded-card border border-border bg-[radial-gradient(ellipse_at_top,rgb(249_115_22/0.06),transparent_60%)] bg-surface p-4 shadow-card sm:p-6">
+          <div className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5" role="group" aria-label="Stage view">
+              <div className="inline-flex rounded-control border border-border bg-surface-2 p-0.5" role="group" aria-label="Stage view">
                 <button
                   type="button"
                   aria-pressed={mode === "preview"}
                   onClick={() => setMode("preview")}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
-                    mode === "preview" ? "bg-accent/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]" : "text-muted hover:text-foreground"
+                    mode === "preview" ? "bg-surface-3 text-foreground shadow-[inset_0_0_0_1px_var(--border-strong)]" : "text-muted hover:text-foreground"
                   }`}
                 >
                   <Eye aria-hidden="true" className="size-3.5" />
@@ -1114,7 +1114,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     if (target) showRendered(target);
                   }}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 disabled:cursor-not-allowed disabled:opacity-40 ${
-                    mode === "rendered" ? "bg-accent/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]" : "text-muted hover:text-foreground"
+                    mode === "rendered" ? "bg-surface-3 text-foreground shadow-[inset_0_0_0_1px_var(--border-strong)]" : "text-muted hover:text-foreground"
                   }`}
                 >
                   <Smartphone aria-hidden="true" className="size-3.5" />
@@ -1232,7 +1232,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
               </Button>
             </div>
             {loadedFrom ? (
-              <div role="status" className="space-y-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-xs">
+              <div role="status" className="space-y-1.5 rounded-control border border-border bg-surface-2 px-3 py-2.5 text-xs">
                 <p className="flex items-start gap-2 text-muted">
                   <History aria-hidden="true" className="mt-px size-3.5 shrink-0" />
                   <span>
@@ -1311,8 +1311,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                     taken={hookOn ? hookPosition : null}
                   />
                   {awaitingWords ? null : (
-                    <details className="group rounded-xl border border-border">
-                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                    <details className="group rounded-block border border-border">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-block px-3 text-sm text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
                         <span>
                           Advanced
                           <span className="ml-2 text-caption text-subtle">
@@ -1352,7 +1352,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   emojiOmitted={spec.emoji === "omitted"}
                 />
               ) : (
-                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-24 rounded-block" />
               )}
               <div className="mt-4">
                 <HookIdeas
@@ -1500,8 +1500,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           </div>
           {edits === null && !loadError ? (
             <div role="status" aria-label="Loading versions" className="space-y-2">
-              <Skeleton className="h-[78px] rounded-xl" />
-              <Skeleton className="h-[78px] rounded-xl" />
+              <Skeleton className="h-[78px] rounded-block" />
+              <Skeleton className="h-[78px] rounded-block" />
             </div>
           ) : loadError ? (
             <ErrorState title="Versions could not be loaded" message={loadError} onRetry={() => void refresh()} />
@@ -1556,8 +1556,8 @@ export function ShortEditorView() {
         <Skeleton className="mb-3 h-4 w-32" />
         <Skeleton className="mb-8 h-8 w-72" />
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <Skeleton className="h-[640px] rounded-2xl" />
-          <Skeleton className="h-[640px] rounded-2xl" />
+          <Skeleton className="h-[640px] rounded-card" />
+          <Skeleton className="h-[640px] rounded-card" />
         </div>
       </div>
     );

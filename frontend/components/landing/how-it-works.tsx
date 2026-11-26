@@ -28,21 +28,16 @@ export function HowItWorks() {
     <section id="how-it-works" className="scroll-mt-20 border-t border-border py-24">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading
-          eyebrow="How it works"
           title="From long recording to ready-to-post clip"
           description="One workflow that takes you from hours of footage to short-form clips worth posting."
         />
 
-        <ol className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* A real sequence: each step sits on one continuous line, like clips on a track. */}
+        <ol className="mt-16 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, i) => (
-            <li
-              key={step.title}
-              className="rounded-2xl border border-border bg-surface p-6 transition-colors hover:border-white/15"
-            >
-              <span className="font-mono text-sm text-accent-soft">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="mt-4 font-medium text-foreground">{step.title}</h3>
+            <li key={step.title} className="border-t-2 border-border-strong pt-5 first:border-accent">
+              <span className="tabular text-sm text-subtle">Step {i + 1}</span>
+              <h3 className="mt-2 text-lg font-semibold text-foreground">{step.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{step.description}</p>
             </li>
           ))}

@@ -57,9 +57,9 @@ export function OptionCard({
 }) {
   return (
     <label
-      className={`group relative flex flex-col rounded-xl border bg-surface-2 ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"} transition-[border-color,background-color,box-shadow] duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+      className={`group relative flex flex-col rounded-block border bg-surface-2 ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"} transition-[border-color,background-color,box-shadow] duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
         checked
-          ? "border-accent/70 bg-accent/[0.06] shadow-[0_0_0_1px_rgb(249_115_22/0.35)]"
+          ? "border-accent/70 bg-accent/[0.06] shadow-[0_0_0_1px_var(--accent)]"
           : "border-border hover:border-border-strong hover:bg-surface-3"
       } ${className}`}
     >
@@ -95,24 +95,24 @@ function LayoutDiagram({ layout }: { layout: PickableLayout }) {
     <span aria-hidden="true" className="relative block h-14 w-8 overflow-hidden rounded-[5px] border border-white/15 bg-black">
       {layout === "smart_reframe" ? (
         <>
-          <span className="absolute inset-0 bg-gradient-to-b from-accent/45 to-accent/25" />
+          <span className="absolute inset-0 bg-gradient-to-b from-subtle/45 to-subtle/25" />
           <span className="absolute top-[30%] left-[58%] size-2.5 rounded-full border border-white/80 bg-white/30" />
           <span className="absolute top-[18%] left-[32%] h-[36%] w-[58%] rounded-[3px] border border-dashed border-white/70" />
         </>
       ) : layout === "center_crop" ? (
         <>
-          <span className="absolute inset-0 bg-gradient-to-b from-accent/55 to-accent/30" />
+          <span className="absolute inset-0 bg-gradient-to-b from-subtle/55 to-subtle/30" />
           <span className="absolute inset-y-0 -left-2 w-2 border-r border-dashed border-white/40" />
         </>
       ) : layout === "blur_background" ? (
         <>
-          <span className="absolute inset-0 bg-accent/25 blur-[2px]" />
-          <span className="absolute inset-x-0 top-1/2 h-[30%] -translate-y-1/2 bg-gradient-to-b from-accent/70 to-accent/45" />
+          <span className="absolute inset-0 bg-subtle/25 blur-[2px]" />
+          <span className="absolute inset-x-0 top-1/2 h-[30%] -translate-y-1/2 bg-gradient-to-b from-subtle/70 to-subtle/45" />
         </>
       ) : (
         <>
           <span className="absolute inset-0 bg-[#111113]" />
-          <span className="absolute inset-x-0 top-1/2 h-[30%] -translate-y-1/2 bg-gradient-to-b from-accent/70 to-accent/45" />
+          <span className="absolute inset-x-0 top-1/2 h-[30%] -translate-y-1/2 bg-gradient-to-b from-subtle/70 to-subtle/45" />
         </>
       )}
     </span>
@@ -155,7 +155,7 @@ export function LayoutPicker({
 
 export function CaptionSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-2 px-3.5 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-block border border-border bg-surface-2 px-3.5 py-3">
       <div className="min-w-0">
         <p id="captions-switch-label" className="text-sm font-medium text-foreground">
           Captions

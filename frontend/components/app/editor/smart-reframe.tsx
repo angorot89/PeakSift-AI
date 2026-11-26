@@ -24,7 +24,7 @@ function ModeSwitch({ mode, onChange, name }: { mode: FramingMode; onChange: (m:
     { value: "manual", label: "Focal point" },
   ];
   return (
-    <fieldset className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
+    <fieldset className="grid grid-cols-2 gap-1 rounded-control border border-border bg-surface-2 p-0.5">
       <legend className="sr-only">Framing mode</legend>
       {options.map((option) => (
         <label
@@ -57,7 +57,7 @@ function AnalysisSummary({ analysis }: { analysis: ReframeAnalysis }) {
   const fallback = Math.round((analysis.fallback_fraction ?? 0) * 100);
   const faces = analysis.tracks_count ?? 0;
   return (
-    <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3.5" role="status">
+    <div className="space-y-2 rounded-block border border-border bg-surface-2 p-3.5" role="status">
       <p className="flex items-center gap-2 text-sm font-medium text-foreground">
         <CheckCircle2 aria-hidden="true" className={`size-4 ${level === "fallback" ? "text-subtle" : "text-success"}`} />
         {level === "fallback" ? "Framing analyzed" : "Smart framing ready"}
@@ -140,7 +140,7 @@ export function FocalPointPicker({
         onPointerMove={(event) => {
           if (event.buttons === 1) fromPointer(event);
         }}
-        className="relative w-full cursor-crosshair touch-none overflow-hidden rounded-lg border border-border bg-black select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="relative w-full cursor-crosshair touch-none overflow-hidden rounded-control border border-border bg-black select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         style={{ aspectRatio: `${sourceWidth} / ${sourceHeight}` }}
       >
         <video
@@ -229,7 +229,7 @@ export function SmartReframePanel(props: PanelProps) {
     body = <WorkingState label="Checking framing analysis" />;
   } else if (analysis === null) {
     body = (
-      <div className="space-y-3 rounded-xl border border-dashed border-border-strong p-3.5">
+      <div className="space-y-3 rounded-block border border-dashed border-border-strong p-3.5">
         <p className="text-sm text-muted">
           PeakSift finds the faces in this clip and plans a smooth vertical camera path that keeps them in frame.
         </p>
@@ -258,7 +258,7 @@ export function SmartReframePanel(props: PanelProps) {
     );
   } else if (isAnalysisActive(analysis.status)) {
     body = (
-      <div className="rounded-xl border border-border bg-surface-2 p-3.5">
+      <div className="rounded-block border border-border bg-surface-2 p-3.5">
         <WorkingState
           label={`Analyzing framing · ${analysisStageLabel(analysis)}`}
           progress={analysis.status === "queued" ? null : analysis.progress_percent}

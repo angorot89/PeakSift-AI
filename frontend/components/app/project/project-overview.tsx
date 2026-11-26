@@ -57,7 +57,7 @@ const TONE: Record<NextAction["tone"], { icon: LucideIcon | null; tile: string; 
 
 const FLOW: Record<FlowState, { circle: string; label: string }> = {
   done: { circle: "border-success/50 bg-success/15 text-emerald-200", label: "done" },
-  current: { circle: "border-accent bg-accent/15 text-accent-soft shadow-glow", label: "next" },
+  current: { circle: "border-accent bg-accent text-accent-ink", label: "next" },
   working: { circle: "border-violet/60 bg-violet/15 text-violet-200", label: "in progress" },
   attention: { circle: "border-danger/60 bg-danger/15 text-rose-200", label: "needs attention" },
   upcoming: { circle: "border-border-strong bg-surface-2 text-subtle", label: "not started" },
@@ -67,7 +67,7 @@ const FLOW: Record<FlowState, { circle: string; label: string }> = {
 function Workflow({ summary }: { summary: ProjectSummary }) {
   const steps = workflowSteps(summary);
   return (
-    <nav aria-label="Project progress" className="rounded-card border border-border bg-surface/80 px-3 py-3 shadow-card sm:px-5 sm:py-4">
+    <nav aria-label="Project progress" className="rounded-card border border-border bg-surface px-3 py-3 shadow-card sm:px-5 sm:py-4">
       <ol className="grid grid-cols-5 gap-1">
         {steps.map((step, index) => {
           const look = FLOW[step.state];
@@ -133,7 +133,7 @@ function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: 
     <section
       aria-labelledby="next-heading"
       className={`relative overflow-hidden rounded-card border p-5 shadow-card sm:p-6 ${
-        next.tone === "action" ? "next-glow border-accent/40" : "border-border bg-surface"
+        next.tone === "action" ? "next-up border-border bg-surface" : "border-border bg-surface"
       }`}
     >
       <div className="flex gap-4">
@@ -141,7 +141,7 @@ function NextStep({ summary, onChanged }: { summary: ProjectSummary; onChanged: 
           {tone.icon ? <tone.icon aria-hidden="true" className="size-6" /> : <Spinner />}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={`text-caption font-semibold tracking-wide uppercase ${next.tone === "attention" ? "text-rose-200" : "text-accent-soft"}`}>{tone.eyebrow}</p>
+          <p className={`text-small font-medium ${next.tone === "attention" ? "text-rose-200" : next.tone === "action" ? "text-accent-soft" : "text-muted"}`}>{tone.eyebrow}</p>
           <h2 id="next-heading" className="mt-1 text-section text-pretty" aria-live="polite">
             {next.title}
           </h2>

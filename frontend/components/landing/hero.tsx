@@ -1,60 +1,83 @@
 import { ButtonLink } from "@/components/ui/button-link";
 
-const platforms = ["YouTube Shorts", "TikTok", "Instagram Reels"];
+const BARS = 96;
+/** Three stretches of the illustration marked as moments: [first bar, last bar, label]. */
+const MOMENTS: [number, number, string][] = [
+  [14, 21, "04:12"],
+  [49, 57, "21:37"],
+  [78, 83, "38:05"],
+];
+
+const inMoment = (index: number) => MOMENTS.some(([from, to]) => index >= from && index <= to);
+
+/** A deterministic, speech-like envelope (no randomness: server and browser draw the same bars). */
+function barHeight(index: number): number {
+  const base = 0.28 + 0.16 * Math.sin(index * 0.9) * Math.sin(index * 0.23) + 0.1 * Math.sin(index * 2.7);
+  const peak = inMoment(index) ? 0.42 + 0.12 * Math.sin(index * 1.7) : 0;
+  return Math.min(1, Math.max(0.1, base + peak));
+}
+
+/**
+ * The hero's one picture: a long recording as a waveform, with the moments PeakSift would mark
+ * picked out in the signal colour. Decorative; the headline says the same thing in words.
+ */
+function MomentStrip() {
+  return (
+    <figure aria-hidden="true" className="mt-14 sm:mt-20">
+      <div className="relative h-40 sm:h-52">
+        <div className="absolute inset-0 flex items-center gap-px sm:gap-[3px]">
+          {Array.from({ length: BARS }, (_, index) => (
+            <span
+              key={index}
+              className={`hero-bar flex-1 rounded-full ${inMoment(index) ? "bg-accent" : "bg-surface-3"}`}
+              style={{ height: `${barHeight(index) * 100}%`, animationDelay: `${index * 6}ms` }}
+            />
+          ))}
+        </div>
+        {MOMENTS.map(([from, to, label]) => (
+          <span
+            key={label}
+            className="hero-mark absolute -top-7 flex flex-col"
+            style={{ left: `${(from / BARS) * 100}%`, width: `${((to - from + 1) / BARS) * 100}%` }}
+          >
+            <span className="tabular text-caption font-medium text-foreground">{label}</span>
+            <span className="mt-1 h-1.5 border-x border-t border-accent" />
+          </span>
+        ))}
+      </div>
+      <div className="tabular mt-3 flex justify-between text-caption text-subtle">
+        <span>00:00</span>
+        <span>A 45-minute recording (illustration)</span>
+        <span>45:00</span>
+      </div>
+    </figure>
+  );
+}
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgb(249_115_22/0.16),transparent_70%)]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgb(255_255_255/0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.04)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
-      />
-
-      <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-16 text-center sm:pt-32">
-        <p className="inline-flex animate-fade-up items-center gap-2 rounded-full border border-border bg-white/[0.03] px-3 py-1 text-xs font-medium text-muted">
-          <span className="size-1.5 rounded-full bg-accent" />
-          Now in development
-        </p>
-
-        <h1 className="mx-auto mt-6 max-w-4xl animate-fade-up text-5xl font-semibold tracking-tight text-balance [animation-delay:80ms] sm:text-6xl lg:text-7xl">
-          Find the moments{" "}
-          <span className="bg-gradient-to-br from-accent-soft via-accent to-rose-500 bg-clip-text text-transparent">
-            worth clipping.
-          </span>
+    <section className="relative">
+      <div className="mx-auto max-w-6xl px-6 pt-20 pb-20 sm:pt-28">
+        <h1 className="max-w-4xl text-5xl leading-[0.95] font-semibold tracking-tight text-balance sm:text-7xl lg:text-8xl">
+          Find the moments worth clipping.
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl animate-fade-up text-lg leading-relaxed text-pretty text-muted [animation-delay:160ms] sm:text-xl">
-          PeakSift AI helps creators discover the strongest moments inside
-          long-form content and turn them into short-form content for YouTube
-          Shorts, TikTok, and Instagram Reels.
+        <p className="mt-6 max-w-xl text-lg leading-relaxed text-pretty text-muted sm:text-xl">
+          Upload a long video. PeakSift reads what was said, marks the strongest moments and helps you cut
+          them into Shorts for YouTube, TikTok and Instagram Reels.
         </p>
 
-        <div className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 [animation-delay:240ms] sm:flex-row">
+        <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
           <ButtonLink href="/register" size="lg" className="w-full sm:w-auto">
-            Get Started
+            Get started
           </ButtonLink>
-          <ButtonLink
-            href="#how-it-works"
-            variant="secondary"
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            See How It Works
+          <ButtonLink href="#how-it-works" variant="secondary" size="lg" className="w-full sm:w-auto">
+            See how it works
           </ButtonLink>
+          <span className="text-sm text-subtle sm:ml-3">In development</span>
         </div>
 
-        <ul className="mt-10 flex animate-fade-up flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-subtle [animation-delay:320ms]">
-          <li className="w-full sm:w-auto">Built for</li>
-          {platforms.map((platform) => (
-            <li key={platform} className="text-zinc-400">
-              {platform}
-            </li>
-          ))}
-        </ul>
+        <MomentStrip />
       </div>
     </section>
   );

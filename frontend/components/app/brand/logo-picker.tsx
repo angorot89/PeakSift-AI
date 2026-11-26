@@ -61,7 +61,7 @@ export function LogoPicker({
       {items === null && !error ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="aspect-square rounded-xl" />
+            <Skeleton key={i} className="aspect-square rounded-block" />
           ))}
         </div>
       ) : null}
@@ -89,7 +89,7 @@ export function LogoPicker({
                       move(index - 1);
                     }
                   }}
-                  className={`relative flex flex-col overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  className={`relative flex flex-col overflow-hidden rounded-block border text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                     checked ? "border-accent bg-accent/[0.08]" : "border-border hover:border-border-strong"
                   }`}
                 >

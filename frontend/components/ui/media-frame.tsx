@@ -21,7 +21,7 @@ export function MediaFrame({
   return (
     <figure className={`min-w-0 ${className}`}>
       <figcaption className="mb-2 flex items-center justify-between gap-3 text-xs">
-        <span className="inline-flex items-center gap-1.5 font-medium tracking-wide text-muted uppercase">
+        <span className="inline-flex items-center gap-1.5 font-medium text-muted">
           <Icon aria-hidden="true" className="size-3.5" />
           {label}
         </span>

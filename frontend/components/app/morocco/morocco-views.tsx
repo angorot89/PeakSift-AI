@@ -80,7 +80,7 @@ export function ModeSwitch({ current }: { current: "global" | "morocco" }) {
             disabled={busy !== null}
             onClick={() => void choose(mode)}
             className={`inline-flex min-h-11 items-center gap-2 rounded-control px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait ${
-              current === mode.key ? "bg-accent/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgb(249_115_22/0.45)]" : "text-muted hover:text-foreground"
+              current === mode.key ? "bg-surface-3 text-foreground shadow-[inset_0_0_0_1px_var(--border-strong)]" : "text-muted hover:text-foreground"
             }`}
           >
             {mode.key === "global" ? <Globe aria-hidden="true" className="size-4" /> : <Languages aria-hidden="true" className="size-4" />}
@@ -100,7 +100,7 @@ function SectionCard({ item }: { item: (typeof MOROCCO_SECTIONS)[number] }) {
   return (
     <li className="min-w-0">
       <Card className="flex h-full flex-col gap-3">
-        <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-block bg-accent/12 text-accent-soft">
+        <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-block bg-surface-3 text-foreground">
           <Icon className="size-5" />
         </span>
         <div>

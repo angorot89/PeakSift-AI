@@ -1,20 +1,15 @@
 type SectionHeadingProps = {
-  eyebrow: string;
   title: string;
   description?: string;
 };
 
-export function SectionHeading({ eyebrow, title, description }: SectionHeadingProps) {
+/** A landing-page section's title and one line of context, left-aligned with the content. */
+export function SectionHeading({ title, description }: SectionHeadingProps) {
   return (
-    <div className="mx-auto max-w-2xl text-center">
-      <p className="text-sm font-medium text-accent-soft">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-        {title}
-      </h2>
+    <div className="max-w-2xl">
+      <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">{title}</h2>
       {description ? (
-        <p className="mt-4 text-base leading-relaxed text-pretty text-muted sm:text-lg">
-          {description}
-        </p>
+        <p className="mt-4 text-base leading-relaxed text-pretty text-muted sm:text-lg">{description}</p>
       ) : null}
     </div>
   );

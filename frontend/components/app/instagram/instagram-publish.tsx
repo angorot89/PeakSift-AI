@@ -24,7 +24,7 @@ import { fromLocalInput, suggestedTime, timeProblem, toLocalInput } from "@/lib/
 import { usePolling } from "@/lib/use-polling";
 
 const choice =
-  "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10";
+  "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-control border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10";
 
 /** The Instagram side of the publish dialog: connect, review the Reel, then its real state. */
 export function InstagramPublish({

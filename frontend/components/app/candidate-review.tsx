@@ -128,7 +128,7 @@ function MomentThumbnail({
       onClick={onPreview}
       aria-pressed={previewing}
       aria-label={`${previewing ? "Close the preview of" : "Preview"} “${title}”`}
-      className="group relative block aspect-video w-28 shrink-0 self-start overflow-hidden rounded-xl border border-border bg-[linear-gradient(160deg,var(--surface-3),var(--background))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-44"
+      className="group relative block aspect-video w-28 shrink-0 self-start overflow-hidden rounded-block border border-border bg-[linear-gradient(160deg,var(--surface-3),var(--background))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-44"
     >
       <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-subtle">
         <Film className="size-5" />
@@ -206,7 +206,7 @@ function MomentCard({
   // A dismissed moment stays out of the way: one line and Restore.
   if (dismissed) {
     return (
-      <li className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3" aria-label={`Dismissed moment: ${candidate.title}`}>
+      <li className="flex items-center justify-between gap-3 rounded-block border border-border px-4 py-3" aria-label={`Dismissed moment: ${candidate.title}`}>
         <div className="min-w-0">
           <p className="truncate text-sm text-muted">{candidate.title}</p>
           {times}
@@ -247,7 +247,7 @@ function MomentCard({
 
   return (
     <li
-      className={`rounded-2xl border bg-surface p-4 transition-colors sm:p-5 ${saved ? "border-success/40" : "border-border"}`}
+      className={`rounded-card border bg-surface p-4 transition-colors sm:p-5 ${saved ? "border-success/40" : "border-border"}`}
       aria-label={`${label}: ${candidate.title}`}
     >
       <div className="flex gap-3 sm:gap-4">
@@ -311,7 +311,7 @@ function MomentCard({
                 </>
               )}
               {candidate.transcript_excerpt ? (
-                <blockquote dir="auto" className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
+                <blockquote dir="auto" className="rounded-control bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
                   {candidate.transcript_excerpt}
                 </blockquote>
               ) : null}
@@ -449,8 +449,8 @@ export function CandidateReview({ projectId, videoId, run, clips, clipsKnown, on
 
       {firstLoad ? (
         <div role="status" aria-label="Loading moments" className="space-y-3">
-          <Skeleton className="h-40 rounded-2xl" />
-          <Skeleton className="h-40 rounded-2xl" />
+          <Skeleton className="h-40 rounded-card" />
+          <Skeleton className="h-40 rounded-card" />
         </div>
       ) : error && candidates.length === 0 ? (
         <ErrorState title="Moments couldn't be loaded" message={error} onRetry={() => void load(0)} />

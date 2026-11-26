@@ -167,7 +167,7 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
         {drop.dragging && assets.length ? (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -inset-2 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-background/85 text-sm font-medium text-foreground"
+            className="pointer-events-none absolute -inset-2 z-10 flex items-center justify-center rounded-card border-2 border-dashed border-accent bg-background/85 text-sm font-medium text-foreground"
           >
             <UploadCloud className="mr-2 size-5 text-accent-soft" />
             Drop to add to this project
@@ -183,7 +183,7 @@ export function VisualLibrary({ projectId }: { projectId: string }) {
         {loading && !data ? (
           <div role="status" aria-label="Loading your visuals" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-block" />
             ))}
           </div>
         ) : error ? (
@@ -293,7 +293,7 @@ function DropZone({ disabled, onFiles }: { disabled: boolean; onFiles: (files: F
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={drop}
-      className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+      className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-block border border-dashed px-4 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
         dragging ? "border-accent bg-accent/5" : "border-border-strong hover:border-white/30 hover:bg-surface-2/50"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
@@ -356,7 +356,7 @@ function useFileDrop(disabled: boolean, onFiles: (files: FileList | null) => voi
 function UploadButton({ disabled, onFiles }: { disabled: boolean; onFiles: (files: FileList | null) => void }) {
   return (
     <label
-      className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent pointer-coarse:h-11 ${
+      className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-control border border-border-strong bg-surface-2 px-3 text-small font-medium text-foreground transition-colors hover:bg-surface-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent pointer-coarse:h-11 ${
         disabled ? "pointer-events-none opacity-60" : ""
       }`}
     >
@@ -383,7 +383,7 @@ function UploadBatch({ uploads, onDismiss }: { uploads: Upload[]; onDismiss: () 
   const failures = uploads.filter((u) => u.state === "failed");
   const checking = uploads.some((u) => u.state === "processing");
   return (
-    <section aria-label="Uploads" className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+    <section aria-label="Uploads" className="rounded-block border border-border bg-surface-2 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <p className="flex min-w-0 items-center gap-2 text-sm text-foreground" role="status">
           {summary.working ? (
@@ -527,7 +527,7 @@ function AssetCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group block w-full overflow-hidden rounded-xl border border-border bg-surface-2 text-left transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="group block w-full overflow-hidden rounded-block border border-border bg-surface-2 text-left transition-colors hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       aria-label={`Preview ${asset.display_name} (${asset.kind === "video" ? `video, ${formatVisualDuration(asset.duration_seconds ?? 0)}` : "image"})${found}${stateNote(asset)}`}
     >
       <span className={`relative flex aspect-video items-center justify-center overflow-hidden ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
@@ -615,7 +615,7 @@ function VisualSearchDetails({ projectId, asset, onRetried }: { projectId: strin
     }
   }
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-block border border-border px-3 py-2">
       <div className="min-w-0">
         <p className="text-small font-medium text-foreground" role="status">
           {label}
@@ -697,7 +697,7 @@ function PreviewDialog({
     >
       {asset ? (
           <div className="space-y-4">
-            <div className={`flex max-h-[60dvh] items-center justify-center overflow-hidden rounded-xl ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
+            <div className={`flex max-h-[60dvh] items-center justify-center overflow-hidden rounded-block ${asset.has_alpha ? "checkerboard" : "bg-black"}`}>
               {asset.kind === "video" ? (
                 <video
                   key={asset.id}
@@ -796,7 +796,7 @@ function DetailsForm({
   }
 
   return (
-    <form onSubmit={save} className="space-y-3 rounded-xl border border-border p-3">
+    <form onSubmit={save} className="space-y-3 rounded-block border border-border p-3">
       <p className="text-small font-medium text-foreground">Details</p>
       <p className="text-xs text-muted">A description and tags help match B-roll suggestions to this asset.</p>
       <div className="space-y-1">
