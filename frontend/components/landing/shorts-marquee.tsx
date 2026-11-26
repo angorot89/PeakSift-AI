@@ -1,3 +1,5 @@
+import { ClipVideo } from "@/components/landing/clip-video";
+import { MIN_REAL_CLIPS, REAL_CLIPS } from "@/components/landing/clips";
 import { Backdrop, Person, type Platform, ShortFrame } from "@/components/landing/scene-parts";
 import { Reveal } from "@/components/landing/reveal";
 
@@ -44,6 +46,7 @@ function ExampleCard({ example, copy }: { example: Example; copy: boolean }) {
  * (it pauses under the pointer or keyboard focus, and stands still under reduced motion).
  */
 export function ShortsMarquee() {
+  const real = REAL_CLIPS.length >= MIN_REAL_CLIPS;
   return (
     <section id="made-for" className="scroll-mt-24 overflow-hidden py-24">
       <Reveal className="mx-auto max-w-3xl px-6 text-center">
@@ -55,13 +58,26 @@ export function ShortsMarquee() {
         </p>
       </Reveal>
       <div className="relative mt-14 [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
-        <ul aria-label="Example Shorts (illustrations)" className="lp-marquee flex w-max gap-5">
-          {[...EXAMPLES, ...EXAMPLES].map((example, i) => (
-            <ExampleCard key={`${example.kind}-${i}`} example={example} copy={i >= EXAMPLES.length} />
-          ))}
-        </ul>
+        {real ? (
+          <ul aria-label="Shorts made with PeakSift" className="lp-marquee flex w-max gap-5">
+            {[...REAL_CLIPS, ...REAL_CLIPS].map((clip, i) => (
+              <li key={`${clip.src}-${i}`} aria-hidden={i >= REAL_CLIPS.length || undefined} className="w-44 shrink-0 sm:w-52">
+                <ClipVideo clip={clip} />
+                <p className="mt-3 font-display font-bold text-foreground">{clip.kind}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul aria-label="Example Shorts (illustrations)" className="lp-marquee flex w-max gap-5">
+            {[...EXAMPLES, ...EXAMPLES].map((example, i) => (
+              <ExampleCard key={`${example.kind}-${i}`} example={example} copy={i >= EXAMPLES.length} />
+            ))}
+          </ul>
+        )}
       </div>
-      <p className="mt-6 text-center text-small text-subtle">Illustrations of the kinds of Shorts PeakSift makes.</p>
+      <p className="mt-6 text-center text-small text-subtle">
+        {real ? "Real Shorts made with PeakSift." : "Illustrations of the kinds of Shorts PeakSift makes."}
+      </p>
     </section>
   );
 }

@@ -201,12 +201,18 @@ The website's other pages follow StreamLadder's page set where PeakSift has a re
 from one shared template and one content file (`components/landing/content.ts`): **All tools**
 (`/features`) and a page per tool (`/features/[slug]`, 12: hero and drawn demo, what it does, how
 it works, why, more tools, works well with, example Shorts, questions); **Made for** pages
-(`/made-for/[slug]`: podcasters, streamers, educators, interviews); **Pricing** (free while in
-development — one honest card, no invented tiers); **About**; **Guides** (`/guides`, six
+(`/made-for/[slug]`: podcasters, streamers, educators, interviews); **Pricing** (Free, Starter $12, Creator $24
+and Pro $39 a month, two months free yearly, with a comparison table — shown without checkout:
+every account has every tool for free during early access, and the page says so); **About**; **Guides** (`/guides`, six
 step-by-step guides with a table of contents); and **Your data** (`/privacy`: how PeakSift is
-built to handle data — explicitly not a legal policy). Deliberately not made: montage, emote and
-schedule makers, a clip downloader, a mobile app, workspaces, careers, competitor comparisons and
-legal terms or refund pages — PeakSift has no such product, and legal text needs a lawyer. Tokens and rules:
+built to handle data — explicitly not a legal policy). **Terms of Service** and **Privacy
+Policy** drafts (`/terms`, `/privacy-policy`) describe what PeakSift really does, carry a "draft for
+legal review" notice and leave the company details as [placeholders]. The site also has a 404
+page, `sitemap.xml`, `robots.txt` (the signed-in app is disallowed), a share image and
+`NEXT_PUBLIC_SITE_URL`. Real Shorts made with PeakSift go in `public/clips/` and
+`components/landing/clips.ts`; with four or more, the "Made for" row plays them instead of the
+drawings. Deliberately not made: montage, emote and schedule makers, a clip downloader, a mobile
+app, workspaces, careers and competitor comparisons — PeakSift has no such product. Tokens and rules:
 [design-system.md](design-system.md). Behaviour, copy rules and data are unchanged; the look
 described in the next section is superseded.
 

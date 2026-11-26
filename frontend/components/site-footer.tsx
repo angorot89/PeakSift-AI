@@ -38,6 +38,8 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
       { href: "/privacy", label: "Your data" },
+      { href: "/terms", label: "Terms of Service" },
+      { href: "/privacy-policy", label: "Privacy Policy" },
       { href: "/login", label: "Log in" },
       { href: "/register", label: "Create an account" },
     ],
@@ -71,7 +73,7 @@ export function SiteFooter() {
         ))}
       </div>
       <p className="mx-auto mt-12 max-w-6xl border-t border-border pt-6 text-small text-subtle">
-        © PeakSift. In development.
+        © PeakSift. Early access.
       </p>
       {/* The name, large and quiet, as the page's last line. */}
       <p

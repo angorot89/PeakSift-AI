@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist_Mono, Instrument_Sans, Noto_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 // The interface face (body, controls, labels).
@@ -36,6 +37,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  openGraph: { siteName: "PeakSift", type: "website" },
+  twitter: { card: "summary_large_image" },
   title: {
     default: "PeakSift AI — Find the moments worth clipping.",
     template: "%s — PeakSift AI",

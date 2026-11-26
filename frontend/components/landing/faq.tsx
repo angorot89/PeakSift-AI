@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 const QUESTIONS: { q: string; a: string }[] = [
   {
     q: "Is PeakSift free?",
-    a: "PeakSift is in development and there are no plans or prices yet. Create an account to try everything that is built today.",
+    a: "There is a Free plan, and paid plans from $12 a month. During early access every account has every tool for free — see Pricing.",
   },
   {
     q: "Which platforms can I post to?",
