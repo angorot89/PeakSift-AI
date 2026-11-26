@@ -30,7 +30,7 @@ const MARKS: [number, number][] = [
 const marked = (i: number) => MARKS.findIndex(([a, b]) => i >= a && i <= b);
 const barHeight = (i: number) => Math.min(1, 0.25 + 0.18 * Math.abs(Math.sin(i * 0.9) * Math.sin(i * 0.31)) + (marked(i) >= 0 ? 0.45 : 0.12 * Math.abs(Math.sin(i * 2.3))));
 
-function MomentsScene() {
+export function MomentsScene() {
   return (
     <div className="absolute inset-0">
       <Backdrop from="#2a2fd6" to="#5b22c9" glow="rgb(160 175 255 / 0.35)" />
@@ -82,7 +82,7 @@ function MomentsScene() {
 
 // ---- Scene 2: smart reframe ------------------------------------------------------------------
 
-function ReframeScene() {
+export function ReframeScene() {
   return (
     <div className="absolute inset-0">
       <Backdrop from="#1b1f4a" to="#3d1a8f" glow="rgb(120 140 255 / 0.3)" />
@@ -114,9 +114,9 @@ function ReframeScene() {
 // ---- Scene 3: word-by-word captions ----------------------------------------------------------
 
 const WORDS = ["here's", "the", "one", "thing", "nobody", "tells", "you"];
-const STYLES = ["Bold", "Clean", "Karaoke", "Boxed"];
+const STYLES = ["Focus", "Punch", "Minimal", "Boxed"];
 
-function CaptionsScene() {
+export function CaptionsScene() {
   return (
     <div className="absolute inset-0">
       <Backdrop from="#0f3d3e" to="#1b1f4a" glow="rgb(61 220 151 / 0.25)" />
@@ -159,7 +159,7 @@ const TRACKS: { label: string; blocks: [number, number, string][] }[] = [
   { label: "Music", blocks: [[0, 100, "bg-[#c084fc]"]] },
 ];
 
-function AutoEditScene() {
+export function AutoEditScene() {
   return (
     <div className="absolute inset-0">
       <Backdrop from="#2a2fd6" to="#1b1f4a" glow="rgb(160 175 255 / 0.3)" />

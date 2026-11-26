@@ -1,37 +1,10 @@
-import {
-  AudioLines,
-  BarChart3,
-  CalendarClock,
-  Captions,
-  Crop,
-  Image as ImageIcon,
-  Languages,
-  MessageCircle,
-  Palette,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Wand2,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, BarChart3, Captions, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { TOOLS } from "@/components/landing/content";
+import { ToolIcon } from "@/components/landing/tool-icon";
 import { Reveal } from "@/components/landing/reveal";
 
-const TOOLS: { title: string; text: string; icon: LucideIcon; tint: string }[] = [
-  { title: "AI moments", text: "The strongest moments of a long video, ranked, with the reason for each.", icon: Sparkles, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]" },
-  { title: "Find Clips", text: "Describe a moment in your own words and jump to where it was said.", icon: Search, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]" },
-  { title: "Auto Edit", text: "A first cut made for you: framing, captions, hook and visuals.", icon: Wand2, tint: "bg-violet-500/10 text-violet-700" },
-  { title: "Smart reframe", text: "Follows faces to turn widescreen footage into clean 9:16.", icon: Crop, tint: "bg-violet-500/10 text-violet-700" },
-  { title: "Dynamic captions", text: "Word-by-word captions with the spoken word highlighted.", icon: Captions, tint: "bg-amber-500/15 text-amber-800" },
-  { title: "B-roll & visuals", text: "Your own images and clips, matched to what is being said.", icon: ImageIcon, tint: "bg-amber-500/15 text-amber-800" },
-  { title: "Music & sound", text: "Your music under the voice, ducking, effects and loudness.", icon: AudioLines, tint: "bg-rose-500/10 text-rose-700" },
-  { title: "Brand Studio", text: "Your colours, logo and templates on every Short.", icon: Palette, tint: "bg-rose-500/10 text-rose-700" },
-  { title: "Schedule & publish", text: "YouTube Shorts, TikTok and Instagram Reels, now or later.", icon: CalendarClock, tint: "bg-emerald-500/10 text-emerald-700" },
-  { title: "Analytics", text: "How every published Short is doing, compared with your own uploads.", icon: BarChart3, tint: "bg-emerald-500/10 text-emerald-700" },
-  { title: "Ask PeakSift", text: "An assistant that answers from your projects, not from guesswork.", icon: MessageCircle, tint: "bg-sky-500/10 text-sky-700" },
-  { title: "Morocco Mode", text: "Darija-aware hooks and Moroccan formats, on top of everything else.", icon: Languages, tint: "bg-sky-500/10 text-sky-700" },
-];
-
-/** Every tool, one card each. */
+/** Every tool, one card each, leading to its own page. */
 export function Toolkit() {
   return (
     <section id="toolkit" className="scroll-mt-24 border-t border-border bg-surface px-6 py-24">
@@ -42,18 +15,29 @@ export function Toolkit() {
         </Reveal>
         <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TOOLS.map((tool) => (
-            <li
-              key={tool.title}
-              className="group rounded-card border border-border bg-background p-6 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-accent/30 hover:shadow-[0_18px_40px_-20px_rgb(14_18_34/0.35)]"
-            >
-              <span className={`flex size-11 items-center justify-center rounded-block transition-transform duration-200 group-hover:scale-110 ${tool.tint}`}>
-                <tool.icon aria-hidden="true" className="size-5" />
-              </span>
-              <h3 className="mt-4 font-display text-lg font-bold">{tool.title}</h3>
-              <p className="mt-1.5 text-muted">{tool.text}</p>
+            <li key={tool.slug}>
+              <Link
+                href={`/features/${tool.slug}`}
+                className="group block h-full rounded-card border border-border bg-background p-6 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-accent/30 hover:shadow-[0_18px_40px_-20px_rgb(14_18_34/0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <span className="block w-fit transition-transform duration-200 group-hover:scale-110">
+                  <ToolIcon slug={tool.slug} />
+                </span>
+                <span className="mt-4 flex items-center gap-1 font-display text-lg font-bold">
+                  {tool.name}
+                  <ArrowRight aria-hidden="true" className="size-4 text-subtle opacity-0 transition-[opacity,transform] group-hover:translate-x-0.5 group-hover:opacity-100" />
+                </span>
+                <span className="mt-1.5 block text-muted">{tool.summary}</span>
+              </Link>
             </li>
           ))}
         </ul>
+        <div className="mt-10 flex justify-center">
+          <Link href="/features" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent-soft hover:underline">
+            Explore all tools
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
       </div>
     </section>
   );

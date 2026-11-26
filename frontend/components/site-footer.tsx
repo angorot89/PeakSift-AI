@@ -5,22 +5,39 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Product",
     links: [
-      { href: "/#find", label: "AI moments" },
-      { href: "/#edit", label: "Editing" },
-      { href: "/#publish", label: "Publishing" },
-      { href: "/#learn", label: "Analytics" },
+      { href: "/features/ai-moments", label: "AI moments" },
+      { href: "/features/find-clips", label: "Find Clips" },
+      { href: "/features/auto-edit", label: "Auto Edit" },
+      { href: "/features/smart-reframe", label: "Smart reframe" },
+      { href: "/features/captions", label: "Dynamic captions" },
+      { href: "/features/publish", label: "Schedule & publish" },
+      { href: "/features", label: "All tools" },
     ],
   },
   {
-    title: "Explore",
+    title: "Made for",
     links: [
-      { href: "/#toolkit", label: "All tools" },
+      { href: "/made-for/podcasters", label: "Podcasters" },
+      { href: "/made-for/streamers", label: "Streamers" },
+      { href: "/made-for/educators", label: "Educators & coaches" },
+      { href: "/made-for/interviews", label: "Interviews & talks" },
+      { href: "/features/morocco-mode", label: "Morocco Mode" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { href: "/guides", label: "Guides" },
+      { href: "/guides/getting-started", label: "Getting started" },
       { href: "/#faq", label: "FAQ" },
     ],
   },
   {
-    title: "Account",
+    title: "Company",
     links: [
+      { href: "/about", label: "About" },
+      { href: "/pricing", label: "Pricing" },
+      { href: "/privacy", label: "Your data" },
       { href: "/login", label: "Log in" },
       { href: "/register", label: "Create an account" },
     ],
@@ -30,7 +47,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 export function SiteFooter() {
   return (
     <footer className="overflow-hidden border-t border-border bg-surface px-6 pt-16">
-      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
         <div>
           <Logo />
           <p className="mt-3 max-w-xs text-muted">Find the moments worth clipping.</p>

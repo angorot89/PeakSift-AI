@@ -195,7 +195,18 @@ tabs); an endless row of drawn example Shorts per kind of video ("Made for"); fe
 illustrations that play when scrolled into view; count-up product facts (3 platforms, 12 tools,
 1080×1920, −14 LUFS); pressable buttons; and a large wordmark in the footer. Everything is drawn
 with CSS (no other creators' footage), labelled as an illustration, and still under reduced
-motion. Tokens and rules:
+motion.
+
+The website's other pages follow StreamLadder's page set where PeakSift has a real equivalent,
+from one shared template and one content file (`components/landing/content.ts`): **All tools**
+(`/features`) and a page per tool (`/features/[slug]`, 12: hero and drawn demo, what it does, how
+it works, why, more tools, works well with, example Shorts, questions); **Made for** pages
+(`/made-for/[slug]`: podcasters, streamers, educators, interviews); **Pricing** (free while in
+development — one honest card, no invented tiers); **About**; **Guides** (`/guides`, six
+step-by-step guides with a table of contents); and **Your data** (`/privacy`: how PeakSift is
+built to handle data — explicitly not a legal policy). Deliberately not made: montage, emote and
+schedule makers, a clip downloader, a mobile app, workspaces, careers, competitor comparisons and
+legal terms or refund pages — PeakSift has no such product, and legal text needs a lawyer. Tokens and rules:
 [design-system.md](design-system.md). Behaviour, copy rules and data are unchanged; the look
 described in the next section is superseded.
 

@@ -17,6 +17,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { HeaderAuth } from "@/components/auth/header-auth";
 import { Logo } from "@/components/logo";
@@ -30,19 +31,21 @@ const GROUPS: Group[] = [
     label: "Product",
     heading: "Tools",
     items: [
-      { href: "/#find", title: "AI moments", text: "Ranked moments from your long video, with the reason for each", icon: Sparkles, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]", badge: "Popular" },
-      { href: "/#edit", title: "Editor", text: "Smart reframe, word-by-word captions, visuals and sound", icon: Crop, tint: "bg-violet-500/10 text-violet-700" },
-      { href: "/#edit", title: "Auto Edit", text: "A first cut made for you, ready to tweak", icon: Wand2, tint: "bg-amber-500/15 text-amber-800" },
-      { href: "/#publish", title: "Publisher", text: "Post or schedule to YouTube, TikTok and Instagram", icon: CalendarClock, tint: "bg-emerald-500/10 text-emerald-700" },
-      { href: "/#learn", title: "Analytics", text: "How every published Short is doing", icon: BarChart3, tint: "bg-sky-500/10 text-sky-700" },
-      { href: "/#toolkit", title: "Brand Studio", text: "Your colours, logo and templates on every Short", icon: Palette, tint: "bg-rose-500/10 text-rose-700" },
+      { href: "/features/ai-moments", title: "AI moments", text: "Ranked moments from your long video, with the reason for each", icon: Sparkles, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]", badge: "Popular" },
+      { href: "/features/smart-reframe", title: "Editor", text: "Smart reframe, word-by-word captions, visuals and sound", icon: Crop, tint: "bg-violet-500/10 text-violet-700" },
+      { href: "/features/auto-edit", title: "Auto Edit", text: "A first cut made for you, ready to tweak", icon: Wand2, tint: "bg-amber-500/15 text-amber-800" },
+      { href: "/features/publish", title: "Publisher", text: "Post or schedule to YouTube, TikTok and Instagram", icon: CalendarClock, tint: "bg-emerald-500/10 text-emerald-700" },
+      { href: "/features/analytics", title: "Analytics", text: "How every published Short is doing", icon: BarChart3, tint: "bg-sky-500/10 text-sky-700" },
+      { href: "/features/brand-studio", title: "Brand Studio", text: "Your colours, logo and templates on every Short", icon: Palette, tint: "bg-rose-500/10 text-rose-700" },
     ],
     chips: [
-      { href: "/#find", label: "Find Clips" },
-      { href: "/#edit", label: "Word-by-word captions" },
-      { href: "/#edit", label: "Smart reframe" },
-      { href: "/#publish", label: "Scheduling" },
-      { href: "/#toolkit", label: "Morocco Mode" },
+      { href: "/features/find-clips", label: "Find Clips" },
+      { href: "/features/captions", label: "Word-by-word captions" },
+      { href: "/features/visuals", label: "B-roll & visuals" },
+      { href: "/features/music", label: "Music & sound" },
+      { href: "/features/ask", label: "Ask PeakSift" },
+      { href: "/features/morocco-mode", label: "Morocco Mode" },
+      { href: "/features", label: "All tools" },
     ],
   },
   {
@@ -50,21 +53,24 @@ const GROUPS: Group[] = [
     label: "Made for",
     heading: "Made for",
     items: [
-      { href: "/#made-for", title: "Podcasters", text: "Turn every episode into a week of Shorts", icon: Mic, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]" },
-      { href: "/#made-for", title: "Streamers", text: "Clip the best of a long stream while it is still fresh", icon: Gamepad2, tint: "bg-violet-500/10 text-violet-700" },
-      { href: "/#made-for", title: "Educators & coaches", text: "Short lessons from long classes and calls", icon: GraduationCap, tint: "bg-amber-500/15 text-amber-800" },
-      { href: "/#made-for", title: "Interviews & talks", text: "The quotable moments from every conversation", icon: Presentation, tint: "bg-emerald-500/10 text-emerald-700" },
-      { href: "/#toolkit", title: "Moroccan creators", text: "Morocco Mode: Darija-aware hooks and local formats", icon: Languages, tint: "bg-rose-500/10 text-rose-700" },
+      { href: "/made-for/podcasters", title: "Podcasters", text: "Turn every episode into a week of Shorts", icon: Mic, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]" },
+      { href: "/made-for/streamers", title: "Streamers", text: "Clip the best of a long stream while it is still fresh", icon: Gamepad2, tint: "bg-violet-500/10 text-violet-700" },
+      { href: "/made-for/educators", title: "Educators & coaches", text: "Short lessons from long classes and calls", icon: GraduationCap, tint: "bg-amber-500/15 text-amber-800" },
+      { href: "/made-for/interviews", title: "Interviews & talks", text: "The quotable moments from every conversation", icon: Presentation, tint: "bg-emerald-500/10 text-emerald-700" },
+      { href: "/features/morocco-mode", title: "Moroccan creators", text: "Morocco Mode: Darija-aware hooks and local formats", icon: Languages, tint: "bg-rose-500/10 text-rose-700" },
     ],
   },
 ];
 
-const LINKS = [{ href: "/#faq", label: "FAQ" }];
+const LINKS = [
+  { href: "/pricing", label: "Pricing" },
+  { href: "/guides", label: "Guides" },
+];
 
 /** One tool or audience in a menu: icon tile, title (and badge), one line. */
 function MenuCard({ item, onPick }: { item: Item; onPick: () => void }) {
   return (
-    <a
+    <Link
       href={item.href}
       onClick={onPick}
       className="group flex gap-3 rounded-block border border-border bg-surface p-3.5 transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent/40 hover:shadow-[0_8px_24px_-14px_rgb(14_18_34/0.4)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -79,7 +85,7 @@ function MenuCard({ item, onPick }: { item: Item; onPick: () => void }) {
         </span>
         <span className="mt-0.5 block text-small text-muted">{item.text}</span>
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -219,14 +225,14 @@ export function SiteHeader() {
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                   <span className="mr-1 text-caption font-semibold text-subtle">Popular</span>
                   {group.chips.map((chip) => (
-                    <a
+                    <Link
                       key={chip.label}
                       href={chip.href}
                       onClick={close}
                       className="inline-flex min-h-8 items-center rounded-control border border-border px-2.5 text-small font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       {chip.label}
-                    </a>
+                    </Link>
                   ))}
                 </div>
               ) : null}

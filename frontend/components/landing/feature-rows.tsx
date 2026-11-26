@@ -5,7 +5,7 @@ import { Backdrop, delay, Person, PlatformBadge } from "@/components/landing/sce
 import { ButtonLink } from "@/components/ui/button-link";
 
 /** A dark panel in the workspace's look that holds one illustration (never real data). */
-function Panel({ children }: { children: ReactNode }) {
+export function Panel({ children }: { children: ReactNode }) {
   return (
     <div className="theme-dark relative overflow-hidden rounded-canvas border border-white/10 p-5 shadow-[0_30px_60px_-30px_rgb(14_18_34/0.55)] sm:p-7">
       {children}
@@ -14,7 +14,7 @@ function Panel({ children }: { children: ReactNode }) {
   );
 }
 
-function FindArt() {
+export function FindArt() {
   return (
     <Panel>
       <div className="flex items-center gap-2 rounded-control border border-border-strong bg-background px-3 py-2.5 text-sm text-muted">
@@ -39,7 +39,7 @@ function FindArt() {
   );
 }
 
-function EditArt() {
+export function EditArt() {
   return (
     <Panel>
       <div className="flex items-center justify-center gap-5">
@@ -70,7 +70,7 @@ function EditArt() {
   );
 }
 
-function PublishArt() {
+export function PublishArt() {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
   const posts: Record<string, [string, string, "youtube" | "tiktok" | "instagram", number]> = {
     Tue: ["YouTube", "bg-danger/20 text-rose-200", "youtube", 0],
@@ -101,7 +101,7 @@ function PublishArt() {
   );
 }
 
-function LearnArt() {
+export function LearnArt() {
   const bars = [38, 52, 44, 71, 63, 88];
   return (
     <Panel>
@@ -161,6 +161,14 @@ const ROWS: { id: string; tag: string; title: string; text: string; points: stri
   },
 ];
 
+/** Where each row's "Learn more" leads. */
+const PAGES: Record<string, string> = {
+  find: "/features/ai-moments",
+  edit: "/features/smart-reframe",
+  publish: "/features/publish",
+  learn: "/features/analytics",
+};
+
 /** What PeakSift does, one feature per row: words on one side, a picture on the other. */
 export function FeatureRows() {
   return (
@@ -187,9 +195,9 @@ export function FeatureRows() {
                     </li>
                   ))}
                 </ul>
-                <ButtonLink href="/register" variant="secondary" className="mt-8">
+                <ButtonLink href={PAGES[row.id]} variant="secondary" className="mt-8">
                   <Sparkles aria-hidden="true" />
-                  Try it
+                  Learn more
                 </ButtonLink>
               </Reveal>
               <Reveal scene delay={120} className={index % 2 ? "lg:order-1" : ""}>
