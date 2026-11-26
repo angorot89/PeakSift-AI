@@ -17,6 +17,17 @@ settings = get_settings()
 COOKIE = settings.auth_cookie_name
 
 
+def replace_session_cookie(client: TestClient, value: str) -> None:
+    """Make ``value`` the only session cookie the client sends.
+
+    The server set its cookie for the test host; a plain ``cookies.set`` adds a second cookie
+    with no domain instead of replacing it, and which of the two is sent depends on the HTTP
+    client's version. Clearing first leaves exactly one.
+    """
+    client.cookies.clear()
+    client.cookies.set(COOKIE, value)
+
+
 def register(client: TestClient, email: str = EMAIL, password: str = PASSWORD):
     return client.post("/auth/register", json={"email": email, "password": password})
 
@@ -155,7 +166,7 @@ def test_session_answers_without_an_error(client: TestClient):
     assert signed_in.status_code == 200 and signed_in.json() == {"user": registered}
     assert "password" not in signed_in.text
 
-    client.cookies.set(COOKIE, "not-a-token")
+    replace_session_cookie(client, "not-a-token")
     assert client.get("/auth/session").json() == {"user": None}
     assert client.get("/auth/me").status_code == 401  # /me keeps its contract
 
@@ -168,14 +179,14 @@ def test_me_rejects_expired_token(client: TestClient):
         settings.secret_key.get_secret_value(),
         algorithm=JWT_ALGORITHM,
     )
-    client.cookies.set(COOKIE, expired)
+    replace_session_cookie(client, expired)
 
     assert client.get("/auth/me").status_code == 401
 
 
 def test_me_rejects_tampered_token(client: TestClient):
     token = register(client).cookies[COOKIE]
-    client.cookies.set(COOKIE, token[:-2] + "xx")
+    replace_session_cookie(client, token[:-2] + "xx")
 
     assert client.get("/auth/me").status_code == 401
 
@@ -188,7 +199,7 @@ def test_me_rejects_token_signed_with_other_key(client: TestClient):
         "a-different-secret-key-with-enough-length-0123456789",
         algorithm=JWT_ALGORITHM,
     )
-    client.cookies.set(COOKIE, forged)
+    replace_session_cookie(client, forged)
 
     assert client.get("/auth/me").status_code == 401
 

@@ -36,7 +36,11 @@ jobs:
 
   backend:
     name: Backend (ruff, migrations, tests)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the backup tests dump and restore the PostgreSQL 16 service
+    # with the runner's client tools, and a newer pg_dump writes dumps that PostgreSQL 16
+    # cannot restore. Ubuntu 24.04 ships the PostgreSQL 16 client, like the production image
+    # (deploy/backend.Dockerfile installs postgresql-client-16).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
