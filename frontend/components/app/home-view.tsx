@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { ModeSwitch } from "@/components/app/morocco/morocco-views";
 import { PageHeader } from "@/components/app/page-header";
+import { QuickStart } from "@/components/app/quick-start";
 import { ErrorState } from "@/components/app/states";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -74,12 +75,14 @@ function Welcome() {
         <p className="mt-3 max-w-xl text-lead text-pretty text-muted">
           PeakSift finds the best moments in your long videos and helps you edit them for YouTube Shorts, TikTok and Reels.
         </p>
-        <div className="mt-7">
-          <ButtonLink href="/projects/new" size="lg">
-            <Plus aria-hidden="true" />
-            Create your first project
-          </ButtonLink>
-        </div>
+        {/* One step to a first result: drop a video, PeakSift does the rest. */}
+        <QuickStart className="mt-7 max-w-2xl" />
+        <p className="mt-3 text-small text-muted">
+          Prefer to set things up first?{" "}
+          <Link href="/projects/new" className="text-accent-soft underline underline-offset-2 hover:text-foreground">
+            Create an empty project
+          </Link>
+        </p>
         {/* V1.8: Morocco Mode is discoverable from the first visit (Global stays the default). */}
         <div className="mt-6">
           <ModeSwitch current="global" />
@@ -372,6 +375,8 @@ function Returning({ home }: { home: Home }) {
           <ModeSwitch current="global" />
         </div>
       </PageHeader>
+
+      <QuickStart />
 
       <GettingStarted home={home} />
 

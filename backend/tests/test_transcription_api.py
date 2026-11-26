@@ -25,6 +25,7 @@ STATUS_KEYS = {
     "progress_percent",
     "segment_count",
     "is_stale",
+    "auto_find_moments",
     "error_code",
     "error_message",
     "created_at",

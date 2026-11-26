@@ -17,6 +17,7 @@ class SourceSummary(BaseModel):
 class TranscriptSummary(BaseModel):
     status: str
     progress_percent: int
+    auto_find_moments: bool = False
 
 
 class CandidateSummary(BaseModel):
