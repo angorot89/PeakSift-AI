@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 
 /** Right-hand side of the site header: sign-in links or the signed-in user. */
-export function HeaderAuth() {
+export function HeaderAuth({ onDark = false }: { onDark?: boolean }) {
+  const quiet = onDark ? "text-white hover:bg-white/15 hover:text-white" : "";
   const { user, status, logout } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -29,11 +30,11 @@ export function HeaderAuth() {
     return (
       <div className="flex items-center gap-2 sm:gap-3">
         <span className="hidden sm:block">
-          <Button variant="ghost" onClick={handleLogout} disabled={loggingOut}>
+          <Button variant="ghost" onClick={handleLogout} disabled={loggingOut} className={quiet}>
             {loggingOut ? "Logging out…" : "Log out"}
           </Button>
         </span>
-        <ButtonLink href="/home">Open PeakSift</ButtonLink>
+        <ButtonLink href="/home" className="lp-key">Open PeakSift</ButtonLink>
       </div>
     );
   }
@@ -42,11 +43,11 @@ export function HeaderAuth() {
     <div className="flex items-center gap-4">
       <Link
         href="/login"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm text-sm font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm text-sm font-semibold transition-colors ${onDark ? "text-white" : "text-muted hover:text-foreground"} focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent`}
       >
         Log in
       </Link>
-      <ButtonLink href="/register">Sign up</ButtonLink>
+      <ButtonLink href="/register" className="lp-key">Sign up</ButtonLink>
     </div>
   );
 }

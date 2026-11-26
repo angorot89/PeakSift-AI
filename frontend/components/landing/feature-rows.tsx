@@ -1,5 +1,7 @@
 import { Check, MessageCircle, Search, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
+import { Reveal } from "@/components/landing/reveal";
+import { Backdrop, delay, Person, PlatformBadge } from "@/components/landing/scene-parts";
 import { ButtonLink } from "@/components/ui/button-link";
 
 /** A dark panel in the workspace's look that holds one illustration (never real data). */
@@ -17,14 +19,16 @@ function FindArt() {
     <Panel>
       <div className="flex items-center gap-2 rounded-control border border-border-strong bg-background px-3 py-2.5 text-sm text-muted">
         <Search aria-hidden="true" className="size-4 text-subtle" />
-        the part where I explain pricing
+        <span className="lp-type" style={delay(300)}>
+          the part where I explain pricing
+        </span>
       </div>
       <ul className="mt-4 space-y-2">
         {[
           ["12:40", "“So here's how we price it — and why it's not per seat.”"],
           ["31:02", "“Pricing was the hardest call we made all year.”"],
-        ].map(([at, line]) => (
-          <li key={at} className="flex gap-3 rounded-block border border-border bg-surface p-3">
+        ].map(([at, line], i) => (
+          <li key={at} className="lp-pop flex gap-3 rounded-block border border-border bg-surface p-3" style={delay(1500 + i * 250)}>
             <span className="tabular h-fit rounded-full bg-accent/20 px-2 py-0.5 text-caption font-semibold text-accent-soft">{at}</span>
             <span className="text-sm text-foreground">{line}</span>
           </li>
@@ -39,15 +43,22 @@ function EditArt() {
   return (
     <Panel>
       <div className="flex items-center justify-center gap-5">
-        <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-block border border-border-strong bg-[linear-gradient(160deg,#2b3a8f,#151a3a_55%,#0d0f1c)] sm:w-44">
-          <span className="absolute inset-x-3 top-1/3 h-24 rounded-full bg-accent/25 blur-2xl" />
-          <p className="absolute inset-x-3 bottom-[22%] text-center font-display text-lg leading-tight font-extrabold text-white">
-            this is <span className="text-[#ffd84d]">the price</span>
+        <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-block border border-border-strong sm:w-44">
+          <Backdrop from="#6b8cff" to="#3d1a8f" />
+          <span aria-hidden="true" className="absolute bottom-0 -left-[15%] w-[130%]">
+            <Person tone="#c68642" shirt="#7c2d12" className="relative w-full" />
+          </span>
+          <p className="absolute inset-x-3 bottom-[20%] flex flex-wrap justify-center gap-x-1.5 text-center font-display text-lg leading-tight font-extrabold text-white uppercase [text-shadow:0_2px_6px_rgb(0_0_0/0.6)]">
+            {["this", "is", "the", "price"].map((word, i) => (
+              <span key={word} className={`lp-word ${i >= 2 ? "text-[#ffd84d]" : ""}`} style={delay(400 + i * 380)}>
+                {word}
+              </span>
+            ))}
           </p>
         </div>
         <ul className="space-y-2 text-sm">
-          {["Smart reframe", "Word-by-word captions", "Your brand", "Music & ducking"].map((item) => (
-            <li key={item} className="flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-foreground">
+          {["Smart reframe", "Word-by-word captions", "Your brand", "Music & ducking"].map((item, i) => (
+            <li key={item} className="lp-pop flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-foreground" style={delay(1800 + i * 200)}>
               <Check aria-hidden="true" className="size-4 text-success" />
               {item}
             </li>
@@ -61,7 +72,11 @@ function EditArt() {
 
 function PublishArt() {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-  const posts: Record<string, [string, string]> = { Tue: ["YouTube", "bg-danger/20 text-rose-200"], Thu: ["TikTok", "bg-info/20 text-sky-200"], Fri: ["Reels", "bg-violet/20 text-violet-200"] };
+  const posts: Record<string, [string, string, "youtube" | "tiktok" | "instagram", number]> = {
+    Tue: ["YouTube", "bg-danger/20 text-rose-200", "youtube", 0],
+    Thu: ["TikTok", "bg-info/20 text-sky-200", "tiktok", 1],
+    Fri: ["Reels", "bg-violet/20 text-violet-200", "instagram", 2],
+  };
   return (
     <Panel>
       <p className="text-title">This week</p>
@@ -70,7 +85,8 @@ function PublishArt() {
           <li key={day} className="flex min-h-32 flex-col gap-2 rounded-block border border-border bg-surface p-2">
             <span className="text-caption text-subtle">{day}</span>
             {posts[day] ? (
-              <span className={`rounded-control px-1.5 py-1 text-caption font-medium ${posts[day][1]}`}>
+              <span className={`lp-pop rounded-control px-1.5 py-1 text-caption font-medium ${posts[day][1]}`} style={delay(500 + posts[day][3] * 450)}>
+                <PlatformBadge platform={posts[day][2]} className="mb-1 size-4" />
                 7:00 PM
                 <span className="block font-semibold">{posts[day][0]}</span>
               </span>
@@ -92,10 +108,14 @@ function LearnArt() {
       <p className="text-title">How your Shorts are doing</p>
       <div className="mt-4 flex h-32 items-end gap-2" aria-hidden="true">
         {bars.map((height, index) => (
-          <span key={index} className={`flex-1 rounded-t-md ${index === bars.length - 1 ? "bg-accent" : "bg-surface-3"}`} style={{ height: `${height}%` }} />
+          <span
+            key={index}
+            className={`lp-grow flex-1 rounded-t-md ${index === bars.length - 1 ? "bg-accent" : "bg-surface-3"}`}
+            style={{ height: `${height}%`, ...delay(200 + index * 140) }}
+          />
         ))}
       </div>
-      <div className="mt-5 flex gap-3 rounded-block border border-border bg-surface p-3">
+      <div className="lp-pop mt-5 flex gap-3 rounded-block border border-border bg-surface p-3" style={delay(1400)}>
         <MessageCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent-soft" />
         <p className="text-sm text-foreground">
           <span className="font-semibold">Ask PeakSift:</span> “Which of my moments should I post next?”
@@ -146,14 +166,14 @@ export function FeatureRows() {
   return (
     <section id="features" className="scroll-mt-24 px-6 py-24">
       <div className="mx-auto max-w-6xl">
-        <div className="mx-auto max-w-2xl text-center">
+        <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-4xl font-extrabold tracking-tight text-balance sm:text-5xl">From one long video to a week of Shorts</h2>
           <p className="mt-4 text-lg text-pretty text-muted">You already made the content. PeakSift makes sure people see the best of it.</p>
-        </div>
+        </Reveal>
         <div className="mt-20 space-y-24">
           {ROWS.map((row, index) => (
             <article id={row.id} key={row.id} className="grid scroll-mt-28 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-              <div className={index % 2 ? "lg:order-2" : ""}>
+              <Reveal className={index % 2 ? "lg:order-2" : ""}>
                 <span className="inline-flex rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-small font-semibold text-accent-soft">
                   {row.tag}
                 </span>
@@ -171,8 +191,10 @@ export function FeatureRows() {
                   <Sparkles aria-hidden="true" />
                   Try it
                 </ButtonLink>
-              </div>
-              <div className={index % 2 ? "lg:order-1" : ""}>{row.art}</div>
+              </Reveal>
+              <Reveal scene delay={120} className={index % 2 ? "lg:order-1" : ""}>
+                {row.art}
+              </Reveal>
             </article>
           ))}
         </div>

@@ -29,7 +29,7 @@ export function MomentStrip({ className = "", compact = false }: { className?: s
             <span
               key={index}
               className={`hero-bar flex-1 rounded-full ${inMoment(index) ? "bg-accent" : "bg-surface-3"}`}
-              style={{ height: `${barHeight(index) * 100}%`, animationDelay: `${index * 6}ms` }}
+              style={{ height: `${(barHeight(index) * 100).toFixed(2)}%`, animationDelay: `${index * 6}ms` }}
             />
           ))}
         </div>

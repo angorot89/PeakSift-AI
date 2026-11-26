@@ -187,7 +187,15 @@ navigation bar, a blue hero with the platforms, headline, "Start clipping" and a
 frame (labelled as an illustration), four alternating feature rows (AI moments, Editing,
 Publishing, Analytics) with built-in illustrations, the toolkit grid, a "Built to explain itself"
 bento of plain statements (no invented user numbers or testimonials), a FAQ and a closing call to
-action. Tokens and rules:
+action. Details: an announcement strip; a floating bar that turns solid on scroll with **Product**
+and **Made for** mega menus (hover, click or keyboard, Escape closes; one panel on phones); an
+animated demo carousel in the hero (AI moments, Smart reframe, Captions, Auto Edit & publish —
+drawn scenes that advance by themselves, with the next one peeking, a pause button and synced
+tabs); an endless row of drawn example Shorts per kind of video ("Made for"); feature
+illustrations that play when scrolled into view; count-up product facts (3 platforms, 12 tools,
+1080×1920, −14 LUFS); pressable buttons; and a large wordmark in the footer. Everything is drawn
+with CSS (no other creators' footage), labelled as an illustration, and still under reduced
+motion. Tokens and rules:
 [design-system.md](design-system.md). Behaviour, copy rules and data are unchanged; the look
 described in the next section is superseded.
 

@@ -29,7 +29,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-surface px-6 pt-16 pb-10">
+    <footer className="overflow-hidden border-t border-border bg-surface px-6 pt-16">
       <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <Logo />
@@ -55,6 +55,13 @@ export function SiteFooter() {
       </div>
       <p className="mx-auto mt-12 max-w-6xl border-t border-border pt-6 text-small text-subtle">
         © PeakSift. In development.
+      </p>
+      {/* The name, large and quiet, as the page's last line. */}
+      <p
+        aria-hidden="true"
+        className="mx-auto mt-8 max-w-6xl font-display text-[clamp(4.5rem,19vw,16rem)] leading-[0.8] font-extrabold tracking-[-0.04em] text-surface-3 select-none"
+      >
+        PeakSift
       </p>
     </footer>
   );

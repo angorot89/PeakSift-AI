@@ -19,15 +19,16 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
   );
 }
 
-export function Logo() {
+/** The logo and name, linking home; `onDark` for a coloured background (the website hero). */
+export function Logo({ onDark = false }: { onDark?: boolean }) {
   return (
     <Link
       href="/"
-      className="flex min-h-11 items-center gap-2.5 rounded-md font-display text-lg font-extrabold tracking-tight text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+      className={`flex min-h-11 items-center gap-2.5 rounded-md font-display text-lg font-extrabold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent ${onDark ? "text-white" : "text-foreground"}`}
     >
       <LogoMark />
       <span className="whitespace-nowrap">
-        PeakSift <span className="font-normal text-subtle">AI</span>
+        PeakSift <span className={`font-normal ${onDark ? "text-white/70" : "text-subtle"}`}>AI</span>
       </span>
     </Link>
   );

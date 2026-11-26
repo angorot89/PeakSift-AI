@@ -9,10 +9,12 @@ import {
   MessageCircle,
   Palette,
   Search,
+  ShieldCheck,
   Sparkles,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
+import { Reveal } from "@/components/landing/reveal";
 
 const TOOLS: { title: string; text: string; icon: LucideIcon; tint: string }[] = [
   { title: "AI moments", text: "The strongest moments of a long video, ranked, with the reason for each.", icon: Sparkles, tint: "bg-[#3d5afe]/10 text-[#2f4ae0]" },
@@ -34,14 +36,17 @@ export function Toolkit() {
   return (
     <section id="toolkit" className="scroll-mt-24 border-t border-border bg-surface px-6 py-24">
       <div className="mx-auto max-w-6xl">
-        <div className="mx-auto max-w-2xl text-center">
+        <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-4xl font-extrabold tracking-tight text-balance sm:text-5xl">Everything in one workspace</h2>
           <p className="mt-4 text-lg text-pretty text-muted">Every tool you need to turn long videos into Shorts — no exporting between apps.</p>
-        </div>
+        </Reveal>
         <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TOOLS.map((tool) => (
-            <li key={tool.title} className="rounded-card border border-border bg-background p-6">
-              <span className={`flex size-11 items-center justify-center rounded-block ${tool.tint}`}>
+            <li
+              key={tool.title}
+              className="group rounded-card border border-border bg-background p-6 transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-accent/30 hover:shadow-[0_18px_40px_-20px_rgb(14_18_34/0.35)]"
+            >
+              <span className={`flex size-11 items-center justify-center rounded-block transition-transform duration-200 group-hover:scale-110 ${tool.tint}`}>
                 <tool.icon aria-hidden="true" className="size-5" />
               </span>
               <h3 className="mt-4 font-display text-lg font-bold">{tool.title}</h3>
@@ -54,36 +59,35 @@ export function Toolkit() {
   );
 }
 
-/** Why PeakSift, as a bento of plain statements (no invented figures). */
+const PRINCIPLES: { title: string; text: string; icon: LucideIcon }[] = [
+  { title: "Every pick has a reason", text: "See why a moment made the list — the line it opens on, the turn in the story.", icon: Sparkles },
+  { title: "Your words, never invented", text: "Captions, hooks and search results come from your own transcript.", icon: Captions },
+  { title: "Private by default", text: "Your media stays in your workspace. Nothing is posted without your click.", icon: ShieldCheck },
+  { title: "No fake numbers", text: "Analytics show only what the platforms report — never predictions.", icon: BarChart3 },
+];
+
+/** Why PeakSift: the promises behind the product, in plain statements (no invented figures). */
 export function WhyPeakSift() {
   return (
-    <section className="px-6 py-24">
-      <div className="mx-auto max-w-6xl">
-        <h2 className="mx-auto max-w-2xl text-center text-4xl font-extrabold tracking-tight text-balance sm:text-5xl">
-          Built to explain itself
-        </h2>
-        <div className="mt-14 grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr] lg:grid-rows-2">
-          <div className="flex flex-col justify-end rounded-canvas bg-[linear-gradient(150deg,#3d5afe,#6f4bff)] p-8 text-white lg:row-span-2">
-            <p className="font-display text-4xl leading-tight font-extrabold sm:text-5xl">Every pick comes with a reason.</p>
-            <p className="mt-4 max-w-md text-lg text-white/90">
-              PeakSift shows why a moment made the list — the line it opens on, the turn in the story — so you decide, not a
-              score.
-            </p>
-          </div>
-          <div className="flex flex-col justify-end rounded-canvas bg-[#e3f25c] p-7 text-[#15170a] lg:row-span-2">
-            <p className="font-display text-3xl leading-tight font-extrabold">Your words, never invented.</p>
-            <p className="mt-3 text-[#15170a]/80">Captions, hooks and search results come from your own transcript.</p>
-          </div>
-          <div className="rounded-canvas bg-[#141833] p-7 text-white">
-            <p className="font-display text-2xl font-extrabold">Private by default</p>
-            <p className="mt-2 text-white/75">Your media stays in your workspace. Nothing is published without your click.</p>
-          </div>
-          <div className="rounded-canvas border border-accent/20 bg-accent/10 p-7">
-            <p className="font-display text-2xl font-extrabold text-accent-soft">No fake numbers</p>
-            <p className="mt-2 text-muted">Analytics show only what the platforms report — never predictions.</p>
-          </div>
+    <section className="px-6 pb-24">
+      <Reveal className="mx-auto grid max-w-6xl gap-10 rounded-canvas border border-border bg-surface p-8 sm:p-12 lg:grid-cols-[1fr_1.3fr] lg:items-center">
+        <div>
+          <h2 className="text-4xl font-extrabold tracking-tight text-balance sm:text-5xl">Built to explain itself</h2>
+          <p className="mt-4 text-lg text-pretty text-muted">
+            PeakSift suggests; you decide. Every choice it makes comes with the reason, and nothing happens to your
+            channel without you.
+          </p>
         </div>
-      </div>
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {PRINCIPLES.map((principle) => (
+            <li key={principle.title} className="rounded-card bg-background p-5">
+              <principle.icon aria-hidden="true" className="size-6 text-accent-soft" />
+              <p className="mt-3 font-display text-lg font-bold">{principle.title}</p>
+              <p className="mt-1 text-muted">{principle.text}</p>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
     </section>
   );
 }

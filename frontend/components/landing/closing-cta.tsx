@@ -12,7 +12,7 @@ export function ClosingCta() {
         <ButtonLink
           href="/register"
           size="lg"
-          className="mt-9 bg-white !text-[#1b2a8f] shadow-[0_10px_30px_-10px_rgb(14_18_34/0.5)] hover:!bg-white/90"
+          className="lp-key mt-9 bg-white !text-[#1b2a8f] hover:!bg-white"
         >
           <Wand2 aria-hidden="true" />
           Start clipping
