@@ -3,8 +3,10 @@
 import {
   BarChart3,
   CalendarClock,
+  ChevronDown,
   ChevronsUpDown,
   FolderOpen,
+  FolderPlus,
   Home,
   LogOut,
   Menu as MenuIcon,
@@ -14,7 +16,9 @@ import {
   Search,
   Settings,
   Smartphone,
+  Plus,
   Sparkles,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,10 +31,11 @@ import { CopilotProvider, useCopilot } from "@/components/app/copilot/copilot-pr
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoMark } from "@/components/logo";
 import { Dialog } from "@/components/ui/dialog";
+import { buttonClasses } from "@/components/ui/button-styles";
 import { IconButton } from "@/components/ui/icon-button";
 import { Menu } from "@/components/ui/menu";
 import { isCommandShortcut } from "@/lib/command-menu";
-import { activeGlobal, GLOBAL_NAV, projectLocation, SETTINGS_NAV, type GlobalKey } from "@/lib/navigation";
+import { activeGlobal, GLOBAL_NAV, NAV_GROUPS, projectLocation, SETTINGS_NAV, type GlobalKey } from "@/lib/navigation";
 import { listProjects, type Project } from "@/lib/projects";
 import { useStoredFlag } from "@/lib/use-stored-flag";
 
@@ -71,7 +76,7 @@ function NavLink({
       title={collapsed ? label : undefined}
       className={`group flex items-center gap-3 rounded-control transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:min-h-11 ${
         collapsed ? "justify-center" : ""
-      } ${nested ? "min-h-9 pl-11 pr-2.5 text-small" : "min-h-11 px-3 text-[0.9375rem]"} ${
+      } ${nested ? "min-h-9 px-3 text-small" : "min-h-11 px-3 text-[0.9375rem]"} ${
         active
           ? nested
             ? "bg-surface-2 font-medium text-foreground"
@@ -109,6 +114,35 @@ function AskButton({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?:
   );
 }
 
+/** The sidebar's first button: every way to start something new, one click away. */
+function CreateNew({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const router = useRouter();
+  const go = (href: string) => {
+    onNavigate?.();
+    router.push(href);
+  };
+  return (
+    <Menu
+      label="Create new"
+      align="start"
+      className="w-full"
+      triggerClassName={`${buttonClasses("primary", "lg")} w-full ${collapsed ? "px-0" : ""}`}
+      trigger={
+        <>
+          <Plus aria-hidden="true" />
+          <span className={collapsed ? "sr-only" : ""}>Create new</span>
+          {collapsed ? null : <ChevronDown aria-hidden="true" className="ml-auto opacity-80" />}
+        </>
+      }
+      items={[
+        { label: "Upload a video", icon: Upload, onSelect: () => go("/home#start") },
+        { label: "New empty project", icon: FolderPlus, onSelect: () => go("/projects/new") },
+        { label: "Create a Short", icon: Smartphone, onSelect: () => go("/shorts") },
+      ]}
+    />
+  );
+}
+
 /** Everything in the sidebar: brand, the quick action, destinations, recent projects, account. */
 function SidebarContent({
   collapsed,
@@ -143,17 +177,15 @@ function SidebarContent({
   const name = user ? user.email.split("@")[0] : "";
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-5">
       <div className={`flex items-center gap-2 ${collapsed ? "flex-col" : "justify-between"}`}>
         <Link
           href="/home"
           onClick={onNavigate}
-          className="flex min-h-11 items-center gap-2.5 rounded-control px-1 text-lg font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 items-center gap-2.5 rounded-control px-1 font-display text-lg font-extrabold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <LogoMark className="size-8" />
-          <span className={collapsed ? "sr-only" : ""}>
-            PeakSift <span className="font-normal text-subtle">AI</span>
-          </span>
+          <span className={collapsed ? "sr-only" : "whitespace-nowrap"}>PeakSift</span>
         </Link>
         {onToggle ? (
           <IconButton aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} onClick={onToggle} size="sm">
@@ -162,34 +194,46 @@ function SidebarContent({
         ) : null}
       </div>
 
-      <nav aria-label="Main" className="flex flex-col gap-1">
-        {[...GLOBAL_NAV, SETTINGS_NAV].map((item) => (
-          <div key={item.key} className="flex flex-col gap-0.5">
-            <NavLink
-              href={item.href}
-              label={item.label}
-              icon={ICONS[item.key]}
-              active={active === item.key && !(item.key === "projects" && current)}
-              collapsed={collapsed}
-              onNavigate={onNavigate}
-            />
-            {item.key === "projects" && !collapsed && listed.length > 0 ? (
-              <ul aria-label="Recent projects" className="flex flex-col gap-0.5">
-                {listed.map((project) => (
-                  <li key={project.id}>
-                    <NavLink
-                      href={`/projects/${project.id}`}
-                      label={project.name}
-                      icon={FolderOpen}
-                      active={project.id === current}
-                      collapsed={false}
-                      onNavigate={onNavigate}
-                      nested
-                    />
-                  </li>
-                ))}
-              </ul>
+      <CreateNew collapsed={collapsed} onNavigate={onNavigate} />
+
+      <nav aria-label="Main" className="flex flex-col gap-4">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label ?? "top"} className="flex flex-col gap-0.5">
+            {group.label && !collapsed ? (
+              <p className="px-3 pb-1 text-caption font-semibold text-subtle">{group.label}</p>
             ) : null}
+            {group.keys.map((key) => {
+              const item = GLOBAL_NAV.find((entry) => entry.key === key)!;
+              return (
+                <div key={key} className="flex flex-col gap-0.5">
+                  <NavLink
+                    href={item.href}
+                    label={item.label}
+                    icon={ICONS[key]}
+                    active={active === key && !(key === "projects" && current)}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                  />
+                  {key === "projects" && !collapsed && listed.length > 0 ? (
+                    <ul aria-label="Recent projects" className="ml-5 flex flex-col gap-0.5 border-l border-border pl-1">
+                      {listed.map((project) => (
+                        <li key={project.id}>
+                          <NavLink
+                            href={`/projects/${project.id}`}
+                            label={project.name}
+                            icon={FolderOpen}
+                            active={project.id === current}
+                            collapsed={false}
+                            onNavigate={onNavigate}
+                            nested
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         ))}
       </nav>
@@ -207,6 +251,14 @@ function SidebarContent({
             Search
           </button>
         ) : null}
+        <NavLink
+          href={SETTINGS_NAV.href}
+          label={SETTINGS_NAV.label}
+          icon={Settings}
+          active={active === "settings"}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
         <AskButton collapsed={collapsed} onNavigate={onNavigate} />
         {user ? (
           <Menu
@@ -308,7 +360,7 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <ShellSearchContext.Provider value={openMenu}>
-    <div className="flex min-h-dvh bg-background">
+    <div className="flex min-h-dvh bg-chrome">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-control focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
@@ -317,7 +369,7 @@ function Shell({ children }: { children: ReactNode }) {
       </a>
       <aside
         aria-label="Sidebar"
-        className={`sticky top-0 hidden h-dvh bg-chrome shrink-0 border-r border-border px-3 py-5 transition-[width] duration-200 lg:block ${
+        className={`sticky top-0 hidden h-dvh shrink-0 overflow-y-auto bg-chrome px-3 py-4 transition-[width] duration-200 [scrollbar-width:none] lg:block ${
           collapsed ? "w-[4.75rem]" : "w-64"
         }`}
       >
@@ -325,14 +377,14 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* On very wide screens an open Ask PeakSift panel sits beside the page instead of over it. */}
-      <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ${copilot.open ? "2xl:pr-[28rem]" : ""}`}>
+      <div className={`flex min-w-0 flex-1 flex-col transition-[padding] duration-200 lg:py-2 lg:pr-2 ${copilot.open ? "2xl:pr-[28rem]" : ""}`}>
         <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-chrome px-3 lg:hidden">
           <IconButton aria-label="Open navigation" aria-haspopup="dialog" aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <MenuIcon aria-hidden="true" />
           </IconButton>
-          <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-bold tracking-tight">
+          <Link href="/home" className="flex min-h-11 items-center gap-2 rounded-md px-1 font-display text-lg font-extrabold tracking-tight">
             <LogoMark className="size-7" />
-            PeakSift <span className="font-normal text-subtle">AI</span>
+            PeakSift
           </Link>
           <IconButton aria-label="Search" aria-haspopup="dialog" onClick={openMenu} className="ml-auto">
             <Search aria-hidden="true" />
@@ -346,9 +398,12 @@ function Shell({ children }: { children: ReactNode }) {
             <Sparkles aria-hidden="true" />
           </IconButton>
         </header>
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[80rem] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-9">
-          {children}
-        </main>
+        {/* The canvas: every page sits on one rounded surface beside the sidebar. */}
+        <div className="flex flex-1 flex-col bg-background lg:rounded-canvas lg:border lg:border-border">
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[80rem] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-9">
+            {children}
+          </main>
+        </div>
       </div>
 
       <Dialog open={drawer} onClose={() => setDrawer(false)} title="Navigation" placement="left" hideTitle>

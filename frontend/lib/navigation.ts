@@ -13,6 +13,14 @@ export const GLOBAL_NAV: { key: GlobalKey; href: string; label: string }[] = [
 ];
 export const SETTINGS_NAV = { key: "settings" as const, href: "/settings", label: "Settings" };
 
+/** How the sidebar groups the destinations: what you make, where it goes, how it looks. */
+export const NAV_GROUPS: { label: string | null; keys: GlobalKey[] }[] = [
+  { label: null, keys: ["home"] },
+  { label: "Create", keys: ["projects", "shorts"] },
+  { label: "Publish", keys: ["schedule", "analytics"] },
+  { label: "Brand", keys: ["brand"] },
+];
+
 export type ProjectSection = "overview" | "source" | "clips" | "assets" | "analytics";
 
 export const PROJECT_SECTIONS: { key: ProjectSection; label: string; path: string }[] = [

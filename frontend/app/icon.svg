@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#1d1e22"/>
-  <g stroke-width="2.6" stroke-linecap="round">
-    <path d="M7 14.5v3" stroke="#8d919a"/>
-    <path d="M11.5 12v8" stroke="#a9acb4"/>
-    <path d="M16 15v2" stroke="#8d919a"/>
-    <path d="M20.5 7.5v17" stroke="#e3f25c"/>
-    <path d="M25 13v6" stroke="#a9acb4"/>
+  <rect width="32" height="32" rx="8" fill="#3d5afe"/>
+  <g stroke-width="2.6" stroke-linecap="round" stroke="#ffffff">
+    <path d="M7 14.5v3" stroke-opacity="0.6"/>
+    <path d="M11.5 12v8" stroke-opacity="0.75"/>
+    <path d="M16 15v2" stroke-opacity="0.6"/>
+    <path d="M20.5 7.5v17"/>
+    <path d="M25 13v6" stroke-opacity="0.75"/>
   </g>
 </svg>

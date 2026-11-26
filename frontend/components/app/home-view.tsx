@@ -3,24 +3,28 @@
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
+  CalendarClock,
   CheckCircle2,
   Clapperboard,
-  Plus,
+  FolderPlus,
+  Palette,
   Scissors,
+  Search,
   Smartphone,
   Sparkles,
   Upload,
+  Wand2,
   X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { ModeSwitch } from "@/components/app/morocco/morocco-views";
-import { PageHeader } from "@/components/app/page-header";
 import { QuickStart } from "@/components/app/quick-start";
+import { ShellSearch } from "@/components/app/shell-search";
 import { ErrorState } from "@/components/app/states";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ButtonLink } from "@/components/ui/button-link";
-import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
 import { Spinner } from "@/components/ui/progress";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -55,7 +59,82 @@ const TONE: Record<ActionTone, { icon: LucideIcon | null; tile: string; ring: st
   done: { icon: CheckCircle2, tile: "bg-success/15 text-emerald-200", ring: "hover:border-success/40", label: "Done" },
 };
 
-/** First visit: what PeakSift does, in three steps, and one way to start. */
+/**
+ * The top of Home: one question, one place to drop a video, and the two other ways to start. On a
+ * band of PeakSift blue — the one coloured surface in the workspace.
+ */
+function CreateBox({ greeting, momentsHref }: { greeting: string; momentsHref: string | null }) {
+  return (
+    <section aria-labelledby="create-heading" className="create-band relative overflow-hidden rounded-card border border-border px-4 pt-10 pb-6 sm:px-10 sm:pt-14 sm:pb-10">
+      <div className="absolute top-4 right-4">
+        <ShellSearch />
+      </div>
+      <div className="mx-auto max-w-2xl text-center">
+        <p className="text-sm font-medium text-white/85">{greeting}</p>
+        <h1 id="create-heading" className="mt-2 text-page text-balance sm:text-display">
+          What will you clip today?
+        </h1>
+      </div>
+      <div className="mx-auto mt-7 max-w-2xl rounded-card border border-border-strong bg-surface p-3 shadow-raised sm:p-4">
+        <QuickStart bare />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <ButtonLink href="/projects/new" variant="secondary">
+            <FolderPlus aria-hidden="true" />
+            New empty project
+          </ButtonLink>
+          <ButtonLink href={momentsHref ?? "/projects"} variant="secondary">
+            <Search aria-hidden="true" />
+            Find clips in a video
+          </ButtonLink>
+        </div>
+      </div>
+      <div className="mx-auto mt-6 flex max-w-2xl justify-center">
+        <ModeSwitch current="global" />
+      </div>
+    </section>
+  );
+}
+
+type Tool = { title: string; text: string; href: string; icon: LucideIcon; tint: string };
+
+/** Everything PeakSift can do, one tile each, pointed at the most useful place to do it. */
+function Tools({ momentsHref }: { momentsHref: string | null }) {
+  const tools: Tool[] = [
+    { title: "Find Clips", text: "Ask for a moment in your own words", href: momentsHref ?? "/projects", icon: Search, tint: "bg-accent/20 text-accent-soft" },
+    { title: "Auto Edit", text: "PeakSift edits a moment for you", href: momentsHref ?? "/projects", icon: Wand2, tint: "bg-violet/20 text-violet-200" },
+    { title: "Shorts", text: "Everything you have made", href: "/shorts", icon: Smartphone, tint: "bg-success/20 text-emerald-200" },
+    { title: "Schedule", text: "Plan posts across platforms", href: "/schedule", icon: CalendarClock, tint: "bg-warning/20 text-amber-200" },
+    { title: "Brand Studio", text: "Your colours, logo and templates", href: "/brand", icon: Palette, tint: "bg-rose-400/20 text-rose-200" },
+    { title: "Analytics", text: "How your Shorts are doing", href: "/analytics", icon: BarChart3, tint: "bg-info/20 text-sky-200" },
+  ];
+  return (
+    <section aria-labelledby="tools-heading">
+      <h2 id="tools-heading" className="mb-4 text-section">
+        Tools
+      </h2>
+      <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {tools.map((tool) => (
+          <li key={tool.title} className="min-w-0">
+            <Link
+              href={tool.href}
+              className="group flex h-full flex-col gap-3 rounded-card border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className={`flex size-11 items-center justify-center rounded-block ${tool.tint}`}>
+                <tool.icon aria-hidden="true" className="size-5" />
+              </span>
+              <span>
+                <span className="block text-title">{tool.title}</span>
+                <span className="mt-0.5 block text-small text-muted">{tool.text}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** First visit: the creation box, the tools, and what happens after a drop. */
 function Welcome() {
   const steps: { icon: LucideIcon; title: string; text: string }[] = [
     { icon: Upload, title: "Upload", text: "A stream, podcast, interview or any long recording." },
@@ -63,41 +142,28 @@ function Welcome() {
     { icon: Smartphone, title: "Create Shorts", text: "Framing, captions, visuals and sound — ready to publish." },
   ];
   return (
-    <div className="relative mx-auto max-w-4xl py-6 sm:py-12">
-      <div className="relative">
-        <h1 className="max-w-2xl text-page text-balance sm:text-display">Find the moments worth clipping</h1>
-        <p className="mt-3 max-w-xl text-lead text-pretty text-muted">
-          PeakSift finds the best moments in your long videos and helps you edit them for YouTube Shorts, TikTok and Reels.
-        </p>
-        {/* One step to a first result: drop a video, PeakSift does the rest. */}
-        <QuickStart className="mt-7 max-w-2xl" />
-        <p className="mt-3 text-small text-muted">
-          Prefer to set things up first?{" "}
-          <Link href="/projects/new" className="text-foreground underline decoration-subtle underline-offset-2 hover:decoration-foreground">
-            Create an empty project
-          </Link>
-        </p>
-        {/* V1.8: Morocco Mode is discoverable from the first visit (Global stays the default). */}
-        <div className="mt-6">
-          <ModeSwitch current="global" />
-        </div>
-      </div>
-      <ol className="relative mt-12 grid gap-3 sm:grid-cols-3">
-        {steps.map((step, index) => (
-          <li key={step.title}>
-            <Card className="h-full">
-              <span className="flex size-10 items-center justify-center rounded-block bg-surface-3 text-foreground">
-                <step.icon aria-hidden="true" className="size-5" />
+    <div className="space-y-10">
+      <CreateBox greeting="Welcome to PeakSift" momentsHref={null} />
+      <section aria-labelledby="how-heading">
+        <h2 id="how-heading" className="mb-4 text-section">
+          How it works
+        </h2>
+        <ol className="grid gap-3 sm:grid-cols-3">
+          {steps.map((step, index) => (
+            <li key={step.title} className="rounded-card border border-border bg-surface p-5">
+              <span className="flex items-center gap-3">
+                <span className="tabular flex size-8 items-center justify-center rounded-full bg-accent-fill text-sm font-bold text-accent-ink">
+                  {index + 1}
+                </span>
+                <step.icon aria-hidden="true" className="size-5 text-subtle" />
               </span>
-              <p className="mt-4 text-title">
-                <span className="tabular text-subtle">{index + 1}. </span>
-                {step.title}
-              </p>
+              <p className="mt-4 text-title">{step.title}</p>
               <p className="mt-1 text-sm text-muted">{step.text}</p>
-            </Card>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <Tools momentsHref={null} />
     </div>
   );
 }
@@ -345,29 +411,14 @@ function Returning({ home }: { home: Home }) {
   const { user } = useAuth();
   const name = user ? displayName(user.email) : "";
   const projects = new Map(home.projects.map((p) => [p.id, p]));
+  // Find Clips and Auto Edit start from a project's moments: the most recent project with a video.
+  const withSource = home.projects.find((p) => p.source);
+  const momentsHref = withSource ? `/projects/${withSource.id}/clips` : null;
   return (
     <div className="space-y-12">
-      <PageHeader
-        size="hero"
-        title={
-          <>
-            Welcome back{name ? `, ${name}` : ""}
-          </>
-        }
-        description="Turn your long-form videos into Shorts worth watching."
-        action={
-          <ButtonLink href="/projects/new">
-            <Plus aria-hidden="true" />
-            New project
-          </ButtonLink>
-        }
-      >
-        <div className="mt-6">
-          <ModeSwitch current="global" />
-        </div>
-      </PageHeader>
+      <CreateBox greeting={name ? `Hi ${name}` : "Welcome back"} momentsHref={momentsHref} />
 
-      <QuickStart />
+      <Tools momentsHref={momentsHref} />
 
       <GettingStarted home={home} />
 

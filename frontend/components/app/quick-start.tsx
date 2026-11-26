@@ -33,7 +33,16 @@ function problemWith(file: File): string | null {
  * transcribes it and finds the moments — so the creator's next click is reviewing them.
  * `market` is only passed where the page has already chosen one (Morocco Mode).
  */
-export function QuickStart({ market, className = "" }: { market?: string; className?: string }) {
+export function QuickStart({
+  market,
+  className = "",
+  bare = false,
+}: {
+  market?: string;
+  className?: string;
+  /** Inside Home's creation box: no card of its own, the box carries the heading. */
+  bare?: boolean;
+}) {
   const router = useRouter();
   const toast = useToast();
   const { setUser } = useAuth();
@@ -93,10 +102,11 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
 
   return (
     <section
+      id="start"
       aria-labelledby={headingId}
-      className={`rounded-card border border-border bg-surface p-4 sm:p-5 ${className}`}
+      className={`scroll-mt-24 ${bare ? "" : "rounded-card border border-border bg-surface p-4 sm:p-5"} ${className}`}
     >
-      <div className="flex items-start gap-3">
+      <div className={bare ? "sr-only" : "flex items-start gap-3"}>
         <span className="flex size-10 shrink-0 items-center justify-center rounded-block bg-surface-3 text-foreground">
           <Sparkles aria-hidden="true" className="size-5" />
         </span>
@@ -119,8 +129,8 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={`mt-4 flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-block border border-dashed px-5 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
-            dragging ? "border-accent bg-accent/10" : "border-border-strong bg-background hover:border-subtle"
+          className={`${bare ? "min-h-36 bg-background/70" : "mt-4 min-h-28"} flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-block border border-dashed px-5 py-6 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+            dragging ? "border-accent bg-accent/10" : `border-border-strong ${bare ? "" : "bg-background"} hover:border-accent/70`
           }`}
         >
           <input
@@ -131,16 +141,16 @@ export function QuickStart({ market, className = "" }: { market?: string; classN
             className="sr-only"
             aria-describedby={`${inputId}-hint`}
           />
-          <UploadCloud aria-hidden="true" className="size-6 text-accent-soft" />
+          <UploadCloud aria-hidden="true" className="size-7 text-accent-soft" />
           <span className="font-medium text-foreground">
-            Drop a video here, or <span className="text-foreground underline decoration-accent decoration-2 underline-offset-4">browse</span>
+            Drop a video here, or <span className="text-accent-soft underline decoration-2 underline-offset-4">browse</span>
           </span>
           <span id={`${inputId}-hint`} className="text-small text-muted">
             {ACCEPTED_LABEL}
           </span>
         </label>
       ) : (
-        <form onSubmit={start} noValidate className="mt-4 space-y-4">
+        <form onSubmit={start} noValidate className={`${bare ? "" : "mt-4"} space-y-4`}>
           <div className="rounded-block border border-border bg-surface px-4 py-3">
             <p className="font-medium break-all text-foreground">{file.name}</p>
             <p className="text-small text-muted">{formatBytes(file.size)}</p>

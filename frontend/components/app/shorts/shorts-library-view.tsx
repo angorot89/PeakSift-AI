@@ -81,7 +81,7 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
         <SegmentedControl
           wrap
           label="Show"
-          options={FILTERS.map((f) => ({ value: f.key, label: f.label, count: counts[f.key] }))}
+          options={FILTERS.map((f) => ({ value: f.key, label: f.label, count: counts[f.key], dot: f.dot }))}
           value={filter}
           onChange={(value) => setView((view) => ({ ...view, filter: value }))}
         />

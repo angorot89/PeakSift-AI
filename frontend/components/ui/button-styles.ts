@@ -7,7 +7,7 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   // The one signal action per region (Create Short, Render Short, New project).
-  primary: "bg-accent-fill font-semibold text-accent-ink hover:bg-accent-fill-hover",
+  primary: "bg-accent-fill font-semibold text-accent-ink shadow-glow hover:bg-accent-fill-hover",
   secondary:
     "border border-border-strong bg-surface-2 text-foreground hover:border-subtle/60 hover:bg-surface-3",
   ghost: "text-muted hover:bg-surface-2 hover:text-foreground",

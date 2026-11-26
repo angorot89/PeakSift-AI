@@ -188,12 +188,13 @@ export function contextLine(item: ShortItem, now: Date = new Date()): string {
 
 // --- filters, search and sort -----------------------------------------------------------------
 
-export const FILTERS: { key: FilterKey; label: string }[] = [
+/** The library's status tabs; `dot` is the status colour shown beside the word. */
+export const FILTERS: { key: FilterKey; label: string; dot?: string }[] = [
   { key: "all", label: "All" },
-  { key: "drafts", label: "Drafts" },
-  { key: "ready", label: "Ready" },
-  { key: "published", label: "Published" },
-  { key: "attention", label: "Needs attention" },
+  { key: "drafts", label: "Drafts", dot: "bg-info" },
+  { key: "ready", label: "Ready", dot: "bg-accent" },
+  { key: "published", label: "Published", dot: "bg-success" },
+  { key: "attention", label: "Needs attention", dot: "bg-danger" },
 ];
 
 export function matchesFilter(item: ShortItem, filter: FilterKey): boolean {
