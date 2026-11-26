@@ -37,3 +37,16 @@ export const TEAM_CLIPS: RealClip[] = [
   { src: "/clips/fox-four-stripe-flag.mp4", poster: "/clips/fox-four-stripe-flag.jpg", kind: "Quiz", title: "Can you beat a pigeon?", channel: "Think Fast Fox", platform: "youtube" },
   { src: "/clips/pov-zombie-container.mp4", poster: "/clips/pov-zombie-container.jpg", kind: "Animation", title: "Zombie-proof shipping container", channel: "Lock The Door POV" },
 ];
+
+/** A Short that stays on YouTube and is embedded, never copied into this repository. */
+export type YouTubeShort = { id: string; title: string };
+
+/**
+ * Stream highlights from the Amgoro clips channel, shown by embedding the live YouTube Shorts
+ * (the creator's decision). The streams belong to the streamers in them; nothing is hosted here.
+ */
+export const AMGORO = {
+  channel: "Amgoro Shorts",
+  url: "",
+  shorts: [] as YouTubeShort[],
+};

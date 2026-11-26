@@ -30,6 +30,12 @@ describe("content security policy", () => {
     assert.doesNotMatch(contentSecurityPolicy("http://localhost:8000"), /upgrade-insecure-requests/);
   });
 
+  it("embeds only YouTube's privacy-enhanced player and its thumbnails", () => {
+    const policy = contentSecurityPolicy("/api");
+    assert.equal(directive(policy, "frame-src"), "frame-src https://www.youtube-nocookie.com");
+    assert.equal(directive(policy, "img-src"), "img-src 'self' data: https://i.ytimg.com");
+  });
+
   it("allows what the development server needs only in development", () => {
     const policy = contentSecurityPolicy("http://localhost:8000", { development: true });
     assert.match(directive(policy, "script-src"), /'unsafe-eval'/);

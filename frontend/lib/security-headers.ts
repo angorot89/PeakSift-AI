@@ -30,7 +30,8 @@ export function contentSecurityPolicy(apiUrl: string, { development = false } = 
     // Development only: React Refresh evaluates code and the dev server opens a websocket.
     "script-src": development ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'",
     "style-src": "'self' 'unsafe-inline'",
-    "img-src": withApi("'self'", "data:"),
+    // YouTube thumbnails for the website's embedded Shorts.
+    "img-src": withApi("'self'", "data:", "https://i.ytimg.com"),
     "font-src": "'self' data:",
     "media-src": withApi("'self'"),
     "connect-src": development ? withApi("'self'", "ws:") : withApi("'self'"),
@@ -38,7 +39,8 @@ export function contentSecurityPolicy(apiUrl: string, { development = false } = 
     "base-uri": "'self'",
     "form-action": "'self'",
     "frame-ancestors": "'none'",
-    "frame-src": "'none'",
+    // Only YouTube's privacy-enhanced player, loaded when a visitor presses play on the website.
+    "frame-src": "https://www.youtube-nocookie.com",
     "worker-src": "'self'",
     "manifest-src": "'self'",
   };
