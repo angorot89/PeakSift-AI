@@ -2,11 +2,13 @@
 
 ``request_publish`` refuses anything but a ready edit and a ``connected`` account, then
 either creates a ``queued`` job (with its fencing token already set, so it can be enqueued
-right after the commit) or returns the job the same request created before — the same
-edit, connection and metadata are never uploaded twice, even when two requests race.
+right after the commit), or a ``scheduled`` one when a time was given, or returns the job
+the same request created before — the same edit, connection and metadata are never uploaded
+twice, even when two requests race.
 """
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -38,6 +40,7 @@ def request_publish(
     connection: PublishingConnection | None,
     metadata: PublishMetadata,
     task_id: str,
+    scheduled_at: datetime | None = None,
 ) -> tuple[PublishJob, bool]:
     """``(job, created)``. Raises :class:`PublishRefused` for an unready edit or account."""
     if edit.status != ClipEditStatus.READY or not edit.storage_key:
@@ -63,11 +66,13 @@ def request_publish(
         made_for_kids=metadata.made_for_kids,
         category_id=DEFAULT_CATEGORY_ID,
         fingerprint=key,
-        status=PublishStatus.QUEUED,
+        # A scheduled job waits; the scheduler gives it its token when it releases it.
+        status=PublishStatus.SCHEDULED if scheduled_at else PublishStatus.QUEUED,
+        scheduled_at=scheduled_at,
         progress_percent=0,
         attempt=1,
         bytes_uploaded=0,
-        celery_task_id=task_id,
+        celery_task_id=None if scheduled_at else task_id,
     )
     db.add(job)
     try:

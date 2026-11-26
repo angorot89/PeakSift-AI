@@ -12,8 +12,33 @@ export const disconnectYouTube = () =>
   apiFetch<{ revoked_with_provider: boolean }>("/publishing/youtube", { method: "DELETE" });
 
 export const getPublishPanel = (editId: string) => apiFetch<PublishPanel>(`/edits/${editId}/publish`);
-export const publishEdit = (editId: string, metadata: PublishMetadata) =>
-  postJson<PublishJob>(`/edits/${editId}/publish`, metadata);
+/** Publish now, or at `scheduledAt` (an ISO time with its zone) when given. */
+export const publishEdit = (editId: string, metadata: PublishMetadata, scheduledAt?: string) =>
+  postJson<PublishJob>(`/edits/${editId}/publish`, scheduledAt ? { ...metadata, scheduled_at: scheduledAt } : metadata);
+
+/** One post on the calendar: a publish job with the Short it belongs to. */
+export type CalendarItem = {
+  job: PublishJob;
+  /** Where it sits: its scheduled time, else when it was published or started. */
+  at: string;
+  short_title: string;
+  project_id: string;
+  project_name: string;
+  clip_id: string;
+};
+export type PublishCalendar = { items: CalendarItem[]; connection_ready: boolean };
+
+export const getCalendar = (from: Date, to: Date) =>
+  apiFetch<PublishCalendar>(
+    `/publish-jobs?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+  );
+export const reschedulePost = (jobId: string, scheduledAt: string) =>
+  apiFetch<PublishJob>(`/publish-jobs/${jobId}/schedule`, {
+    method: "PATCH",
+    body: JSON.stringify({ scheduled_at: scheduledAt }),
+  });
+export const publishPostNow = (jobId: string) => postJson<PublishJob>(`/publish-jobs/${jobId}/publish-now`, {});
+export const cancelPost = (jobId: string) => apiFetch<void>(`/publish-jobs/${jobId}`, { method: "DELETE" });
 export const getPublishJob = (jobId: string) => apiFetch<PublishJob>(`/publish-jobs/${jobId}`);
 export const retryPublishJob = (jobId: string) =>
   postJson<PublishJob>(`/publish-jobs/${jobId}/retry`, {});

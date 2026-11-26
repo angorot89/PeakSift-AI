@@ -41,3 +41,14 @@ def check_publish_status_task(publish_job_id: str) -> None:
         return
     with SessionLocal() as db:
         check_status(job_id, db, schedule_status_check=schedule_status_check)
+
+
+@celery_app.task(name="peaksift.release_scheduled_publishes")
+def release_scheduled_publishes_task() -> None:
+    """Celery beat, every minute: hand every post whose time has come to the upload pipeline."""
+    from app.core.config import get_settings
+    from app.services.publishing.schedule import release_due
+    from app.workers.dispatch import enqueue_publish  # the dispatcher imports this module
+
+    with SessionLocal() as db:
+        release_due(db, get_settings(), enqueue_publish)
