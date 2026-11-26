@@ -121,6 +121,16 @@ answers with a stereotype screen, the live `/morocco` and Creator Kit, and the r
 (`scripts/morocco_acceptance.py`, `scripts/darija_quality.py`); see
 [docs/morocco-mode.md](docs/morocco-mode.md).
 
+**Built after V1.8 at the creator's explicit instruction (26 November 2026), from the
+StreamLadder benchmark in
+[docs/product-research/streamladder-live-benchmark.md](docs/product-research/streamladder-live-benchmark.md):**
+quick start on Home (one upload → project, transcription, then moments by themselves), Find
+Clips (plain-language search of the transcript; a kept result is a saved moment) and scheduled
+publishing (a `scheduled` publish job released by Celery beat, and the `/schedule` calendar);
+see [docs/creator-experience.md](docs/creator-experience.md) and
+[docs/publishing.md](docs/publishing.md). Not merged, not tagged. The list below still applies
+to everything else.
+
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
 scores or predictions, automatic thumbnails, analytics beyond V1.4 (other platforms, revenue,

@@ -1,7 +1,9 @@
 "use client";
 
-import { CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send } from "lucide-react";
+import { CalendarClock, CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send } from "lucide-react";
+import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { ScheduledPost } from "@/components/app/schedule/scheduled-post";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { inputClasses, textareaClasses } from "@/components/ui/input-styles";
@@ -33,6 +35,7 @@ import {
   tagsLength,
   TITLE_MAX,
 } from "@/lib/publishing";
+import { fromLocalInput, suggestedTime, timeProblem, toLocalInput } from "@/lib/schedule-rules";
 import { usePolling } from "@/lib/use-polling";
 
 const STEPS: { key: string; label: string }[] = [
@@ -83,7 +86,9 @@ export function PublishBody({ editId, onClose, returnTo }: { editId: string; onC
         setPanel(data);
         // Show the latest job still in flight (or just finished) instead of a blank form.
         const latest = data.jobs[0];
-        if (latest && (isActive(latest) || isFollowing(latest))) setJob(latest);
+        const waiting = data.jobs.find((item) => item.status === "scheduled");
+        if (waiting) setJob(waiting); // one Short has at most one post waiting for its time
+        else if (latest && (isActive(latest) || isFollowing(latest))) setJob(latest);
       })
       .catch((failure) => !cancelled && setLoadError(errorMessage(failure)));
     return () => {
@@ -133,6 +138,19 @@ export function PublishBody({ editId, onClose, returnTo }: { editId: string; onC
       </InlineAlert>
     );
   }
+  if (job?.status === "scheduled") {
+    return (
+      <div className="space-y-4">
+        <ScheduledPost job={job} onChange={setJob} onCancelled={() => setJob(null)} />
+        <p className="text-small text-muted">
+          It goes out with the title, description and visibility you reviewed.{" "}
+          <Link href="/schedule" className="text-accent-soft underline underline-offset-2 hover:text-foreground">
+            Open the schedule
+          </Link>
+        </p>
+      </div>
+    );
+  }
   if (job) return <JobProgress job={job} onChange={setJob} onClose={onClose} onNew={() => setJob(null)} />;
   return <PublishForm editId={editId} panel={panel} onPublished={setJob} />;
 }
@@ -180,10 +198,14 @@ function PublishForm({
   const [madeForKids, setMadeForKids] = useState(panel.defaults.made_for_kids);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When: now, or at a time the creator picks (their local time).
+  const [later, setLater] = useState(false);
+  const [when, setWhen] = useState(() => toLocalInput(suggestedTime(new Date())));
 
   const metadata = { title, description, tags: parseTags(tagText), privacy, made_for_kids: madeForKids };
   const problems = metadataProblems(metadata);
-  const valid = Object.keys(problems).length === 0;
+  const whenProblem = later ? timeProblem(when, new Date()) : null;
+  const valid = Object.keys(problems).length === 0 && !whenProblem;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -191,7 +213,10 @@ function PublishForm({
     setBusy(true);
     setError(null);
     try {
-      onPublished(await publishEdit(editId, { ...metadata, title: title.trim(), description: description.trim() }));
+      const scheduledAt = later ? fromLocalInput(when)?.toISOString() : undefined;
+      onPublished(
+        await publishEdit(editId, { ...metadata, title: title.trim(), description: description.trim() }, scheduledAt),
+      );
     } catch (failure) {
       setError(errorMessage(failure));
       setBusy(false);
@@ -302,6 +327,44 @@ function PublishForm({
         </div>
       </fieldset>
 
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">When</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[false, true].map((value) => (
+            <label
+              key={String(value)}
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm has-[:checked]:border-accent/60 has-[:checked]:bg-accent/10"
+            >
+              <input
+                type="radio"
+                name={`${id}-when`}
+                checked={later === value}
+                onChange={() => setLater(value)}
+                className="accent-[var(--color-accent)]"
+              />
+              {value ? "Schedule for later" : "Publish now"}
+            </label>
+          ))}
+        </div>
+        {later ? (
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-when-time`} className="block text-xs text-muted">
+              Date and time, in your local time
+            </label>
+            <input
+              id={`${id}-when-time`}
+              type="datetime-local"
+              value={when}
+              onChange={(event) => setWhen(event.target.value)}
+              aria-invalid={whenProblem ? true : undefined}
+              aria-describedby={whenProblem ? `${id}-when-error` : undefined}
+              className={`${inputClasses} max-w-64`}
+            />
+            {whenProblem ? <p id={`${id}-when-error`} className="text-sm text-rose-300">{whenProblem}</p> : null}
+          </div>
+        ) : null}
+      </fieldset>
+
       <InlineAlert tone="info" title="Before you publish">
         The short goes to your connected channel with this title, description and visibility. Google keeps videos
         uploaded through apps it has not yet verified <strong className="font-medium text-foreground">private</strong>,
@@ -311,8 +374,16 @@ function PublishForm({
 
       <FormError>{error}</FormError>
       <Button type="submit" disabled={!valid || busy} className="w-full sm:w-auto">
-        <Send aria-hidden="true" />
-        {busy ? "Starting…" : privacy === "private" ? "Publish privately" : `Publish as ${privacyLabel(privacy).toLowerCase()}`}
+        {later ? <CalendarClock aria-hidden="true" /> : <Send aria-hidden="true" />}
+        {busy
+          ? later
+            ? "Scheduling…"
+            : "Starting…"
+          : later
+            ? `Schedule ${privacyLabel(privacy).toLowerCase()} post`
+            : privacy === "private"
+              ? "Publish privately"
+              : `Publish as ${privacyLabel(privacy).toLowerCase()}`}
       </Button>
     </form>
   );

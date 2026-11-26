@@ -71,11 +71,17 @@ celery_app.conf.update(
     task_eager_propagates=True,
 )
 # Celery beat (one `celery -A app.workers.celery_app beat` process per deployment) runs the
-# analytics scheduler; the task itself does nothing unless analytics is enabled.
+# analytics scheduler (the task does nothing unless analytics is enabled) and releases
+# scheduled posts.
 celery_app.conf.beat_schedule = {
     "schedule-performance-syncs": {
         "task": "peaksift.schedule_performance_syncs",
         "schedule": float(settings.performance_schedule_interval_seconds),
+    },
+    # Scheduled publishing: release the posts whose time has come.
+    "release-scheduled-publishes": {
+        "task": "peaksift.release_scheduled_publishes",
+        "schedule": float(settings.publish_schedule_interval_seconds),
     },
 }
 if settings.semantic_queue:

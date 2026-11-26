@@ -7,6 +7,11 @@
   job; ``200`` with the existing job when the same request was made before (never a second
   upload). ``422`` names the field that breaks YouTube's rules; ``409`` when the edit is
   not ready, no account is connected or it needs reconnecting, or publishing is disabled.
+  With ``scheduled_at`` the job waits in ``scheduled`` and is released at that time by the
+  scheduler (``services/publishing/schedule.py``); one Short has at most one waiting post.
+- ``GET /publish-jobs?from=&to=`` — the calendar: the creator's posts in a time range.
+- ``PATCH /publish-jobs/{job_id}/schedule``, ``POST …/publish-now``, ``DELETE …`` — move,
+  release or cancel a post that is still waiting (``409`` once it is not).
 - ``GET /publish-jobs/{job_id}`` — status and real progress.
 - ``POST /publish-jobs/{job_id}/retry`` — only a job that failed before YouTube created a
   video (or stalled); it resumes the stored upload session.
@@ -16,23 +21,36 @@ contain tokens, upload session URIs, task ids or storage keys.
 """
 
 import uuid
+from datetime import datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query, Response, status
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUser, DbSession, Storage
 from app.api.media_streaming import object_present
 from app.core.config import get_settings
 from app.core.rate_limit import per_user
-from app.models import ClipEdit, ClipEditStatus, Project, PublishJob, PublishStatus, Video
+from app.models import (
+    ClipEdit,
+    ClipEditStatus,
+    ConnectionStatus,
+    Project,
+    PublishJob,
+    PublishStatus,
+    Video,
+)
 from app.schemas.publishing import (
+    CalendarItem,
+    CalendarRead,
     PublishDefaults,
     PublishingConnectionRead,
     PublishJobRead,
     PublishPanelRead,
     PublishRequest,
+    ScheduleChange,
 )
-from app.services.publishing import connections
+from app.services.publishing import connections, schedule
 from app.services.publishing.jobs import PublishRefused, request_publish
 from app.services.publishing.metadata import MetadataError, PublishMetadata, prefill
 from app.services.publishing.pipeline import awaiting_processing, is_stale
@@ -99,6 +117,7 @@ def _read(job: PublishJob) -> PublishJobRead:
         started_at=job.started_at,
         completed_at=job.completed_at,
         published_at=job.published_at,
+        scheduled_at=job.scheduled_at,
     )
 
 
@@ -121,6 +140,28 @@ def _enqueue_or_503(db: DbSession, job: PublishJob, *, created: bool) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The publishing queue is unavailable. Try again in a moment.",
         ) from None
+
+
+def _when(value: datetime) -> datetime:
+    try:
+        return schedule.validate_time(value)
+    except schedule.ScheduleError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[{"type": "schedule", "loc": ["body", "scheduled_at"], "msg": error.message}],
+        ) from None
+
+
+def _scheduled_job(job_id: uuid.UUID, user_id: uuid.UUID, db) -> PublishJob:
+    """The owner's job, locked, and still waiting for its time — otherwise 404 or 409."""
+    job = _owned_job(job_id, user_id, db)
+    db.refresh(job, with_for_update=True)  # the scheduler may be releasing it right now
+    if job.status != PublishStatus.SCHEDULED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This post is no longer waiting for its time",
+        )
+    return job
 
 
 @edit_router.get("", response_model=PublishPanelRead)
@@ -165,7 +206,7 @@ def publish(
             detail="YouTube publishing is not enabled on this server",
         )
     try:
-        metadata = PublishMetadata.create(**payload.model_dump())
+        metadata = PublishMetadata.create(**payload.model_dump(exclude={"scheduled_at"}))
     except MetadataError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -175,18 +216,138 @@ def publish(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Render the short before publishing it"
         )
+    when = _when(payload.scheduled_at) if payload.scheduled_at else None
+    waiting = schedule.scheduled_for_edit(db, current_user.id, edit.id)
     try:
         job, created = request_publish(
             db, user_id=current_user.id, edit=edit, metadata=metadata, task_id=new_task_id(),
-            connection=connections.get_connection(db, current_user.id),
+            connection=connections.get_connection(db, current_user.id), scheduled_at=when,
         )  # fmt: skip
     except PublishRefused as refused:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refused.message) from None
-    if created:
-        _enqueue_or_503(db, job, created=True)
-    else:
+    if created and waiting is not None:
+        # One Short, one pending post: a second request must change or cancel the first.
+        db.delete(job)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This Short is already scheduled. Change its time, publish it now or cancel it.",
+        )
+    if not created:
         response.status_code = status.HTTP_200_OK
+        if when and job.status == PublishStatus.SCHEDULED and job.scheduled_at != when:
+            job.scheduled_at = when  # the same post, asked for at a new time
+            db.commit()
+    elif when is None:
+        _enqueue_or_503(db, job, created=True)
     return _read(job)
+
+
+MAX_CALENDAR_DAYS = 62
+
+
+@job_router.get("", response_model=CalendarRead)
+def calendar(
+    current_user: CurrentUser,
+    db: DbSession,
+    start: Annotated[datetime, Query(alias="from", description="Inclusive, with a time zone")],
+    end: Annotated[datetime, Query(alias="to", description="Exclusive, with a time zone")],
+) -> CalendarRead:
+    """The creator's posts in a time range: scheduled ones at their time, the others when they
+    were published (or started). Newest and oldest alike, in calendar order."""
+    if start.tzinfo is None or end.tzinfo is None or end <= start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Send a valid range with time zones",
+        )
+    if end - start > timedelta(days=MAX_CALENDAR_DAYS):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"A calendar range covers at most {MAX_CALENDAR_DAYS} days",
+        )
+    at = func.coalesce(
+        PublishJob.scheduled_at,
+        PublishJob.published_at,
+        PublishJob.completed_at,
+        PublishJob.created_at,
+    )
+    rows = db.execute(
+        select(PublishJob, ClipEdit, Project, at.label("at"))
+        .join(ClipEdit, ClipEdit.id == PublishJob.edit_id)
+        .join(Video, Video.id == ClipEdit.video_id)
+        .join(Project, Project.id == Video.project_id)
+        .where(PublishJob.user_id == current_user.id, at >= start, at < end)
+        .order_by(at, PublishJob.id)
+        .limit(500)
+    ).all()
+    connection = connections.get_connection(db, current_user.id)
+    return CalendarRead(
+        items=[
+            CalendarItem(
+                job=_read(job),
+                at=when,
+                short_title=edit.clip.candidate.title,
+                project_id=project.id,
+                project_name=project.name,
+                clip_id=edit.clip_id,
+            )
+            for job, edit, project, when in rows
+        ],
+        connection_ready=connection is not None and connection.status == ConnectionStatus.CONNECTED,
+    )
+
+
+@job_router.patch("/{job_id}/schedule", response_model=PublishJobRead)
+def reschedule(
+    job_id: uuid.UUID, payload: ScheduleChange, current_user: CurrentUser, db: DbSession
+) -> PublishJobRead:
+    """Move a post that is still waiting to a new time."""
+    when = _when(payload.scheduled_at)
+    job = _scheduled_job(job_id, current_user.id, db)
+    job.scheduled_at = when
+    db.commit()
+    return _read(job)
+
+
+@job_router.post(
+    "/{job_id}/publish-now",
+    response_model=PublishJobRead,
+    dependencies=[per_user("publish_start")],
+)
+def publish_now(
+    job_id: uuid.UUID, current_user: CurrentUser, db: DbSession, storage: Storage
+) -> PublishJobRead:
+    """Stop waiting: publish a scheduled post now, through the ordinary pipeline."""
+    job = _scheduled_job(job_id, current_user.id, db)
+    edit = db.get(ClipEdit, job.edit_id)
+    if edit is None or not _ready(edit, storage):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Render the short before publishing it"
+        )
+    job.status = PublishStatus.QUEUED
+    job.celery_task_id = new_task_id()
+    db.commit()
+    try:
+        enqueue_publish(job.id, task_id=job.celery_task_id)
+    except JobQueueUnavailable:
+        job.status = PublishStatus.SCHEDULED  # still scheduled; nothing was lost
+        job.celery_task_id = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The publishing queue is unavailable. Try again in a moment.",
+        ) from None
+    return _read(job)
+
+
+@job_router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_scheduled(job_id: uuid.UUID, current_user: CurrentUser, db: DbSession) -> Response:
+    """Cancel a post that is still waiting. Anything already uploading or on YouTube is not
+    touched by this (409): PeakSift never deletes a published video."""
+    job = _scheduled_job(job_id, current_user.id, db)
+    db.delete(job)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @job_router.get("/{job_id}", response_model=PublishJobRead)
