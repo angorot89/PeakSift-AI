@@ -1,4 +1,7 @@
-"""Connecting and disconnecting a YouTube account.
+"""Connecting and disconnecting a YouTube account, and the list of platforms.
+
+- ``GET /publishing/platforms`` — every platform PeakSift can publish to, whether this server
+  offers it, and the creator's connection to each.
 
 - ``GET /publishing/youtube`` — whether publishing is enabled and the user's connection.
 - ``POST /publishing/youtube/connect`` — start: a fresh single-use state, then Google's
@@ -26,17 +29,19 @@ from app.core.rate_limit import per_user
 from app.schemas.publishing import (
     AuthorizationRead,
     DisconnectRead,
+    PlatformRead,
     PublishingConnectionRead,
     YouTubeStatusRead,
 )
 from app.services.performance.lifecycle import start_backfill_quietly
-from app.services.publishing import connections
+from app.services.publishing import connections, platforms
 from app.services.publishing import youtube_oauth as oauth
 from app.services.publishing.tokens import TokenCipher, TokenDecryptionError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/publishing/youtube", tags=["publishing"])
+platforms_router = APIRouter(prefix="/publishing/platforms", tags=["publishing"])
 
 SETTINGS_PATH = "/settings"
 
@@ -150,3 +155,23 @@ def disconnect_youtube(current_user: CurrentUser, db: DbSession) -> DisconnectRe
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No YouTube connection")
     revoked = connections.disconnect(db, _cipher(get_settings()), connection, oauth.revoke)
     return DisconnectRead(revoked_with_provider=revoked)
+
+
+@platforms_router.get("", response_model=list[PlatformRead])
+def list_platforms(current_user: CurrentUser, db: DbSession) -> list[PlatformRead]:
+    """Every platform PeakSift can publish to, whether this server offers it, and the
+    creator's own connection to each. Never tokens or scopes."""
+    settings = get_settings()
+    connected = connections.list_connections(db, current_user.id)
+    return [
+        PlatformRead(
+            key=platform.key,
+            label=platform.label,
+            account_noun=platform.account_noun,
+            enabled=platform.enabled(settings),
+            connection=PublishingConnectionRead.model_validate(connected[platform.key])
+            if platform.key in connected
+            else None,
+        )
+        for platform in platforms.PLATFORMS
+    ]

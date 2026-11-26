@@ -29,6 +29,7 @@ from app.api.projects import router as projects_router
 from app.api.publish_jobs import edit_router as publish_edit_router
 from app.api.publish_jobs import job_router as publish_job_router
 from app.api.publish_jobs import slots_router as posting_slots_router
+from app.api.publishing import platforms_router as publishing_platforms_router
 from app.api.publishing import router as publishing_router
 from app.api.quick_start import router as quick_start_router
 from app.api.reframe import router as reframe_router
@@ -71,6 +72,7 @@ ROUTERS = (
     visual_assets_router,
     visual_limits_router,
     publishing_router,
+    publishing_platforms_router,
     publish_edit_router,
     publish_job_router,
     posting_slots_router,

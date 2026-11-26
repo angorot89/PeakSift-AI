@@ -380,7 +380,7 @@ def test_the_celery_task_runs_the_pipeline(db_session, settings, storage, setup,
     monkeypatch.setattr(publish_tasks, "SessionLocal", Borrowed)
     monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
     monkeypatch.setattr(pipeline, "media_storage", lambda s: storage)
-    monkeypatch.setattr(pipeline, "get_publishing_provider", lambda s: provider)
+    monkeypatch.setattr(pipeline, "get_publishing_provider", lambda s, platform: provider)
     monkeypatch.setattr(publish_tasks, "schedule_status_check",
                         lambda job_id, delay: scheduled.append((job_id, delay)))  # fmt: skip
     publish_tasks.publish_short_task.apply(args=[str(setup["job"].id)], task_id="task-1")

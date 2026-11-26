@@ -35,6 +35,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.models.publishing_connection import PROVIDER_CHECK
 
 
 class PublishStatus(StrEnum):
@@ -73,7 +74,7 @@ class PublishJob(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "fingerprint", name="uq_publish_jobs_fingerprint"),
         UniqueConstraint("provider_video_id", name="uq_publish_jobs_provider_video"),
-        CheckConstraint("provider IN ('youtube')", name="ck_publish_jobs_provider"),
+        CheckConstraint(PROVIDER_CHECK, name="ck_publish_jobs_provider"),
         CheckConstraint(
             "status IN ('scheduled', 'queued', 'preparing', 'uploading', 'uploaded', "
             "'processing', 'published', 'failed', 'provider_failed')",

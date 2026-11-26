@@ -1,9 +1,9 @@
-"""A user's connection to a publishing provider (YouTube only).
+"""A user's connection to a publishing platform (one per platform).
 
 The only secret kept is the OAuth **refresh token**, encrypted with AES-256-GCM before it is
 stored (see ``app/services/publishing/tokens.py``); access tokens are short-lived and never
 persisted. The ciphertext is bound to its user, provider and key version, so it is useless
-copied to another row. One connection per user: reconnecting replaces it.
+copied to another row. One connection per user and platform: reconnecting replaces it.
 """
 
 import uuid
@@ -28,6 +28,11 @@ from app.core.database import Base
 
 class PublishingProvider(StrEnum):
     YOUTUBE = "youtube"
+    TIKTOK = "tiktok"
+
+
+# Every table that names a platform accepts exactly these (kept in step by a test).
+PROVIDER_CHECK = "provider IN ('youtube', 'tiktok')"
 
 
 class ConnectionStatus(StrEnum):
@@ -40,8 +45,8 @@ class ConnectionStatus(StrEnum):
 class PublishingConnection(Base):
     __tablename__ = "publishing_connections"
     __table_args__ = (
-        UniqueConstraint("user_id", name="uq_publishing_connections_user"),
-        CheckConstraint("provider IN ('youtube')", name="ck_publishing_connections_provider"),
+        UniqueConstraint("user_id", "provider", name="uq_publishing_connections_user_provider"),
+        CheckConstraint(PROVIDER_CHECK, name="ck_publishing_connections_provider"),
         CheckConstraint(
             "status IN ('connected', 'needs_reconnect')", name="ck_publishing_connections_status"
         ),
@@ -52,7 +57,7 @@ class PublishingConnection(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    # Unique (one connection per user), which also indexes it.
+    # Unique with the provider (one connection per platform), which also indexes it.
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"))
     provider: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(32), default=ConnectionStatus.CONNECTED)

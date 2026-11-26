@@ -20,8 +20,22 @@ from app.services.publishing.tokens import EncryptedToken, TokenCipher
 logger = logging.getLogger(__name__)
 
 
-def get_connection(db: Session, user_id: uuid.UUID) -> PublishingConnection | None:
-    return db.scalar(select(PublishingConnection).where(PublishingConnection.user_id == user_id))
+def get_connection(
+    db: Session, user_id: uuid.UUID, provider: PublishingProvider = PublishingProvider.YOUTUBE
+) -> PublishingConnection | None:
+    """The user's connection to one platform (YouTube unless another is named)."""
+    return db.scalar(
+        select(PublishingConnection).where(
+            PublishingConnection.user_id == user_id,
+            PublishingConnection.provider == PublishingProvider(provider).value,
+        )
+    )
+
+
+def list_connections(db: Session, user_id: uuid.UUID) -> dict[str, PublishingConnection]:
+    """Every platform the user has connected, by platform key."""
+    rows = db.scalars(select(PublishingConnection).where(PublishingConnection.user_id == user_id))
+    return {row.provider: row for row in rows}
 
 
 def save_connection(
@@ -35,9 +49,10 @@ def save_connection(
     scopes: list[str],
     provider: PublishingProvider = PublishingProvider.YOUTUBE,
 ) -> PublishingConnection:
-    """Create the user's connection, or replace it (one per user)."""
+    """Create the user's connection to this platform, or replace it (one per platform)."""
+    provider = PublishingProvider(provider)
     sealed = cipher.encrypt(refresh_token, user_id=user_id, provider=provider.value)
-    connection = get_connection(db, user_id) or PublishingConnection(user_id=user_id)
+    connection = get_connection(db, user_id, provider) or PublishingConnection(user_id=user_id)
     connection.provider = provider.value
     connection.status = ConnectionStatus.CONNECTED
     connection.account_id = account_id[:128]
@@ -68,6 +83,20 @@ def refresh_token_of(db: Session, cipher: TokenCipher, connection: PublishingCon
         connection.token_key_version = sealed.key_version
         db.commit()
     return token
+
+
+def store_rotated_token(
+    db: Session, cipher: TokenCipher, connection: PublishingConnection, refresh_token: str
+) -> None:
+    """Keep the refresh token a platform issued in place of the one just used.
+
+    Some platforms rotate refresh tokens: the old one stops working the moment a new one is
+    returned, so the new one is committed before anything else is done with the access token.
+    """
+    sealed = cipher.encrypt(refresh_token, user_id=connection.user_id, provider=connection.provider)
+    connection.refresh_token_ciphertext = sealed.ciphertext
+    connection.token_key_version = sealed.key_version
+    db.commit()
 
 
 def mark_needs_reconnect(db: Session, connection: PublishingConnection) -> None:

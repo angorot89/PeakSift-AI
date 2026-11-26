@@ -99,6 +99,29 @@ queued → preparing → uploading → uploaded → processing → published
   `network_error`, `provider_error`, `processing_failed` — each with a plain message.
   **Retry** exists only for jobs that failed before a video existed (or stalled).
 
+## Platforms
+
+Publishing is not tied to one platform in the data model. A platform is a key
+(`PublishingProvider`: `youtube`, `tiktok`) recorded by connections, OAuth states and publish
+jobs, and checked by the database on all three.
+
+- **One connection per platform.** `publishing_connections` is unique on `(user_id, provider)`;
+  `connections.get_connection(db, user_id, provider)` reads one (YouTube when none is named) and
+  `list_connections` all of them. A refresh token's ciphertext is bound to its platform, so one
+  platform's token cannot be read from another's row.
+- **A provider per job.** `get_publishing_provider(settings, job.provider)` returns the
+  implementation of `provider.py`'s contract for that platform (or the simulation when
+  `PUBLISHING_PROVIDER=fake`). The pipeline, the uploader and scheduling are unchanged.
+- **Rotating refresh tokens.** Some platforms replace the refresh token every time it is used.
+  `ProviderAuth.rotated_refresh_token` carries the new one and the pipeline stores it, encrypted,
+  before the access token is used for anything.
+- **Messages in the platform's name.** `user_message(code, platform)` and
+  `PublishProviderError(code, platform=…)`.
+- **The registry.** `services/publishing/platforms.py` lists the platforms that have a working
+  provider (today: YouTube) and whether this server is set up for each;
+  `GET /publishing/platforms` returns them with the creator's connection to each. A platform is
+  never listed before it works.
+
 ## Scheduled publishing
 
 A creator can publish now or pick a time. A scheduled post is an ordinary publish job in the

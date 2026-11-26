@@ -202,7 +202,7 @@ def _execute(
         raise PipelineFailure("edit_missing", "The short's file is empty; render it again")
     connection = db.get(PublishingConnection, job.connection_id) if job.connection_id else None
     if connection is None:
-        raise PipelineFailure("not_connected", "Connect a YouTube account and retry")
+        raise PipelineFailure("not_connected", "Connect your account again and retry")
     if connection.status != ConnectionStatus.CONNECTED:
         raise PublishProviderError(PublishErrorCode.AUTHENTICATION_REQUIRED)
 
@@ -211,8 +211,11 @@ def _execute(
         refresh_token = connections.refresh_token_of(db, cipher, connection)
     except (TokenKeyError, TokenDecryptionError):
         raise PublishProviderError(PublishErrorCode.AUTHENTICATION_REQUIRED) from None
-    provider = provider or get_publishing_provider(settings)
+    provider = provider or get_publishing_provider(settings, job.provider)
     auth = provider.authorize(refresh_token)
+    if auth.rotated_refresh_token:
+        # The old token is already dead: keep the new one before anything else can fail.
+        connections.store_rotated_token(db, cipher, connection, auth.rotated_refresh_token)
 
     job.bytes_total = size
     job.status = PublishStatus.UPLOADING
@@ -330,8 +333,10 @@ def check_status(
     db.commit()
     try:
         cipher = TokenCipher.from_settings(settings)
-        provider = provider or get_publishing_provider(settings)
+        provider = provider or get_publishing_provider(settings, job.provider)
         auth = provider.authorize(connections.refresh_token_of(db, cipher, connection))
+        if auth.rotated_refresh_token:
+            connections.store_rotated_token(db, cipher, connection, auth.rotated_refresh_token)
         status = provider.video_status(auth, job.provider_video_id)
     except (PublishProviderError, TokenDecryptionError, TokenKeyError) as error:
         logger.info("Publish job %s: status unavailable (%s)", job.id, type(error).__name__)

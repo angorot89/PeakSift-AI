@@ -156,7 +156,7 @@ def test_one_connection_per_user(db_session: Session):
 
 
 @pytest.mark.parametrize(
-    ("field", "value"), [("provider", "tiktok"), ("status", "active"), ("token_key_version", 0)]
+    ("field", "value"), [("provider", "myspace"), ("status", "active"), ("token_key_version", 0)]
 )
 def test_the_database_refuses_unknown_providers_and_states(db_session: Session, field, value):
     owner = user(db_session)

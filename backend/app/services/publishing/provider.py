@@ -1,4 +1,4 @@
-"""The publishing provider contract (YouTube is the only implementation).
+"""The publishing provider contract (one implementation per platform).
 
 The pipeline talks to a provider only through this module's types, so it never sees an SDK
 object, an HTTP response or a provider error class:
@@ -39,25 +39,37 @@ RETRYABLE = frozenset(
      PublishErrorCode.UPLOAD_SESSION_EXPIRED}
 )  # fmt: skip
 
+# Safe to show the creator; ``{platform}`` is the platform's own name ("YouTube", "TikTok").
 USER_MESSAGES = {
-    PublishErrorCode.AUTHENTICATION_REQUIRED: "YouTube needs you to reconnect your account",
-    PublishErrorCode.PERMISSION_DENIED: (
+    PublishErrorCode.AUTHENTICATION_REQUIRED: "{platform} needs you to reconnect your account",
+    PublishErrorCode.PERMISSION_DENIED: "This {platform} account cannot publish videos",
+    PublishErrorCode.QUOTA_EXCEEDED: "{platform}'s upload quota is used up for today; try tomorrow",
+    PublishErrorCode.RATE_LIMITED: "{platform} asked us to slow down; try again in a few minutes",
+    PublishErrorCode.INVALID_METADATA: "{platform} rejected the title, description or tags",
+    PublishErrorCode.UPLOAD_SESSION_EXPIRED: "The upload session expired; retry to start again",
+    PublishErrorCode.NETWORK_ERROR: "{platform} could not be reached; try again",
+    PublishErrorCode.PROVIDER_ERROR: "{platform} had a problem; try again",
+    PublishErrorCode.PROCESSING_FAILED: "{platform} could not process this video",
+}
+# Wording a platform needs beyond the general message.
+PLATFORM_MESSAGES = {
+    ("YouTube", PublishErrorCode.PERMISSION_DENIED): (
         "This YouTube account cannot upload videos (it may need a channel)"
     ),
-    PublishErrorCode.QUOTA_EXCEEDED: "YouTube's upload quota is used up for today; try tomorrow",
-    PublishErrorCode.RATE_LIMITED: "YouTube asked us to slow down; try again in a few minutes",
-    PublishErrorCode.INVALID_METADATA: "YouTube rejected the title, description or tags",
-    PublishErrorCode.UPLOAD_SESSION_EXPIRED: "The upload session expired; retry to start again",
-    PublishErrorCode.NETWORK_ERROR: "YouTube could not be reached; try again",
-    PublishErrorCode.PROVIDER_ERROR: "YouTube had a problem; try again",
-    PublishErrorCode.PROCESSING_FAILED: "YouTube could not process this video",
 }
 
 
+def user_message(code: PublishErrorCode, platform: str = "YouTube") -> str:
+    code = PublishErrorCode(code)
+    return PLATFORM_MESSAGES.get((platform, code)) or USER_MESSAGES[code].format(platform=platform)
+
+
 class PublishProviderError(Exception):
-    def __init__(self, code: PublishErrorCode, message: str | None = None) -> None:
+    def __init__(
+        self, code: PublishErrorCode, message: str | None = None, *, platform: str = "YouTube"
+    ) -> None:
         self.code = PublishErrorCode(code)
-        self.message = message or USER_MESSAGES[self.code]
+        self.message = message or user_message(self.code, platform)
         super().__init__(self.message)
 
     @property
@@ -70,6 +82,9 @@ class ProviderAuth:
     """A short-lived credential for one job. Opaque to callers; never stored or logged."""
 
     access_token: str = field(repr=False)
+    # Set when the platform replaced the refresh token while authorizing (rotation): the caller
+    # stores it, encrypted, before using the access token. Never logged.
+    rotated_refresh_token: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)

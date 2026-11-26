@@ -32,6 +32,17 @@ class YouTubeStatusRead(BaseModel):
     connection: PublishingConnectionRead | None
 
 
+class PlatformRead(BaseModel):
+    """A platform PeakSift can publish to, and the creator's connection to it (if any)."""
+
+    key: str
+    label: str
+    account_noun: str
+    # This server is set up for it; when false the creator cannot connect yet.
+    enabled: bool
+    connection: PublishingConnectionRead | None
+
+
 class AuthorizationRead(BaseModel):
     authorization_url: str
 

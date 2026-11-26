@@ -15,12 +15,13 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, LargeBinary, Strin
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.models.publishing_connection import PROVIDER_CHECK
 
 
 class OAuthState(Base):
     __tablename__ = "oauth_states"
     __table_args__ = (
-        CheckConstraint("provider IN ('youtube')", name="ck_oauth_states_provider"),
+        CheckConstraint(PROVIDER_CHECK, name="ck_oauth_states_provider"),
         CheckConstraint("length(state_hash) = 64", name="ck_oauth_states_state_hash"),
         CheckConstraint("purpose IN ('publishing', 'analytics')", name="ck_oauth_states_purpose"),
     )

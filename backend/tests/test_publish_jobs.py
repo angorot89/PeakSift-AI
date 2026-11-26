@@ -214,7 +214,7 @@ def job_row(db: Session, **overrides) -> PublishJob:
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"provider": "tiktok"},
+        {"provider": "myspace"},
         {"status": "done"},
         {"privacy": "friends"},
         {"title": ""},
