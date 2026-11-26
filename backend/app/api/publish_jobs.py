@@ -21,7 +21,7 @@ contain tokens, upload session URIs, task ids or storage keys.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -43,6 +43,8 @@ from app.models import (
 from app.schemas.publishing import (
     CalendarItem,
     CalendarRead,
+    PostingSlotsRead,
+    PostingSlotsUpdate,
     PublishDefaults,
     PublishingConnectionRead,
     PublishJobRead,
@@ -50,7 +52,7 @@ from app.schemas.publishing import (
     PublishRequest,
     ScheduleChange,
 )
-from app.services.publishing import connections, schedule
+from app.services.publishing import connections, schedule, slots
 from app.services.publishing.jobs import PublishRefused, request_publish
 from app.services.publishing.metadata import MetadataError, PublishMetadata, prefill
 from app.services.publishing.pipeline import awaiting_processing, is_stale
@@ -58,6 +60,7 @@ from app.workers.dispatch import JobQueueUnavailable, enqueue_publish, new_task_
 
 edit_router = APIRouter(prefix="/edits/{edit_id}/publish", tags=["publishing"])
 job_router = APIRouter(prefix="/publish-jobs", tags=["publishing"])
+slots_router = APIRouter(prefix="/posting-slots", tags=["publishing"])
 
 
 def _owned_edit(edit_id: uuid.UUID, user_id: uuid.UUID, db) -> ClipEdit:
@@ -388,3 +391,54 @@ def retry_publish_job(
     db.commit()
     _enqueue_or_503(db, job, created=False)
     return _read(job)
+
+
+# --- posting times ------------------------------------------------------------------------
+
+UPCOMING_SLOTS = 21
+
+
+def _slots_read(user, db) -> PostingSlotsRead:
+    saved = slots.stored(user.posting_slots)
+    upcoming: list[datetime] = []
+    if saved and user.posting_timezone:
+        try:
+            zone = slots.timezone(user.posting_timezone)
+        except slots.SlotError:
+            zone = None
+        if zone is not None:
+            taken = db.scalars(
+                select(PublishJob.scheduled_at).where(
+                    PublishJob.user_id == user.id, PublishJob.status == PublishStatus.SCHEDULED
+                )
+            ).all()
+            upcoming = slots.upcoming(saved, zone, datetime.now(UTC), taken, UPCOMING_SLOTS)
+    return PostingSlotsRead(
+        timezone=user.posting_timezone, slots=[slot.read() for slot in saved], upcoming=upcoming
+    )
+
+
+@slots_router.get("", response_model=PostingSlotsRead)
+def get_posting_slots(current_user: CurrentUser, db: DbSession) -> PostingSlotsRead:
+    """The creator's weekly posting times and the next free ones. A preference: PeakSift only
+    offers these when the creator schedules a Short; it never schedules from them by itself."""
+    return _slots_read(current_user, db)
+
+
+@slots_router.put("", response_model=PostingSlotsRead)
+def put_posting_slots(
+    payload: PostingSlotsUpdate, current_user: CurrentUser, db: DbSession
+) -> PostingSlotsRead:
+    """Replace the posting times (an empty list clears them). Posts already scheduled keep
+    their times."""
+    try:
+        slots.timezone(payload.timezone)
+        saved = slots.normalize(slot.model_dump() for slot in payload.slots)
+    except slots.SlotError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.message
+        ) from None
+    current_user.posting_slots = [slot.read() for slot in saved]
+    current_user.posting_timezone = payload.timezone
+    db.commit()
+    return _slots_read(current_user, db)

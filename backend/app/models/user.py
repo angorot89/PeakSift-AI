@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import CheckConstraint, DateTime, String, Uuid, func
+from sqlalchemy import CheckConstraint, DateTime, String, Uuid, func, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -25,6 +26,13 @@ class User(Base):
     default_market: Mapped[str] = mapped_column(
         String(8), default="global", server_default="global"
     )
+    # Posting times (Schedule & Post): the weekly slots the creator likes to post at, as
+    # [{"weekday": 0-6 (Monday first), "time": "HH:MM"}] in ``posting_timezone`` (an IANA name).
+    # A preference only: nothing is ever scheduled from it without the creator choosing to.
+    posting_slots: Mapped[list[Any]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    posting_timezone: Mapped[str | None] = mapped_column(String(64))
 
     projects: Mapped[list["Project"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"
