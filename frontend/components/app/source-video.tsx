@@ -4,6 +4,7 @@ import { Film, RefreshCw, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { CandidateReview } from "@/components/app/candidate-review";
 import { ClipDetectionPanel } from "@/components/app/clip-detection-panel";
+import { FindClips } from "@/components/app/find-clips";
 import { GeneratedClipsPanel } from "@/components/app/generated-clips-panel";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -208,6 +209,7 @@ export function ClipsSection({ projectId }: { projectId: string }) {
       cancelled = true;
     };
   }, [projectId, videoId]);
+  const [momentsVersion, setMomentsVersion] = useState(0);
   const rememberClip = useCallback((clip: GeneratedClip) => {
     setClips((previous) => new Map(previous ?? []).set(clip.candidate_id, clip));
   }, []);
@@ -233,7 +235,12 @@ export function ClipsSection({ projectId }: { projectId: string }) {
   }
   return (
     <div className="space-y-6">
+      {transcript.transcription?.status === "completed" ? (
+        <FindClips projectId={projectId} videoId={videoId} onKept={() => setMomentsVersion((version) => version + 1)} />
+      ) : null}
       <ClipDetectionPanel
+        // A kept search result is a new saved moment: reload the runs and their moments.
+        key={momentsVersion}
         projectId={projectId}
         videoId={videoId}
         transcription={transcript.transcription}

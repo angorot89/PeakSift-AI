@@ -46,6 +46,7 @@ DEFAULT_LIMITS: dict[str, Limit] = {
     "auto_edit": Limit(60, HOUR),
     "transcription": Limit(30, HOUR),
     "clip_detection": Limit(30, HOUR),
+    "find_clips": Limit(300, HOUR),  # a search may ask the local model for related words
     "clip_render": Limit(200, HOUR),
     "edit_render": Limit(200, HOUR),
     "reframe": Limit(100, HOUR),
