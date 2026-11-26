@@ -293,3 +293,15 @@ def test_the_copilot_recommends_the_same_step_even_offline(client, db_session):
     for answer in (own, offline):
         href = client.post(f"/copilot/messages/{answer.id}/actions/0").json()["href"]
         assert href == dashboard["href"]
+
+
+def test_quick_start_says_moments_follow_the_transcript():
+    """Dropped on Home: the creator is told they do not have to come back and press anything."""
+    plain = next_action(project(source=READY, transcript={"status": "transcribing"}))
+    quick = next_action(
+        project(source=READY, transcript={"status": "transcribing", "auto_find_moments": True})
+    )
+    assert (plain.key, quick.key) == ("transcribing", "transcribing")
+    assert "finds your moments" not in plain.description
+    assert "finds your moments" in quick.description
+    assert quick.tone == "waiting"

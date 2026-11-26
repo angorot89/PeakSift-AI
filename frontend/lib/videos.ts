@@ -1,4 +1,5 @@
 import { API_URL, ApiError, apiFetch, messageFrom } from "@/lib/api";
+import type { Project } from "@/lib/projects";
 
 export type VideoStatus = "uploaded" | "processing_metadata" | "ready" | "failed";
 
@@ -42,17 +43,13 @@ export const listProjectVideos = (projectId: string) =>
 export const videoContentUrl = (videoId: string) => `${API_URL}/videos/${videoId}/content`;
 
 /**
- * Upload with real byte progress. `fetch` cannot report upload progress, so this
+ * POST a form with real byte progress. `fetch` cannot report upload progress, so this
  * uses XMLHttpRequest; cookies are sent with `withCredentials`.
  */
-export function uploadProjectVideo(
-  projectId: string,
-  file: File,
-  onProgress?: (percent: number) => void,
-): Promise<Video> {
+function postForm<T>(path: string, form: FormData, onProgress?: (percent: number) => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_URL}/projects/${projectId}/videos`);
+    xhr.open("POST", `${API_URL}${path}`);
     xhr.withCredentials = true;
     xhr.responseType = "json";
 
@@ -63,7 +60,7 @@ export function uploadProjectVideo(
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(xhr.response as Video);
+        resolve(xhr.response as T);
       } else {
         reject(new ApiError(xhr.status, messageFrom(xhr.response, xhr.status)));
       }
@@ -72,8 +69,41 @@ export function uploadProjectVideo(
       reject(new ApiError(0, "Could not reach the server. Check your connection and try again."));
     xhr.onabort = () => reject(new ApiError(0, "Upload cancelled."));
 
-    const form = new FormData();
-    form.append("file", file, file.name);
     xhr.send(form);
   });
+}
+
+/** Upload a project's source video. */
+export function uploadProjectVideo(
+  projectId: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<Video> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return postForm<Video>(`/projects/${projectId}/videos`, form, onProgress);
+}
+
+export type QuickStartResult = {
+  project: Project;
+  video: Video;
+  /** False when the file is not usable video or the job could not be queued. */
+  transcription_started: boolean;
+};
+
+/**
+ * Quick start: one upload becomes a project that transcribes itself and then finds moments.
+ * `name` is optional (the server names the project from the file); `market` defaults to the
+ * creator's own.
+ */
+export function quickStart(
+  file: File,
+  options: { name?: string; market?: string } = {},
+  onProgress?: (percent: number) => void,
+): Promise<QuickStartResult> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  if (options.name?.trim()) form.append("name", options.name.trim());
+  if (options.market) form.append("market", options.market);
+  return postForm<QuickStartResult>("/quick-start", form, onProgress);
 }

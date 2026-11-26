@@ -22,6 +22,8 @@ class TranscriptionRead(BaseModel):
     segment_count: int
     # An active job whose worker stopped reporting (heartbeat older than the stale threshold).
     is_stale: bool
+    # Quick start: moment detection starts by itself when this transcript completes.
+    auto_find_moments: bool = False
     error_code: str | None
     error_message: str | None
     created_at: datetime

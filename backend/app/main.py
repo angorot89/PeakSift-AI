@@ -28,6 +28,7 @@ from app.api.projects import router as projects_router
 from app.api.publish_jobs import edit_router as publish_edit_router
 from app.api.publish_jobs import job_router as publish_job_router
 from app.api.publishing import router as publishing_router
+from app.api.quick_start import router as quick_start_router
 from app.api.reframe import router as reframe_router
 from app.api.shorts import router as shorts_router
 from app.api.transcriptions import router as transcriptions_router
@@ -46,6 +47,7 @@ ROUTERS = (
     auth_router,
     projects_router,
     videos_router,
+    quick_start_router,
     video_content_router,
     transcriptions_router,
     clip_providers_router,

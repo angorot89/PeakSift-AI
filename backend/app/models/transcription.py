@@ -4,6 +4,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -69,6 +71,9 @@ class Transcription(Base):
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(String(500))
     celery_task_id: Mapped[str | None] = mapped_column(String(255))
+    # Quick start: when this transcript completes, the worker starts moment detection with
+    # the server's default provider (once; see clip_detection/autostart.py).
+    auto_find_moments: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     # Internal metadata about derived audio; never exposed by the API.
     audio_storage_key: Mapped[str | None] = mapped_column(String(255))

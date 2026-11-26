@@ -124,6 +124,7 @@ def project_summary(db: Session, project: Project) -> dict:
             summary["transcript"] = {
                 "status": transcription.status,
                 "progress_percent": transcription.progress_percent,
+                "auto_find_moments": transcription.auto_find_moments,
             }
         run = db.scalar(
             select(ClipDetectionRun)
