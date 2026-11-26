@@ -78,3 +78,16 @@ export function forgetReturnPath(): void {
     // nothing stored
   }
 }
+
+/** A weekly posting time: a weekday (0 = Monday) and a wall-clock time in the creator's zone. */
+export type PostingSlot = { weekday: number; time: string };
+export type PostingSlots = {
+  timezone: string | null;
+  slots: PostingSlot[];
+  /** The next free slot times (ISO, UTC): not in the past, not taken by a scheduled post. */
+  upcoming: string[];
+};
+
+export const getPostingSlots = () => apiFetch<PostingSlots>("/posting-slots");
+export const savePostingSlots = (timezone: string, slots: PostingSlot[]) =>
+  apiFetch<PostingSlots>("/posting-slots", { method: "PUT", body: JSON.stringify({ timezone, slots }) });

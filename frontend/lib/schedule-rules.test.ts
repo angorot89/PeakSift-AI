@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   addDays,
+  addSlot,
+  copyDayToAll,
+  isSlotTime,
+  removeSlot,
+  slotsSummary,
+  slotTimeLabel,
   dayKey,
   fromLocalInput,
   groupByDay,
@@ -85,5 +91,41 @@ describe("a post's state on the calendar", () => {
     assert.equal(postState(job("failed", { error_code: "schedule_missed" })).label, "Missed");
     assert.equal(postState(job("provider_failed")).tone, "attention");
     assert.equal(postState(job("uploading", { is_stale: true })).label, "Stalled");
+  });
+});
+
+describe("posting times", () => {
+  const friday = { weekday: 4, time: "19:30" };
+
+  it("adds in week order and ignores duplicates and bad times", () => {
+    let slots = addSlot([], friday);
+    slots = addSlot(slots, { weekday: 0, time: "07:00" });
+    slots = addSlot(slots, friday);
+    slots = addSlot(slots, { weekday: 4, time: "25:00" });
+    slots = addSlot(slots, { weekday: 4, time: "7:30" });
+    assert.deepEqual(slots, [{ weekday: 0, time: "07:00" }, friday]);
+    assert.equal(isSlotTime("19:30"), true);
+    assert.equal(isSlotTime("24:00"), false);
+  });
+
+  it("keeps a day to four times", () => {
+    let slots: { weekday: number; time: string }[] = [];
+    for (const time of ["07:00", "12:00", "17:00", "20:00", "22:00"]) slots = addSlot(slots, { weekday: 2, time });
+    assert.equal(slots.length, 4);
+  });
+
+  it("removes one slot and copies a day to the whole week", () => {
+    const slots = [{ weekday: 0, time: "07:00" }, { weekday: 0, time: "19:30" }, friday];
+    assert.deepEqual(removeSlot(slots, friday), slots.slice(0, 2));
+    const week = copyDayToAll(slots, 0);
+    assert.equal(week.length, 14);
+    assert.deepEqual(week.filter((slot) => slot.weekday === 4).map((slot) => slot.time), ["07:00", "19:30"]);
+  });
+
+  it("describes the rhythm", () => {
+    assert.equal(slotsSummary([]), "No posting times yet");
+    assert.equal(slotsSummary([friday]), "1 post a week");
+    assert.equal(slotsSummary([friday, { weekday: 0, time: "07:00" }]), "2 posts a week");
+    assert.equal(slotTimeLabel("19:30", "en-US"), "7:30 PM");
   });
 });

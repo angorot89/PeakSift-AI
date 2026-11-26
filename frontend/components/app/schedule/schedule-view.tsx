@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarClock, ChevronLeft, ChevronRight, Smartphone } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Clock, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { PublishBody } from "@/components/app/editor/publish-dialog";
 import { PageHeader } from "@/components/app/page-header";
-import { ScheduledPost } from "@/components/app/schedule/scheduled-post";
+import { PostingTimes } from "@/components/app/schedule/posting-times";
+import { ScheduledPost, formatWhen } from "@/components/app/schedule/scheduled-post";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -17,13 +18,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import { VideoFrame } from "@/components/ui/video-frame";
 import { editContentUrl } from "@/lib/edits";
-import { getCalendar, type CalendarItem, type PublishCalendar } from "@/lib/publishing";
+import { getCalendar, getPostingSlots, type CalendarItem, type PostingSlots, type PublishCalendar } from "@/lib/publishing";
 import {
   addDays,
   dayKey,
   groupByDay,
   isSameDay,
   postState,
+  slotsSummary,
+  toLocalInput,
   weekDays,
   weekLabel,
   weekStart,
@@ -42,7 +45,7 @@ const TONE: Record<PostTone, StatusTone> = {
 const UPCOMING_DAYS = 60; // how far ahead "already scheduled" is known for the ready list
 const WORKING = ["queued", "preparing", "uploading"];
 
-type Loaded = { week: PublishCalendar; upcoming: CalendarItem[]; shorts: ShortItem[] };
+type Loaded = { week: PublishCalendar; upcoming: CalendarItem[]; shorts: ShortItem[]; posting: PostingSlots };
 
 const clockTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
@@ -96,26 +99,49 @@ function Post({ item, onChanged }: { item: CalendarItem; onChanged: () => void }
   );
 }
 
-function ReadyShort({ short, onSchedule }: { short: ShortItem; onSchedule: () => void }) {
+function ReadyShort({
+  short,
+  slot,
+  onSchedule,
+}: {
+  short: ShortItem;
+  /** This Short's next free posting slot, when the creator has posting times. */
+  slot?: Date;
+  onSchedule: (when?: string) => void;
+}) {
   return (
-    <li className="flex items-center gap-3 rounded-block border border-border bg-surface p-3">
-      {short.edit_id ? (
-        <VideoFrame src={editContentUrl(short.edit_id)} ratio="vertical" icon={Smartphone} className="w-12 shrink-0 rounded-control border border-border" />
-      ) : null}
-      <div className="min-w-0 flex-1">
-        <Link
-          href={shortHref(short.id)}
-          dir="auto"
-          className="line-clamp-2 text-sm font-medium break-words text-foreground underline-offset-2 hover:underline"
-        >
-          {short.title}
-        </Link>
-        <p className="truncate text-caption text-subtle">{short.project.name}</p>
+    <li className="flex flex-col gap-3 rounded-block border border-border bg-surface p-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {short.edit_id ? (
+          <VideoFrame src={editContentUrl(short.edit_id)} ratio="vertical" icon={Smartphone} className="w-12 shrink-0 rounded-control border border-border" />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <Link
+            href={shortHref(short.id)}
+            dir="auto"
+            className="line-clamp-2 text-sm font-medium break-words text-foreground underline-offset-2 hover:underline"
+          >
+            {short.title}
+          </Link>
+          <p className="truncate text-caption text-subtle">{short.project.name}</p>
+        </div>
       </div>
-      <Button variant="secondary" size="sm" onClick={onSchedule}>
-        <CalendarClock aria-hidden="true" />
-        Schedule
-      </Button>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {slot ? (
+          <Button size="sm" onClick={() => onSchedule(toLocalInput(slot))}>
+            <CalendarClock aria-hidden="true" />
+            {formatWhen(slot)}
+          </Button>
+        ) : null}
+        <Button variant="secondary" size="sm" onClick={() => onSchedule()}>
+          {slot ? "Other time" : (
+            <>
+              <CalendarClock aria-hidden="true" />
+              Schedule
+            </>
+          )}
+        </Button>
+      </div>
     </li>
   );
 }
@@ -127,16 +153,19 @@ function ReadyShort({ short, onSchedule }: { short: ShortItem; onSchedule: () =>
  */
 export function ScheduleView() {
   const [start, setStart] = useState(() => weekStart(new Date()));
-  const [scheduling, setScheduling] = useState<ShortItem | null>(null);
+  // The Short being scheduled, and the time offered for it (its next free posting slot, if any).
+  const [scheduling, setScheduling] = useState<{ short: ShortItem; when?: string } | null>(null);
+  const [editingTimes, setEditingTimes] = useState(false);
 
   const load = useCallback(async (): Promise<Loaded> => {
     const now = new Date();
-    const [week, ahead, library] = await Promise.all([
+    const [week, ahead, library, posting] = await Promise.all([
       getCalendar(start, addDays(start, 7)),
       getCalendar(now, addDays(now, UPCOMING_DAYS)),
       getShorts(),
+      getPostingSlots(),
     ]);
-    return { week, upcoming: ahead.items, shorts: library.shorts };
+    return { week, upcoming: ahead.items, shorts: library.shorts, posting };
   }, [start]);
   const { data, error, reload } = useApi(load);
   const week = data?.week ?? null;
@@ -155,12 +184,22 @@ export function ScheduleView() {
   );
   const today = new Date();
   const thisWeek = isSameDay(start, weekStart(today));
+  const posting = data?.posting ?? null;
+  // Free posting slots: the ones in this week show on the calendar; ready Shorts get one each.
+  const freeSlots = useMemo(() => (posting?.upcoming ?? []).map((iso) => new Date(iso)), [posting]);
+  const freeByDay = useMemo(() => groupByDay(freeSlots.map((slot) => ({ at: slot.toISOString() }))), [freeSlots]);
 
   return (
     <div className="space-y-10">
       <PageHeader
         title="Schedule"
         description="What goes out, and when. Times are in your local time; nothing is uploaded before its time."
+        action={
+          <Button variant="secondary" onClick={() => setEditingTimes(true)} disabled={!posting}>
+            <Clock aria-hidden="true" />
+            Posting times
+          </Button>
+        }
       />
 
       {error && !week ? <ErrorState title="Your schedule could not be loaded" message={error} onRetry={reload} /> : null}
@@ -207,6 +246,7 @@ export function ScheduleView() {
             {days.map((day) => {
               const key = dayKey(day);
               const posts = byDay.get(key) ?? [];
+              const free = freeByDay.get(key) ?? [];
               const isToday = isSameDay(day, today);
               return (
                 <li
@@ -222,10 +262,22 @@ export function ScheduleView() {
                     </time>
                     {isToday ? <span className="text-caption text-accent-soft">Today</span> : null}
                   </h3>
-                  {posts.length ? (
+                  {posts.length || free.length ? (
                     <ul className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-1">
                       {posts.map((item) => (
                         <Post key={item.job.id} item={item} onChanged={reload} />
+                      ))}
+                      {free.map((slot) => (
+                        // A posting time with no post yet: an invitation, not a commitment.
+                        <li
+                          key={slot.at}
+                          className="flex min-h-11 items-center justify-between gap-2 rounded-control border border-dashed border-border-strong px-2.5 py-1.5"
+                        >
+                          <time dateTime={slot.at} className="tabular text-small text-muted">
+                            {clockTime(slot.at)}
+                          </time>
+                          <span className="text-caption text-subtle">Free slot</span>
+                        </li>
                       ))}
                     </ul>
                   ) : (
@@ -245,14 +297,22 @@ export function ScheduleView() {
             title="Ready to schedule"
             description={
               ready.length
-                ? "Finished Shorts with no post planned. Pick a time, or publish now."
+                ? posting?.slots.length
+                  ? `Finished Shorts with no post planned. Your rhythm: ${slotsSummary(posting.slots)}.`
+                  : "Finished Shorts with no post planned. Pick a time, or set your posting times once and take the next free one."
                 : "Every ready Short already has a post planned, or nothing is ready yet."
             }
           />
           {ready.length ? (
             <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {ready.map((short) => (
-                <ReadyShort key={short.id} short={short} onSchedule={() => setScheduling(short)} />
+              {ready.map((short, index) => (
+                // Each ready Short is offered its own free posting slot, in order.
+                <ReadyShort
+                  key={short.id}
+                  short={short}
+                  slot={freeSlots[index]}
+                  onSchedule={(when) => setScheduling({ short, when })}
+                />
               ))}
             </ul>
           ) : (
@@ -270,17 +330,29 @@ export function ScheduleView() {
           reload();
         }}
         title="Publish to YouTube"
-        description={scheduling?.title}
+        description={scheduling?.short.title}
       >
-        {scheduling?.edit_id ? (
+        {scheduling?.short.edit_id ? (
           <PublishBody
-            editId={scheduling.edit_id}
+            editId={scheduling.short.edit_id}
             returnTo="/schedule"
+            initialWhen={scheduling.when}
             onClose={() => {
               setScheduling(null);
               reload();
             }}
           />
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={editingTimes}
+        onClose={() => setEditingTimes(false)}
+        title="Posting times"
+        description="The times you like to post at each week."
+      >
+        {editingTimes && posting ? (
+          <PostingTimes current={posting} onSaved={reload} onClose={() => setEditingTimes(false)} />
         ) : null}
       </Dialog>
     </div>
