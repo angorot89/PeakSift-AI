@@ -43,6 +43,23 @@ class PlatformRead(BaseModel):
     connection: PublishingConnectionRead | None
 
 
+class TikTokStatusRead(BaseModel):
+    enabled: bool
+    connection: PublishingConnectionRead | None
+
+
+class TikTokCreatorRead(BaseModel):
+    """What TikTok offers this creator for a post right now (shown as-is in the dialog)."""
+
+    nickname: str
+    username: str
+    privacy_levels: list[str]
+    comment_disabled: bool
+    duet_disabled: bool
+    stitch_disabled: bool
+    max_duration_seconds: int | None
+
+
 class AuthorizationRead(BaseModel):
     authorization_url: str
 
@@ -62,6 +79,11 @@ class PublishRequest(BaseModel):
     made_for_kids: bool = False
     # Publish at this time instead of now (with its time zone; at least a few minutes ahead).
     scheduled_at: datetime | None = None
+    # Where it goes ("youtube" when left out) and what the creator chose that only that
+    # platform has. For TikTok: privacy_level, allow_comment, allow_duet, allow_stitch,
+    # commercial, brand_organic, brand_content, music_usage_confirmed.
+    platform: str = Field(default="youtube", max_length=16)
+    options: dict[str, bool | str | None] = Field(default_factory=dict, max_length=16)
 
 
 class ScheduleChange(BaseModel):
@@ -144,6 +166,8 @@ class PublishJobRead(BaseModel):
     published_at: datetime | None
     # When the creator asked for it to go out (null for a job published right away).
     scheduled_at: datetime | None = None
+    # What the creator chose that only this platform has (empty for YouTube).
+    options: dict[str, bool | str | None] = Field(default_factory=dict)
 
 
 class PublishPanelRead(BaseModel):
@@ -154,6 +178,8 @@ class PublishPanelRead(BaseModel):
     edit_ready: bool
     defaults: PublishDefaults
     jobs: list[PublishJobRead]
+    # Which platform this panel is for.
+    platform: str = "youtube"
 
 
 CalendarItem.model_rebuild()

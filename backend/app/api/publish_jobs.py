@@ -52,10 +52,12 @@ from app.schemas.publishing import (
     PublishRequest,
     ScheduleChange,
 )
-from app.services.publishing import connections, schedule, slots
+from app.services.publishing import connections, platforms, schedule, slots, tiktok_post
 from app.services.publishing.jobs import PublishRefused, request_publish
 from app.services.publishing.metadata import MetadataError, PublishMetadata, prefill
 from app.services.publishing.pipeline import awaiting_processing, is_stale
+from app.services.publishing.provider import PublishErrorCode, PublishProviderError
+from app.services.publishing.tokens import TokenDecryptionError, TokenKeyError
 from app.workers.dispatch import JobQueueUnavailable, enqueue_publish, new_task_id
 
 edit_router = APIRouter(prefix="/edits/{edit_id}/publish", tags=["publishing"])
@@ -92,7 +94,7 @@ def _retryable(job: PublishJob) -> bool:
 
 def _read(job: PublishJob) -> PublishJobRead:
     video_id = job.provider_video_id
-    simulated = bool(video_id) and job.provider == "youtube" and video_id.startswith("fake-")
+    simulated = bool(video_id) and video_id.startswith("fake-")
     # A link only where the id is a public video id: TikTok's is a publish id, not a video's.
     real = video_id and not simulated and job.provider == "youtube"
     return PublishJobRead(
@@ -122,6 +124,7 @@ def _read(job: PublishJob) -> PublishJobRead:
         completed_at=job.completed_at,
         published_at=job.published_at,
         scheduled_at=job.scheduled_at,
+        options=dict(job.options or {}),
     )
 
 
@@ -168,20 +171,78 @@ def _scheduled_job(job_id: uuid.UUID, user_id: uuid.UUID, db) -> PublishJob:
     return job
 
 
+def _tiktok_post(db, settings, edit: ClipEdit, connection, payload: PublishRequest):
+    """A TikTok post's stored metadata and options, checked against what TikTok offers this
+    creator right now. Raises ``MetadataError`` (422) or an ``HTTPException``."""
+    if connection is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Connect a TikTok account first"
+        )
+    if connection.status != ConnectionStatus.CONNECTED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Reconnect your TikTok account to publish",
+        )
+    try:
+        info = tiktok_post.creator_info(db, settings, connection)
+    except (TokenKeyError, TokenDecryptionError):
+        connections.mark_needs_reconnect(db, connection)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Reconnect your TikTok account to publish",
+        ) from None
+    except PublishProviderError as failure:
+        if failure.code == PublishErrorCode.AUTHENTICATION_REQUIRED:
+            connections.mark_needs_reconnect(db, connection)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Reconnect your TikTok account to publish",
+            ) from None
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=failure.message
+        ) from None
+    options = tiktok_post.choices(payload.options, info, edit.duration_seconds)
+    metadata = tiktok_post.metadata(
+        edit.clip.candidate.title, payload.description, options["privacy_level"]
+    )
+    return metadata, options
+
+
+def _platform(key: str):
+    """The platform a request names, or 422 for one PeakSift does not publish to."""
+    platform = platforms.get(key)
+    if platform is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[{"type": "platform", "loc": ["body", "platform"], "msg": "Unknown platform"}],
+        )
+    return platform
+
+
 @edit_router.get("", response_model=PublishPanelRead)
 def publish_panel(
-    edit_id: uuid.UUID, current_user: CurrentUser, db: DbSession, storage: Storage
+    edit_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: Storage,
+    platform: Annotated[str, Query(max_length=16)] = "youtube",
 ) -> PublishPanelRead:
     edit = _owned_edit(edit_id, current_user.id, db)
+    target = _platform(platform)
     candidate = edit.clip.candidate
-    connection = connections.get_connection(db, current_user.id)
+    connection = connections.get_connection(db, current_user.id, target.key)
     jobs = db.scalars(
         select(PublishJob)
-        .where(PublishJob.edit_id == edit.id, PublishJob.user_id == current_user.id)
+        .where(
+            PublishJob.edit_id == edit.id,
+            PublishJob.user_id == current_user.id,
+            PublishJob.provider == target.key,
+        )
         .order_by(PublishJob.created_at.desc())
     ).all()
     return PublishPanelRead(
-        enabled=get_settings().youtube_publishing_enabled,
+        platform=target.key,
+        enabled=target.enabled(get_settings()),
         connection=PublishingConnectionRead.model_validate(connection) if connection else None,
         edit_ready=_ready(edit, storage),
         defaults=PublishDefaults(**prefill(candidate.title, candidate.hook)),
@@ -204,13 +265,26 @@ def publish(
     storage: Storage,
 ) -> PublishJobRead:
     edit = _owned_edit(edit_id, current_user.id, db)
-    if not get_settings().youtube_publishing_enabled:
+    target = _platform(payload.platform)
+    settings = get_settings()
+    if not target.enabled(settings):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="YouTube publishing is not enabled on this server",
+            detail=f"{target.label} publishing is not enabled on this server",
+        )
+    connection = connections.get_connection(db, current_user.id, target.key)
+    options: dict = {}
+    if target.key == "tiktok" and not _ready(edit, storage):  # before asking TikTok anything
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Render the short before publishing it"
         )
     try:
-        metadata = PublishMetadata.create(**payload.model_dump(exclude={"scheduled_at"}))
+        if target.key == "tiktok":
+            metadata, options = _tiktok_post(db, settings, edit, connection, payload)
+        else:
+            metadata = PublishMetadata.create(
+                **payload.model_dump(exclude={"scheduled_at", "platform", "options"})
+            )
     except MetadataError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -221,11 +295,11 @@ def publish(
             status_code=status.HTTP_409_CONFLICT, detail="Render the short before publishing it"
         )
     when = _when(payload.scheduled_at) if payload.scheduled_at else None
-    waiting = schedule.scheduled_for_edit(db, current_user.id, edit.id)
+    waiting = schedule.scheduled_for_edit(db, current_user.id, edit.id, target.key)
     try:
         job, created = request_publish(
             db, user_id=current_user.id, edit=edit, metadata=metadata, task_id=new_task_id(),
-            connection=connections.get_connection(db, current_user.id), scheduled_at=when,
+            connection=connection, scheduled_at=when, options=options, platform=target.label,
         )  # fmt: skip
     except PublishRefused as refused:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refused.message) from None

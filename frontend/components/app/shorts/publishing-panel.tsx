@@ -204,11 +204,12 @@ export function PublishingPanel({ short, onChange }: { short: ShortDetail; onCha
           reload();
           onChange();
         }}
-        title="Publish to YouTube"
+        title="Publish"
         description={short.title}
       >
         <PublishBody
           editId={editId}
+          durationSeconds={short.duration_seconds}
           onClose={() => {
             setOpen(false);
             reload();

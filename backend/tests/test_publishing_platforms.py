@@ -187,9 +187,9 @@ def test_messages_name_the_platform():
 
 
 def test_the_registry_lists_only_working_platforms():
-    assert [platform.key for platform in platforms.PLATFORMS] == ["youtube"]
-    assert platforms.label("youtube") == "YouTube" and platforms.label("tiktok") == "Tiktok"
-    assert platforms.get("myspace") is None
+    assert [platform.key for platform in platforms.PLATFORMS] == ["youtube", "tiktok"]
+    assert platforms.label("youtube") == "YouTube" and platforms.label("tiktok") == "TikTok"
+    assert platforms.get("myspace") is None and platforms.label("myspace") == "Myspace"
     for platform in platforms.PLATFORMS:
         assert platform.key in {p.value for p in PublishingProvider}
 
@@ -217,9 +217,12 @@ def test_platforms_endpoint_lists_platforms_and_the_creators_connections(
 
     user = new_user(db_session)
     sign_in(client, user.id)
-    (youtube,) = client.get("/publishing/platforms").json()
+    youtube, tiktok_row = client.get("/publishing/platforms").json()
     assert youtube == {"key": "youtube", "label": "YouTube", "account_noun": "channel",
                        "enabled": enabled, "connection": None}  # fmt: skip
+    # TikTok is listed, and honestly marked as not set up on this server.
+    assert tiktok_row == {"key": "tiktok", "label": "TikTok", "account_noun": "account",
+                          "enabled": False, "connection": None}  # fmt: skip
 
     connect(db_session, user)
     response = client.get("/publishing/platforms")

@@ -216,7 +216,7 @@ def job_row(db: Session, **overrides) -> PublishJob:
     [
         {"provider": "myspace"},
         {"status": "done"},
-        {"privacy": "friends"},
+        {"privacy": "everyone"},
         {"title": ""},
         {"title": "x" * 101},
         {"description": "é" * 2501},

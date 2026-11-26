@@ -63,6 +63,8 @@ export type PublishJob = PublishMetadata & {
   published_at: string | null;
   /** When the creator asked for it to go out (null when published right away). */
   scheduled_at?: string | null;
+  /** What the creator chose that only this platform has (empty for YouTube). */
+  options?: Record<string, boolean | string | null>;
 };
 
 export type PublishPanel = {

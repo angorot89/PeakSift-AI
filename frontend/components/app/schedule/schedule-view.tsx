@@ -329,12 +329,13 @@ export function ScheduleView() {
           setScheduling(null);
           reload();
         }}
-        title="Publish to YouTube"
+        title="Publish"
         description={scheduling?.short.title}
       >
         {scheduling?.short.edit_id ? (
           <PublishBody
             editId={scheduling.short.edit_id}
+            durationSeconds={scheduling.short.duration_seconds}
             returnTo="/schedule"
             initialWhen={scheduling.when}
             onClose={() => {

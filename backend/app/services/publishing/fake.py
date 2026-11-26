@@ -70,6 +70,21 @@ class FakePublishingProvider:
 
     # --- the contract ----------------------------------------------------------------------
 
+    def creator_info(self, auth: ProviderAuth):
+        """What a simulated TikTok creator may choose (non-production stacks and tests)."""
+        from app.services.publishing.tiktok import CreatorInfo
+
+        self._maybe_fail("creator_info")
+        return CreatorInfo(
+            nickname="Simulated creator",
+            username="simulated",
+            privacy_levels=("PUBLIC_TO_EVERYONE", "FOLLOWER_OF_CREATOR", "SELF_ONLY"),
+            comment_disabled=False,
+            duet_disabled=False,
+            stitch_disabled=True,
+            max_duration_seconds=600,
+        )
+
     def authorize(self, refresh_token: str) -> ProviderAuth:
         self._maybe_fail("authorize")
         if not refresh_token or refresh_token in self.revoked_tokens:

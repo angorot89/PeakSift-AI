@@ -52,6 +52,7 @@ DEFAULT_LIMITS: dict[str, Limit] = {
     "reframe": Limit(100, HOUR),
     "caption_timing": Limit(100, HOUR),
     "oauth_start": Limit(10, HOUR),
+    "tiktok_creator": Limit(120, HOUR),  # each asks TikTok (its own limit is 20 a minute)
     "publish_start": Limit(30, HOUR),
     "analytics_refresh": Limit(60, HOUR),
     "hook_ideas": Limit(120, HOUR),  # each language request may ask the local model

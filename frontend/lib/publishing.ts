@@ -91,3 +91,13 @@ export type PostingSlots = {
 export const getPostingSlots = () => apiFetch<PostingSlots>("/posting-slots");
 export const savePostingSlots = (timezone: string, slots: PostingSlot[]) =>
   apiFetch<PostingSlots>("/posting-slots", { method: "PUT", body: JSON.stringify({ timezone, slots }) });
+
+/** A platform PeakSift can publish to, whether this server offers it, and the creator's connection. */
+export type PublishingPlatform = {
+  key: "youtube" | "tiktok";
+  label: string;
+  account_noun: string;
+  enabled: boolean;
+  connection: { provider: string; status: "connected" | "needs_reconnect"; account_title: string } | null;
+};
+export const getPlatforms = () => apiFetch<PublishingPlatform[]>("/publishing/platforms");

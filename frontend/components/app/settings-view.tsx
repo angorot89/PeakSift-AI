@@ -8,6 +8,7 @@ import {
   ConnectAnalyticsButton,
   DeleteCollectedMetrics,
 } from "@/components/app/analytics/analytics-access";
+import { TikTokConnection } from "@/components/app/tiktok/tiktok-connection";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -210,6 +211,9 @@ export function SettingsView() {
           ) : null}
         </div>
       </Panel>
+      <div className="mt-6">
+        <TikTokConnection />
+      </div>
     </>
   );
 }

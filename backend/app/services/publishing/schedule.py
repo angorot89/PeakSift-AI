@@ -132,11 +132,15 @@ def release_due(
     return released
 
 
-def scheduled_for_edit(db: Session, user_id: uuid.UUID, edit_id: uuid.UUID) -> PublishJob | None:
+def scheduled_for_edit(
+    db: Session, user_id: uuid.UUID, edit_id: uuid.UUID, provider: str = "youtube"
+) -> PublishJob | None:
+    """The Short's post that is still waiting on this platform (one per platform)."""
     return db.scalar(
         select(PublishJob).where(
             PublishJob.user_id == user_id,
             PublishJob.edit_id == edit_id,
+            PublishJob.provider == provider,
             PublishJob.status == PublishStatus.SCHEDULED,
         )
     )

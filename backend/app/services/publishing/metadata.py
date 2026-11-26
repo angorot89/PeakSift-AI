@@ -28,6 +28,9 @@ DEFAULT_CATEGORY_ID = "22"
 _ANGLE = re.compile(r"[<>]")
 
 
+YOUTUBE_PRIVACY = (Privacy.PRIVATE, Privacy.UNLISTED, Privacy.PUBLIC)
+
+
 class MetadataError(ValueError):
     def __init__(self, field_name: str, message: str) -> None:
         super().__init__(message)
@@ -88,7 +91,9 @@ class PublishMetadata:
         try:
             privacy = Privacy(privacy)
         except ValueError:
-            raise MetadataError("privacy", "Choose private, unlisted or public") from None
+            privacy = None
+        if privacy not in YOUTUBE_PRIVACY:  # other platforms' levels are not YouTube's
+            raise MetadataError("privacy", "Choose private, unlisted or public")
         return cls(title, description, cleaned_tags, privacy, bool(made_for_kids))
 
 

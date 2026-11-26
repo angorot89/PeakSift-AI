@@ -53,8 +53,10 @@ class PublishStatus(StrEnum):
 
 class Privacy(StrEnum):
     PRIVATE = "private"
-    UNLISTED = "unlisted"
+    UNLISTED = "unlisted"  # YouTube only
     PUBLIC = "public"
+    FOLLOWERS = "followers"  # TikTok only: the creator's followers
+    FRIENDS = "friends"  # TikTok only: followers the creator follows back
 
 
 ACTIVE_PUBLISH_STATUSES = (
@@ -91,7 +93,8 @@ class PublishJob(Base):
             postgresql_where=text("status = 'scheduled'"),
         ),
         CheckConstraint(
-            "privacy IN ('private', 'unlisted', 'public')", name="ck_publish_jobs_privacy"
+            "privacy IN ('private', 'unlisted', 'public', 'followers', 'friends')",
+            name="ck_publish_jobs_privacy",
         ),
         CheckConstraint(
             "char_length(title) BETWEEN 1 AND 100", name="ck_publish_jobs_title_length"

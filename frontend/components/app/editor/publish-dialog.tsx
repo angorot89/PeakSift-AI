@@ -4,6 +4,7 @@ import { CalendarClock, CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { ScheduledPost } from "@/components/app/schedule/scheduled-post";
+import { TikTokPublish } from "@/components/app/tiktok/tiktok-publish";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { inputClasses, textareaClasses } from "@/components/ui/input-styles";
@@ -12,6 +13,7 @@ import { buttonClasses } from "@/components/ui/button-styles";
 import { FormError } from "@/components/ui/form-error";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ProgressBar, Spinner } from "@/components/ui/progress";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { errorMessage } from "@/lib/api";
 import {
   bytes,
@@ -19,6 +21,7 @@ import {
   connectYouTube,
   DESCRIPTION_MAX_BYTES,
   getPublishJob,
+  getPlatforms,
   getPublishPanel,
   isActive,
   isFollowing,
@@ -36,6 +39,7 @@ import {
   TITLE_MAX,
 } from "@/lib/publishing";
 import { fromLocalInput, suggestedTime, timeProblem, toLocalInput } from "@/lib/schedule-rules";
+import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 
 const STEPS: { key: string; label: string }[] = [
@@ -66,14 +70,62 @@ export function PublishToYouTube({
         <CirclePlay aria-hidden="true" />
         Publish to YouTube
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Publish to YouTube" description={editName}>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Publish" description={editName}>
         <PublishBody editId={editId} onClose={() => setOpen(false)} returnTo={returnTo} />
       </Dialog>
     </>
   );
 }
 
-export function PublishBody({
+type PlatformKey = "youtube" | "tiktok";
+
+/**
+ * The publish dialog's content. Where this server also offers TikTok, the creator first
+ * chooses the platform; each platform then has its own reviewed post and its own real state.
+ */
+export function PublishBody(props: {
+  editId: string;
+  onClose: () => void;
+  returnTo?: string;
+  /** Open on "Schedule for later" with this time (a datetime-local value), e.g. the next posting slot. */
+  initialWhen?: string;
+  /** The Short's length, checked against the creator's TikTok limit. */
+  durationSeconds?: number | null;
+}) {
+  const { data } = useApi(getPlatforms);
+  const [chosen, setChosen] = useState<PlatformKey | null>(null);
+  const offered = (data ?? []).filter((platform) => platform.enabled).map((platform) => platform.key);
+  const both = offered.includes("youtube") && offered.includes("tiktok");
+  // One platform on this server: no choice to make. YouTube stays the default with both.
+  const platform: PlatformKey = chosen ?? (offered.includes("tiktok") && !offered.includes("youtube") ? "tiktok" : "youtube");
+  return (
+    <div className="space-y-5">
+      {both ? (
+        <SegmentedControl
+          label="Where to publish"
+          value={platform}
+          onChange={setChosen}
+          options={[
+            { value: "youtube", label: "YouTube" },
+            { value: "tiktok", label: "TikTok" },
+          ]}
+        />
+      ) : null}
+      {platform === "tiktok" ? (
+        <TikTokPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} />
+      ) : (
+        <YouTubePublishBody
+          editId={props.editId}
+          onClose={props.onClose}
+          returnTo={props.returnTo}
+          initialWhen={props.initialWhen}
+        />
+      )}
+    </div>
+  );
+}
+
+function YouTubePublishBody({
   editId,
   onClose,
   returnTo,

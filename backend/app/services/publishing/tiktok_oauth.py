@@ -47,6 +47,9 @@ class Grant:
     refresh_token: str = field(repr=False)
     scopes: list[str]
     open_id: str  # TikTok's id for this user in this app: display and bookkeeping only
+    # The access token issued with the grant: used once, to learn the account's name. Never
+    # stored.
+    access_token: str = field(default="", repr=False)
 
 
 def _hash(state: str) -> str:
@@ -136,7 +139,12 @@ def exchange_code(settings: Settings, code: str, client: httpx.Client | None = N
     scopes = [s for s in str(body.get("scope") or "").replace(" ", ",").split(",") if s]
     if PUBLISH_SCOPE not in scopes:
         raise OAuthError("insufficient_scope")
-    return Grant(refresh_token, scopes, str(body.get("open_id") or "")[:128])
+    return Grant(
+        refresh_token,
+        scopes,
+        str(body.get("open_id") or "")[:128],
+        str(body.get("access_token") or ""),
+    )
 
 
 def revoke(settings: Settings, token: str, client: httpx.Client | None = None) -> None:

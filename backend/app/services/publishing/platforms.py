@@ -33,6 +33,12 @@ PLATFORMS: tuple[Platform, ...] = (
         account_noun="channel",
         enabled=lambda settings: settings.youtube_publishing_enabled,
     ),
+    Platform(
+        key=PublishingProvider.TIKTOK.value,
+        label="TikTok",
+        account_noun="account",
+        enabled=lambda settings: settings.tiktok_publishing_enabled,
+    ),
 )
 
 

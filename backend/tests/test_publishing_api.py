@@ -29,7 +29,7 @@ PUBLIC_FIELDS = {
     "title", "description", "tags", "privacy", "made_for_kids", "video_url", "studio_url",
     "simulated", "error_code", "error_message", "retryable", "is_stale",
     "awaiting_processing", "attempt",
-    "created_at", "started_at", "completed_at", "published_at", "scheduled_at",
+    "created_at", "started_at", "completed_at", "published_at", "scheduled_at", "options",
 }  # fmt: skip
 
 
