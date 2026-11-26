@@ -60,6 +60,11 @@ ACTIVE_CLIP_DETECTION_STATUSES = (
 _ACTIVE_STATUS_SQL = ", ".join(f"'{s.value}'" for s in ACTIVE_CLIP_DETECTION_STATUSES)
 
 
+class CandidateOrigin(StrEnum):
+    DETECTED = "detected"
+    SEARCH = "search"
+
+
 class CandidateDecision(StrEnum):
     UNDECIDED = "undecided"
     SAVED = "saved"
@@ -175,6 +180,7 @@ class ClipCandidate(Base):
             name="ck_clip_candidates_duration_matches",
         ),
         CheckConstraint("rank >= 1", name="ck_clip_candidates_rank_positive"),
+        CheckConstraint("origin IN ('detected', 'search')", name="ck_clip_candidates_origin"),
         _score_check("overall_score"),
         _score_check("hook_score"),
         _score_check("entertainment_score"),
@@ -211,6 +217,14 @@ class ClipCandidate(Base):
     payoff_score: Mapped[int] = mapped_column(Integer)
     completeness_score: Mapped[int] = mapped_column(Integer)
     rank: Mapped[int] = mapped_column(Integer)
+
+    # Where the moment came from: "detected" by a run's analysis, or "search" — the creator
+    # asked for it in plain language (Find Clips) and kept it. A searched moment carries the
+    # request and no editorial scores (they are 0 and not shown).
+    origin: Mapped[str] = mapped_column(
+        String(16), default=CandidateOrigin.DETECTED, server_default=CandidateOrigin.DETECTED
+    )
+    query: Mapped[str | None] = mapped_column(String(200))
 
     decision: Mapped[str] = mapped_column(String(16), default=CandidateDecision.UNDECIDED)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

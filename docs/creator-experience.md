@@ -44,6 +44,30 @@ unreadable file leaves the project with its "upload a different file" step, and 
 no reachable provider leaves the usual **Start transcription** / **Find moments** step.
 `/projects/new` stays for creators who want an empty project first.
 
+## Find Clips
+
+On the Moments tab, above the detected moments (`components/app/find-clips.tsx`): the creator
+describes a moment in plain language — "the part where I explain pricing" — and gets the places
+where it was said. Every result is real lines of their own transcript with real timestamps; it
+says which of their words were heard, and which related words if the local model offered any.
+
+- `GET /projects/{id}/videos/{id}/find-clips?q=` — `services/find_clips.py`, pure and
+  deterministic: the request is reduced to its spoken words (folded for case, accents and Arabic
+  letter forms, lightly stemmed, without function words and words of asking), transcript lines
+  are scored BM25-style, nearby hits are pulled into one span and context is added until the
+  span is a valid clip length. Results never overlap and are ranked by how much of the request
+  they cover.
+- Related words (`services/find_clips_model.py`) are optional: the local model suggests single
+  words likely to be *said* in such a moment. They only widen the search, count for half, and
+  are reported apart. No model, a slow model or a strange answer mean none.
+- `POST …/find-clips/keep` turns a result into a saved moment (`clip_candidates.origin =
+  "search"`, with the request in `query`), so Create Short, Auto Edit and the editor work on it
+  unchanged. It joins the newest completed analysis of the current transcript, or a completed
+  run of its own when there is none. It carries no editorial scores (0, not shown), is labelled
+  "You asked for this" and is never a top pick. Keeping the same span twice is one moment.
+
+A search match is not a rating: nothing here predicts how a clip will perform.
+
 ## Next best action
 
 `GET /workspace/home` and `GET /projects/{id}/summary` (`app/services/workspace_summary.py`)

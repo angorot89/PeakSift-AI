@@ -20,6 +20,7 @@ from app.api.clip_media import router as clip_media_router
 from app.api.clips import router as clips_router
 from app.api.clips import video_clips_router
 from app.api.copilot import router as copilot_router
+from app.api.find_clips import router as find_clips_router
 from app.api.health import router as health_router
 from app.api.hooks import router as hooks_router
 from app.api.markets import router as markets_router
@@ -52,6 +53,7 @@ ROUTERS = (
     transcriptions_router,
     clip_providers_router,
     clip_detection_router,
+    find_clips_router,
     clips_router,
     video_clips_router,
     clip_media_router,
