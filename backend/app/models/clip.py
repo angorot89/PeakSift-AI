@@ -113,6 +113,8 @@ class Clip(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Hidden from the creator's Shorts library (their choice; nothing else changes). NULL = shown.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     candidate: Mapped["ClipCandidate"] = relationship(back_populates="clip")

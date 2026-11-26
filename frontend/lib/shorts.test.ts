@@ -9,6 +9,8 @@ import {
   matchesSearch,
   menuActions,
   primaryAction,
+  projectsOf,
+  quickActions,
   performanceFreshness,
   performanceTotals,
   publishingView,
@@ -95,7 +97,29 @@ describe("filters, search and sort", () => {
     short({ id: "e", status: "rendering", preview: "clip" }),
   ];
   it("counts each filter from the statuses (working Shorts only under All)", () => {
-    assert.deepEqual(filterCounts(items), { all: 5, drafts: 1, ready: 1, published: 1, attention: 1 });
+    assert.deepEqual(filterCounts(items), { all: 5, drafts: 1, ready: 1, scheduled: 0, published: 1, attention: 1, hidden: 0 });
+  });
+  it("keeps hidden Shorts under Hidden only, and scheduled ones under Scheduled", () => {
+    const hidden = short({ id: "h", hidden: true });
+    const scheduled = short({ id: "s", schedule: { at: "2026-11-13T19:00:00Z", platform: "tiktok" } });
+    const mix = [short({ id: "r" }), hidden, scheduled, short({ id: "hs", hidden: true, schedule: scheduled.schedule })];
+    assert.deepEqual(filterCounts(mix), { all: 2, drafts: 0, ready: 1, scheduled: 1, published: 0, attention: 0, hidden: 2 });
+    assert.deepEqual(visibleShorts(mix, "all", "", "updated").map((i) => i.id).sort(), ["r", "s"]);
+    assert.deepEqual(visibleShorts(mix, "hidden", "", "updated").map((i) => i.id).sort(), ["h", "hs"]);
+    assert.deepEqual(visibleShorts(mix, "ready", "", "updated").map((i) => i.id), ["r"]);
+    assert.deepEqual(visibleShorts(mix, "scheduled", "", "updated").map((i) => i.id), ["s"]);
+  });
+  it("filters by project and lists the projects by name", () => {
+    const other = short({ id: "o", project: { id: "p2", name: "A Stream" } });
+    assert.deepEqual(projectsOf([short(), other, short({ id: "x" })]), [
+      { id: "p2", name: "A Stream" },
+      { id: "p1", name: "Podcast — Guest Interview" },
+    ]);
+    assert.deepEqual(visibleShorts([short(), other], "all", "", "updated", "p2").map((i) => i.id), ["o"]);
+  });
+  it("says when and where a scheduled post goes out", () => {
+    const line = contextLine(short({ schedule: { at: "2026-11-13T19:00:00Z", platform: "tiktok" } }), NOW);
+    assert.match(line, /^TikTok · Scheduled Nov 1[34], \d{1,2}:00 (AM|PM)$/);
   });
   it("searches titles, projects and source names, ignoring case and accents", () => {
     assert.ok(matchesSearch(items[1], "LAVA"));
@@ -124,10 +148,20 @@ describe("actions follow the state", () => {
   });
   it("offers only valid menu actions", () => {
     const labels = (item: ShortItem) => menuActions(item).map((a) => a.label);
-    assert.deepEqual(labels(short()), ["Edit", "Download", "Publish", "Open project"]);
-    assert.deepEqual(labels(published()), ["Edit", "Download", "View analytics", "Open project"]);
-    assert.deepEqual(labels(short({ status: "rendering", preview: "clip" })), ["Edit", "Open project"]);
-    assert.deepEqual(labels(short({ status: "draft", kind: "draft", edit_id: null, preview: "clip" })), ["Continue editing", "Open project"]);
+    assert.deepEqual(labels(short()), ["Edit", "Download", "Publish", "Open project", "Hide"]);
+    assert.deepEqual(labels(published()), ["Edit", "Download", "View analytics", "Open project", "Hide"]);
+    assert.deepEqual(labels(short({ status: "rendering", preview: "clip" })), ["Edit", "Open project", "Hide"]);
+    assert.deepEqual(labels(short({ status: "draft", kind: "draft", edit_id: null, preview: "clip" })), ["Continue editing", "Open project", "Hide"]);
+    assert.deepEqual(labels(short({ hidden: true })).at(-1), "Show in library");
+  });
+  it("puts the next step on the card itself", () => {
+    const labels = (item: ShortItem) => quickActions(item).map((a) => a.label);
+    assert.deepEqual(labels(short()), ["Publish", "Schedule", "Download"]);
+    assert.deepEqual(labels(short({ schedule: { at: "2026-11-13T19:00:00Z", platform: "youtube" } })), ["Change time", "Download"]);
+    assert.deepEqual(labels(published()), ["Analytics", "Download"]);
+    assert.deepEqual(labels(short({ status: "draft", kind: "draft", edit_id: null, preview: "clip" })), ["Edit"]);
+    assert.deepEqual(labels(short({ status: "rendering", preview: "clip" })), []);
+    assert.deepEqual(labels(short({ hidden: true })), ["Show"]);
   });
   it("continues a draft where the work is", () => {
     const draft = short({ kind: "draft", status: "draft", edit_id: null });

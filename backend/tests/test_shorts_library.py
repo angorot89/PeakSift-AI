@@ -328,3 +328,49 @@ def test_home_and_the_project_speak_the_librarys_status(client, db_session):
         assert summary["short_status"] == library[summary["edit_id"]]
     assert library[str(first.id)] == "on_youtube" and home[str(first.id)]["published"] is False
     assert library[str(second.id)] == "needs_attention"
+
+
+def test_a_short_or_draft_can_be_hidden_and_shown_again(client, db_session):
+    sign_up(client, "tidy@example.com")
+    short = version(db_session, ready_clip(db_session, "tidy@example.com")["clip"])
+    draft = ready_clip(db_session, "tidy@example.com")["clip"]
+
+    for target in (short.id, draft.id):
+        assert client.patch(f"/shorts/{target}", json={"hidden": True}).json() == {
+            "id": str(target), "hidden": True,
+        }  # fmt: skip
+    items = by_id(client.get("/shorts").json()["shorts"])
+    # Hidden Shorts are still listed (for the Hidden tab) and keep their status.
+    assert items[str(short.id)]["hidden"] is True and items[str(short.id)]["status"] == "ready"
+    assert items[str(draft.id)]["hidden"] is True and items[str(draft.id)]["status"] == "draft"
+    assert client.get(f"/shorts/{short.id}").json()["hidden"] is True
+
+    assert client.patch(f"/shorts/{short.id}", json={"hidden": False}).status_code == 200
+    assert by_id(client.get("/shorts").json()["shorts"])[str(short.id)]["hidden"] is False
+
+
+def test_only_the_owner_can_hide_a_short(client, db_session):
+    sign_up(client, "owner@example.com")
+    short = version(db_session, ready_clip(db_session, "owner@example.com")["clip"])
+    sign_up(client, "stranger@example.com")
+    assert client.patch(f"/shorts/{short.id}", json={"hidden": True}).status_code == 404
+    assert client.patch(f"/shorts/{uuid.uuid4()}", json={"hidden": True}).status_code == 404
+    assert client.patch(f"/shorts/{short.id}", json={"hidden": "yes please"}).status_code == 422
+    db_session.refresh(short)
+    assert short.hidden_at is None
+
+
+def test_a_scheduled_post_shows_its_time_without_changing_the_status(client, db_session):
+    sign_up(client, "planner@example.com")
+    user = me(db_session, "planner@example.com")
+    short = version(db_session, ready_clip(db_session, "planner@example.com")["clip"])
+    later, sooner = NOW + timedelta(days=3), NOW + timedelta(days=1)
+    job(db_session, user, short, "scheduled", scheduled_at=later)
+    job(db_session, user, short, "scheduled", scheduled_at=sooner)
+
+    item = by_id(client.get("/shorts").json()["shorts"])[str(short.id)]
+    assert item["status"] == "ready"  # nothing has gone out yet
+    assert item["schedule"]["platform"] == "youtube"
+    assert datetime.fromisoformat(item["schedule"]["at"]) == sooner  # the soonest post
+    unscheduled = version(db_session, ready_clip(db_session, "planner@example.com")["clip"])
+    assert by_id(client.get("/shorts").json()["shorts"])[str(unscheduled.id)]["schedule"] is None

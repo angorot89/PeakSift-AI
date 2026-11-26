@@ -191,6 +191,8 @@ class ClipEdit(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Hidden from the creator's Shorts library (their choice; nothing else changes). NULL = shown.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     clip: Mapped["Clip"] = relationship(back_populates="edits")
