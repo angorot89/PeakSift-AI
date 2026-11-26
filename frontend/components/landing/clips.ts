@@ -47,6 +47,13 @@ export type YouTubeShort = { id: string; title: string };
  */
 export const AMGORO = {
   channel: "Amgoro Shorts",
-  url: "",
-  shorts: [] as YouTubeShort[],
+  url: "https://www.youtube.com/@AMGOROShorts/shorts",
+  shorts: [
+    { id: "yJCdhKXncqk", title: "Kai Cenat Couldn't Finish… Until He Heard His Mom Was Watching" },
+    { id: "PMcZtorBKoQ", title: "Kai Cenat Was Trying On Hats With 4 Seconds Left vs IShowSpeed" },
+    { id: "iiuyJnKCAOU", title: "IShowSpeed Asked Chat Which UFO Door… They Lied" },
+    { id: "cpN8N78Zh4o", title: "Rakai Threatened Kai Cenat… Then The Prison Doctor Showed Up" },
+    { id: "gYvCEK7IsOI", title: "He Skipped The Audition And Gave Kai Cenat A List Of Demands" },
+    { id: "rgvAxavzmv4", title: "Typical Gamer Opened 145,000 Chests And Got Zero Pirate Tokens" },
+  ] as YouTubeShort[],
 };
