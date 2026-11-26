@@ -22,6 +22,7 @@ from app.core.rate_limit import per_user
 from app.models import (
     ACTIVE_CLIP_DETECTION_STATUSES,
     CandidateDecision,
+    CandidateOrigin,
     ClipCandidate,
     ClipDetectionRun,
     ClipDetectionStatus,
@@ -197,6 +198,8 @@ def _read_candidate(candidate: ClipCandidate) -> ClipCandidateRead:
         decision=candidate.decision,
         decided_at=candidate.decided_at,
         created_at=candidate.created_at,
+        origin=candidate.origin,
+        query=candidate.query,
     )
 
 
@@ -418,6 +421,8 @@ _VIEW_FILTERS = {
     CandidateView.ACTIVE: _NOT_DISMISSED,
     CandidateView.TOP: and_(
         _NOT_DISMISSED,
+        # A moment the creator searched for (Find Clips) was never ranked: it is not a top pick.
+        ClipCandidate.origin != CandidateOrigin.SEARCH.value,
         or_(ClipCandidate.rank == 1, ClipCandidate.overall_score >= STRONG_MOMENT_SCORE),
     ),
 }

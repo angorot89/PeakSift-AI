@@ -84,6 +84,10 @@ class ClipCandidateRead(BaseModel):
     decision: str
     decided_at: datetime | None
     created_at: datetime
+    # "detected" by an analysis, or "search": the creator asked for it (Find Clips) and kept it.
+    # A searched moment has no editorial scores (all 0, not shown) and carries its request.
+    origin: str = "detected"
+    query: str | None = None
 
 
 class CandidateCounts(BaseModel):
@@ -102,3 +106,37 @@ class CandidatePage(BaseModel):
     limit: int
     candidates: list[ClipCandidateRead]
     counts: CandidateCounts
+
+
+class FoundLine(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
+class FoundClip(BaseModel):
+    """A span of the creator's own transcript where the request was heard."""
+
+    start: float
+    end: float
+    duration: float
+    excerpt: str
+    lines: list[FoundLine]
+    matched: list[str]  # the creator's own words heard in this span
+    related: list[str]  # related words heard in this span
+    score: int  # 0–100: the share of the request heard here (a search match, not a rating)
+    # Set when this exact span is already one of the video's moments.
+    candidate_id: uuid.UUID | None = None
+
+
+class FindClipsRead(BaseModel):
+    query: str
+    terms: list[str]  # what was searched for, from the request
+    related: list[str]  # related words added by the local model (may be empty)
+    results: list[FoundClip]
+
+
+class KeepFoundClip(BaseModel):
+    query: str = Field(min_length=2, max_length=200)
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)

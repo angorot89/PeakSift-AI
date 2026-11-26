@@ -77,6 +77,9 @@ export type ClipCandidate = {
   decision: CandidateDecision;
   decided_at: string | null;
   created_at: string;
+  /** "search": the creator asked for it (Find Clips) and kept it — it has no editorial scores. */
+  origin?: "detected" | "search";
+  query?: string | null;
 };
 
 /** How many moments each review filter holds ("active" = not dismissed). */

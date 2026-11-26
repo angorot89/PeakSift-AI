@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, ChevronDown, EyeOff, Film, Play, SearchX, Star, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronDown, EyeOff, Film, Play, Search, SearchX, Star, Undo2, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { MediaFrame } from "@/components/ui/media-frame";
 import { ClipRenderControls } from "@/components/app/clip-render-controls";
@@ -193,6 +193,7 @@ function MomentCard({
   const dismissed = candidate.decision === "dismissed";
   const saved = candidate.decision === "saved";
   const label = momentLabel(candidate.rank, candidate.overall_score);
+  const searched = candidate.origin === "search";
   const times = (
     <p className="tabular text-xs text-muted">
       <time dateTime={`PT${Math.floor(candidate.start)}S`}>{formatTimestamp(candidate.start)}</time>
@@ -259,13 +260,23 @@ function MomentCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium ${LABEL_STYLES[label]}`}>
-              {label === "Top pick" ? <Star aria-hidden="true" className="size-3" /> : null}
-              {label}
-            </span>
-            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
-              {categoryLabel(candidate.category)}
-            </span>
+            {searched ? (
+              // Find Clips: the creator asked for this moment. It is a search match, not a ranking.
+              <span className="inline-flex items-center gap-1 rounded-md bg-violet/15 px-1.5 py-0.5 text-caption font-medium text-violet-200">
+                <Search aria-hidden="true" className="size-3" />
+                You asked for this
+              </span>
+            ) : (
+              <>
+                <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium ${LABEL_STYLES[label]}`}>
+                  {label === "Top pick" ? <Star aria-hidden="true" className="size-3" /> : null}
+                  {label}
+                </span>
+                <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-caption font-medium text-muted">
+                  {categoryLabel(candidate.category)}
+                </span>
+              </>
+            )}
           </div>
           <h3 dir="auto" className="mt-1.5 text-section text-balance break-words text-foreground">{candidate.title}</h3>
           <div className="mt-0.5">{times}</div>
@@ -284,15 +295,21 @@ function MomentCard({
             </summary>
             <div className="mt-2 animate-fade-in space-y-3">
               <p className="text-small text-pretty text-muted">{candidate.rationale}</p>
-              <p className="text-xs text-subtle">
-                Editorial score <span className="tabular text-muted">{candidate.overall_score}</span> of 100 — the model&apos;s
-                judgement, not a prediction of views.
-              </p>
-              <ul className="grid gap-1.5 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
-                {DIMENSIONS.map(({ key, label: name }) => (
-                  <ScoreBar key={key} label={name} value={candidate.scores[key]} />
-                ))}
-              </ul>
+              {searched ? (
+                <p className="text-xs text-subtle">Found by your search. PeakSift did not score this moment.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-subtle">
+                    Editorial score <span className="tabular text-muted">{candidate.overall_score}</span> of 100 — the model&apos;s
+                    judgement, not a prediction of views.
+                  </p>
+                  <ul className="grid gap-1.5 sm:grid-cols-2 sm:gap-x-6" aria-label="Score breakdown">
+                    {DIMENSIONS.map(({ key, label: name }) => (
+                      <ScoreBar key={key} label={name} value={candidate.scores[key]} />
+                    ))}
+                  </ul>
+                </>
+              )}
               {candidate.transcript_excerpt ? (
                 <blockquote dir="auto" className="rounded-lg bg-surface-3/60 px-3 py-2 text-sm leading-relaxed break-words text-muted">
                   {candidate.transcript_excerpt}
