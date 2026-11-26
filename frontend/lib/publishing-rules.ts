@@ -2,6 +2,8 @@
 
 export type Privacy = "private" | "unlisted" | "public";
 export type PublishStatus =
+  /** Waiting for its scheduled time; nothing is uploaded yet. */
+  | "scheduled"
   | "queued"
   | "preparing"
   | "uploading"
@@ -59,6 +61,8 @@ export type PublishJob = PublishMetadata & {
   started_at: string | null;
   completed_at: string | null;
   published_at: string | null;
+  /** When the creator asked for it to go out (null when published right away). */
+  scheduled_at?: string | null;
 };
 
 export type PublishPanel = {
@@ -142,6 +146,8 @@ export function isFollowing(job: PublishJob): boolean {
 
 export function stageLabel(job: PublishJob): string {
   switch (job.status) {
+    case "scheduled":
+      return "Scheduled";
     case "queued":
       return job.is_stale ? "Stalled" : "Waiting to start";
     case "preparing":

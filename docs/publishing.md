@@ -99,6 +99,40 @@ queued → preparing → uploading → uploaded → processing → published
   `network_error`, `provider_error`, `processing_failed` — each with a plain message.
   **Retry** exists only for jobs that failed before a video existed (or stalled).
 
+## Scheduled publishing
+
+A creator can publish now or pick a time. A scheduled post is an ordinary publish job in the
+`scheduled` status with a `scheduled_at` (UTC; shown in the creator's local time). Nothing about
+it runs until its time, and when it runs it is the pipeline above — scheduling adds no second
+way to upload.
+
+- **Scheduling.** `POST /edits/{id}/publish` with `scheduled_at` (with a time zone, at least two
+  minutes ahead, at most a year). The metadata is validated then, exactly as for publishing now.
+  One Short has at most one waiting post; a second request is a `409` until the first is moved,
+  released or cancelled.
+- **While it waits.** `PATCH /publish-jobs/{id}/schedule` moves it, `POST …/publish-now` releases
+  it, `DELETE /publish-jobs/{id}` cancels it. Each is a `409` once the post is no longer waiting:
+  PeakSift never deletes or changes a video that is already on YouTube.
+- **Releasing.** Celery beat runs `peaksift.release_scheduled_publishes` every
+  `PUBLISH_SCHEDULE_INTERVAL_SECONDS` (60). `services/publishing/schedule.py::release_due` locks
+  due rows `SKIP LOCKED`, commits the fencing token and enqueues the upload. A post goes out at
+  its time or within one interval after it, never before.
+- **When something is wrong at that time.** The job fails with the reason and stays visible: the
+  Short is no longer ready (`edit_not_ready`), the account needs reconnecting
+  (`needs_reconnect`), or the scheduler was down for longer than
+  `PUBLISH_SCHEDULE_GRACE_SECONDS` (six hours; `schedule_missed`). A missed post is never
+  published late by surprise; the creator retries it or picks a new time.
+- **The calendar.** `GET /publish-jobs?from=&to=` (at most 62 days) lists the creator's posts in
+  a range, each at its scheduled time or, for the others, when it was published. The Schedule
+  page (`/schedule`) shows the week, the ready Shorts without a post, and the same reviewed
+  metadata dialog for scheduling.
+- **The Shorts library.** A waiting post has not happened, so it never changes a Short's status:
+  the Short stays *Ready* until the upload starts.
+
+Scheduled posts need the beat process. The production stack already runs one
+(`deploy/docker-compose.prod.yml`, service `beat`); locally run
+`celery -A app.workers.celery_app beat` next to the worker.
+
 ## Testing without Google
 
 `PUBLISHING_PROVIDER=fake` (refused in production) swaps in an in-memory provider with
@@ -109,8 +143,8 @@ Google credentials and makes no Google calls.
 
 ## Limitations (V1.0)
 
-- YouTube only. No TikTok, Instagram, Facebook or X; no scheduling, multi-platform posting,
-  analytics, comments or thumbnails.
+- YouTube only. No TikTok, Instagram, Facebook or X; no multi-platform posting, comments or
+  thumbnails. (Scheduling was added later; see *Scheduled publishing* above.)
 - PeakSift cannot edit or delete a published video or its metadata — use YouTube Studio.
 - Unverified Google projects upload **private** videos only, and Google's default quota allows
   about six uploads a day (see [youtube-setup.md](youtube-setup.md)).

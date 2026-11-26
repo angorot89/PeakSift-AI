@@ -311,6 +311,10 @@ class Settings(BaseSettings):
     # A publish whose heartbeat is older than this is stalled (retryable).
     publish_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     publish_max_attempts: int = Field(default=5, ge=1)
+    # Scheduled publishing: how often Celery beat looks for due posts, and how late a post may
+    # still go out after an outage before it is marked missed instead.
+    publish_schedule_interval_seconds: int = Field(default=60, ge=10, le=900)
+    publish_schedule_grace_seconds: int = Field(default=6 * 3600, ge=60)
     # After the upload: how often, and how many times, to ask YouTube about processing.
     publish_status_poll_seconds: int = Field(default=30, ge=5)
     publish_status_max_polls: int = Field(default=20, ge=1)

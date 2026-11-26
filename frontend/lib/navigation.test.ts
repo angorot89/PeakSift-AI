@@ -15,6 +15,8 @@ describe("global navigation", () => {
     assert.equal(activeGlobal("/shorts"), "shorts");
     assert.equal(activeGlobal(`/shorts/${C}`), "shorts");
     assert.equal(activeGlobal("/shortsale"), null);
+    assert.equal(activeGlobal("/schedule"), "schedule");
+    assert.equal(activeGlobal("/scheduled"), null);
     assert.equal(activeGlobal("/analytics/abc"), "analytics");
     assert.equal(activeGlobal("/settings"), "settings");
     assert.equal(activeGlobal("/brand"), "brand");

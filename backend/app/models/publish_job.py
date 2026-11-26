@@ -2,7 +2,8 @@
 
 A job is the user's explicit request to upload one READY edit with the metadata they
 reviewed (title, description, tags, privacy — private by default, "made for kids"). It
-moves ``queued → preparing → uploading → uploaded → processing → published``; ``failed``
+moves ``queued → preparing → uploading → uploaded → processing → published`` (a job the
+creator scheduled waits in ``scheduled`` first and is released when its time comes); ``failed``
 means PeakSift could not finish (retryable), ``provider_failed`` that YouTube rejected or
 could not process the video. The resumable upload session URI is a secret: stored only
 encrypted, never returned. ``fingerprint`` makes the request idempotent: the same edit,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -27,6 +29,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,6 +38,8 @@ from app.core.database import Base
 
 
 class PublishStatus(StrEnum):
+    # Waiting for its time: nothing is uploaded until the scheduler releases it to ``queued``.
+    SCHEDULED = "scheduled"
     QUEUED = "queued"
     PREPARING = "preparing"
     UPLOADING = "uploading"
@@ -70,9 +75,19 @@ class PublishJob(Base):
         UniqueConstraint("provider_video_id", name="uq_publish_jobs_provider_video"),
         CheckConstraint("provider IN ('youtube')", name="ck_publish_jobs_provider"),
         CheckConstraint(
-            "status IN ('queued', 'preparing', 'uploading', 'uploaded', 'processing', "
-            "'published', 'failed', 'provider_failed')",
+            "status IN ('scheduled', 'queued', 'preparing', 'uploading', 'uploaded', "
+            "'processing', 'published', 'failed', 'provider_failed')",
             name="ck_publish_jobs_status",
+        ),
+        CheckConstraint(
+            "status <> 'scheduled' OR scheduled_at IS NOT NULL",
+            name="ck_publish_jobs_scheduled_has_time",
+        ),
+        # The scheduler's query: what is due.
+        Index(
+            "ix_publish_jobs_due",
+            "scheduled_at",
+            postgresql_where=text("status = 'scheduled'"),
         ),
         CheckConstraint(
             "privacy IN ('private', 'unlisted', 'public')", name="ck_publish_jobs_privacy"
@@ -152,6 +167,8 @@ class PublishJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the creator asked for it to go out (kept after it does, for the calendar).
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     def __repr__(self) -> str:  # never includes the session or metadata text
         return f"PublishJob(id={self.id!r}, status={self.status!r})"

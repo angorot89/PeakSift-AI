@@ -49,6 +49,30 @@ class PublishRequest(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=200)
     privacy: str = "private"
     made_for_kids: bool = False
+    # Publish at this time instead of now (with its time zone; at least a few minutes ahead).
+    scheduled_at: datetime | None = None
+
+
+class ScheduleChange(BaseModel):
+    scheduled_at: datetime
+
+
+class CalendarItem(BaseModel):
+    """One post on the calendar: a publish job with the Short it belongs to."""
+
+    job: "PublishJobRead"
+    # Where it sits on the calendar: its scheduled time, else when it was published or started.
+    at: datetime
+    short_title: str
+    project_id: uuid.UUID
+    project_name: str
+    clip_id: uuid.UUID
+
+
+class CalendarRead(BaseModel):
+    items: list[CalendarItem]
+    # Scheduled posts need the scheduler (Celery beat); the UI says so when it cannot tell.
+    connection_ready: bool
 
 
 class PublishDefaults(BaseModel):
@@ -90,6 +114,8 @@ class PublishJobRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     published_at: datetime | None
+    # When the creator asked for it to go out (null for a job published right away).
+    scheduled_at: datetime | None = None
 
 
 class PublishPanelRead(BaseModel):
@@ -100,3 +126,6 @@ class PublishPanelRead(BaseModel):
     edit_ready: bool
     defaults: PublishDefaults
     jobs: list[PublishJobRead]
+
+
+CalendarItem.model_rebuild()

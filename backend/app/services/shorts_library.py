@@ -89,7 +89,9 @@ def publication(jobs: list[PublishJob], settings: Settings) -> Publication:
     """What happened on YouTube, from one edit's publish jobs (newest first).
 
     A video YouTube has (published, then uploaded or processing) outranks a later attempt; with
-    none, the newest attempt decides."""
+    none, the newest attempt decides. A post still waiting for its scheduled time has not
+    happened yet, so it never decides the state (the Short stays "ready" until it goes out)."""
+    jobs = [job for job in jobs if job.status != PublishStatus.SCHEDULED]
     for job in jobs:
         if job.status == PublishStatus.PUBLISHED:
             return Publication(PublishState.PUBLISHED, job)

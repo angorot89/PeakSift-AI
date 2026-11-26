@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  CalendarClock,
   ChevronsUpDown,
   FolderOpen,
   Home,
@@ -37,6 +38,7 @@ const ICONS: Record<GlobalKey, LucideIcon> = {
   home: Home,
   projects: FolderOpen,
   shorts: Smartphone,
+  schedule: CalendarClock,
   analytics: BarChart3,
   brand: Palette,
   settings: Settings,
