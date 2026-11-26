@@ -64,6 +64,7 @@ def _read(db: DbSession, transcription: Transcription) -> TranscriptionRead:
         progress_percent=transcription.progress_percent,
         segment_count=_segment_count(db, transcription),
         is_stale=is_stale(transcription, get_settings()),
+        auto_find_moments=transcription.auto_find_moments,
         error_code=transcription.error_code,
         error_message=transcription.error_message,
         created_at=transcription.created_at,

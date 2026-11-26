@@ -28,6 +28,22 @@ The app shell (`components/app/app-shell.tsx`) has a collapsible sidebar on larg
 top bar with a navigation sheet on phones; `lib/navigation.ts` (unit-tested) owns routes and
 which item is current. Project pages share `ProjectFrame` (name, actions menu, tabs).
 
+## Quick start
+
+Home's one step (`components/app/quick-start.tsx`, `POST /quick-start`): the creator drops a long
+video and presses **Find my moments**. PeakSift names the project from the file (editable before
+the upload; `services/quick_start.py` and `lib/quick-start.ts` apply the same rule), stores and
+checks the video, starts the transcription and marks it `auto_find_moments`. When the transcript
+completes, the worker starts one moment-detection run with the first configured provider that is
+reachable at that moment (`services/clip_detection/autostart.py`) — never a second run, and never
+on a provider that is switched off. The creator lands on the ordinary project page, which says
+that moments follow by themselves.
+
+It degrades to the normal steps, never to a dead end: a refused upload leaves no project, an
+unreadable file leaves the project with its "upload a different file" step, and a busy queue or
+no reachable provider leaves the usual **Start transcription** / **Find moments** step.
+`/projects/new` stays for creators who want an empty project first.
+
 ## Next best action
 
 `GET /workspace/home` and `GET /projects/{id}/summary` (`app/services/workspace_summary.py`)

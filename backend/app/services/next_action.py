@@ -117,7 +117,10 @@ def next_action(p: dict[str, Any]) -> NextAction:
         return NextAction(
             "transcribing",
             "Transcribing your video",
-            "You can leave this page; it keeps going.",
+            # Quick start: detection follows by itself (clip_detection/autostart.py).
+            "PeakSift finds your moments as soon as the words are ready. You can leave this page."
+            if t.get("auto_find_moments")
+            else "You can leave this page; it keeps going.",
             routes.project(pid, "source"),
             "waiting",
             None,
