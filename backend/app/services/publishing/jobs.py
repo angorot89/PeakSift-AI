@@ -48,7 +48,8 @@ def request_publish(
     if edit.status != ClipEditStatus.READY or not edit.storage_key:
         raise PublishRefused("edit_not_ready", "Render the short before publishing it")
     if connection is None:
-        raise PublishRefused("not_connected", f"Connect a {platform} account first")
+        article = "an" if platform[:1].lower() in "aeiou" else "a"
+        raise PublishRefused("not_connected", f"Connect {article} {platform} account first")
     if connection.status != ConnectionStatus.CONNECTED:
         raise PublishRefused("needs_reconnect", f"Reconnect your {platform} account to publish")
 

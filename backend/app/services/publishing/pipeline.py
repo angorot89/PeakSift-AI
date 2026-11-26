@@ -37,7 +37,7 @@ from app.models import (
     PublishStatus,
 )
 from app.services.performance.content import link_quietly
-from app.services.publishing import connections
+from app.services.publishing import connections, platforms
 from app.services.publishing.factory import get_publishing_provider
 from app.services.publishing.provider import (
     PublishErrorCode,
@@ -45,6 +45,7 @@ from app.services.publishing.provider import (
     PublishProviderError,
     UploadState,
     VideoRequest,
+    VideoStatus,
 )
 from app.services.publishing.tokens import (
     EncryptedToken,
@@ -342,6 +343,10 @@ def check_status(
     except (PublishProviderError, TokenDecryptionError, TokenKeyError) as error:
         logger.info("Publish job %s: status unavailable (%s)", job.id, type(error).__name__)
         status = None
+    after = getattr(provider, "publishes_after_processing", False)
+    if status is None and after:
+        # The post only exists once PeakSift publishes it: keep checking (bounded below).
+        status = VideoStatus(UploadState.UPLOADED)
     if status is None or status.upload == UploadState.UNKNOWN:
         return _processing_unknown(job, db)  # YouTube will not say: the job ends at "uploaded"
     job.provider_upload_status = status.upload.value
@@ -351,14 +356,24 @@ def check_status(
     elif status.upload in (UploadState.FAILED, UploadState.REJECTED, UploadState.DELETED):
         job.status = PublishStatus.PROVIDER_FAILED
         job.error_code = PublishErrorCode.PROCESSING_FAILED.value
+        name = platforms.label(job.provider)
         job.error_message = {
-            UploadState.REJECTED: "YouTube rejected this video",
-            UploadState.DELETED: "The video was removed from YouTube",
-        }.get(status.upload, "YouTube could not process this video")
+            UploadState.REJECTED: f"{name} rejected this video",
+            UploadState.DELETED: f"The video was removed from {name}",
+        }.get(status.upload, f"{name} could not process this video")
         if status.reason:
             job.provider_processing_status = status.reason[:32]
     else:
         job.status = PublishStatus.PROCESSING
+        if after and job.status_checks >= settings.publish_status_max_polls:
+            # Never leave it looking posted: it is not on the platform until published.
+            name = platforms.label(job.provider)
+            job.status = PublishStatus.PROVIDER_FAILED
+            job.error_code = PublishErrorCode.PROCESSING_FAILED.value
+            job.error_message = (
+                f"{name} was still processing the video when PeakSift stopped checking, so it "
+                "was not posted. Post it again."
+            )
     db.commit()
     if job.status == PublishStatus.PROCESSING and schedule_status_check is not None:
         if job.status_checks < settings.publish_status_max_polls:

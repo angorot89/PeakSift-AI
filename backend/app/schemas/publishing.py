@@ -48,6 +48,11 @@ class TikTokStatusRead(BaseModel):
     connection: PublishingConnectionRead | None
 
 
+class InstagramStatusRead(BaseModel):
+    enabled: bool
+    connection: PublishingConnectionRead | None
+
+
 class TikTokCreatorRead(BaseModel):
     """What TikTok offers this creator for a post right now (shown as-is in the dialog)."""
 

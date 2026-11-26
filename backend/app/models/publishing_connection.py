@@ -29,10 +29,11 @@ from app.core.database import Base
 class PublishingProvider(StrEnum):
     YOUTUBE = "youtube"
     TIKTOK = "tiktok"
+    INSTAGRAM = "instagram"
 
 
 # Every table that names a platform accepts exactly these (kept in step by a test).
-PROVIDER_CHECK = "provider IN ('youtube', 'tiktok')"
+PROVIDER_CHECK = "provider IN ('youtube', 'tiktok', 'instagram')"
 
 
 class ConnectionStatus(StrEnum):

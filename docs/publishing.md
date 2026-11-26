@@ -122,13 +122,13 @@ jobs, and checked by the database on all three.
   `GET /publishing/platforms` returns them with the creator's connection to each. A platform is
   never listed before it works.
 
-## TikTok (provider and authorization; not yet offered to creators)
+## TikTok
 
 `services/publishing/tiktok.py` implements the provider contract on TikTok's Content Posting
 API (direct post, `FILE_UPLOAD`), and `tiktok_oauth.py` its authorization. Both are tested
 against a mock of the documented endpoints (`tests/tiktok_mock.py`); **neither has run against
-TikTok itself**, which needs a TikTok developer app. Until the routes and the dialog exist,
-TikTok is not in the platform registry and no creator can reach it.
+TikTok itself**, which needs a TikTok developer app. Creators connect in Settings and choose
+TikTok in the publish dialog where the server switches it on (`TIKTOK_PUBLISHING_ENABLED`).
 
 - **Authorization.** Login Kit for Web, scope `video.publish` only. Single-use, user-bound,
   hashed, ten-minute state, never shared with YouTube's. TikTok's web flow has no PKCE.
@@ -149,6 +149,39 @@ TikTok is not in the platform registry and no creator can reach it.
   refused rather than cut.
 - **Before TikTok's audit** a client may only post privately (`SELF_ONLY`) to private accounts,
   for a handful of accounts a day. PeakSift reports those refusals in plain words.
+
+## Instagram Reels (Facebook Login for Business)
+
+`services/publishing/instagram.py` and `instagram_oauth.py`, tested against a mock of Meta's
+documented endpoints (`tests/instagram_mock.py`). **Not yet run against Meta.**
+
+- **Why Facebook Login.** It is the path Meta documents for sending a Reel's bytes from the
+  server (`rupload.facebook.com`). Instagram Login only lets Meta fetch a public URL, and
+  PeakSift's media is never public. Creators need an Instagram professional account linked to
+  a Facebook Page.
+- **Authorization.** Permissions `instagram_basic`, `instagram_content_publish`,
+  `pages_show_list`, `pages_read_engagement`. The code becomes a user token, then a long-lived
+  user token (server side only), which lists the creator's Pages; the long-lived **Page token**
+  of the first Page with an Instagram professional account is kept, encrypted, together with
+  that account's id. Meta has no refresh token; it documents long-lived Page tokens as not
+  expiring. A connection without the publishing permission, or without an Instagram account,
+  is refused with a reason the Settings page explains.
+- **Disconnecting** deletes the token here. Meta's own removal needs the creator's user token,
+  which PeakSift does not keep, so PeakSift never claims it and tells the creator where to
+  remove the app on Facebook.
+- **Upload.** A Reels container with `upload_type=resumable`, then the whole file in one
+  request to the container's `rupload` URI (`offset: 0`, `file_size`). Meta documents no
+  partial resume, so after an interruption the file goes again, whole — safe, because nothing
+  is on Instagram until `media_publish`. Reels over 300 MB are refused before anything is sent.
+- **Publishing exactly once.** Processing checks read the container: `IN_PROGRESS` keeps
+  checking; `FINISHED` is published once with `media_publish`; a container already
+  `PUBLISHED` is never published again (a concurrent check is detected by reading the status
+  after a refused publish); `ERROR` and `EXPIRED` fail with Meta's reason. If processing has
+  not finished when the checks run out, the job fails as "not posted" instead of looking
+  posted.
+- **What the creator chooses.** A caption (2200 characters, 30 hashtags, 20 mentions — refused,
+  never cut) and when. Reels posted this way are public; the dialog says so. The Short must
+  last 3 seconds to 15 minutes.
 
 ## Scheduled publishing
 

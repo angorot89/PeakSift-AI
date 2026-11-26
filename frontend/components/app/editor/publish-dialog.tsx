@@ -4,6 +4,7 @@ import { CalendarClock, CheckCircle2, CirclePlay, ExternalLink, RotateCcw, Send 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { ScheduledPost } from "@/components/app/schedule/scheduled-post";
+import { InstagramPublish } from "@/components/app/instagram/instagram-publish";
 import { TikTokPublish } from "@/components/app/tiktok/tiktok-publish";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -77,7 +78,7 @@ export function PublishToYouTube({
   );
 }
 
-type PlatformKey = "youtube" | "tiktok";
+type PlatformKey = "youtube" | "tiktok" | "instagram";
 
 /**
  * The publish dialog's content. Where this server also offers TikTok, the creator first
@@ -94,25 +95,24 @@ export function PublishBody(props: {
 }) {
   const { data } = useApi(getPlatforms);
   const [chosen, setChosen] = useState<PlatformKey | null>(null);
-  const offered = (data ?? []).filter((platform) => platform.enabled).map((platform) => platform.key);
-  const both = offered.includes("youtube") && offered.includes("tiktok");
-  // One platform on this server: no choice to make. YouTube stays the default with both.
-  const platform: PlatformKey = chosen ?? (offered.includes("tiktok") && !offered.includes("youtube") ? "tiktok" : "youtube");
+  const offered = (data ?? []).filter((platform) => platform.enabled);
+  // One platform on this server: no choice to make. YouTube stays the default when offered.
+  const platform: PlatformKey =
+    chosen ?? (offered.some((item) => item.key === "youtube") ? "youtube" : (offered[0]?.key ?? "youtube"));
   return (
     <div className="space-y-5">
-      {both ? (
+      {offered.length > 1 ? (
         <SegmentedControl
           label="Where to publish"
           value={platform}
           onChange={setChosen}
-          options={[
-            { value: "youtube", label: "YouTube" },
-            { value: "tiktok", label: "TikTok" },
-          ]}
+          options={offered.map((item) => ({ value: item.key, label: item.label }))}
         />
       ) : null}
       {platform === "tiktok" ? (
         <TikTokPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} />
+      ) : platform === "instagram" ? (
+        <InstagramPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} />
       ) : (
         <YouTubePublishBody
           editId={props.editId}

@@ -30,4 +30,8 @@ def get_publishing_provider(settings: Settings, platform: str = "youtube") -> Pu
         from app.services.publishing.tiktok import TikTokProvider
 
         return TikTokProvider.from_settings(settings)
+    if platform == "instagram":
+        from app.services.publishing.instagram import InstagramProvider
+
+        return InstagramProvider()
     raise RuntimeError(f"no publishing provider for platform {platform!r}")

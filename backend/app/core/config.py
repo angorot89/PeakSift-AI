@@ -317,6 +317,13 @@ class Settings(BaseSettings):
     tiktok_oauth_redirect_uri: str = ""
     # Bytes per upload request. TikTok accepts 5 MB to 64 MB per chunk. Default 10 MiB.
     tiktok_upload_chunk_bytes: int = Field(default=10 * 1024 * 1024, ge=5 * 1024 * 1024)
+    # --- Instagram (Reels through Facebook Login for Business) --------------------------
+    # Off unless explicitly enabled; when on, the settings below are validated at startup.
+    instagram_publishing_enabled: bool = False
+    meta_app_id: str = ""
+    meta_app_secret: SecretStr | None = None
+    # The API's /publishing/instagram/callback URL, exactly as registered with Meta.
+    instagram_oauth_redirect_uri: str = ""
     # A publish whose heartbeat is older than this is stalled (retryable).
     publish_stale_after_seconds: int = Field(default=15 * 60, gt=0)
     publish_max_attempts: int = Field(default=5, ge=1)
@@ -424,6 +431,35 @@ class Settings(BaseSettings):
         return [p.strip() for p in self.trusted_proxies.split(",") if p.strip()]
 
 
+def _instagram_problems(settings: "Settings", key: object) -> list[str]:
+    """What is wrong with the Instagram settings, by name only (nothing when switched off)."""
+    if not settings.instagram_publishing_enabled:
+        return []
+    problems: list[str] = []
+    if key is None:
+        problems.append("PUBLISHING_TOKEN_ENCRYPTION_KEY is required when publishing is enabled")
+    if not settings.meta_app_id.isdigit():
+        problems.append("META_APP_ID must be the Meta app's numeric id")
+    if settings.meta_app_secret is None or not settings.meta_app_secret.get_secret_value():
+        problems.append("META_APP_SECRET is required when Instagram publishing is enabled")
+    redirect = urlsplit(settings.instagram_oauth_redirect_uri)
+    local = redirect.hostname in ("localhost", "127.0.0.1")
+    if (
+        not redirect.hostname
+        or redirect.query
+        or redirect.fragment
+        or redirect.username
+        or not redirect.path.endswith("/publishing/instagram/callback")
+        or not (redirect.scheme == "https" or (redirect.scheme == "http" and local))
+        or (settings.is_production and redirect.scheme != "https")
+    ):
+        problems.append(
+            "INSTAGRAM_OAUTH_REDIRECT_URI must be the API's /publishing/instagram/callback URL "
+            "(https; http only for localhost in development)"
+        )
+    return problems
+
+
 def _tiktok_problems(settings: "Settings", key: object) -> list[str]:
     """What is wrong with the TikTok settings, by name only (nothing when it is switched off)."""
     problems: list[str] = []
@@ -482,6 +518,7 @@ def publishing_problems(settings: "Settings") -> list[str]:
     if settings.youtube_upload_chunk_bytes % (256 * 1024):
         problems.append("YOUTUBE_UPLOAD_CHUNK_BYTES must be a multiple of 262144 (256 KiB)")
     problems.extend(_tiktok_problems(settings, key))
+    problems.extend(_instagram_problems(settings, key))
     if not settings.youtube_publishing_enabled:
         return problems
     if key is None:

@@ -31,6 +31,7 @@ from app.api.publish_jobs import job_router as publish_job_router
 from app.api.publish_jobs import slots_router as posting_slots_router
 from app.api.publishing import platforms_router as publishing_platforms_router
 from app.api.publishing import router as publishing_router
+from app.api.publishing_instagram import router as publishing_instagram_router
 from app.api.publishing_tiktok import router as publishing_tiktok_router
 from app.api.quick_start import router as quick_start_router
 from app.api.reframe import router as reframe_router
@@ -75,6 +76,7 @@ ROUTERS = (
     publishing_router,
     publishing_platforms_router,
     publishing_tiktok_router,
+    publishing_instagram_router,
     publish_edit_router,
     publish_job_router,
     posting_slots_router,

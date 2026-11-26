@@ -86,6 +86,9 @@ class ProviderAuth:
     # Set when the platform replaced the refresh token while authorizing (rotation): the caller
     # stores it, encrypted, before using the access token. Never logged.
     rotated_refresh_token: str | None = field(default=None, repr=False)
+    # The platform account this credential acts for, when calls must name it (Instagram's
+    # professional account id). Not a secret.
+    account_id: str | None = None
 
 
 @dataclass(frozen=True)

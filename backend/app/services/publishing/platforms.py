@@ -39,6 +39,12 @@ PLATFORMS: tuple[Platform, ...] = (
         account_noun="account",
         enabled=lambda settings: settings.tiktok_publishing_enabled,
     ),
+    Platform(
+        key=PublishingProvider.INSTAGRAM.value,
+        label="Instagram",
+        account_noun="account",
+        enabled=lambda settings: settings.instagram_publishing_enabled,
+    ),
 )
 
 

@@ -82,7 +82,7 @@ def test_a_token_is_bound_to_its_platform(db_session: Session):
 
 
 def test_only_known_platforms_can_be_stored(db_session: Session):
-    assert {p.value for p in PublishingProvider} == {"youtube", "tiktok"}
+    assert {p.value for p in PublishingProvider} == {"youtube", "tiktok", "instagram"}
     for provider in PublishingProvider:
         assert f"'{provider.value}'" in PROVIDER_CHECK  # the constraint and the enum agree
     user = new_user(db_session)
@@ -187,7 +187,7 @@ def test_messages_name_the_platform():
 
 
 def test_the_registry_lists_only_working_platforms():
-    assert [platform.key for platform in platforms.PLATFORMS] == ["youtube", "tiktok"]
+    assert [platform.key for platform in platforms.PLATFORMS] == ["youtube", "tiktok", "instagram"]
     assert platforms.label("youtube") == "YouTube" and platforms.label("tiktok") == "TikTok"
     assert platforms.get("myspace") is None and platforms.label("myspace") == "Myspace"
     for platform in platforms.PLATFORMS:
@@ -217,12 +217,14 @@ def test_platforms_endpoint_lists_platforms_and_the_creators_connections(
 
     user = new_user(db_session)
     sign_in(client, user.id)
-    youtube, tiktok_row = client.get("/publishing/platforms").json()
+    youtube, tiktok_row, instagram_row = client.get("/publishing/platforms").json()
     assert youtube == {"key": "youtube", "label": "YouTube", "account_noun": "channel",
                        "enabled": enabled, "connection": None}  # fmt: skip
     # TikTok is listed, and honestly marked as not set up on this server.
     assert tiktok_row == {"key": "tiktok", "label": "TikTok", "account_noun": "account",
                           "enabled": False, "connection": None}  # fmt: skip
+    assert instagram_row == {"key": "instagram", "label": "Instagram", "account_noun": "account",
+                             "enabled": False, "connection": None}  # fmt: skip
 
     connect(db_session, user)
     response = client.get("/publishing/platforms")

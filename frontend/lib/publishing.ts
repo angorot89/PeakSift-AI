@@ -94,7 +94,7 @@ export const savePostingSlots = (timezone: string, slots: PostingSlot[]) =>
 
 /** A platform PeakSift can publish to, whether this server offers it, and the creator's connection. */
 export type PublishingPlatform = {
-  key: "youtube" | "tiktok";
+  key: "youtube" | "tiktok" | "instagram";
   label: string;
   account_noun: string;
   enabled: boolean;

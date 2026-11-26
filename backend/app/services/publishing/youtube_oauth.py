@@ -49,7 +49,8 @@ _VERIFIER_PURPOSE = "youtube-pkce"
 # Codes the callback may report to the frontend (nothing else ever reaches the URL).
 ERROR_CODES = frozenset(
     {"denied", "invalid_state", "expired", "signin_required", "missing_refresh_token",
-     "insufficient_scope", "exchange_failed", "disabled", "analytics_not_granted"}
+     "insufficient_scope", "exchange_failed", "disabled", "analytics_not_granted",
+     "no_instagram_account"}
 )  # fmt: skip
 
 

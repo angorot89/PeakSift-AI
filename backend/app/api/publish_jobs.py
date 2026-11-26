@@ -52,7 +52,14 @@ from app.schemas.publishing import (
     PublishRequest,
     ScheduleChange,
 )
-from app.services.publishing import connections, platforms, schedule, slots, tiktok_post
+from app.services.publishing import (
+    connections,
+    instagram_post,
+    platforms,
+    schedule,
+    slots,
+    tiktok_post,
+)
 from app.services.publishing.jobs import PublishRefused, request_publish
 from app.services.publishing.metadata import MetadataError, PublishMetadata, prefill
 from app.services.publishing.pipeline import awaiting_processing, is_stale
@@ -281,6 +288,10 @@ def publish(
     try:
         if target.key == "tiktok":
             metadata, options = _tiktok_post(db, settings, edit, connection, payload)
+        elif target.key == "instagram":
+            metadata = instagram_post.metadata(
+                edit.clip.candidate.title, payload.description, edit.duration_seconds
+            )
         else:
             metadata = PublishMetadata.create(
                 **payload.model_dump(exclude={"scheduled_at", "platform", "options"})

@@ -125,11 +125,14 @@ answers with a stereotype screen, the live `/morocco` and Creator Kit, and the r
 StreamLadder benchmark in
 [docs/product-research/streamladder-live-benchmark.md](docs/product-research/streamladder-live-benchmark.md):**
 quick start on Home (one upload → project, transcription, then moments by themselves), Find
-Clips (plain-language search of the transcript; a kept result is a saved moment) and scheduled
-publishing (a `scheduled` publish job released by Celery beat, and the `/schedule` calendar);
+Clips (plain-language search of the transcript; a kept result is a saved moment), scheduled
+publishing (a `scheduled` publish job released by Celery beat, and the `/schedule` calendar),
+posting times, and publishing to TikTok and Instagram Reels behind the same contract (a
+connection per platform, `services/publishing/platforms.py`; each switched on by its own
+setting);
 see [docs/creator-experience.md](docs/creator-experience.md) and
-[docs/publishing.md](docs/publishing.md). Not merged, not tagged. The list below still applies
-to everything else.
+[docs/publishing.md](docs/publishing.md). On `main` since 26 November 2026; not tagged. The
+list below still applies to everything else.
 
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
 generated images, video, music or sound effects, voice cloning, performance or virality
