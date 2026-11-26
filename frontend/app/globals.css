@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+:root,
+.theme-dark {
   /* The frame and the canvas: the sidebar sits on the darkest `chrome`, every page sits on a
      rounded `background` canvas inset beside it; panels and controls step up from there. */
   --chrome: #0d0e11;
@@ -29,6 +30,41 @@
   --danger: #f47c7c;
   --info: #6cc3f5;
   --violet: #b294ff;
+}
+
+/* The public website (landing page) is light: the same tokens, re-pointed. A `.theme-dark`
+   panel inside it (the product demo) switches back to the workspace's dark values. */
+.theme-light {
+  color-scheme: light;
+  --chrome: #ffffff;
+  --background: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef0f7;
+  --surface-3: #e3e6f0;
+  --border: #e2e5ef;
+  --border-strong: #cdd2e0;
+  --foreground: #0e1222;
+  --muted: #4b5168;
+  --subtle: #646a80;
+  --accent: #3d5afe;
+  --accent-soft: #2f4ae0;
+  --accent-fill: #3d5afe;
+  --accent-fill-hover: #3350f0;
+  --accent-ink: #ffffff;
+  background: var(--background);
+  color: var(--foreground);
+}
+.theme-dark {
+  color-scheme: dark;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* The landing hero: PeakSift blue at the top fading into the light page. */
+.hero-band {
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgb(140 160 255 / 0.55), transparent 70%),
+    linear-gradient(180deg, #3d5afe 0%, #4f6bff 30%, #9fb0ff 62%, #f6f7fb 100%);
 }
 
 @theme inline {

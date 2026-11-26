@@ -181,8 +181,13 @@ At the creator's request ("the whole design of the system is bad") the workspace
 around the layout pattern of StreamLadder's app — structure only, nothing copied: pages on a
 rounded canvas beside a grouped sidebar with a **Create new** menu, Home opening on one creation
 box with tool tiles, status tabs with coloured dots and counts, heavy display titles, and one
-brand colour, PeakSift blue. The login and sign-up pages became a split screen. The landing page
-opens on a waveform with three marked moments (labelled as an illustration). Tokens and rules:
+brand colour, PeakSift blue. The login and sign-up pages became a split screen. The public website follows the section order
+of StreamLadder's site in PeakSift's own words and colours: a light page with a floating
+navigation bar, a blue hero with the platforms, headline, "Start clipping" and a dark product
+frame (labelled as an illustration), four alternating feature rows (AI moments, Editing,
+Publishing, Analytics) with built-in illustrations, the toolkit grid, a "Built to explain itself"
+bento of plain statements (no invented user numbers or testimonials), a FAQ and a closing call to
+action. Tokens and rules:
 [design-system.md](design-system.md). Behaviour, copy rules and data are unchanged; the look
 described in the next section is superseded.
 

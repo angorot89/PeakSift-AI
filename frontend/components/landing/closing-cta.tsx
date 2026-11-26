@@ -1,34 +1,22 @@
+import { Wand2 } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button-link";
 
 export function ClosingCta() {
   return (
-    <section id="get-started" className="scroll-mt-20 border-t border-border py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="relative overflow-hidden rounded-card border border-border bg-surface px-6 py-16 sm:px-16">
-          <div className="relative">
-            <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              Your next long-form video already has its best clips in it.
-            </h2>
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-pretty text-muted sm:text-lg">
-              Upload a recording, get a timestamped transcript, let AI rank
-              the moments worth clipping, then render them as vertical shorts
-              with captions — all in one workspace.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink href="/register" size="lg" className="w-full sm:w-auto">
-                Get started
-              </ButtonLink>
-              <ButtonLink
-                href="#how-it-works"
-                variant="secondary"
-                size="lg"
-                className="w-full sm:w-auto"
-              >
-                See how it works
-              </ButtonLink>
-            </div>
-          </div>
-        </div>
+    <section id="get-started" className="scroll-mt-20 px-6 py-24">
+      <div className="mx-auto max-w-6xl rounded-canvas bg-[radial-gradient(70%_80%_at_50%_0%,rgb(140_160_255/0.6),transparent_70%),linear-gradient(150deg,#3d5afe,#5b3dfe)] px-6 py-20 text-center sm:px-16">
+        <h2 className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight text-balance text-white sm:text-6xl">
+          Your next long video already has its best Shorts in it.
+        </h2>
+        <p className="mx-auto mt-5 max-w-xl text-lg text-pretty text-white/90">Drop it in and see what PeakSift finds.</p>
+        <ButtonLink
+          href="/register"
+          size="lg"
+          className="mt-9 bg-white !text-[#1b2a8f] shadow-[0_10px_30px_-10px_rgb(14_18_34/0.5)] hover:!bg-white/90"
+        >
+          <Wand2 aria-hidden="true" />
+          Start clipping
+        </ButtonLink>
       </div>
     </section>
   );

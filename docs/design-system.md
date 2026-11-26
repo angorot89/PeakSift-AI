@@ -41,6 +41,7 @@ mirror the render's proportions.
 | `useToast` | brief confirmation of a small completed action; problems stay inline |
 | `StatusPill` / `StatusBadge` | state in words plus a shape (never colour alone), tinted per state; `overlay` for a chip on a thumbnail |
 | `VideoFrame` / `FrameTag` | a real still from the creator's own source, clip or Short at a given second (lazy, owner-checked media URL, fixed ratio so nothing shifts) and a small label on it (length, time range) |
+| `.theme-light` / `.theme-dark` | the public website is light (same tokens re-pointed); `.theme-dark` inside it shows the workspace look (product frames) |
 | `MomentStrip` | the illustration of a recording's waveform with three marked moments (landing hero, login panel); decorative and labelled as an illustration |
 | `PageHeader` | a page's title, back link and one primary action; `size="hero"` for a destination's front page; on large screens the search field (command menu) sits beside the action |
 | `EmptyState`, `ErrorState`, `LoadingState`, `Skeleton`, `ProgressBar`, `WorkingState`, `InlineAlert` | intentional empty, failure and working states |

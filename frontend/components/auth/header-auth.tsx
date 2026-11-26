@@ -15,7 +15,7 @@ export function HeaderAuth() {
 
   if (status === "loading") {
     // Same footprint as the buttons so the header does not jump once we know.
-    return <div aria-hidden="true" className="h-9 w-24 rounded-full bg-white/[0.04]" />;
+    return <div aria-hidden="true" className="h-10 w-32 rounded-control bg-surface-2" />;
   }
 
   if (user) {
@@ -27,11 +27,13 @@ export function HeaderAuth() {
     }
 
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="hidden sm:block">
+          <Button variant="ghost" onClick={handleLogout} disabled={loggingOut}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </Button>
+        </span>
         <ButtonLink href="/home">Open PeakSift</ButtonLink>
-        <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
-          {loggingOut ? "Logging out…" : "Log out"}
-        </Button>
       </div>
     );
   }
@@ -40,11 +42,11 @@ export function HeaderAuth() {
     <div className="flex items-center gap-4">
       <Link
         href="/login"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm text-sm text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm text-sm font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
       >
         Log in
       </Link>
-      <ButtonLink href="/register">Get Started</ButtonLink>
+      <ButtonLink href="/register">Sign up</ButtonLink>
     </div>
   );
 }
