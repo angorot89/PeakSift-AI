@@ -590,6 +590,9 @@ def build_dynamic_ass(
         style = replace(style, active=normalize_color(active_colour))
     if style.box and alignment != 5:  # libass pads the box by the outline: keep it inside too
         margin_v += round(style.outline)
+    if style.highlight == "marker" and alignment != 5:
+        # The spoken word's marker outline is wider than the text's: keep it inside too.
+        margin_v += round(max(0.0, style.marker_outline - style.outline))
     border = 3 if style.box else 1
     back = ass_colour(style.outline_colour, style.box_alpha) if style.box else "&H80000000"
     outline_colour = back if style.box else ass_colour(style.outline_colour)

@@ -161,7 +161,13 @@ function wordCss(look: PresetSpec, spec: CaptionStyles, active: boolean, colour?
 }
 
 // libass pads a box by the outline; box styles sit that much further in so the box stays inside.
-const boxInset = (look: TextLook, alignment: number) => (look.box && alignment !== 5 ? Math.round(look.outline) : 0);
+// A marker style's spoken word has a wider outline than its text: it sits that much further in.
+const boxInset = (look: TextLook & { highlight?: string; marker_outline?: number }, alignment: number) => {
+  if (alignment === 5) return 0;
+  const box = look.box ? Math.round(look.outline) : 0;
+  const marker = look.highlight === "marker" ? Math.round(Math.max(0, (look.marker_outline ?? 0) - look.outline)) : 0;
+  return box + marker;
+};
 
 function placementCss(alignment: number, marginV: number, marginH: number, spec: CaptionStyles): CSSProperties {
   const css: CSSProperties = {
