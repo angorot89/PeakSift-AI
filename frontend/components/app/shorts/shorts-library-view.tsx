@@ -1,20 +1,22 @@
 "use client";
 
-import { Clapperboard, FolderOpen, Plus, Scissors, Search, SearchX } from "lucide-react";
+import { Clapperboard, FolderOpen, LayoutGrid, List, Plus, Scissors, Search, SearchX } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
-import { ShortCard, ShortCardSkeleton } from "@/components/app/shorts/short-card";
+import { ShortCard, ShortCardSkeleton, ShortRow, useShortAction } from "@/components/app/shorts/short-card";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { inputClasses } from "@/components/ui/input-styles";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { selectClasses } from "@/components/ui/select-styles";
+import { useToast } from "@/components/ui/toast";
 import {
   FILTERS,
   filterCounts,
   type FilterKey,
   getShorts,
+  projectsOf,
   type ShortItem,
   SORTS,
   type SortKey,
@@ -25,19 +27,25 @@ import { useApi } from "@/lib/use-api";
 const GRID = "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
 const SEARCH_DELAY_MS = 200;
 
-function readParams(): { filter: FilterKey; sort: SortKey; q: string } {
+type Layout = "grid" | "list";
+type View = { filter: FilterKey; sort: SortKey; q: string; project: string | null; layout: Layout };
+
+function readParams(): View {
   const params = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const filter = FILTERS.find((f) => f.key === params.get("filter"))?.key ?? "all";
   const sort = SORTS.find((s) => s.key === params.get("sort"))?.key ?? "updated";
-  return { filter, sort, q: params.get("q") ?? "" };
+  const layout: Layout = params.get("view") === "list" ? "list" : "grid";
+  return { filter, sort, q: params.get("q") ?? "", project: params.get("project"), layout };
 }
 
 /** The view lives in the URL (back, refresh and sharing keep it) without a navigation. */
-function writeParams(filter: FilterKey, sort: SortKey, q: string) {
+function writeParams({ filter, sort, q, project, layout }: View) {
   const params = new URLSearchParams();
   if (filter !== "all") params.set("filter", filter);
   if (sort !== "updated") params.set("sort", sort);
   if (q.trim()) params.set("q", q.trim());
+  if (project) params.set("project", project);
+  if (layout === "list") params.set("view", "list");
   const query = params.toString();
   window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
 }
@@ -59,25 +67,42 @@ function LibrarySkeleton() {
   );
 }
 
-function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean }) {
+function Library({ items: loaded, truncated }: { items: ShortItem[]; truncated: boolean }) {
   const searchId = useId();
   const sortId = useId();
-  const [{ filter, sort, q }, setView] = useState(readParams);
+  const projectId = useId();
+  const toast = useToast();
+  const [view, setView] = useState(readParams);
+  const { filter, sort, q, project, layout } = view;
+  // Hiding or showing moves a card at once; the server already has the change.
+  const [hiddenNow, setHiddenNow] = useState<Record<string, boolean>>({});
+  const items = useMemo(
+    () => loaded.map((item) => (item.id in hiddenNow ? { ...item, hidden: hiddenNow[item.id] } : item)),
+    [loaded, hiddenNow],
+  );
+  const run = useShortAction(
+    (item, hidden) => {
+      setHiddenNow((now) => ({ ...now, [item.id]: hidden }));
+      toast(hidden ? "Hidden. Find it under Hidden." : "Back in your library.");
+    },
+    (message) => toast(message),
+  );
   const [query, setQuery] = useState(q);
   // The list follows the search box after a short pause, so typing stays smooth.
   useEffect(() => {
     const timer = window.setTimeout(() => setView((view) => ({ ...view, q: query })), SEARCH_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [query]);
-  useEffect(() => writeParams(filter, sort, q), [filter, sort, q]);
+  useEffect(() => writeParams(view), [view]);
 
   const counts = useMemo(() => filterCounts(items), [items]);
-  const shown = useMemo(() => visibleShorts(items, filter, q, sort), [items, filter, q, sort]);
-  const narrowed = filter !== "all" || q.trim() !== "";
+  const projects = useMemo(() => projectsOf(loaded), [loaded]);
+  const shown = useMemo(() => visibleShorts(items, filter, q, sort, project), [items, filter, q, sort, project]);
+  const narrowed = filter !== "all" || q.trim() !== "" || project !== null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3">
         <SegmentedControl
           wrap
           label="Show"
@@ -85,8 +110,8 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
           value={filter}
           onChange={(value) => setView((view) => ({ ...view, filter: value }))}
         />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative sm:w-72">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative sm:w-72 sm:flex-1 lg:max-w-sm">
             <label htmlFor={searchId} className="sr-only">
               Search Shorts
             </label>
@@ -101,6 +126,26 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
               className={`${inputClasses} pl-9`}
             />
           </div>
+          {projects.length > 1 ? (
+            <div className="flex items-center gap-2">
+              <label htmlFor={projectId} className="sr-only">
+                Project
+              </label>
+              <select
+                id={projectId}
+                value={project ?? ""}
+                onChange={(event) => setView((view) => ({ ...view, project: event.target.value || null }))}
+                className={`${selectClasses} sm:w-48`}
+              >
+                <option value="">All projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             <label htmlFor={sortId} className="shrink-0 text-small text-muted">
               Sort
@@ -118,6 +163,26 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
               ))}
             </select>
           </div>
+          <div role="group" aria-label="Layout" className="inline-flex shrink-0 self-start rounded-control border border-border bg-surface-2 p-0.5 sm:self-auto">
+            {([
+              { value: "grid", label: "Grid", icon: LayoutGrid },
+              { value: "list", label: "List", icon: List },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={layout === option.value}
+                aria-label={`${option.label} view`}
+                title={`${option.label} view`}
+                onClick={() => setView((view) => ({ ...view, layout: option.value }))}
+                className={`flex size-8 items-center justify-center rounded-[0.375rem] transition-colors focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11 ${
+                  layout === option.value ? "bg-background text-foreground shadow-[inset_0_0_0_1px_var(--border-strong)]" : "text-muted hover:text-foreground"
+                }`}
+              >
+                <option.icon aria-hidden="true" className="size-4" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -127,11 +192,19 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
       </p>
 
       {shown.length ? (
-        <ul className={GRID}>
-          {shown.map((item) => (
-            <ShortCard key={item.id} item={item} />
-          ))}
-        </ul>
+        layout === "list" ? (
+          <ul className="space-y-2">
+            {shown.map((item) => (
+              <ShortRow key={item.id} item={item} run={run} />
+            ))}
+          </ul>
+        ) : (
+          <ul className={GRID}>
+            {shown.map((item) => (
+              <ShortCard key={item.id} item={item} run={run} />
+            ))}
+          </ul>
+        )
       ) : (
         <EmptyState
           icon={SearchX}
@@ -142,7 +215,7 @@ function Library({ items, truncated }: { items: ShortItem[]; truncated: boolean 
               variant="secondary"
               onClick={() => {
                 setQuery("");
-                setView({ filter: "all", sort, q: "" });
+                setView({ ...view, filter: "all", q: "", project: null });
               }}
             >
               Show all Shorts

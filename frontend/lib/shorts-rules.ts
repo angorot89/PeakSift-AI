@@ -73,6 +73,10 @@ export type ShortItem = {
   created_at: string;
   updated_at: string;
   rendered_at: string | null;
+  /** Hidden from the library by the creator (it shows under Hidden only). */
+  hidden?: boolean;
+  /** The soonest post waiting for its time; it has not gone out yet. */
+  schedule?: { at: string; platform: string } | null;
 };
 
 export type ShortDetail = ShortItem & {
@@ -88,7 +92,7 @@ export type ShortsLibrary = { shorts: ShortItem[]; truncated: boolean };
 
 // --- status words -----------------------------------------------------------------------------
 
-export type FilterKey = "all" | "drafts" | "ready" | "published" | "attention";
+export type FilterKey = "all" | "drafts" | "ready" | "scheduled" | "published" | "attention" | "hidden";
 
 const STATUS: Record<ShortStatus, { label: string; tone: StatusTone; filter: FilterKey | null }> = {
   draft: { label: "Draft", tone: "info", filter: "drafts" },
@@ -171,9 +175,20 @@ export function dayLabel(iso: string, now: Date = new Date()): string {
   return (date.getFullYear() === now.getFullYear() ? shortDate : longDate).format(date);
 }
 
+const PLATFORM_NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram" };
+export const platformName = (platform: string) => PLATFORM_NAMES[platform] ?? platform;
+
+const timeOfDay = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
+
+/** "Nov 28, 7:00 PM": a day and a time, in the creator's own time zone. */
+export function whenLabel(iso: string, now: Date = new Date()): string {
+  return `${dayLabel(iso, now)}, ${timeOfDay.format(new Date(iso))}`;
+}
+
 /** The card's last line: where it went and when, or what is happening. */
 export function contextLine(item: ShortItem, now: Date = new Date()): string {
   const publish = item.publish;
+  if (item.schedule) return `${platformName(item.schedule.platform)} · Scheduled ${whenLabel(item.schedule.at, now)}`;
   if (item.status === "published" && publish.published_at) {
     return `YouTube · Published ${dayLabel(publish.published_at, now)}${publish.simulated ? " (simulated)" : ""}`;
   }
@@ -193,21 +208,38 @@ export const FILTERS: { key: FilterKey; label: string; dot?: string }[] = [
   { key: "all", label: "All" },
   { key: "drafts", label: "Drafts", dot: "bg-info" },
   { key: "ready", label: "Ready", dot: "bg-accent" },
+  { key: "scheduled", label: "Scheduled", dot: "bg-violet" },
   { key: "published", label: "Published", dot: "bg-success" },
   { key: "attention", label: "Needs attention", dot: "bg-danger" },
+  { key: "hidden", label: "Hidden", dot: "bg-subtle" },
 ];
 
+/** The one tab a Short belongs to besides All: hidden first, then scheduled, then its status. */
+function tabOf(item: ShortItem): FilterKey | null {
+  if (item.hidden) return "hidden";
+  if (item.schedule) return "scheduled";
+  return STATUS[item.status]?.filter ?? null;
+}
+
 export function matchesFilter(item: ShortItem, filter: FilterKey): boolean {
-  return filter === "all" || STATUS[item.status]?.filter === filter;
+  if (filter === "all") return !item.hidden; // hidden Shorts live only under Hidden
+  return tabOf(item) === filter;
 }
 
 export function filterCounts(items: ShortItem[]): Record<FilterKey, number> {
-  const counts: Record<FilterKey, number> = { all: items.length, drafts: 0, ready: 0, published: 0, attention: 0 };
+  const counts: Record<FilterKey, number> = { all: 0, drafts: 0, ready: 0, scheduled: 0, published: 0, attention: 0, hidden: 0 };
   for (const item of items) {
-    const key = STATUS[item.status]?.filter;
+    if (!item.hidden) counts.all += 1;
+    const key = tabOf(item);
     if (key) counts[key] += 1;
   }
   return counts;
+}
+
+/** The projects the library's Shorts come from, by name, for the project filter. */
+export function projectsOf(items: ShortItem[]): { id: string; name: string }[] {
+  const byId = new Map(items.map((item) => [item.project.id, item.project.name]));
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const fold = (text: string) => text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase();
@@ -243,8 +275,11 @@ export function sortShorts(items: ShortItem[], sort: SortKey): ShortItem[] {
   return [...items].sort((a, b) => by[sort](a, b) || a.id.localeCompare(b.id));
 }
 
-export function visibleShorts(items: ShortItem[], filter: FilterKey, query: string, sort: SortKey): ShortItem[] {
-  return sortShorts(items.filter((item) => matchesFilter(item, filter) && matchesSearch(item, query)), sort);
+export function visibleShorts(items: ShortItem[], filter: FilterKey, query: string, sort: SortKey, project: string | null = null): ShortItem[] {
+  return sortShorts(
+    items.filter((item) => matchesFilter(item, filter) && matchesSearch(item, query) && (!project || item.project.id === project)),
+    sort,
+  );
 }
 
 // --- where things go --------------------------------------------------------------------------
@@ -263,7 +298,7 @@ export function continueHref(item: ShortItem): string {
   return editorHref(item);
 }
 
-export type ShortAction = "continue" | "publish" | "performance" | "fix_render" | "fix_publish" | "retry_cut" | "edit" | "download" | "analytics" | "project";
+export type ShortAction = "continue" | "publish" | "schedule" | "performance" | "fix_render" | "fix_publish" | "retry_cut" | "edit" | "download" | "analytics" | "project" | "hide" | "show";
 
 /** The one primary action for a state (null while there is nothing to do but wait). */
 export function primaryAction(item: ShortItem): { action: ShortAction; label: string } | null {
@@ -294,7 +329,25 @@ export function menuActions(item: ShortItem): { action: ShortAction; label: stri
   if (item.status === "ready") actions.push({ action: "publish", label: "Publish" });
   if (item.performance) actions.push({ action: "analytics", label: "View analytics" });
   actions.push({ action: "project", label: "Open project" });
+  actions.push(item.hidden ? { action: "show", label: "Show in library" } : { action: "hide", label: "Hide" });
   return actions;
+}
+
+/** The few buttons always on a card: what most Shorts in that state need next. */
+export function quickActions(item: ShortItem): { action: ShortAction; label: string }[] {
+  if (item.hidden) return [{ action: "show", label: "Show" }];
+  const actions: { action: ShortAction; label: string }[] = [];
+  if (item.status === "ready" && !item.schedule) {
+    actions.push({ action: "publish", label: "Publish" }, { action: "schedule", label: "Schedule" });
+  } else if (item.schedule) {
+    actions.push({ action: "schedule", label: "Change time" });
+  } else if (item.status === "draft") {
+    actions.push({ action: "continue", label: "Edit" });
+  } else if (item.performance) {
+    actions.push({ action: "analytics", label: "Analytics" });
+  }
+  if (item.kind === "short" && item.preview === "short") actions.push({ action: "download", label: "Download" });
+  return actions.slice(0, 3);
 }
 
 /** "Short: Lava jump — Published, 0:42, from Speedrun Fails": a card's accessible name. */

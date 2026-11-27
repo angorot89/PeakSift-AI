@@ -67,6 +67,13 @@ class ShortPerformance(BaseModel):
     analytics_through: date | None
 
 
+class ShortSchedule(BaseModel):
+    """The Short's next post that is waiting for its time (it has not happened yet)."""
+
+    at: datetime
+    platform: str
+
+
 class ShortRead(BaseModel):
     id: uuid.UUID
     kind: str  # short | draft
@@ -90,6 +97,9 @@ class ShortRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     rendered_at: datetime | None
+    # Hidden from the library by the creator; hidden Shorts are still returned (the Hidden tab).
+    hidden: bool = False
+    schedule: ShortSchedule | None = None
 
 
 class ShortsLibraryRead(BaseModel):
@@ -124,3 +134,14 @@ class ShortDetailRead(ShortRead):
     auto_edit_plan_id: uuid.UUID | None
     # Whether performance can be shown for this creator (and whether it is simulated).
     analytics: AnalyticsAccessRead
+
+
+class ShortUpdate(BaseModel):
+    """What the creator can change on a Short from the library: whether it is hidden."""
+
+    hidden: bool
+
+
+class ShortUpdateRead(BaseModel):
+    id: uuid.UUID
+    hidden: bool

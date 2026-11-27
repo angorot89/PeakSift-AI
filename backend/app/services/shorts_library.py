@@ -17,6 +17,10 @@ frontend maps these keys to words (``lib/shorts-rules.ts``). Statuses:
 - ``failed`` — the render (or the cut) failed;
 - ``needs_attention`` — a render or an upload stopped reporting, or an upload failed.
 
+Separately from the status, a Short can be **hidden** by the creator (``hidden_at`` on the version,
+or on the clip for a draft) and can have a post **scheduled** for later (a publish job waiting for
+its time, which never changes the status: the Short stays "ready" until the post goes out).
+
 Everything is scoped to one creator by the caller's ``user_id``; the whole library is a fixed
 handful of queries whatever its size (no per-Short queries). Failed versions of a clip that has
 a newer version are history, not something to fix: they are left out of the library and listed
@@ -25,6 +29,7 @@ among the newer version's versions.
 
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -286,6 +291,15 @@ def _contents(db: Session, edit_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[Pu
     return contents
 
 
+def _schedule(jobs: list[PublishJob]) -> dict[str, Any] | None:
+    """The soonest post still waiting for its time, if any."""
+    waiting = [j for j in jobs if j.status == PublishStatus.SCHEDULED and j.scheduled_at]
+    if not waiting:
+        return None
+    soonest = min(waiting, key=lambda job: job.scheduled_at)
+    return {"at": soonest.scheduled_at, "platform": soonest.provider}
+
+
 def _short_items(db: Session, rows: list[_Row], settings: Settings) -> list[dict[str, Any]]:
     ids = [row.edit.id for row in rows]
     jobs = _jobs(db, ids)
@@ -325,6 +339,7 @@ def _short_items(db: Session, rows: list[_Row], settings: Settings) -> list[dict
             "performance": _performance(content, counters.get(content.id) if content else None),
             "created_at": edit.created_at, "updated_at": updated,
             "rendered_at": edit.completed_at if ready else None,
+            "hidden": edit.hidden_at is not None, "schedule": _schedule(jobs.get(edit.id, [])),
         })  # fmt: skip
     return items
 
@@ -373,6 +388,7 @@ def _draft_items(
             "version": None, "template": None, "brand": None, "auto_edit": False,
             "plan_ready": clip.id in planned, "publish": _not_published(), "performance": None,
             "created_at": clip.created_at, "updated_at": clip.updated_at, "rendered_at": None,
+            "hidden": clip.hidden_at is not None, "schedule": None,
         })  # fmt: skip
     return items
 
@@ -458,3 +474,30 @@ def detail(
         .limit(1)
     )
     return item
+
+
+def set_hidden(db: Session, user_id: uuid.UUID, short_id: uuid.UUID, hidden: bool) -> bool:
+    """Hide or show one of this creator's Shorts (a version id) or drafts (a clip id without
+    versions) in the library. ``False`` when there is no such Short for this creator."""
+    when = datetime.now(UTC) if hidden else None
+    edit = db.scalar(
+        select(ClipEdit)
+        .join(Video, Video.id == ClipEdit.video_id)
+        .join(Project, Project.id == Video.project_id)
+        .where(ClipEdit.id == short_id, Project.user_id == user_id)
+    )
+    if edit is not None:
+        edit.hidden_at = when
+        db.commit()
+        return True
+    clip = db.scalar(
+        select(Clip)
+        .join(Video, Video.id == Clip.video_id)
+        .join(Project, Project.id == Video.project_id)
+        .where(Clip.id == short_id, Project.user_id == user_id)
+    )
+    if clip is None:
+        return False
+    clip.hidden_at = when
+    db.commit()
+    return True

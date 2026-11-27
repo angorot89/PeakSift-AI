@@ -35,6 +35,11 @@ library and the Short's page all use them.
 | `failed` | the render (or the cut) failed | Failed | Needs attention |
 | `needs_attention` | a render or an upload stopped reporting, or an upload failed (`reason` says which) | Needs attention | Needs attention |
 
+Two things sit beside the status without changing it: a Short can be **hidden** by the creator
+(it then shows only under *Hidden*, and keeps its status, links and actions), and a Short can have
+a post **scheduled** (`schedule`: the soonest waiting post's time and platform). A scheduled Short
+is still `ready` — nothing has gone out — but the library lists it under *Scheduled*, not *Ready*.
+
 A video YouTube already has outranks a later failed attempt. Publishing stages are the job's real
 ones — Preparing upload… · Uploading… (with YouTube's confirmed bytes) · Processing on YouTube… ·
 On YouTube · Published · Stalled · Failed — never a guessed percentage. Status is words plus a
@@ -46,9 +51,10 @@ shape, never colour alone.
 | --- | --- |
 | `GET /shorts` | the creator's Shorts and drafts, most recently updated first (≤ 500; `truncated` says when more exist): project, source, title, duration, what can be previewed (`short` / `clip` / none), version number, the template version and brand **recorded with the version** (`origin`), publishing state and dates, a YouTube link only for real uploads, the latest reported figures (`null` = not reported) |
 | `GET /shorts/{id}` | one Short or draft, plus the moment (time, rank, kind), the clip's versions, render facts and the creator's analytics access |
+| `PATCH /shorts/{id}` | `{"hidden": true \| false}` hides a Short (a version id) or draft (a clip id) from the library, or shows it again (`hidden_at` on the version or clip); owner-scoped, `404` otherwise |
 | `GET /workspace/home`, `GET /projects/{id}/summary` | their Shorts now carry `short_status` (the library's status); `published` keeps its meaning |
 
-Owner-scoped (another creator's Short is `404`), read-only, and a fixed number of queries
+Owner-scoped (another creator's Short is `404`), read-only except for hiding, and a fixed number of queries
 whatever the library's size (window functions and batched jobs, contents and counters; a test
 asserts 1 and 8 Shorts cost the same statements). Responses never contain storage keys, task
 ids, fingerprints, configuration snapshots or provider payloads.
@@ -57,14 +63,23 @@ ids, fingerprints, configuration snapshots or provider payloads.
 
 **Shorts** sits in the sidebar between Projects and Analytics (and in the ⌘K menu). The page:
 title, "Everything you've created, ready to edit, publish or review.", **Create a Short** (the
-moments of the most recently active project). Filters with counts (they wrap on phones), a search
-over titles, projects and source names (case- and accent-insensitive, 200 ms after typing), four
-sorts (Recently updated · Newest · Oldest · Recently published); the view lives in the address.
+moments of the most recently active project). Status tabs with coloured dots and counts — All ·
+Drafts · Ready · Scheduled · Published · Needs attention · Hidden (each Short is in exactly one
+besides All; hidden ones are left out of All) — on their own row, wrapping on phones; then a
+search over titles, projects and source names (case- and accent-insensitive, 200 ms after typing),
+a project filter (when there is more than one project), four sorts (Recently updated · Newest ·
+Oldest · Recently published) and a grid / list switch. The whole view lives in the address.
 
-Cards: a real 9:16 frame (the render, or the moment's cut until then), the status, length, "v2",
-title, project and one context line ("YouTube · Published Oct 18", "(simulated)" for test
-uploads). The card opens the Short; its menu, beside the title and always visible, lists only what
-is valid now (Edit / Continue editing, Download, Publish, View analytics, Open project). Empty:
+Cards: a real 9:16 frame (the render, or the moment's cut until then), the status (plus
+*Scheduled* and *Hidden* pills when they apply), length, "v2", title, project and one context line
+("YouTube · Published Oct 18", "TikTok · Scheduled Nov 28, 7:00 PM", "(simulated)" for test
+uploads). The card opens the Short. Under it, up to three **quick actions** for what that state
+usually needs next (Ready: Publish · Schedule · Download; scheduled: Change time; draft: Edit;
+on YouTube: Analytics; hidden: Show). Its menu, beside the title and always visible, lists only
+what is valid now (Edit / Continue editing, Download, Publish, View analytics, Open project, Hide /
+Show in library). Hiding moves the card at once and confirms with a toast. The **list** view shows
+the same Shorts as rows: a small frame, title, project and length, the context line, the pills,
+the quick actions and the menu. Empty:
 "No Shorts yet" with **Open projects** / **Create project**; no match: **Show all Shorts**; loading:
 skeletons with the same proportions.
 
@@ -159,8 +174,8 @@ publishing architecture passed real YouTube acceptance in V1.0).
 ## Limitations
 
 - One card per version: a moment rendered three times shows three Shorts (labelled v1–v3).
-- The library loads whole (≤ 500, filtered in the browser); there is no project or template
-  filter yet (search finds a project by name).
+- The library loads whole (≤ 500, filtered in the browser); there is no template filter (search
+  finds a project by name, and the project filter narrows to one).
 - Ask PeakSift does not know which Short a `/shorts/{id}` page shows (it answers as on Home).
-- No scheduling, multi-platform publishing, thumbnails, editing published videos or deleting
-  Shorts from the library.
+- Hiding is not deleting: a hidden Short keeps its files, posts and analytics. There is still no
+  deleting Shorts, thumbnails or editing published videos.
