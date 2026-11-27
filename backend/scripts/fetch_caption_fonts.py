@@ -44,8 +44,10 @@ def install(url: str, sha256: str, target: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--dir", default=get_settings().caption_fonts_dir)
-    target = Path(parser.parse_args().dir)
+    parser.add_argument("--dir", help="where to install (default: CAPTION_FONTS_DIR)")
+    chosen = parser.parse_args().dir
+    # With --dir no settings are read (the image build has no runtime configuration).
+    target = Path(chosen or get_settings().caption_fonts_dir)
     target.mkdir(parents=True, exist_ok=True)
     failed = False
     for font in CAPTION_FONTS.values():
