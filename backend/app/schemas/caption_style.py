@@ -36,6 +36,21 @@ class DynamicPresetRead(BaseModel):
     fade_ms: int
     grow_from: int
     grow_ms: int
+    # Creator styles (V2.0). `font` is the display font's family (None: the server's caption
+    # font); its own em ratio sizes the preview like libass. `available` is false when the font
+    # is not installed on this server (the style cannot be rendered then).
+    font: str | None = None
+    em_per_size: float
+    available: bool = True
+    one_word: bool = False
+    highlight: Literal["colour", "marker", "underline"] = "colour"
+    marker: str | None = None
+    marker_outline: float = 0
+    pop: int = 100
+    reveal: bool = False
+    glow: float = 0
+    needs_word_timing: bool = False
+    scripts: list[str]
 
 
 class HookStyleRead(BaseModel):

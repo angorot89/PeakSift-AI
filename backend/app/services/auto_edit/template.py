@@ -29,7 +29,12 @@ from app.services.auto_edit.contract import AutoEditContext
 from app.services.auto_edit.recipes import MUSIC_LEVEL_DB, MusicLevel
 from app.services.auto_edit.validation import LAYOUT_LABELS, ValidatedPlan
 from app.services.branding.template_config import BrollAmount, Framing, TemplateConfig
-from app.services.clip_edit.config import CaptionTiming, EditConfig
+from app.services.clip_edit.config import (
+    WORD_TIMED_PRESETS,
+    CaptionTiming,
+    DynamicPreset,
+    EditConfig,
+)
 from app.services.visuals.config import VisualsConfig
 
 USABLE_REFRAME = {"high", "mixed"}
@@ -106,6 +111,17 @@ def _captions(fields, template: TemplateConfig, context: AutoEditContext, notes)
         fields["caption_style"] = template.caption_preset.value
         if fields["caption_timing"] is None:  # a phrase style became a dynamic one
             fields["caption_timing"] = CaptionTiming.PHRASE_FALLBACK.value
+        if (
+            template.caption_preset in WORD_TIMED_PRESETS
+            and fields["caption_timing"] != CaptionTiming.ALIGNED_WORD.value
+        ):
+            # One word / Reveal show words as they are spoken: never with estimated timing.
+            fields["caption_style"] = DynamicPreset.FOCUS.value
+            notes.append(
+                "Your template's caption style shows words as they are spoken, which needs word "
+                "sync; this clip has none yet, so Focus captions are used. Generate word sync "
+                "in the editor to switch."
+            )
     if template.caption_position is not None:
         fields["caption_position"] = template.caption_position.value
 

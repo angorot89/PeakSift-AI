@@ -229,7 +229,8 @@ def _group(pieces: list[CueWord], rules: CueRules) -> list[list[CueWord]]:
     for group in groups:
         previous = merged[-1] if merged else None
         lonely = (
-            previous is not None
+            rules.max_words > 1  # one word at a time: a single word is the point, not lonely
+            and previous is not None
             and len(group) == 1
             and not group[0].attached
             and not SENTENCE_END.search(previous[-1].text)

@@ -46,3 +46,12 @@ export function parseState(state: string): { cue: number; active: Set<string> } 
   const [cue, words] = state.split("|");
   return { cue: Number(cue), active: new Set(words ? words.split(",") : []) };
 }
+
+/** How many words of `cue` have started by `t` (Reveal shows only those; a phrase-timed cue
+ * shows every word). Words are counted across lines, in reading order. */
+export function spokenCount(cue: PreviewCue, t: number): number {
+  if (!cue.timed) return Number.POSITIVE_INFINITY;
+  let count = 0;
+  for (const line of cue.lines) for (const word of line) if (word.start <= t + 1e-6) count += 1;
+  return count;
+}

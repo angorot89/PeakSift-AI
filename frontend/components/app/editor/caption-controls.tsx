@@ -24,6 +24,16 @@ const PRESET_HINTS: Record<DynamicPreset, string> = {
   punch: "Bold uppercase, spoken word in green",
   minimal: "Small and restrained, subtle emphasis",
   boxed: "White on a dark box, spoken word in yellow",
+  pop: "Condensed uppercase, spoken word pops",
+  comic: "Comic lettering, spoken word in pink",
+  bubble: "Round letters, thick violet outline",
+  one_word: "Big words, one at a time",
+  neon: "Soft pink glow",
+  underline: "Clean bold, spoken word underlined",
+  reveal: "Words appear as they are spoken",
+  headline: "Tall headline letters, soft shadow",
+  marker: "Spoken word on a violet marker",
+  bold_arabic: "Bold display letters for Arabic and Latin",
 };
 
 /** Dynamic caption presets as visual cards (real radios): each shows its emphasised word. */
@@ -48,9 +58,10 @@ export function PresetCards({
             key={preset.name}
             name={name}
             value={preset.name}
-            label={`${preset.label}: ${PRESET_HINTS[preset.name]}`}
+            label={`${preset.label}: ${PRESET_HINTS[preset.name]}${preset.needs_word_timing ? " (needs word sync)" : ""}${preset.available ? "" : " (not available on this server)"}`}
             checked={value === preset.name}
             onChange={() => onChange(preset.name)}
+            disabled={!preset.available}
             className="overflow-hidden"
             badge={false}
           >
@@ -65,7 +76,15 @@ export function PresetCards({
                 {preset.label}
                 <InlineCheck on={value === preset.name} />
               </span>
-              <span className="block text-caption leading-snug text-subtle">{PRESET_HINTS[preset.name]}</span>
+              <span className="block text-caption leading-snug text-subtle">
+                {preset.available ? PRESET_HINTS[preset.name] : "Not available on this server"}
+              </span>
+              {preset.needs_word_timing ? (
+                <span className="mt-1 inline-flex items-center gap-1 text-caption text-accent-soft">
+                  <AudioLines aria-hidden="true" className="size-3" />
+                  Word sync
+                </span>
+              ) : null}
             </span>
           </OptionCard>
         ))}

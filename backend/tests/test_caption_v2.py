@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from app.core.config import get_settings
+from app.services.clip_edit.caption_fonts import CAPTION_FONTS, font_file
 from app.services.clip_edit.caption_metrics import (
     ADVANCE_BOLD,
     ADVANCE_REGULAR,
@@ -17,7 +18,9 @@ from app.services.clip_edit.caption_metrics import (
 )
 from app.services.clip_edit.caption_v2 import (
     PRESETS_V2,
+    CaptionFontUnavailable,
     DynamicPreset,
+    _spoken,
     ass_colour,
     build_dynamic_ass,
     escape_ass_text_v2,
@@ -29,6 +32,31 @@ from app.services.clip_edit.dynamic_cues import SourceWord, WordCue, build_word_
 from tests.media_fixtures import requires_ffmpeg, requires_libass
 
 MARGIN_H = 90
+FONTS_DIR = get_settings().caption_fonts_dir
+HAVE_FONTS = all(font_file(key, FONTS_DIR) for key in CAPTION_FONTS)
+requires_caption_fonts = pytest.mark.skipif(
+    not HAVE_FONTS, reason="caption style fonts not installed (scripts/fetch_caption_fonts.py)"
+)
+ORIGINAL = (DynamicPreset.FOCUS, DynamicPreset.PUNCH, DynamicPreset.MINIMAL, DynamicPreset.BOXED)
+# Styles whose spoken word stands out by its colour (the frame checks below follow that colour).
+COLOURED = [
+    p for p in DynamicPreset
+    if PRESETS_V2[p].highlight != "marker" and not PRESETS_V2[p].reveal
+    and not PRESETS_V2[p].one_word
+]  # fmt: skip
+
+
+def rules(preset):
+    return rules_for(preset, MARGIN_H, FONTS_DIR)
+
+
+def needs_fonts(preset):
+    """Parametrize a preset, skipped where its display font is not installed."""
+    if PRESETS_V2[preset].font is None:
+        return preset
+    return pytest.param(preset, marks=requires_caption_fonts)
+
+
 ONE_TWO_THREE = [
     SourceWord("ONE", 0.5, 1.0),
     SourceWord("TWO", 1.0, 1.5),
@@ -59,14 +87,33 @@ def centis(t: str) -> int:
 # --- presets and colours -----
 
 
-def test_there_are_four_complete_presets_with_valid_colours():
-    assert {p.value for p in DynamicPreset} == {"focus", "punch", "minimal", "boxed"}
+def test_every_preset_is_complete_with_valid_colours():
+    assert set(PRESETS_V2) == set(DynamicPreset) and len(PRESETS_V2) == 14
     for preset, style in PRESETS_V2.items():
-        for colour in (style.text, style.active, style.outline_colour):
+        for colour in (style.text, style.active, style.outline_colour, style.marker or "#000000"):
             assert re.fullmatch(r"#[0-9A-F]{6}", colour), (preset, colour)
-        assert style.text != style.active  # the spoken word is visibly different
-        assert 60 <= style.size <= 130 and 0 < style.max_line_width <= OUTPUT_WIDTH
+        # The spoken word is visibly different (its colour, a marker, or words appearing).
+        assert (
+            style.text != style.active
+            or style.highlight == "marker"
+            or style.reveal
+            or (style.one_word)
+        )
+        assert style.highlight in ("colour", "marker", "underline")
+        assert style.font is None or style.font in CAPTION_FONTS
+        assert 60 <= style.size <= 180 and 0 < style.max_line_width <= OUTPUT_WIDTH
         assert style.fade_ms <= 150 and style.grow_ms <= 150 and 88 <= style.grow_from <= 100
+        assert 100 <= style.pop <= 120 and 0 <= style.glow <= 10
+
+
+def test_the_original_presets_render_exactly_as_before():
+    # V2.0 fields default to the original behaviour: no font, colour emphasis, no pop/reveal.
+    for preset in ORIGINAL:
+        style = PRESETS_V2[preset]
+        assert (style.font, style.one_word, style.highlight, style.pop, style.reveal) == (
+            None, False, "colour", 100, False,
+        )  # fmt: skip
+        assert style.glow == 0
 
 
 def test_ass_colour_is_alpha_blue_green_red():
@@ -146,23 +193,28 @@ def test_line_breaks_come_from_the_cue_builder():
         assert event.count("\\N") == len(cue.lines) - 1
 
 
-@pytest.mark.parametrize("preset", list(DynamicPreset))
+@pytest.mark.parametrize("preset", [needs_fonts(p) for p in DynamicPreset])
 def test_every_line_fits_the_preset_width(preset):
     text = (
         "Nobody tells you what the first night in orbit actually feels like, mmmm wwww "
         "MMMM WWWW unbelievably extraordinary moments matter"
     )
     words = [SourceWord(w, 0.3 * i, 0.3 * i + 0.25) for i, w in enumerate(text.split())]
-    rules = rules_for(preset, MARGIN_H)
+    fitted = rules(preset)
     style = PRESETS_V2[preset]
-    for cue in build_word_cues(words, clip_duration=60, rules=rules):
-        assert len(cue.line_words()) <= 2
+    for cue in build_word_cues(words, clip_duration=60, rules=fitted):
+        assert len(cue.line_words()) <= (1 if style.one_word else 2)
+        assert not style.one_word or len(cue.words) == 1
         for line in cue.line_words():
             rendered = " ".join(w.text for w in line)
-            rendered = rendered.upper() if style.uppercase else rendered
-            assert text_width(rendered, bold=style.bold, size=style.size) <= line_capacity(
-                preset, MARGIN_H
-            )
+            width = fitted.measure(rendered)
+            if style.font is None:
+                upper = rendered.upper() if style.uppercase else rendered
+                assert width == text_width(upper, bold=style.bold, size=style.size)
+            # One word at a time keeps even an over-long word on its own (libass then shrinks
+            # nothing: such a word may overflow only when it alone is wider than the frame).
+            if not style.one_word:
+                assert width <= line_capacity(preset, MARGIN_H)
 
 
 # --- real libass renders, checked on frames -----
@@ -170,13 +222,20 @@ def test_every_line_fits_the_preset_width(preset):
 
 def render_frames(ass: str, times: list[float], tmp_path: Path, rate: int = 25) -> list[np.ndarray]:
     (tmp_path / "c.ass").write_text(ass, encoding="utf-8")
+    fonts = tmp_path / "fonts"
+    if HAVE_FONTS and not fonts.exists():  # as the pipeline does: the fonts next to the captions
+        fonts.mkdir()
+        for key in CAPTION_FONTS:
+            path = font_file(key, FONTS_DIR)
+            (fonts / path.name).write_bytes(path.read_bytes())
     frames = []
     for t in times:
         raw = subprocess.run(
             [
                 get_settings().ffmpeg_path, "-v", "error", "-f", "lavfi",
                 "-i", f"color=c=0x2B3A55:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:d=3:r={rate}",
-                "-vf", "subtitles=c.ass", "-ss", f"{t:.2f}", "-frames:v", "1",
+                "-vf", "subtitles=c.ass:fontsdir=fonts" if HAVE_FONTS else "subtitles=c.ass",
+                "-ss", f"{t:.2f}", "-frames:v", "1",
                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
             ],
             capture_output=True, check=True, cwd=tmp_path, timeout=60,
@@ -194,10 +253,10 @@ def colour_mask(frame: np.ndarray, rgb: str, tolerance: int = 40) -> np.ndarray:
 
 @requires_ffmpeg
 @requires_libass
-@pytest.mark.parametrize("preset", list(DynamicPreset))
+@pytest.mark.parametrize("preset", [needs_fonts(p) for p in COLOURED])
 def test_the_active_word_really_moves_on_rendered_frames(preset, tmp_path):
     style = PRESETS_V2[preset]
-    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules_for(preset, MARGIN_H))
+    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules(preset))
     ass = document(cues, preset, alignment=5, margin_v=0)
     before, one, two, three, after = render_frames(ass, [0.3, 0.8, 1.3, 1.8, 2.6], tmp_path)
     background = np.array([0x2B, 0x3A, 0x55])
@@ -213,12 +272,76 @@ def test_the_active_word_really_moves_on_rendered_frames(preset, tmp_path):
         centres.append(np.nonzero(active)[1].mean())
     # ONE, TWO, THREE are left to right: the emphasis follows the speech across the line.
     assert centres[0] + 40 < centres[1] < centres[2] - 40, (preset, centres)
-    # The whole cue keeps the same footprint while the emphasis moves (no layout jumps).
+    # The whole cue keeps the same footprint while the emphasis moves (no layout jumps) —
+    # except a popping word, which grows by a few percent on purpose.
     extents = [np.nonzero(np.abs(f - background).max(axis=2) > 60)[1] for f in (two, three)]
+    # (an underline may reach a few pixels past the last letter.)
+    slack = 3 if style.pop == 100 else round(style.size * (style.pop - 100) / 100 * 2)
+    slack += 4 if style.highlight == "underline" else 0
     assert (
-        abs(extents[0].min() - extents[1].min()) <= 3
-        and abs(extents[0].max() - extents[1].max()) <= 3
+        abs(extents[0].min() - extents[1].min()) <= slack
+        and abs(extents[0].max() - extents[1].max()) <= slack
     )
+
+
+@requires_ffmpeg
+@requires_libass
+def test_marker_draws_its_colour_around_the_spoken_word_only(tmp_path):
+    preset = DynamicPreset.MARKER
+    marker = PRESETS_V2[preset].marker
+    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules(preset))
+    ass = document(cues, preset, alignment=5, margin_v=0)
+    centres = []
+    for frame in render_frames(ass, [0.8, 1.3, 1.8], tmp_path):
+        mask = colour_mask(frame, marker)
+        assert mask.sum() > 300
+        centres.append(np.nonzero(mask)[1].mean())
+    assert centres[0] + 40 < centres[1] < centres[2] - 40, centres
+
+
+@requires_ffmpeg
+@requires_libass
+def test_reveal_shows_words_only_once_they_are_spoken(tmp_path):
+    preset = DynamicPreset.REVEAL
+    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules(preset))
+    ass = document(cues, preset, alignment=5, margin_v=0)
+    background = np.array([0x2B, 0x3A, 0x55])
+    drawn = [
+        (np.abs(frame - background).max(axis=2) > 60).sum()
+        for frame in render_frames(ass, [0.8, 1.3, 1.8], tmp_path)
+    ]
+    assert 0 < drawn[0] < drawn[1] < drawn[2], drawn  # one word, then two, then all three
+
+
+@requires_caption_fonts
+def test_one_word_at_a_time_makes_single_word_cues():
+    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules(DynamicPreset.ONE_WORD))
+    assert [len(c.words) for c in cues] == [1, 1, 1]
+    for line in dialogue_lines(document(cues, DynamicPreset.ONE_WORD)):
+        assert ",Dynamic,," in line and "Anton" not in line  # the font is in the style line
+    assert "Style: Dynamic,Anton," in document(cues, DynamicPreset.ONE_WORD)
+
+
+def test_display_font_presets_need_their_font_installed(tmp_path):
+    with pytest.raises(CaptionFontUnavailable):
+        rules_for(DynamicPreset.POP, MARGIN_H, tmp_path)  # an empty fonts folder
+    rules_for(DynamicPreset.FOCUS, MARGIN_H, tmp_path)  # the server font needs no file
+
+
+def test_emphasis_tags_are_built_from_the_preset_only():
+    pop = _spoken(PRESETS_V2[DynamicPreset.POP], "HI")
+    assert pop.startswith("{\\1c&H004DE1FF\\t(0,90,\\fscx116\\fscy116)}HI")
+    assert pop.endswith("\\fscx100\\fscy100}")
+    marker = _spoken(PRESETS_V2[DynamicPreset.MARKER], "hi")
+    assert "\\3c&H00ED3A7C\\bord16}hi" in marker and marker.endswith("\\bord6}")
+    assert "\\u1" in _spoken(PRESETS_V2[DynamicPreset.UNDERLINE], "hi")
+    assert _spoken(PRESETS_V2[DynamicPreset.FOCUS], "hi") == "{\\1c&H003BD4FF}hi{\\1c&H00FFFFFF}"
+
+
+@requires_caption_fonts
+def test_glow_softens_the_outline_of_every_event():
+    cues = build_word_cues(ONE_TWO_THREE, clip_duration=3, rules=rules(DynamicPreset.NEON))
+    assert all("\\blur6" in line for line in dialogue_lines(document(cues, DynamicPreset.NEON)))
 
 
 @requires_ffmpeg
@@ -252,7 +375,9 @@ def test_long_lines_render_inside_the_side_margins(tmp_path):
     text = "Nobody tells you what the first night in orbit actually feels like"
     words = [SourceWord(w, 0.1 + 0.15 * i, 0.2 + 0.15 * i) for i, w in enumerate(text.split())]
     for preset in DynamicPreset:
-        cue = build_word_cues(words, clip_duration=3, rules=rules_for(preset, MARGIN_H))[0]
+        if PRESETS_V2[preset].font is not None and not HAVE_FONTS:
+            continue
+        cue = build_word_cues(words, clip_duration=3, rules=rules(preset))[0]
         frame = render_frames(
             document([cue], preset, alignment=5, margin_v=0), [cue.end - 0.05], tmp_path
         )[0]

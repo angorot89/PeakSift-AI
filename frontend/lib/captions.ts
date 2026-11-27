@@ -1,7 +1,22 @@
 import { ApiError, apiFetch, postJson } from "@/lib/api";
 import { stageRanks } from "@/lib/status-sync";
 
-export type DynamicPreset = "focus" | "punch" | "minimal" | "boxed";
+export type DynamicPreset =
+  | "focus"
+  | "punch"
+  | "minimal"
+  | "boxed"
+  // Creator styles (V2.0)
+  | "pop"
+  | "comic"
+  | "bubble"
+  | "one_word"
+  | "neon"
+  | "underline"
+  | "reveal"
+  | "headline"
+  | "marker"
+  | "bold_arabic";
 export type HookStyle = "headline" | "boxed" | "minimal";
 export type HookPosition = "top" | "center";
 export type CaptionTiming = "aligned_word" | "phrase_fallback";
@@ -24,6 +39,20 @@ export type PresetSpec = {
   fade_ms: number;
   grow_from: number;
   grow_ms: number;
+  /** Creator styles (V2.0): the display font family (null = the server's caption font) and its
+   * own em ratio; `available` is false when its font is not installed on this server. */
+  font: string | null;
+  em_per_size: number;
+  available: boolean;
+  one_word: boolean;
+  highlight: "colour" | "marker" | "underline";
+  marker: string | null;
+  marker_outline: number;
+  pop: number;
+  reveal: boolean;
+  glow: number;
+  needs_word_timing: boolean;
+  scripts: string[];
 };
 export type CaptionStyles = {
   renderer: string;

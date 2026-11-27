@@ -41,7 +41,12 @@ from app.schemas.caption_track import (
 )
 from app.services.caption_timing.config import CaptionTimingConfig
 from app.services.caption_timing.pipeline import is_stale
-from app.services.clip_edit.config import CaptionPosition, CaptionTiming, DynamicPreset
+from app.services.clip_edit.config import (
+    WORD_TIMED_PRESETS,
+    CaptionPosition,
+    CaptionTiming,
+    DynamicPreset,
+)
 from app.services.clip_edit.dynamic_text import DynamicCaptionError, dynamic_cues
 from app.services.clip_edit.emoji import emoji_font, split_emoji
 from app.services.storage import StorageProvider
@@ -334,6 +339,11 @@ def caption_preview(
     """The dynamic captions of this clip as the renderer will lay them out, for the editor's
     live preview: the same cue builder, line fitting, word timing and emoji policy."""
     settings = get_settings()
+    if style in WORD_TIMED_PRESETS and timing != CaptionTiming.ALIGNED_WORD:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This caption style needs word timing; generate word sync first",
+        )
     try:
         cues = dynamic_cues(
             clip, db, settings, preset=style, position=position, timing=timing, track_id=track_id

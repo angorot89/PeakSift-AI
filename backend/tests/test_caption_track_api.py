@@ -418,7 +418,7 @@ def test_caption_preview_refuses_unusable_timing_and_respects_ownership(
     url = f"{ctx['clip_base']}/caption-preview"
     response = client.get(url, params={"style": "focus", "track_id": str(uuid.uuid4())})
     assert response.status_code == 409 and "word timing" in response.json()["detail"]
-    assert client.get(url, params={"style": "neon"}).status_code == 422
+    assert client.get(url, params={"style": "sparkle"}).status_code == 422
     client.post("/auth/logout")
     assert client.get(url, params={"style": "focus"}).status_code == 401
     sign_up(client, "intruder@example.com")

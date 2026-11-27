@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from app.core.config import get_settings
+from app.services.clip_edit.caption_fonts import CAPTION_FONTS, font_file
 from app.services.clip_edit.caption_metrics import EM_PER_SIZE
 from app.services.clip_edit.caption_v2 import (
     PRESETS_V2,
@@ -20,6 +21,17 @@ from app.services.clip_edit.dynamic_cues import SourceWord, build_word_cues
 from app.services.clip_edit.hook import HookConfig, HookStyle, hook_ass
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SAFE_AREA_VERSION, caption_placement
 from tests.media_fixtures import requires_ffmpeg, requires_libass
+
+FONTS_DIR = get_settings().caption_fonts_dir
+HAVE_FONTS = all(font_file(key, FONTS_DIR) for key in CAPTION_FONTS)
+
+
+def with_fonts(preset):
+    """A preset parameter, skipped where its display font is not installed."""
+    if PRESETS_V2[preset].font is None:
+        return preset
+    return pytest.param(preset, marks=pytest.mark.skipif(not HAVE_FONTS, reason="fonts missing"))
+
 
 BG = np.array([0x2B, 0x3A, 0x55])
 
@@ -44,11 +56,17 @@ def test_positions_map_into_the_safe_area_not_onto_the_edges():
 
 def text_rows_and_cols(ass: str, at: float, tmp_path: Path):
     (tmp_path / "c.ass").write_text(ass, encoding="utf-8")
+    if HAVE_FONTS and not (tmp_path / "fonts").exists():  # as the pipeline does
+        (tmp_path / "fonts").mkdir()
+        for key in CAPTION_FONTS:
+            path = font_file(key, FONTS_DIR)
+            (tmp_path / "fonts" / path.name).write_bytes(path.read_bytes())
     raw = subprocess.run(
         [
             get_settings().ffmpeg_path, "-v", "error", "-f", "lavfi",
             "-i", f"color=c=0x2B3A55:s={OUTPUT_WIDTH}x{OUTPUT_HEIGHT}:d=3:r=25",
-            "-vf", "subtitles=c.ass", "-ss", f"{at:.2f}", "-frames:v", "1",
+            "-vf", "subtitles=c.ass:fontsdir=fonts" if HAVE_FONTS else "subtitles=c.ass",
+            "-ss", f"{at:.2f}", "-frames:v", "1",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ],
         capture_output=True, check=True, cwd=tmp_path, timeout=60,
@@ -61,14 +79,16 @@ def text_rows_and_cols(ass: str, at: float, tmp_path: Path):
 
 @requires_ffmpeg
 @requires_libass
-@pytest.mark.parametrize("preset", list(DynamicPreset))
+@pytest.mark.parametrize("preset", [with_fonts(p) for p in DynamicPreset])
 @pytest.mark.parametrize("position", list(CaptionPosition))
 def test_rendered_two_line_captions_stay_inside_the_safe_area(preset, position, tmp_path):
     placement = caption_placement(position)
     text = "Nobody tells you what the first night in orbit feels like"
     words = [SourceWord(w, 0.1 + 0.2 * i, 0.25 + 0.2 * i) for i, w in enumerate(text.split())]
-    cue = build_word_cues(words, clip_duration=3, rules=rules_for(preset, placement.margin_h))[0]
-    assert len(cue.line_words()) == 2  # the hardest case: the tallest and widest block
+    rules = rules_for(preset, placement.margin_h, FONTS_DIR)
+    cue = build_word_cues(words, clip_duration=3, rules=rules)[0]
+    # The hardest case: the tallest and widest block (One word shows one word at a time).
+    assert len(cue.line_words()) == (1 if PRESETS_V2[preset].one_word else 2)
     ass = build_dynamic_ass(
         [cue],
         preset=preset,

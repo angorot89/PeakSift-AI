@@ -225,6 +225,9 @@ class Settings(BaseSettings):
     # installed open font. The family is looked up through fontconfig; Arabic and other
     # scripts fall back to installed fonts that have the glyphs (e.g. Noto Sans Arabic).
     caption_font_family: str = Field(default="Noto Sans", pattern=r"^[A-Za-z0-9 _-]{1,64}$")
+    # Caption style fonts (open-licence display fonts, installed by scripts/fetch_caption_fonts.py
+    # and verified against pinned digests; a style whose font is missing cannot be rendered).
+    caption_fonts_dir: str = "fonts"
     caption_max_words: int = Field(default=7, ge=1, le=20)
     caption_max_chars: int = Field(default=32, ge=8, le=80)
 

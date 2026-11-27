@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cueAt, parseState, stateAt, type PreviewCue } from "./caption-timing.ts";
+import { cueAt, parseState, spokenCount, stateAt, type PreviewCue } from "./caption-timing.ts";
 
 const word = (text: string, start: number, end: number, attached = false) => ({ text, start, end, attached });
 const CUES: PreviewCue[] = [
@@ -37,5 +37,20 @@ describe("caption timing", () => {
   it("is empty between cues", () => {
     assert.equal(stateAt(CUES, 1.95), "");
     assert.equal(parseState(""), null);
+  });
+});
+
+describe("reveal", () => {
+  it("counts the words that have started", () => {
+    const cue: PreviewCue = {
+      start: 0,
+      end: 2,
+      timed: true,
+      lines: [[{ text: "one", start: 0.1, end: 0.4, attached: false }, { text: "two", start: 0.6, end: 0.9, attached: false }], [{ text: "three", start: 1.2, end: 1.6, attached: false }]],
+    };
+    assert.equal(spokenCount(cue, 0.05), 0);
+    assert.equal(spokenCount(cue, 0.7), 2);
+    assert.equal(spokenCount(cue, 1.9), 3);
+    assert.equal(spokenCount({ ...cue, timed: false }, 0), Number.POSITIVE_INFINITY);
   });
 });

@@ -26,7 +26,7 @@ from app.models import (
     TranscriptSegment,
 )
 from app.services.caption_timing.contract import TimedWord, TimingOutputError, validate_words
-from app.services.clip_edit.caption_v2 import rules_for
+from app.services.clip_edit.caption_v2 import CaptionFontUnavailable, rules_for
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.config import CaptionPosition, CaptionTiming, DynamicPreset
 from app.services.clip_edit.cuts import CutsConfig, remap_words
@@ -77,7 +77,13 @@ def dynamic_cues(
     removed parts *before* they are grouped, so a cue never spans a join's old pause."""
     clip_seconds = float(clip.duration_seconds)
     duration = cuts.output_duration(clip_seconds) if cuts else clip_seconds
-    rules = rules_for(preset, caption_placement(position).margin_h)
+    try:
+        rules = rules_for(preset, caption_placement(position).margin_h, settings.caption_fonts_dir)
+    except CaptionFontUnavailable:
+        raise DynamicCaptionError(
+            "caption_font_unavailable",
+            "This caption style's font is not installed on this server; choose another style",
+        ) from None
     if timing != CaptionTiming.ALIGNED_WORD:
         phrases = build_cues(
             transcript_segments(clip, db),

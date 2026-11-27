@@ -40,12 +40,14 @@ from app.models import (
 from app.schemas.clip_edit import ClipEditPage, ClipEditRead, EditRequest
 from app.schemas.project import MediaDeletionRead
 from app.services import markets
+from app.services.clip_edit.caption_v2 import CaptionFontUnavailable, preset_font_file
 from app.services.clip_edit.composition import supports_captions, supports_visuals
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
     RENDER_PROFILE_VERTICAL_V1,
     CaptionTiming,
+    DynamicPreset,
     EditConfig,
     Layout,
 )
@@ -191,6 +193,15 @@ def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditCon
             status_code=status.HTTP_409_CONFLICT,
             detail="Text overlays are not available on this server",
         )
+    if config.captions_enabled and isinstance(config.caption_style, DynamicPreset):
+        try:
+            preset_font_file(config.caption_style, get_settings().caption_fonts_dir)
+        except CaptionFontUnavailable:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This caption style's font is not installed on this server; "
+                "choose another style",
+            ) from None
     if config.captions_enabled and config.caption_timing == CaptionTiming.ALIGNED_WORD:
         track = db.get(CaptionTrack, uuid.UUID(str(config.caption_track_id)))
         # Another clip's track is indistinguishable from a missing one (no existence leak).

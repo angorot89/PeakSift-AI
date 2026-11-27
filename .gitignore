@@ -11,6 +11,8 @@ deploy/certs/
 *.onnx
 *.tflite
 backend/models/
+# Caption fonts (fetched by scripts/fetch_caption_fonts.py, never committed)
+backend/fonts/
 
 # ---------- Python ----------
 __pycache__/

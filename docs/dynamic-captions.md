@@ -130,6 +130,9 @@ short first word does not make the text pop.
 
 ### Presets
 
+V2.0 adds ten creator styles with display fonts and word animations; see
+[caption-styles.md](caption-styles.md). The four presets below are unchanged.
+
 | Preset | Size | Weight | Text | Active word | Outline / box |
 | --- | --- | --- | --- | --- | --- |
 | Focus | 112 | bold | white | yellow `#FFD43B` | dark outline |

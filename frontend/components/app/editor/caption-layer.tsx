@@ -9,8 +9,9 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
-import { parseState, stateAt, type PreviewCue } from "@/lib/caption-timing";
-import type { CaptionStyles, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
+import { captionFontFamily } from "@/components/app/editor/caption-fonts";
+import { cueAt, parseState, spokenCount, stateAt, type PreviewCue } from "@/lib/caption-timing";
+import type { CaptionStyles, DynamicPreset, HookPosition, HookStyle, PresetSpec } from "@/lib/captions";
 
 /** The preview's playing video, provided by the stage so overlays follow its clock. */
 export const VideoClockContext = createContext<RefObject<HTMLVideoElement | null> | null>(null);
@@ -98,6 +99,10 @@ type TextLook = {
   shadow: number;
   box: boolean;
   box_alpha: number;
+  // Creator styles (V2.0): a display font with its own em ratio, and a soft glow.
+  font?: string | null;
+  em_per_size?: number;
+  glow?: number;
 };
 
 // Noto Sans' CSS content area (hhea ascent + descent): what an inline background covers.
@@ -106,12 +111,13 @@ const CONTENT_EM = 1.362;
 /** CSS for libass-styled text: same size (em = size × em_per_size), weight, outline or box. */
 function textCss(look: TextLook, spec: CaptionStyles): CSSProperties {
   const h = spec.output_height;
+  const em = look.em_per_size ?? spec.font.em_per_size;
   const css: CSSProperties = {
-    fontSize: ch(look.size * spec.font.em_per_size, h),
-    lineHeight: 1 / spec.font.em_per_size, // libass line height is the font size
+    fontSize: ch(look.size * em, h),
+    lineHeight: 1 / em, // libass line height is the font size
     fontWeight: look.bold ? 700 : 400,
     color: look.text,
-    fontFamily: "var(--font-caption), 'Noto Sans', sans-serif",
+    fontFamily: captionFontFamily(look.font),
     whiteSpace: "nowrap", // the renderer already chose the lines
   };
   if (look.box) {
@@ -121,8 +127,35 @@ function textCss(look: TextLook, spec: CaptionStyles): CSSProperties {
     css.padding = `${ch(vertical, h)} ${ch(look.outline, h)}`;
     css.boxDecorationBreak = "clone";
     css.WebkitBoxDecorationBreak = "clone";
+  } else if (look.glow) {
+    // libass blurs the outline (\\blur): a soft halo of the outline colour around the letters.
+    const ring = outline(ch(look.outline * 0.6, h), look.outline_colour, null);
+    css.textShadow = `${ring}, 0 0 ${ch(look.glow * 2, h)} ${look.outline_colour}, 0 0 ${ch(look.glow * 4, h)} ${look.outline_colour}`;
   } else {
     css.textShadow = outline(ch(look.outline, h), look.outline_colour, look.shadow ? ch(look.shadow, h) : null);
+  }
+  return css;
+}
+
+/** How the spoken word stands out, as the renderer draws it: its colour, a marker outline or an
+ * underline, and a pop (a few percent larger). Every word is inline-block when a style pops, so
+ * the growing word animates like the render. */
+function wordCss(look: PresetSpec, spec: CaptionStyles, active: boolean, colour?: string | null): CSSProperties | undefined {
+  const h = spec.output_height;
+  const css: CSSProperties = {};
+  if (look.pop > 100) {
+    css.display = "inline-block";
+    css.transition = "transform 90ms ease-out";
+    css.transform = active ? `scale(${look.pop / 100})` : "scale(1)";
+  }
+  if (!active) return look.pop > 100 ? css : undefined;
+  css.color = colour ?? look.active;
+  if (look.highlight === "marker" && look.marker) {
+    css.textShadow = outline(ch(look.marker_outline, h), look.marker, null);
+  } else if (look.highlight === "underline") {
+    css.textDecorationLine = "underline";
+    css.textDecorationThickness = ch(look.size * 0.06, h);
+    css.textUnderlineOffset = ch(look.size * 0.08, h);
   }
   return css;
 }
@@ -167,15 +200,21 @@ export function CaptionLayer({
   showSafeArea: boolean;
 }) {
   const [state, setState] = useState("");
+  const [spoken, setSpoken] = useState(Number.POSITIVE_INFINITY);
   const [hookOn, setHookOn] = useState(false);
   const duration = hook?.duration ?? 0;
   const toShort = useShortTime();
+  const look = preset ? spec.presets.find((p) => p.name === preset) : undefined;
+  const reveal = !!look?.reveal;
   useClipTime((t) => {
     setState(cues && preset ? stateAt(cues, t) : "");
+    if (reveal && cues) {
+      const index = cueAt(cues, t);
+      setSpoken(index < 0 ? Number.POSITIVE_INFINITY : spokenCount(cues[index], t));
+    }
     setHookOn(toShort(t) < duration);
   });
 
-  const look = preset ? spec.presets.find((p) => p.name === preset) : undefined;
   const shown = parseState(state);
   const cue = shown && cues ? cues[shown.cue] : null;
   const place = spec.positions[position];
@@ -212,22 +251,27 @@ export function CaptionLayer({
               animationDuration: `${Math.max(look.fade_ms, look.grow_ms)}ms`,
             }}
           >
-            {cue.lines.map((line, l) => (
-              <div key={l} dir="auto">
-                <span style={textCss(look, spec)}>
-                  {line.map((word, w) => {
-                    const text = look.uppercase ? word.text.toUpperCase() : word.text;
-                    const active = shown!.active.has(`${l}:${w}`);
-                    return (
-                      <span key={w}>
-                        {w > 0 && !word.attached ? " " : null}
-                        <span style={active ? { color: look.active } : undefined}>{text}</span>
-                      </span>
-                    );
-                  })}
-                </span>
-              </div>
-            ))}
+            {cue.lines.map((line, l) => {
+              const before = cue.lines.slice(0, l).reduce((n, words) => n + words.length, 0);
+              return (
+                <div key={l} dir="auto">
+                  <span style={textCss(look, spec)}>
+                    {line.map((word, w) => {
+                      const text = look.uppercase ? word.text.toUpperCase() : word.text;
+                      const active = shown!.active.has(`${l}:${w}`);
+                      // Reveal: words not yet spoken keep their place but are not drawn.
+                      const hidden = reveal && before + w >= spoken;
+                      return (
+                        <span key={w} style={hidden ? { opacity: 0 } : undefined}>
+                          {w > 0 && !word.attached ? " " : null}
+                          <span style={wordCss(look, spec, active)}>{text}</span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -250,20 +294,44 @@ export function CaptionLayer({
 export function PresetSample({ spec, preset }: { spec: CaptionStyles; preset: DynamicPreset }) {
   const look = spec.presets.find((p) => p.name === preset);
   if (!look) return null;
-  const words = ["say", "every", "word"];
-  const scale = 0.16; // of the 1920 canvas: readable inside a card
+  const arabic = look.scripts[0] === "arabic";
+  const words = look.one_word ? ["every"] : arabic ? ["قل", "كل", "كلمة"] : ["say", "every", "word"];
+  const scale = look.one_word ? 0.11 : 0.16; // of the 1920 canvas: readable inside a card
   const css = textCss(look, spec);
+  const px = (value: number) => `${Math.max(1, value * scale).toFixed(1)}px`;
+  const ring = look.box ? undefined : outline(px(look.glow ? look.outline * 0.6 : look.outline), look.outline_colour, null);
   return (
     <span
       className="text-center"
-      style={{ ...css, fontSize: `${(look.size * spec.font.em_per_size * scale).toFixed(1)}px`, textShadow: look.box ? undefined : outline(`${Math.max(1, look.outline * scale).toFixed(1)}px`, look.outline_colour, null), padding: look.box ? `1px ${Math.max(2, look.outline * scale).toFixed(1)}px` : undefined }}
+      dir={arabic ? "rtl" : undefined}
+      style={{
+        ...css,
+        fontSize: `${(look.size * look.em_per_size * scale).toFixed(1)}px`,
+        textShadow: look.glow && ring ? `${ring}, 0 0 ${px(look.glow * 3)} ${look.outline_colour}` : ring,
+        padding: look.box ? `1px ${px(look.outline)}` : undefined,
+      }}
     >
-      {words.map((w, i) => (
-        <span key={w}>
-          {i ? " " : null}
-          <span style={i === 1 ? { color: look.active } : undefined}>{look.uppercase ? w.toUpperCase() : w}</span>
-        </span>
-      ))}
+      {words.map((w, i) => {
+        const active = look.one_word || i === 1;
+        const css = wordCss(look, spec, active);
+        const shown = look.reveal && i === 2 ? { opacity: 0.18 } : undefined;
+        return (
+          <span key={w} style={shown}>
+            {i ? " " : null}
+            <span
+              style={
+                css && look.highlight === "marker" && active && look.marker
+                  ? { ...css, textShadow: outline(px(look.marker_outline), look.marker, null) }
+                  : css && look.highlight === "underline" && active
+                    ? { ...css, textDecorationThickness: "2px", textUnderlineOffset: "3px" }
+                    : css
+              }
+            >
+              {look.uppercase ? w.toUpperCase() : w}
+            </span>
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -311,7 +379,7 @@ export function CaptionSampleLayer({
                   return (
                     <span key={w}>
                       {w > 0 ? " " : null}
-                      <span style={on ? { color: activeColour ?? look.active } : undefined}>{text}</span>
+                      <span style={wordCss(look, spec, on, activeColour)}>{text}</span>
                     </span>
                   );
                 })}

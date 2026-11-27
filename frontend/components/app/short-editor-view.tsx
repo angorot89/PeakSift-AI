@@ -1461,7 +1461,17 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   {/* Word sync must exist before word-synced captions can render, so it is never tucked away then. */}
                   {awaitingWords ? timingPanel : null}
                   {spec ? (
-                    <PresetCards spec={spec} value={preset} onChange={edit(setPreset)} name={`${id}-preset`} disabled={!captions} />
+                    <PresetCards
+                      spec={spec}
+                      value={preset}
+                      onChange={(next) => {
+                        edit(setPreset)(next);
+                        // One word / Reveal show words as they are spoken: they need word sync.
+                        if (spec.presets.find((p) => p.name === next)?.needs_word_timing) setTiming("aligned_word");
+                      }}
+                      name={`${id}-preset`}
+                      disabled={!captions}
+                    />
                   ) : null}
                   {typeof brand?.caption_emphasis === "string" ? (
                     <p className="flex items-center gap-2 rounded-block border border-border bg-surface-2/60 px-3 py-2 text-small text-muted">

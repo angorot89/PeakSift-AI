@@ -131,6 +131,16 @@ const DYNAMIC_LABELS: Record<DynamicPreset, string> = {
   punch: "Punch",
   minimal: "Minimal",
   boxed: "Boxed",
+  pop: "Pop",
+  comic: "Comic",
+  bubble: "Bubble",
+  one_word: "One word",
+  neon: "Neon",
+  underline: "Underline",
+  reveal: "Reveal",
+  headline: "Headline",
+  marker: "Marker",
+  bold_arabic: "Bold Arabic",
 };
 
 export const POSITION_OPTIONS: Array<{ value: CaptionPosition; label: string }> = [

@@ -68,7 +68,22 @@ export type Hydration = { draft: EditorDraft; notes: string[] };
 
 /** V0.6 phrase-caption styles are shown with the closest dynamic preset (and said so). */
 const CLASSIC_STYLES: Record<string, DynamicPreset> = { clean: "minimal", bold: "punch", creator: "boxed" };
-const DYNAMIC = new Set<string>(["focus", "punch", "minimal", "boxed"]);
+const DYNAMIC = new Set<string>([
+  "focus",
+  "punch",
+  "minimal",
+  "boxed",
+  "pop",
+  "comic",
+  "bubble",
+  "one_word",
+  "neon",
+  "underline",
+  "reveal",
+  "headline",
+  "marker",
+  "bold_arabic",
+]);
 const LAYOUTS = new Set<string>(["center_crop", "blur_background", "fit", "smart_reframe"]);
 const DUCKING = new Set<string>(["off", "light", "medium", "strong"]);
 

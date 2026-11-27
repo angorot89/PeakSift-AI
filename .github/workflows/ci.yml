@@ -161,6 +161,11 @@ jobs:
         # Each family the app expects must resolve by name and draw real glyphs (not
         # missing-glyph boxes): Noto Sans, Noto Sans Arabic, and a monochrome emoji font.
         run: python scripts/caption_font_probe.py
+      - name: Caption style fonts (pinned files of google/fonts, sha256-verified, never committed)
+        # The creator caption styles use six open-licence display fonts (OFL / Apache). The
+        # operator script downloads exactly the pinned files and refuses any other bytes; the
+        # creator-style suites below render with them (not skipped in CI).
+        run: python scripts/fetch_caption_fonts.py
       - name: Dynamic captions render end to end (word sync, hook, safe area)
         # Known words ONE / TWO / THREE + a hook through the real compose_short: checks the
         # MP4 (1080x1920, H.264, AAC, duration) and frames (active word moves, hook shown then

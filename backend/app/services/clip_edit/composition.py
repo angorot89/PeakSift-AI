@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.services.clip_edit.brand_render import BrandLayers, brand_graph, brand_inputs
+from app.services.clip_edit.caption_fonts import WORKSPACE_FONTS_DIR
 from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH, Layout
 from app.services.clip_edit.smart_crop import CropPoint, smart_crop_filter
 from app.services.clip_render.renderer import (
@@ -236,6 +237,7 @@ def build_edit_command(
     brand_graph: str | None = None,
     brand_label: str | None = None,
     extra_seconds: float = 0.0,
+    caption_fonts: bool = False,
 ) -> list[str]:
     # Smart reframe passes its own validated crop graph; every other layout uses constants.
     graph = video_graph if video_graph is not None else layout_filter(layout)
@@ -257,7 +259,9 @@ def build_edit_command(
         audio_label = "[aud]"
     if captions:
         # A fixed relative name: FFmpeg runs with the workspace as its working directory.
-        graph += f";{picture}subtitles=filename={CAPTIONS_FILENAME}[out]"
+        # A caption style's display font is copied into the workspace's fonts/ (fixed names).
+        fonts = f":fontsdir={WORKSPACE_FONTS_DIR}" if caption_fonts else ""
+        graph += f";{picture}subtitles=filename={CAPTIONS_FILENAME}{fonts}[out]"
         video_label = "[out]"
     else:
         video_label = picture
@@ -425,6 +429,9 @@ def compose_short(
         brand_graph=brand_segment,
         brand_label=brand_label,
         extra_seconds=brand.extra_seconds if brand_segment else 0.0,
+        caption_fonts=captions
+        and workspace is not None
+        and (workspace / WORKSPACE_FONTS_DIR).is_dir(),
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)

@@ -55,6 +55,21 @@ class DynamicPreset(StrEnum):
     PUNCH = "punch"
     MINIMAL = "minimal"
     BOXED = "boxed"
+    # Creator styles (V2.0)
+    POP = "pop"
+    COMIC = "comic"
+    BUBBLE = "bubble"
+    ONE_WORD = "one_word"
+    NEON = "neon"
+    UNDERLINE = "underline"
+    REVEAL = "reveal"
+    HEADLINE = "headline"
+    MARKER = "marker"
+    BOLD_ARABIC = "bold_arabic"
+
+
+# Styles that show words as they are spoken need real word timing (never estimated).
+WORD_TIMED_PRESETS = frozenset({DynamicPreset.ONE_WORD, DynamicPreset.REVEAL})
 
 
 class CaptionTiming(StrEnum):
@@ -220,6 +235,8 @@ class EditConfig:
         timing, track = None, None
         if isinstance(style, DynamicPreset):  # caption_v2: timing (and its track) are explicit
             timing = CaptionTiming(caption_timing) if caption_timing else CaptionTiming.ALIGNED_WORD
+            if style in WORD_TIMED_PRESETS and timing != CaptionTiming.ALIGNED_WORD:
+                raise ValueError("This caption style needs word timing; generate word sync first")
             if timing == CaptionTiming.ALIGNED_WORD:
                 if caption_track_id is None:
                     raise ValueError("Word-synced captions need a completed word timing track")

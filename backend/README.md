@@ -252,6 +252,7 @@ Install the face detector model once per server (it is never committed or downlo
 
 ```bash
 python scripts/fetch_reframe_model.py      # pinned URL + sha256 → ./models/face_detection_yunet_2023mar.onnx
+python scripts/fetch_caption_fonts.py      # caption style fonts: pinned google/fonts files + sha256 → ./fonts
 python scripts/smart_crop_probe.py         # optional: this FFmpeg renders the deepest allowed crop path
 PEAKSIFT_REAL_DETECTOR=1 REFRAME_TEST_FACE_IMAGE=/path/to/face.png pytest tests/test_reframe_detection.py -k real
 ```

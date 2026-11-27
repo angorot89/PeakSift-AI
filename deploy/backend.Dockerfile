@@ -39,9 +39,13 @@ RUN pip install ".[production]" && rm -rf build *.egg-info
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY scripts ./scripts
+# The caption style fonts (open-licence display fonts): exactly the pinned google/fonts files,
+# sha256-verified by the script, with their licence files, read-only for the service user.
+RUN python scripts/fetch_caption_fonts.py --dir /app/fonts
 # Scratch for jobs and model caches live on volumes owned by the service user.
 RUN mkdir -p /work /models && chown peaksift:peaksift /work /models
 ENV WORK_ROOT=/work \
+    CAPTION_FONTS_DIR=/app/fonts \
     HF_HOME=/models/huggingface \
     REFRAME_MODEL_PATH=/models/face_detection_yunet_2023mar.onnx \
     SEMANTIC_MODEL_DIR=/models/clip-vit-b-32

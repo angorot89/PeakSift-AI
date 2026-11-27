@@ -15,18 +15,39 @@ from app.schemas.caption_style import (
     SafeAreaRead,
 )
 from app.services.clip_edit import hook
+from app.services.clip_edit.caption_fonts import CAPTION_FONTS, em_per_size, font_file
 from app.services.clip_edit.caption_metrics import EM_PER_SIZE
 from app.services.clip_edit.caption_v2 import PRESETS_V2
 from app.services.clip_edit.config import (
     CAPTION_RENDERER_V2,
     OUTPUT_HEIGHT,
     OUTPUT_WIDTH,
+    WORD_TIMED_PRESETS,
     CaptionPosition,
+    DynamicPreset,
 )
 from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL, SAFE_AREA_VERSION, caption_placement
 
 router = APIRouter(tags=["captions"])
+
+
+def _creator_fields(preset: DynamicPreset, style, fonts_dir: str) -> dict:
+    path = font_file(style.font, fonts_dir) if style.font else None
+    return {
+        "font": CAPTION_FONTS[style.font].family if style.font else None,
+        "em_per_size": round(em_per_size(path), 4) if path is not None else EM_PER_SIZE,
+        "available": style.font is None or path is not None,
+        "one_word": style.one_word,
+        "highlight": style.highlight,
+        "marker": style.marker,
+        "marker_outline": style.marker_outline,
+        "pop": style.pop,
+        "reveal": style.reveal,
+        "glow": style.glow,
+        "needs_word_timing": preset in WORD_TIMED_PRESETS,
+        "scripts": list(style.scripts),
+    }
 
 
 @router.get("/caption-styles", response_model=CaptionStylesRead)
@@ -67,6 +88,7 @@ def caption_styles(_user: CurrentUser) -> CaptionStylesRead:
                 fade_ms=style.fade_ms,
                 grow_from=style.grow_from,
                 grow_ms=style.grow_ms,
+                **_creator_fields(preset, style, settings.caption_fonts_dir),
             )
             for preset, style in PRESETS_V2.items()
         ],

@@ -20,6 +20,7 @@ Progress is honest stage progress: 5 claimed, 15 captions prepared, 85 rendered,
 """
 
 import logging
+import shutil
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -49,8 +50,13 @@ from app.services.audio_mix.plan import SAMPLE_RATE as MIX_SAMPLE_RATE
 from app.services.audio_mix.plan import mix_request
 from app.services.clip_edit.brand import logo_plan
 from app.services.clip_edit.brand_render import BrandLayers, end_card_ass
+from app.services.clip_edit.caption_fonts import WORKSPACE_FONTS_DIR
 from app.services.clip_edit.caption_styles import build_ass_document
-from app.services.clip_edit.caption_v2 import build_dynamic_ass
+from app.services.clip_edit.caption_v2 import (
+    CaptionFontUnavailable,
+    build_dynamic_ass,
+    preset_font_file,
+)
 from app.services.clip_edit.captions import Cue, SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
 from app.services.clip_edit.config import (
@@ -305,6 +311,8 @@ def _execute(
         extra_events += card_events
     # No speech in this range, no hook and no end card: render without a text layer, honestly.
     captions = bool(cues) or bool(extra_events)
+    if captions and dynamic and cues:
+        _install_caption_font(workspace, config, settings)
     if captions and dynamic:
         placement = caption_placement(config.caption_position)
         store.captions_path(edit.id, attempt).write_text(
@@ -608,6 +616,23 @@ def _crop_path(edit: ClipEdit, db: Session, config: EditConfig) -> list[CropPoin
         return crop_points_from(keyframes)
     except ValueError:
         raise PipelineFailure("invalid_path", "The framing path is not valid") from None
+
+
+def _install_caption_font(workspace: Path, config: EditConfig, settings: Settings) -> None:
+    """Copy the style's display font (verified against its pinned file) into the workspace,
+    where libass finds it by the fixed relative name ``fonts/``."""
+    try:
+        path = preset_font_file(config.caption_style, settings.caption_fonts_dir)
+    except CaptionFontUnavailable:
+        raise PipelineFailure(
+            "caption_font_unavailable",
+            "This caption style's font is not installed on this server; choose another style",
+        ) from None
+    if path is None:
+        return
+    target = workspace / WORKSPACE_FONTS_DIR
+    target.mkdir(exist_ok=True)
+    shutil.copyfile(path, target / path.name)
 
 
 def _dynamic_cues(edit: ClipEdit, db: Session, settings: Settings, config: EditConfig) -> list:

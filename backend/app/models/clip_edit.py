@@ -98,7 +98,8 @@ class ClipEdit(Base):
             "AND ((caption_renderer = 'caption_v1' "
             "AND caption_style IN ('clean', 'bold', 'creator')) "
             "OR (caption_renderer = 'caption_v2' "
-            "AND caption_style IN ('focus', 'punch', 'minimal', 'boxed')))) "
+            "AND caption_style IN ('focus', 'punch', 'minimal', 'boxed', 'pop', 'comic', 'bubble', "
+            "'one_word', 'neon', 'underline', 'reveal', 'headline', 'marker', 'bold_arabic')))) "
             "OR (NOT captions_enabled AND caption_style IS NULL AND caption_position IS NULL "
             "AND caption_renderer IS NULL)",
             name="ck_clip_edits_captions",

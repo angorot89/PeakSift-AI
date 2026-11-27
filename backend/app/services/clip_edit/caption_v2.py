@@ -10,8 +10,15 @@ progressively and keep earlier words highlighted, which is not "the word being s
 Phrase-timed cues are one event with no emphasis.
 
 **Entrance.** The first event of a cue fades in and grows from a slightly smaller scale over a
-fraction of a second; later events of the same cue have no animation. No bouncing, flashing
-or per-word scaling (which would shift the surrounding words).
+fraction of a second; later events of the same cue have no animation.
+
+**Creator styles** (V2.0, the StreamLadder editor study) add, per preset and only through these
+fields: an allow-listed display font (``caption_fonts.py``), one word at a time (single-word
+cues), how the spoken word stands out (colour, a coloured marker outline, or an underline), a
+short "pop" of the spoken word (it grows by a few percent as it is spoken; lines are fitted with
+room for it), "reveal" (words appear as they are spoken; unspoken ones are drawn transparent so
+nothing moves) and a soft glow (``\blur``). The four original presets keep exactly their
+earlier output.
 
 **Lines.** Line breaks come from the cue builder (``\\N``); libass wrapping is disabled
 (``WrapStyle: 2``), so the browser preview and the render break lines identically.
@@ -28,8 +35,10 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from app.services.branding.colors import normalize_color
+from app.services.clip_edit.caption_fonts import CAPTION_FONTS, font_file, text_width_in
 from app.services.clip_edit.caption_metrics import text_width
 from app.services.clip_edit.config import (
     OUTPUT_HEIGHT,
@@ -66,6 +75,16 @@ class V2Style:
     fade_ms: int
     grow_from: int  # entrance scale in percent (100 = no scale animation)
     grow_ms: int
+    # Creator styles (V2.0). The defaults are the original behaviour.
+    font: str | None = None  # a CAPTION_FONTS key; None = the server's caption font
+    one_word: bool = False  # one word at a time
+    highlight: str = "colour"  # how the spoken word stands out: colour | marker | underline
+    marker: str | None = None  # marker: the outline colour around the spoken word
+    marker_outline: float = 0  # marker: its outline width
+    pop: int = 100  # the spoken word's scale in percent (100 = none)
+    reveal: bool = False  # words appear as they are spoken
+    glow: float = 0  # \blur of the outline (0 = crisp)
+    scripts: tuple[str, ...] = ("latin", "arabic")  # what the style is made for (display)
 
 
 PRESETS_V2: dict[DynamicPreset, V2Style] = {
@@ -141,6 +160,210 @@ PRESETS_V2: dict[DynamicPreset, V2Style] = {
         grow_from=96,
         grow_ms=120,
     ),
+    # --- Creator styles (V2.0) ---------------------------------------------------------------
+    # Condensed and loud: uppercase Anton, the spoken word yellow and popping.
+    DynamicPreset.POP: V2Style(
+        label="Pop",
+        size=132,
+        bold=False,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#FFE14D",
+        outline_colour="#000000",
+        outline=9,
+        shadow=3,
+        box=False,
+        box_alpha=0,
+        max_line_width=880,
+        fade_ms=80,
+        grow_from=92,
+        grow_ms=110,
+        font="anton",
+        pop=116,
+        scripts=("latin",),
+    ),
+    # Comic-book lettering, the spoken word in hot pink.
+    DynamicPreset.COMIC: V2Style(
+        label="Comic",
+        size=138,
+        bold=False,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#FF4FA3",
+        outline_colour="#000000",
+        outline=10,
+        shadow=5,
+        box=False,
+        box_alpha=0,
+        max_line_width=880,
+        fade_ms=80,
+        grow_from=90,
+        grow_ms=120,
+        font="bangers",
+        pop=110,
+        scripts=("latin",),
+    ),
+    # Round sticker letters with a thick violet outline.
+    DynamicPreset.BUBBLE: V2Style(
+        label="Bubble",
+        size=116,
+        bold=False,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#FFE14D",
+        outline_colour="#5B21B6",
+        outline=12,
+        shadow=0,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=90,
+        grow_from=94,
+        grow_ms=120,
+        font="luckiest_guy",
+        scripts=("latin",),
+    ),
+    # Big single words, one after another.
+    DynamicPreset.ONE_WORD: V2Style(
+        label="One word",
+        size=176,
+        bold=False,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#FFFFFF",
+        outline_colour="#000000",
+        outline=11,
+        shadow=4,
+        box=False,
+        box_alpha=0,
+        max_line_width=900,
+        fade_ms=40,
+        grow_from=88,
+        grow_ms=90,
+        font="anton",
+        one_word=True,
+        scripts=("latin",),
+    ),
+    # White letters with a soft pink glow; the spoken word glows pink.
+    DynamicPreset.NEON: V2Style(
+        label="Neon",
+        size=108,
+        bold=False,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FF7AD9",
+        outline_colour="#FF2BB5",
+        outline=5,
+        shadow=0,
+        box=False,
+        box_alpha=0,
+        max_line_width=840,
+        fade_ms=120,
+        grow_from=100,
+        grow_ms=0,
+        font="titan_one",
+        glow=6,
+        scripts=("latin",),
+    ),
+    # Clean and bold; the spoken word yellow and underlined.
+    DynamicPreset.UNDERLINE: V2Style(
+        label="Underline",
+        size=104,
+        bold=True,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFD43B",
+        outline_colour="#000000",
+        outline=7,
+        shadow=2,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=90,
+        grow_from=96,
+        grow_ms=120,
+        highlight="underline",
+    ),
+    # Words appear as they are spoken.
+    DynamicPreset.REVEAL: V2Style(
+        label="Reveal",
+        size=104,
+        bold=True,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFFFFF",
+        outline_colour="#000000",
+        outline=7,
+        shadow=2,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=60,
+        grow_from=100,
+        grow_ms=0,
+        reveal=True,
+    ),
+    # Tall uppercase headline letters with a soft drop shadow.
+    DynamicPreset.HEADLINE: V2Style(
+        label="Headline",
+        size=150,
+        bold=False,
+        uppercase=True,
+        text="#FFFFFF",
+        active="#FF9F1C",
+        outline_colour="#000000",
+        outline=3,
+        shadow=7,
+        box=False,
+        box_alpha=0,
+        max_line_width=880,
+        fade_ms=90,
+        grow_from=94,
+        grow_ms=120,
+        font="bebas_neue",
+        scripts=("latin",),
+    ),
+    # The spoken word sits on a thick violet marker stroke.
+    DynamicPreset.MARKER: V2Style(
+        label="Marker",
+        size=104,
+        bold=True,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFFFFF",
+        outline_colour="#000000",
+        outline=6,
+        shadow=0,
+        box=False,
+        box_alpha=0,
+        max_line_width=820,
+        fade_ms=90,
+        grow_from=96,
+        grow_ms=120,
+        highlight="marker",
+        marker="#7C3AED",
+        marker_outline=16,
+    ),
+    # Bold display letters drawn for Arabic and Latin alike.
+    DynamicPreset.BOLD_ARABIC: V2Style(
+        label="Bold Arabic",
+        size=118,
+        bold=False,
+        uppercase=False,
+        text="#FFFFFF",
+        active="#FFD43B",
+        outline_colour="#000000",
+        outline=8,
+        shadow=2,
+        box=False,
+        box_alpha=0,
+        max_line_width=860,
+        fade_ms=90,
+        grow_from=94,
+        grow_ms=120,
+        font="lalezar",
+        scripts=("arabic", "latin"),
+    ),
 }
 
 
@@ -150,23 +373,59 @@ def ass_colour(rgb: str, alpha: int = 0) -> str:
     return f"&H{alpha:02X}{b}{g}{r}".upper()
 
 
+# Measured display-font widths agree with libass within about 1 %; keep a little room.
+FONT_WIDTH_MARGIN = 1.03
+
+
+class CaptionFontUnavailable(Exception):
+    """A preset's font is not installed (or does not match its pinned file) on this server."""
+
+
+def preset_font_file(preset: DynamicPreset, fonts_dir: str | Path) -> Path | None:
+    """The installed file of the preset's display font; None for the server's caption font.
+    Raises ``CaptionFontUnavailable`` when the preset needs a font that is not installed."""
+    style = PRESETS_V2[preset]
+    if style.font is None:
+        return None
+    path = font_file(style.font, fonts_dir)
+    if path is None:
+        raise CaptionFontUnavailable(style.font)
+    return path
+
+
 def line_capacity(preset: DynamicPreset, margin_h: int) -> float:
     """Pixels one line may use: the readability cap, or the space between the side margins
-    (minus the outline or box padding on both sides) — whichever is smaller."""
+    (minus the outline or box padding on both sides) — whichever is smaller. A popping word
+    grows, so its line keeps room for it."""
     style = PRESETS_V2[preset]
-    return min(style.max_line_width, OUTPUT_WIDTH - 2 * margin_h - 2 * style.outline)
+    outline = max(style.outline, style.marker_outline)
+    room = min(style.max_line_width, OUTPUT_WIDTH - 2 * margin_h - 2 * outline)
+    return room * 100 / max(100, style.pop) if style.pop > 100 else room
 
 
-def rules_for(preset: DynamicPreset, margin_h: int) -> CueRules:
-    """Cue rules that fit lines by the real rendered width of this preset's text."""
+def rules_for(
+    preset: DynamicPreset, margin_h: int, fonts_dir: str | Path | None = None
+) -> CueRules:
+    """Cue rules that fit lines by the real rendered width of this preset's text (in its
+    display font when it has one; ``fonts_dir`` is then required)."""
     style = PRESETS_V2[preset]
+    path = preset_font_file(preset, fonts_dir) if style.font and fonts_dir is not None else None
+    if style.font and path is None:
+        raise CaptionFontUnavailable(style.font)
 
     def measure(text: str) -> float:
-        return text_width(
-            text.upper() if style.uppercase else text, bold=style.bold, size=style.size
-        )
+        shown = text.upper() if style.uppercase else text
+        if path is not None:
+            font = CAPTION_FONTS[style.font]
+            return text_width_in(shown, font=font, path=path, size=style.size) * FONT_WIDTH_MARGIN
+        return text_width(shown, bold=style.bold, size=style.size)
 
-    return CueRules(line_units=line_capacity(preset, margin_h), measure=measure, space=measure(" "))
+    rules = CueRules(
+        line_units=line_capacity(preset, margin_h), measure=measure, space=measure(" ")
+    )
+    if style.one_word:
+        rules = replace(rules, max_words=1, min_words=1, max_lines=1)
+    return rules
 
 
 def escape_ass_text_v2(text: str, *, uppercase: bool = False) -> str:
@@ -208,10 +467,37 @@ STYLE_FORMAT = (
 EVENT_FORMAT = "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
 
 
-def _cue_text(cue: WordCue, active: int | None, style: V2Style, emoji_family: str | None) -> str:
+POP_MS = 90  # the spoken word grows to its pop size over this long
+
+
+def _spoken(style: V2Style, text: str) -> str:
+    """The spoken word with its emphasis (colour, marker or underline, and pop)."""
+    on = [f"\\1c{ass_colour(style.active)}"]
+    off = [f"\\1c{ass_colour(style.text)}"]
+    if style.highlight == "marker" and style.marker:
+        on += [f"\\3c{ass_colour(style.marker)}", f"\\bord{style.marker_outline:g}"]
+        off += [f"\\3c{ass_colour(style.outline_colour)}", f"\\bord{style.outline:g}"]
+    elif style.highlight == "underline":
+        on.append("\\u1")
+        off.append("\\u0")
+    if style.pop > 100:
+        on.append(f"\\t(0,{POP_MS},\\fscx{style.pop}\\fscy{style.pop})")
+        off.append("\\fscx100\\fscy100")
+    return "{" + "".join(on) + "}" + text + "{" + "".join(off) + "}"
+
+
+def _cue_text(
+    cue: WordCue,
+    active: int | None,
+    style: V2Style,
+    emoji_family: str | None,
+    at: float | None = None,
+) -> str:
     parts: list[str] = []
-    base = ass_colour(style.text)
-    highlight = ass_colour(style.active)
+    hidden_from = None
+    if style.reveal and cue.timed and at is not None:
+        # Words not yet spoken at ``at`` are drawn fully transparent (the layout stays put).
+        hidden_from = next((i for i, w in enumerate(cue.words) if w.start > at + 1e-6), None)
     for line_index, line in enumerate(cue.line_words()):
         if line_index:
             parts.append("\\N")
@@ -226,8 +512,10 @@ def _cue_text(cue: WordCue, active: int | None, style: V2Style, emoji_family: st
                 continue  # an emoji-only word on a server that cannot draw emoji
             if drawn and not word.attached:
                 parts.append(" ")
+            if hidden_from is not None and index == hidden_from:
+                parts.append("{\\alpha&HFF&}")
             if active is not None and index == active:
-                parts.append(f"{{\\1c{highlight}}}{text}{{\\1c{base}}}")
+                parts.append(_spoken(style, text))
             else:
                 parts.append(text)
             drawn = True
@@ -287,6 +575,8 @@ def build_dynamic_ass(
     emoji_family: str | None = None,
     active_colour: str | None = None,
 ) -> str:
+    # ``font_family`` is the server's caption font; a preset with a display font names that
+    # font's family instead (its file is copied next to the captions by the pipeline).
     """The short's ASS document. ``emoji_family`` is the monochrome emoji font libass can
     draw (see ``emoji.py``); None leaves emoji out of the burned-in text. ``active_colour`` is
     a brand's caption emphasis (``#RRGGBB``, already checked for readability) replacing the
@@ -294,6 +584,8 @@ def build_dynamic_ass(
     if not _FONT_NAME.fullmatch(font_family):
         raise ValueError("Unsupported caption font family name")
     style = PRESETS_V2[preset]
+    if style.font is not None:
+        font_family = CAPTION_FONTS[style.font].family
     if active_colour is not None:
         style = replace(style, active=normalize_color(active_colour))
     if style.box and alignment != 5:  # libass pads the box by the outline: keep it inside too
@@ -336,7 +628,9 @@ def build_dynamic_ass(
             if first is None:
                 first = _centis(a)
             entrance = _entrance(style, (_centis(a) - first) * 10)
-            body = _cue_text(cue, active, style, emoji_family)
+            if style.glow:
+                entrance = (entrance[:-1] if entrance else "{") + f"\\blur{style.glow:g}}}"
+            body = _cue_text(cue, active, style, emoji_family, a)
             lines.append(f"Dialogue: 0,{start},{end},Dynamic,,0,0,0,,{entrance}{body}")
     lines.extend(extra_events)
     return "\n".join(lines) + "\n"

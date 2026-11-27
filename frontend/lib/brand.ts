@@ -3,6 +3,7 @@
 
 import { API_URL, apiFetch, postJson } from "@/lib/api";
 import type { LogoCorner, LogoSize } from "@/lib/brand-rules";
+import type { DynamicPreset } from "@/lib/captions";
 
 export type BrandLogo = {
   id: string;
@@ -84,7 +85,7 @@ export type TemplateSettings = {
   version?: string;
   framing: "auto" | "smart_reframe" | "blur_background" | "center_crop" | "fit";
   captions: boolean;
-  caption_preset: "focus" | "punch" | "minimal" | "boxed" | null;
+  caption_preset: DynamicPreset | null;
   caption_position: "top" | "center" | "bottom" | null;
   hook: boolean;
   hook_style: "headline" | "boxed" | "minimal" | null;
