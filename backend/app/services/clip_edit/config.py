@@ -15,6 +15,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from app.services.audio_mix.config import AudioMix
+from app.services.clip_edit.cuts import CutsConfig
 from app.services.visuals.config import VisualsConfig
 
 if TYPE_CHECKING:
@@ -121,6 +122,9 @@ class EditConfig:
     # Optional brand identity (logo, caption emphasis, hook accent, appended end card), copied
     # from the creator's brand when the Short was made; None renders exactly as before.
     brand: "BrandConfig | None" = None
+    # Optional parts of the clip left out (Tighten: pauses, deleted segments); None renders
+    # the whole clip exactly as before.
+    cuts: CutsConfig | None = None
 
     @property
     def caption_renderer(self) -> str | None:
@@ -154,6 +158,7 @@ class EditConfig:
         audio: dict[str, Any] | AudioMix | None = None,
         visuals: dict[str, Any] | VisualsConfig | None = None,
         brand: "dict[str, Any] | BrandConfig | None" = None,
+        cuts: "dict[str, Any] | list | CutsConfig | None" = None,
     ) -> "EditConfig":
         """Validate against the allow-lists (ValueError otherwise) and normalize."""
         from app.services.clip_edit.brand import BrandConfig
@@ -173,6 +178,7 @@ class EditConfig:
             else None
         )
         mix = audio if isinstance(audio, AudioMix) else AudioMix.create(audio)
+        removed = CutsConfig.create(cuts)
         shown = visuals if isinstance(visuals, VisualsConfig) else VisualsConfig.create(visuals)
         ratio = AspectRatio(aspect_ratio)
         chosen_layout = Layout(layout)
@@ -195,7 +201,7 @@ class EditConfig:
                 branded = branded.without(emphasis=True)
             return cls(
                 ratio, chosen_layout, False, None, None, analysis, *focus, hook, audio=mix,
-                visuals=shown, brand=branded,
+                visuals=shown, brand=branded, cuts=removed,
             )  # fmt: skip
         style: CaptionStyle | DynamicPreset
         if not caption_style:
@@ -220,7 +226,7 @@ class EditConfig:
                 track = str(uuid.UUID(str(caption_track_id)))
         return cls(
             ratio, chosen_layout, True, style, position, analysis, *focus, hook, timing, track,
-            audio=mix, visuals=shown, brand=branded,
+            audio=mix, visuals=shown, brand=branded, cuts=removed,
         )  # fmt: skip
 
     @classmethod
@@ -248,14 +254,16 @@ class EditConfig:
             audio=AudioMix.from_snapshot(snapshot.get("audio")),
             visuals=VisualsConfig.from_snapshot(snapshot.get("visuals")),
             brand=_brand_from_snapshot(snapshot.get("brand")),
+            cuts=CutsConfig.from_snapshot(snapshot.get("cuts")),
         )
 
     def snapshot(self) -> dict[str, Any]:
         """The exact parameters a render uses, stored on the edit (never future defaults).
 
-        The ``reframe``, ``focus``, ``hook``, ``audio``, ``visuals`` and ``brand`` keys — and the
-        dynamic-caption keys (renderer, timing, track, safe area) — exist only when used, so
-        every earlier configuration keeps exactly its previous snapshot and fingerprint
+        The ``reframe``, ``focus``, ``hook``, ``audio``, ``visuals``, ``brand`` and ``cuts``
+        keys — and the dynamic-caption keys (renderer, timing, track, safe area) — exist only
+        when used, so every earlier configuration keeps exactly its previous snapshot and
+        fingerprint
         (repeat requests still deduplicate).
         """
         snapshot: dict[str, Any] = {
@@ -290,7 +298,13 @@ class EditConfig:
             snapshot["visuals"] = self.visuals.snapshot()
         if self.brand is not None:
             snapshot["brand"] = self.brand.snapshot()
+        if self.cuts is not None:
+            snapshot["cuts"] = self.cuts.snapshot()
         return snapshot
+
+    def output_seconds(self, clip_seconds: float) -> float:
+        """How long the Short's own timeline is (before an appended end card)."""
+        return self.cuts.output_duration(clip_seconds) if self.cuts else clip_seconds
 
     def fingerprint(self) -> str:
         """sha256 of the canonical JSON snapshot: equal configurations, equal fingerprints."""

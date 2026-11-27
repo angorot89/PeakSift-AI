@@ -189,10 +189,13 @@ export function EditorTimeline({
   footer,
   message,
   selection,
+  timeMap,
   children,
 }: {
   duration: number;
   video: HTMLVideoElement | null;
+  /** Tighten: the timeline shows the Short (what is kept, back to back) over the clip's video. */
+  timeMap?: { toShort: (t: number) => number; toClip: (t: number) => number } | null;
   /** A short status after an edit on the timeline (e.g. a move that was undone). */
   message?: string;
   /** Small screens: what is selected, and a way to its settings (they sit above the timeline). */
@@ -224,7 +227,10 @@ export function EditorTimeline({
     return () => observer.disconnect();
   }, [LABEL]);
 
-  useVideoClock(video, (t) => {
+  const toShort = timeMap?.toShort;
+  const toClip = timeMap?.toClip;
+  useVideoClock(video, (clipTime) => {
+    const t = toShort ? toShort(clipTime) : clipTime;
     const x = fractionAt(t, safe) * width;
     if (playhead.current) playhead.current.style.transform = `translateX(${x}px)`;
     if (readout.current) readout.current.textContent = timecode(t);
@@ -241,7 +247,8 @@ export function EditorTimeline({
   });
 
   const seek = (seconds: number) => {
-    if (video) setMediaTime(video, Math.min(safe, Math.max(0, seconds)));
+    const at = Math.min(safe, Math.max(0, seconds));
+    if (video) setMediaTime(video, toClip ? toClip(at) : at);
   };
   const timeAt = (clientX: number) => {
     const box = canvasRef.current?.getBoundingClientRect();
@@ -344,7 +351,8 @@ export function EditorTimeline({
                   aria-valuetext={`0:00.0 of ${timecode(safe)}`}
                   onKeyDown={(event) => {
                     if (!video) return;
-                    const next = seekForKey(event.key, event.shiftKey, video.currentTime, safe);
+                    const now = toShort ? toShort(video.currentTime) : video.currentTime;
+                    const next = seekForKey(event.key, event.shiftKey, now, safe);
                     if (next === null) return;
                     event.preventDefault();
                     seek(next);
@@ -385,12 +393,33 @@ export function EditorTimeline({
   );
 }
 
-/** The clip itself, across the whole Short, as a strip of real frames. */
-export function VideoTrack({ src }: { src: string }) {
+/** The clip itself, across the whole Short, as a strip of real frames. With Tighten, the frames
+ * are the kept parts and each join (and each split the creator made) is marked. */
+export function VideoTrack({
+  src,
+  toClip,
+  marks = [],
+}: {
+  src: string;
+  toClip?: (t: number) => number;
+  marks?: { at: number; kind: "join" | "split" }[];
+}) {
   const { duration, width } = useTimelineScale();
+  const times = filmFrameTimes(duration, filmFrameCount(width));
   return (
     <TimelineTrack label="Video" icon={Film}>
-      <FilmStrip src={src} times={filmFrameTimes(duration, filmFrameCount(width))} />
+      <FilmStrip src={src} times={toClip ? times.map(toClip) : times} />
+      {marks.map((mark) => (
+        <span
+          key={`${mark.kind}-${mark.at}`}
+          aria-hidden="true"
+          title={mark.kind === "join" ? "A cut: the parts on each side now play back to back" : "A split"}
+          className={`pointer-events-none absolute inset-y-1 w-0.5 -translate-x-1/2 rounded-full ${
+            mark.kind === "join" ? "bg-amber-300" : "bg-white/70"
+          }`}
+          style={{ left: `${fractionAt(mark.at, duration) * 100}%` }}
+        />
+      ))}
     </TimelineTrack>
   );
 }

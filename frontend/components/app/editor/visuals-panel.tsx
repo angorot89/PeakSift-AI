@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useShortTime } from "@/components/app/editor/caption-layer";
 import { AssetChooser } from "@/components/app/editor/asset-chooser";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -96,6 +97,8 @@ export function VisualsPanel({
   selected: string | null;
   onSelect: (key: string | null) => void;
 }) {
+  // Tighten: the playhead and suggestions on the Short's timeline (suggestions are clip time).
+  const toShort = useShortTime();
   const [state, setState] = useState<BrollState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,7 +152,7 @@ export function VisualsPanel({
   const replacingMode = chooser?.replace ? (elements.find((e) => e.key === chooser.replace)?.mode ?? null) : null;
 
   function playhead() {
-    return video ? Math.min(video.currentTime || 0, Math.max(0, duration - 0.5)) : 0;
+    return video ? Math.min(toShort(video.currentTime || 0), Math.max(0, duration - 0.5)) : 0;
   }
 
   function pick(asset: VisualAsset, scene: number | null = null) {
@@ -173,7 +176,7 @@ export function VisualsPanel({
     if (elements.length >= MAX_ELEMENTS) return;
     const suggestion = context.suggestion;
     const created = suggestion
-      ? newElement(asset.id, asset, suggestion.start, duration, "cutaway", suggestion.end)
+      ? newElement(asset.id, asset, toShort(suggestion.start), duration, "cutaway", toShort(suggestion.end))
       : newElement(asset.id, asset, playhead(), duration);
     // A video matched by what it shows starts at its matched scene (never past its end).
     const element =

@@ -116,6 +116,17 @@ class BrandRequest(BaseModel):
     end_card: EndCardRequest | None = None
 
 
+class CutsRequest(BaseModel):
+    """Parts of the clip the Short leaves out (Tighten), as [start, end] seconds of the clip.
+    Validated and merged by the server; never repaired."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    removed: Annotated[
+        list[tuple[Annotated[float, Field(allow_inf_nan=False)], ...]], Field(max_length=300)
+    ]
+
+
 class EditRequest(BaseModel):
     """The only editing options a client can send. Unknown fields are rejected, and every
     value must come from an allow-list — no filters, fonts, paths, URLs or FFmpeg flags."""
@@ -153,6 +164,9 @@ class EditRequest(BaseModel):
     # Optional brand identity (logo, caption emphasis, hook accent, appended end card);
     # omitted renders exactly as before.
     brand: BrandRequest | None = None
+    # Optional parts of the clip left out (pauses, deleted segments); omitted renders the whole
+    # clip exactly as before. Everything else in the request is on the Short's timeline.
+    cuts: CutsRequest | None = None
     # Display only: the creator's template these settings started from (recorded as the new
     # version's origin; never part of the configuration or its fingerprint).
     origin_template_id: uuid.UUID | None = None

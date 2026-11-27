@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useClipTime } from "@/components/app/editor/caption-layer";
+import { useClipTime, useShortTime } from "@/components/app/editor/caption-layer";
 import { getBrandLayout, listLogoCandidates, logoUrl, type BrandLayout } from "@/lib/brand";
 import { logoPlan, type CaptionPlace, type LogoCorner, type LogoSize } from "@/lib/brand-rules";
 
@@ -21,7 +21,11 @@ export function BrandLogoLayer({
   const [layout, setLayout] = useState<BrandLayout | null>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [time, setTime] = useState(0);
-  useClipTime((t) => setTime((previous) => (Math.abs(previous - t) > 0.05 ? t : previous)));
+  const toShort = useShortTime();
+  useClipTime((clipTime) => {
+    const t = toShort(clipTime);
+    setTime((previous) => (Math.abs(previous - t) > 0.05 ? t : previous));
+  });
   useEffect(() => {
     let cancelled = false;
     Promise.all([getBrandLayout(), listLogoCandidates()])

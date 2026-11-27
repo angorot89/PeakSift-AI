@@ -15,6 +15,18 @@ import type { CaptionStyles, DynamicPreset, HookPosition, HookStyle } from "@/li
 /** The preview's playing video, provided by the stage so overlays follow its clock. */
 export const VideoClockContext = createContext<RefObject<HTMLVideoElement | null> | null>(null);
 
+/** With Tighten: how the clip's time maps onto the Short's (shorter) timeline. The hook,
+ * visuals, logo, sounds and the timeline are on the Short's timeline; captions come from the
+ * clip's own words, in the clip's time. Absent when nothing is cut. */
+export type ShortTimeMap = { toShort: (t: number) => number; toClip: (t: number) => number; seconds: number };
+export const ShortTimeContext = createContext<ShortTimeMap | null>(null);
+
+/** The Short's time of a clip time (the same time when nothing is cut). */
+export function useShortTime(): (t: number) => number {
+  return useContext(ShortTimeContext)?.toShort ?? identity;
+}
+const identity = (t: number) => t;
+
 type VideoWithFrameCallback = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number;
   cancelVideoFrameCallback?: (handle: number) => void;
@@ -157,9 +169,10 @@ export function CaptionLayer({
   const [state, setState] = useState("");
   const [hookOn, setHookOn] = useState(false);
   const duration = hook?.duration ?? 0;
+  const toShort = useShortTime();
   useClipTime((t) => {
     setState(cues && preset ? stateAt(cues, t) : "");
-    setHookOn(t < duration);
+    setHookOn(toShort(t) < duration);
   });
 
   const look = preset ? spec.presets.find((p) => p.name === preset) : undefined;

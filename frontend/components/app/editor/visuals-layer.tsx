@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useRef, useState, type CSSProperties } from "react";
-import { useClipTime, VideoClockContext } from "@/components/app/editor/caption-layer";
+import { useClipTime, useShortTime, VideoClockContext } from "@/components/app/editor/caption-layer";
 import { assetTimeAt, insetRect, opacityAt, type VisualElementDraft, type VisualLayout } from "@/lib/visual-elements";
 import { visualContentUrl, type VisualAsset } from "@/lib/visuals";
 
@@ -78,7 +78,8 @@ export function VisualsLayer({
   layout: VisualLayout | null;
 }) {
   const [t, setT] = useState(0);
-  useClipTime(setT);
+  const toShort = useShortTime();
+  useClipTime((clipTime) => setT(toShort(clipTime)));
   const clock = useContext(VideoClockContext);
   const [mainPlaying, setMainPlaying] = useState(false);
   useEffect(() => {

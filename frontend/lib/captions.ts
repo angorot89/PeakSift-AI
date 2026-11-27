@@ -113,6 +113,11 @@ export const startWordTiming = (projectId: string, videoId: string, clipId: stri
 export const getTrack = (projectId: string, videoId: string, clipId: string, id: string) =>
   apiFetch<CaptionTrack>(`${clipBase(projectId, videoId, clipId)}/caption-tracks/${id}`);
 
+/** A completed word timing's words (clip-local seconds), for finding pauses. */
+export type CaptionWords = { track_id: string; words: { i: number; start: number; end: number; text: string }[] };
+export const getCaptionWords = (projectId: string, videoId: string, clipId: string, id: string) =>
+  apiFetch<CaptionWords>(`${clipBase(projectId, videoId, clipId)}/caption-tracks/${id}/words`);
+
 export const retryWordTiming = (projectId: string, videoId: string, clipId: string, id: string) =>
   postJson<CaptionTrack>(`${clipBase(projectId, videoId, clipId)}/caption-tracks/${id}/retry`, undefined);
 

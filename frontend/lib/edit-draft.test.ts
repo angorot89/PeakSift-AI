@@ -37,6 +37,7 @@ const FULL = {
 describe("loading editor settings from a stored configuration", () => {
   it("reproduces every section exactly", () => {
     const { draft, notes } = draftFromConfiguration(FULL, CURRENT);
+    assert.deepEqual(draft.cuts, []); // no cuts section: the whole clip
     assert.deepEqual(notes, []);
     assert.equal(draft.layout, "smart_reframe");
     assert.equal(draft.framingMode, "auto");
@@ -137,5 +138,10 @@ describe("a branded version", () => {
     const { draft } = draftFromConfiguration({ layout: "fit", captions: { enabled: false }, brand }, { analysisId: null, trackId: null });
     assert.deepEqual(draft.brand, { name: "Amine Clips", logo: { asset_id: "a", corner: "top_left", size: "small" } });
     assert.equal(draftFromConfiguration({ layout: "fit" }, { analysisId: null, trackId: null }).draft.brand, null);
+  });
+
+  it("opens a tightened version with its cuts", () => {
+    const { draft } = draftFromConfiguration({ ...FULL, cuts: { version: "cuts_v1", removed: [[2.5, 3], [0, 0.4]] } }, CURRENT);
+    assert.deepEqual(draft.cuts, [[0, 0.4], [2.5, 3]]);
   });
 });

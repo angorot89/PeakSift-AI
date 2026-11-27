@@ -15,6 +15,7 @@ import {
   type ClipEdit,
 } from "@/lib/edits";
 import { audioFromConfiguration, audioSummary } from "@/lib/audio-mix";
+import { cutsFromConfiguration } from "@/lib/cuts";
 import { formatDuration } from "@/lib/format";
 
 function VersionStatus({ edit }: { edit: ClipEdit }) {
@@ -84,6 +85,7 @@ export function VersionList({
               <p className="truncate text-xs text-muted">
                 {captionSummary(edit)}
                 {audio ? ` · ${audio}` : ""}
+                {cutsFromConfiguration(edit.configuration).length ? " · Tightened" : ""}
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <VersionStatus edit={edit} />

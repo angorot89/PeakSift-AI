@@ -15,6 +15,7 @@ import {
   Plus,
   RotateCcw,
   ScanFace,
+  Scissors,
   Smartphone,
   Sparkles,
   Type,
@@ -25,7 +26,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AudioPanel } from "@/components/app/editor/audio-panel";
 import { CaptionTimingPanel, HookPanel, PresetCards, SafeAreaToggle } from "@/components/app/editor/caption-controls";
-import { CaptionLayer, type HookPreview } from "@/components/app/editor/caption-layer";
+import { CaptionLayer, ShortTimeContext, type HookPreview, type ShortTimeMap } from "@/components/app/editor/caption-layer";
+import { TightenPanel, type TightenState } from "@/components/app/editor/tighten-panel";
 import { CaptionSwitch, LayoutPicker, PositionPicker } from "@/components/app/editor/controls";
 import { NineBySixteenFrame, PreviewStage, ReframedPreview, type Framing } from "@/components/app/editor/preview-stage";
 import { SmartReframePanel, type FramingMode } from "@/components/app/editor/smart-reframe";
@@ -73,6 +75,7 @@ import {
 import {
   TRACK_STAGES,
   getCaptionPreview,
+  getCaptionWords,
   getCaptionStyles,
   getTimingOptions,
   getTrack,
@@ -88,6 +91,18 @@ import {
   type PreviewCue,
 } from "@/lib/captions";
 import { autoEditHref, getPlan } from "@/lib/auto-edit";
+import {
+  cutsProblem,
+  DEFAULT_PAUSE_SECONDS,
+  formatSeconds,
+  keptRanges,
+  outputDuration,
+  recognizePauses,
+  skipRemoved,
+  toOutput,
+  toSource,
+  type TimedWord,
+} from "@/lib/cuts";
 import { getCandidate } from "@/lib/clip-detection";
 import { clipContentUrl, type GeneratedClip } from "@/lib/clips";
 import {
@@ -150,12 +165,37 @@ import { listVisuals, type VisualAsset } from "@/lib/visuals";
 
 const TOOL_ICONS: Record<ToolKey, typeof Crop> = {
   style: Crop,
+  tighten: Scissors,
   captions: Captions,
   opening: Type,
   visuals: ImageIcon,
   sound: Music,
   brand: Palette,
 };
+
+/** Caption cues placed on the Short's timeline (Tighten); a cue that was cut away is dropped. */
+function shortCues(cues: PreviewCue[], toShort: (t: number) => number): PreviewCue[] {
+  return cues.flatMap((cue) => {
+    const start = toShort(cue.start);
+    const end = toShort(cue.end);
+    if (end - start < 0.001) return [];
+    return [
+      {
+        ...cue,
+        start,
+        end,
+        lines: cue.lines.map((line) => line.map((word) => ({ ...word, start: toShort(word.start), end: toShort(word.end) }))),
+      },
+    ];
+  });
+}
+
+/** Tighten state with a stored version's pauses recognised (unchanged when already known). */
+function withRecognizedPauses(state: TightenState, words: TimedWord[], clipSeconds: number): TightenState {
+  if (state.pauseCuts.length || !state.cuts.length) return state;
+  const found = recognizePauses(state.cuts, words, clipSeconds);
+  return found ? { ...state, ...found } : state;
+}
 
 function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const { setUser } = useAuth();
@@ -192,6 +232,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const [waveforms, setWaveforms] = useState<Record<string, number[]>>({});
   const [audioLimits, setAudioLimits] = useState<AudioUploadLimits | null>(null);
   const [visuals, setVisuals] = useState<VisualElementDraft[]>([]);
+  // Tighten: parts of the clip left out (clip time), which came from pauses, and split marks.
+  const [tighten, setTighten] = useState<TightenState>({ cuts: [], pauseCuts: [], splits: [], pauseSeconds: DEFAULT_PAUSE_SECONDS });
+  const [words, setWords] = useState<TimedWord[] | null>(null);
+  const wordsRef = useRef<TimedWord[] | null>(null);
   // V1.7: this Short's brand section (copied into the version) and where its settings came from.
   const [brand, setBrand] = useState<Record<string, unknown> | null>(null);
   const [origin, setOrigin] = useState<EditOrigin | null>(null);
@@ -244,7 +288,10 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     setAudioSection(draft.audioSection);
     setVisuals(draft.visuals);
     setBrand(draft.brand);
-  }, []);
+    // A stored version's cuts; the ones that are pauses are recognised once the words are known.
+    const loaded = { cuts: draft.cuts, pauseCuts: [], splits: [], pauseSeconds: DEFAULT_PAUSE_SECONDS };
+    setTighten(wordsRef.current ? withRecognizedPauses(loaded, wordsRef.current, clip.duration_seconds) : loaded);
+  }, [clip.duration_seconds]);
   const hydrate = useCallback(
     (configuration: Record<string, unknown> | null | undefined, label: string, href?: string, from?: EditOrigin | null) => {
       if (hydrated.current) return;
@@ -412,7 +459,11 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         return { ...current, music: { asset_id: asset.id, ...DEFAULT_MUSIC, ...keep } };
       }
       if (current.sfx.length >= MAX_SFX_CUES) return current;
-      const at = Math.round(Math.min(clip.duration_seconds, previewVideo?.currentTime ?? 0) * 10) / 10;
+      // On the Short's timeline (Tighten): the playhead and the length without the cut parts.
+      const playing = previewVideo?.currentTime ?? 0;
+      const removed = tighten.cuts;
+      const end = removed.length ? outputDuration(removed, clip.duration_seconds) : clip.duration_seconds;
+      const at = Math.round(Math.min(end, removed.length ? toOutput(removed, playing) : playing) * 10) / 10;
       return { ...current, sfx: [...current.sfx, { asset_id: asset.id, at_seconds: at, gain_db: DEFAULT_SFX_GAIN_DB }] };
     });
   }
@@ -515,6 +566,27 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     };
   }, [previewReady, project.id, clip.video_id, clip.id, preset, position, timing, trackId]);
 
+  // Tighten finds pauses from the clip's real word timing (the same track word-synced captions use).
+  useEffect(() => {
+    if (!trackReady || !trackId) return;
+    let cancelled = false;
+    getCaptionWords(project.id, clip.video_id, clip.id, trackId)
+      .then((result) => {
+        if (cancelled) return;
+        setWords(result.words);
+        wordsRef.current = result.words;
+        // A reopened version stores only its ranges: recognise its pauses, so the panel offers
+        // "Put the pauses back" instead of listing every pause as a cut made by hand.
+        setTighten((current) => withRecognizedPauses(current, result.words, clip.duration_seconds));
+      })
+      .catch(() => {
+        if (!cancelled) setWords(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trackReady, trackId, project.id, clip.video_id, clip.id, clip.duration_seconds]);
+
   // Poll only while some version is really rendering; stop when all are settled.
   const anyActive = !!edits?.some((e) => isEditActive(e.status) && !e.is_stale);
   usePolling(anyActive, refresh);
@@ -605,6 +677,67 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           : { kind: "center" },
     [manual, focus, pathKeyframes],
   );
+  // Tighten: the Short's own timeline (what is kept, back to back). Everything placed on the
+  // timeline — the hook, visuals, sounds — uses it; captions come from the clip's words.
+  const clipSeconds = clip.duration_seconds;
+  const { cuts, kept, shortSeconds, timeMap, cutsInvalid } = useMemo(() => {
+    const removed = tighten.cuts;
+    const seconds = removed.length ? outputDuration(removed, clipSeconds) : clipSeconds;
+    const map: ShortTimeMap | null = removed.length
+      ? { toShort: (t: number) => toOutput(removed, t), toClip: (t: number) => toSource(removed, clipSeconds, t), seconds }
+      : null;
+    return {
+      cuts: removed,
+      kept: keptRanges(removed, clipSeconds),
+      shortSeconds: seconds,
+      timeMap: map,
+      cutsInvalid: cutsProblem(removed, clipSeconds) !== null,
+    };
+  }, [tighten.cuts, clipSeconds]);
+  // The preview plays only what is kept: a removed part is skipped, and playback stops at the end.
+  useEffect(() => {
+    const video = previewVideo;
+    if (!video || !cuts.length || mode !== "preview") return;
+    if (!kept.length) return;
+    const lastEnd = kept[kept.length - 1][1];
+    let frame = 0;
+    const check = () => {
+      const t = video.currentTime;
+      if (t >= lastEnd - 0.02 && lastEnd < clipSeconds - 0.02) {
+        if (!video.paused) video.pause();
+        if (Math.abs(t - lastEnd) > 0.03) setMediaTime(video, lastEnd);
+        return;
+      }
+      const next = skipRemoved(cuts, t);
+      if (next !== t) setMediaTime(video, Math.min(next, clipSeconds));
+    };
+    const loop = () => {
+      check();
+      frame = requestAnimationFrame(loop);
+    };
+    const onPlay = () => {
+      cancelAnimationFrame(frame);
+      if (video.currentTime >= lastEnd - 0.05) setMediaTime(video, kept[0][0]);
+      frame = requestAnimationFrame(loop);
+    };
+    const onPause = () => cancelAnimationFrame(frame);
+    video.addEventListener("play", onPlay);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("seeked", check);
+    if (!video.paused) onPlay();
+    else check();
+    return () => {
+      cancelAnimationFrame(frame);
+      video.removeEventListener("play", onPlay);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("seeked", check);
+    };
+  }, [previewVideo, cuts, kept, mode, clipSeconds]);
+  const nowOnShort = () => {
+    const t = previewVideo?.currentTime ?? 0;
+    return timeMap ? timeMap.toShort(t) : t;
+  };
+
   // Automatic framing can render only from a completed analysis of this clip.
   const awaitingAnalysis = smart && !manual && !analysisDone;
 
@@ -620,8 +753,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   const visualsInvalid = useMemo(
     () =>
       overlapProblems(visuals).size > 0 ||
-      visuals.some((e) => elementProblems(e, visualAssetMap.get(e.asset_id), clip.duration_seconds).length > 0),
-    [visuals, visualAssetMap, clip.duration_seconds],
+      visuals.some((e) => elementProblems(e, visualAssetMap.get(e.asset_id), shortSeconds).length > 0),
+    [visuals, visualAssetMap, shortSeconds],
   );
   const request: EditRequest = useMemo(
     () => ({
@@ -650,16 +783,17 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       ...(audioRequest ? { audio: audioRequest } : {}),
       ...(visualsRequest ? { visuals: visualsRequest } : {}),
       ...(brand ? { brand } : {}),
+      ...(cuts.length ? { cuts: { removed: cuts } } : {}),
       ...(origin?.template ? { origin_template_id: origin.template.id } : {}),
     }),
-    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest, visualsRequest, brand, origin],
+    [layout, manual, smart, captions, preset, position, timing, trackReady, trackId, analysisDone, analysisId, focus, hookOn, hookText, hookStyle, hookPosition, hookDuration, audioRequest, visualsRequest, brand, cuts, origin],
   );
   // An approximate audio preview with the video as its clock (the render is authoritative).
   const previewPlan: PreviewPlan | null = useMemo(() => {
     if (!audioActive) return null;
     const music = audio.music ? audioAssets?.find((a) => a.id === audio.music!.asset_id) : undefined;
     return {
-      duration: clip.duration_seconds,
+      duration: shortSeconds,
       sourceGainDb: audio.source_gain_db,
       music:
         audio.music && music
@@ -667,13 +801,13 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           : null,
       cues: audio.sfx.map((cue) => ({ url: audioContentUrl(project.id, cue.asset_id), at_seconds: cue.at_seconds, gain_db: cue.gain_db })),
     };
-  }, [audioActive, audio, audioAssets, clip.duration_seconds, project.id]);
-  useAudioPreview(mode === "preview" ? previewVideo : null, previewPlan);
+  }, [audioActive, audio, audioAssets, shortSeconds, project.id]);
+  useAudioPreview(mode === "preview" ? previewVideo : null, previewPlan, timeMap?.toShort);
   // Word-synced captions render only from a completed word timing (never silently phrase).
   const awaitingWords = captions && timing === "aligned_word" && !trackReady;
   const hookLength = [...normalizeHookText(hookText)].length;
   const hookInvalid = hookOn && (hookLength === 0 || hookLength > (spec?.hook.max_chars ?? 60));
-  const blocked = awaitingAnalysis || awaitingWords || hookInvalid || visualsInvalid;
+  const blocked = awaitingAnalysis || awaitingWords || hookInvalid || visualsInvalid || cutsInvalid;
   const hookPreview: HookPreview | null =
     hookOn && !hookInvalid
       ? { text: normalizeHookText(hookText), style: hookStyle, position: hookPosition, duration: hookDuration }
@@ -773,13 +907,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     caption_position: position,
     caption_timing: timing,
     hook_enabled: hookOn,
-  })}${audioLabel ? ` · ${audioLabel}` : ""}${visuals.length ? ` · ${visualsSummary(visuals.length)}` : ""}`;
+  })}${audioLabel ? ` · ${audioLabel}` : ""}${visuals.length ? ` · ${visualsSummary(visuals.length)}` : ""}${
+    cuts.length ? ` · ${formatSeconds(clipSeconds - shortSeconds)} tightened` : ""
+  }`;
 
   const audioById = new Map((audioAssets ?? []).map((a) => [a.id, a]));
   const visualById = new Map((visualAssets ?? []).map((a) => [a.id, a]));
   const musicAsset = audio.music ? audioById.get(audio.music.asset_id) : undefined;
   const items = timelineItems({
-    duration: clip.duration_seconds,
+    duration: shortSeconds,
     hook: { on: hookOn, text: hookText, seconds: hookDuration },
     visuals: visuals.map((v) => ({
       key: v.key,
@@ -795,13 +931,13 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     music: audio.music
       ? {
           name: musicAsset?.display_name ?? "Music",
-          end: musicEnd(audio.music.loop, musicAsset?.duration_seconds ?? 0, audio.music.source_start_seconds, clip.duration_seconds),
+          end: musicEnd(audio.music.loop, musicAsset?.duration_seconds ?? 0, audio.music.source_start_seconds, shortSeconds),
         }
       : null,
   });
   const musicPeaks =
     audio.music && musicAsset && waveforms[audio.music.asset_id]
-      ? heardPeaks(waveforms[audio.music.asset_id], audio.music, musicAsset.duration_seconds, clip.duration_seconds)
+      ? heardPeaks(waveforms[audio.music.asset_id], audio.music, musicAsset.duration_seconds, shortSeconds)
       : null;
   const changeAudio = edit((next: AudioRequest) => {
     setAudioSection(true);
@@ -814,8 +950,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     const edges = editableEdges(item.kind);
     const snapPoints = () => [
       0,
-      clip.duration_seconds,
-      previewVideo?.currentTime ?? 0,
+      shortSeconds,
+      nowOnShort(),
       ...items.filter((other) => other.id !== item.id).flatMap((other) => [other.start, other.end]),
     ];
     const ref = item.ref;
@@ -827,11 +963,11 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
       const at = (s: number, e: number) => visuals.map((v) => (v.key === ref.key ? { ...v, start_seconds: s, end_seconds: e } : v));
       return {
         edges,
-        bounds: { duration: clip.duration_seconds, minLength: MIN_ELEMENT_SECONDS },
+        bounds: { duration: shortSeconds, minLength: MIN_ELEMENT_SECONDS },
         snapPoints,
         validate: (s, e) => {
           const next = at(s, e);
-          return overlapProblems(next).get(ref.key) ?? elementProblems(next.find((v) => v.key === ref.key)!, facts, clip.duration_seconds)[0] ?? null;
+          return overlapProblems(next).get(ref.key) ?? elementProblems(next.find((v) => v.key === ref.key)!, facts, shortSeconds)[0] ?? null;
         },
         commit: (s, e) => {
           setTimelineMessage("");
@@ -850,9 +986,9 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         edges,
         // A sound effect may start up to the very end (its sound is cut there), so its own
         // length is allowed past the end on the timeline.
-        bounds: { duration: clip.duration_seconds + length, minLength: 0 },
+        bounds: { duration: shortSeconds + length, minLength: 0 },
         snapPoints,
-        validate: (s) => (s > clip.duration_seconds ? "A sound effect has to start before the end of the Short." : null),
+        validate: (s) => (s > shortSeconds ? "A sound effect has to start before the end of the Short." : null),
         commit: (s) => {
           setTimelineMessage("");
           changeAudio({ ...audio, sfx: audio.sfx.map((cue, i) => (i === ref.index ? { ...cue, at_seconds: s } : cue)) });
@@ -867,7 +1003,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     if (ref.type === "hook") {
       return {
         edges,
-        bounds: { duration: clip.duration_seconds, minLength: hookLimits.min, maxLength: hookLimits.max },
+        bounds: { duration: shortSeconds, minLength: hookLimits.min, maxLength: hookLimits.max },
         snapPoints,
         validate: () => null,
         commit: (_s, e) => {
@@ -904,6 +1040,8 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
     visualsInvalid,
     audioActive,
     branded: Boolean(brand),
+    tightened: cuts.length > 0,
+    cutsInvalid,
   });
   const timingPanel = (
     <CaptionTimingPanel
@@ -1043,7 +1181,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
   }
 
   return (
-    <>
+    <ShortTimeContext.Provider value={timeMap}>
       <PageHeader
         back={{ href: backToProject, label: "Moments" }}
         title="Edit Short"
@@ -1288,6 +1426,34 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 </div>
               ) : null}
             </div>
+            <div {...toolPanelProps(`${id}-tool`, "tighten", tool === "tighten")} className="focus-visible:outline-none">
+              <TightenPanel
+                state={tighten}
+                onChange={edit(setTighten)}
+                clipSeconds={clipSeconds}
+                words={trackReady ? words : null}
+                wordsNote={
+                  trackRunning ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner /> Finding the timing of every word…
+                    </span>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-pretty">
+                        Pauses are found from the timing of every spoken word. Find it once; word-synced captions use it
+                        too.
+                      </p>
+                      <Button size="sm" variant="secondary" onClick={() => void generateWordSync(!!track && track.status === "failed")} disabled={trackBusy}>
+                        Find word timing
+                      </Button>
+                      {trackError ? <p className="text-caption text-amber-200">{trackError}</p> : null}
+                    </div>
+                  )
+                }
+                playhead={() => previewVideo?.currentTime ?? 0}
+                onSeek={(t) => previewVideo && setMediaTime(previewVideo, t)}
+              />
+            </div>
             <div {...toolPanelProps(`${id}-tool`, "captions", tool === "captions")} className="space-y-4 focus-visible:outline-none">
               <CaptionSwitch checked={captions} onChange={edit(setCaptions)} />
               {captions ? (
@@ -1377,7 +1543,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 projectId={project.id}
                 videoId={clip.video_id}
                 clipId={clip.id}
-                duration={clip.duration_seconds}
+                duration={shortSeconds}
                 video={previewVideo}
                 assets={visualAssets}
                 onUploaded={visualUploaded}
@@ -1398,7 +1564,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                 assets={audioAssets}
                 waveforms={waveforms}
                 limits={audioLimits}
-                duration={clip.duration_seconds}
+                duration={shortSeconds}
                 video={previewVideo}
                 onUploaded={audioUploaded}
                 selectedCue={timelineSelected?.startsWith("sfx:") ? Number(timelineSelected.slice("sfx:".length)) : null}
@@ -1455,14 +1621,15 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
         {mode === "preview" ? (
           <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-2">
             <EditorTimeline
-              duration={clip.duration_seconds}
+              duration={shortSeconds}
               video={previewVideo}
+              timeMap={timeMap}
               message={timelineMessage}
               selection={(() => {
                 const picked = timelineSelected === "captions" ? null : items.find((i) => i.id === timelineSelected);
                 if (!timelineSelected) return null;
                 return {
-                  text: picked ? itemTooltip(picked, clip.duration_seconds) : "Captions",
+                  text: picked ? itemTooltip(picked, shortSeconds) : "Captions",
                   onEdit: () => document.getElementById(`${id}-settings`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
                 };
               })()}
@@ -1472,12 +1639,19 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
                   : undefined
               }
             >
-              <VideoTrack src={clipContentUrl(clip.id)} />
+              <VideoTrack
+                src={clipContentUrl(clip.id)}
+                toClip={timeMap?.toClip}
+                marks={timeMap ? [
+                  ...kept.slice(1).map(([start]) => ({ at: timeMap.toShort(start), kind: "join" as const })),
+                  ...tighten.splits.filter((s) => !cuts.some(([a, b]) => s > a && s < b)).map((s) => ({ at: timeMap.toShort(s), kind: "split" as const })),
+                ] : tighten.splits.map((s) => ({ at: s, kind: "split" as const }))}
+              />
               <OpeningTrack items={items.filter((i) => i.track === "opening")} actions={timelineActions} onAdd={onTrack("opening")} />
               <VisualsTrack items={items.filter((i) => i.track === "visuals")} actions={timelineActions} onAdd={onTrack("visuals")} />
               <CaptionsTrack
                 enabled={captions}
-                cues={cues}
+                cues={timeMap && cues ? shortCues(cues, timeMap.toShort) : cues}
                 selected={timelineSelected === "captions"}
                 onSelect={() => {
                   setTimelineSelected("captions");
@@ -1540,7 +1714,7 @@ function Editor({ project, clip }: { project: Project; clip: GeneratedClip }) {
           </div>
         </div>
       ) : null}
-    </>
+    </ShortTimeContext.Provider>
   );
 }
 

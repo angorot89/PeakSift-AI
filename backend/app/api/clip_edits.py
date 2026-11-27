@@ -167,6 +167,13 @@ def _require_renderable(db: DbSession, clip: Clip, video: Video, config: EditCon
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Generate the clip before editing it"
         )
+    if config.cuts is not None:
+        try:
+            config.cuts.check(float(clip.duration_seconds))
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            ) from None
     if config.layout == Layout.SMART_REFRAME:
         analysis = db.get(ReframeAnalysis, uuid.UUID(str(config.reframe_analysis_id)))
         # Another clip's analysis is indistinguishable from a missing one (no existence leak).
@@ -244,7 +251,7 @@ def _require_audio(db: DbSession, clip: Clip, video: Video, config: EditConfig) 
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Choose sound effects from this project's audio",
             )
-        if cue.at_seconds > float(clip.duration_seconds):
+        if cue.at_seconds > config.output_seconds(float(clip.duration_seconds)):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="A sound effect starts after the end of the clip",
@@ -262,7 +269,7 @@ def _require_visuals(db: DbSession, clip: Clip, video: Video, config: EditConfig
         )
     assets = load_visual_assets(db, video.project_id, config.visuals.asset_ids)
     try:
-        check_visuals(config.visuals, assets, float(clip.duration_seconds))
+        check_visuals(config.visuals, assets, config.output_seconds(float(clip.duration_seconds)))
     except VisualsProblem as problem:
         # Another project's asset is indistinguishable from a missing one (no existence leak).
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
@@ -342,6 +349,7 @@ def create_edit(
             audio=body.audio.model_dump(mode="json") if body.audio else None,
             visuals=body.visuals.model_dump(mode="json") if body.visuals else None,
             brand=body.brand.model_dump(mode="json") if body.brand else None,
+            cuts=body.cuts.model_dump(mode="json") if body.cuts else None,
         )
     except ValueError as error:
         raise HTTPException(

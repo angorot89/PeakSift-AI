@@ -1,7 +1,8 @@
 "use client";
 
 import { Maximize, Minimize, Pause, Play, Volume2, VolumeX } from "lucide-react";
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useCallback, useContext, useRef, useSyncExternalStore } from "react";
+import { ShortTimeContext } from "@/components/app/editor/caption-layer";
 
 /** Playback time, rounded down like a player ("0:07"). */
 function clock(seconds: number) {
@@ -76,7 +77,12 @@ export function PreviewControls({
   video: HTMLVideoElement | null;
   fullscreenTarget: HTMLElement | null;
 }) {
-  const { playing, time, duration, muted } = useMediaState(video);
+  const media = useMediaState(video);
+  // With Tighten the bar shows the Short: its length, and where the playhead is in it.
+  const map = useContext(ShortTimeContext);
+  const { playing, muted } = media;
+  const time = map ? map.toShort(media.time) : media.time;
+  const duration = map && media.duration ? map.seconds : media.duration;
   const fullscreen = useFullscreen(fullscreenTarget);
   const supported = useSyncExternalStore(noop, () => !!document.fullscreenEnabled, () => false);
   const canFullscreen = supported && !!fullscreenTarget;
@@ -106,7 +112,10 @@ export function PreviewControls({
         disabled={!video || !duration}
         aria-label="Seek preview"
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
-        onChange={(event) => video && seek(video, Number(event.target.value))}
+        onChange={(event) => {
+          const value = Number(event.target.value);
+          if (video) seek(video, map ? map.toClip(value) : value);
+        }}
         className="h-1.5 min-w-0 flex-1 cursor-pointer accent-[var(--accent)] pointer-coarse:h-11"
       />
       <span className="tabular shrink-0 px-1 text-caption text-subtle">

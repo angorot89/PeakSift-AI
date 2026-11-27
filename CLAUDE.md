@@ -131,7 +131,9 @@ posting times, and publishing to TikTok and Instagram Reels behind the same cont
 connection per platform, `services/publishing/platforms.py`; each switched on by its own
 setting);
 see [docs/creator-experience.md](docs/creator-experience.md) and
-[docs/publishing.md](docs/publishing.md). On `main` since 26 November 2026; not tagged. The
+[docs/publishing.md](docs/publishing.md). On `main` since 26 November 2026; not tagged. Then,
+from the StreamLadder clip-editor study (28 November 2026), **Tighten**: remove the pauses
+between words and cut parts by hand ([docs/tighten.md](docs/tighten.md)). The
 list below still applies to everything else.
 
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
@@ -238,7 +240,13 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   "playing" marks update the DOM from one animation-frame clock (no React render per frame);
   timeline and preview use the same cue rule (`cueAt`). Selecting never scrolls the page
   (`revealInPanel`). Keyboard paths exist for every drag; 44 px targets on touch. Not an NLE: no
-  splitting, ripple, keyframes or extra tracks.
+  ripple, keyframes or extra tracks.
+- Tighten (`docs/tighten.md`): an edit's `cuts` section lists removed ranges in the clip's own
+  time, only when used (old fingerprints unchanged); validated and merged, never repaired.
+  Everything the creator places is on the Short's timeline; only source data (word timings,
+  transcript phrases, the crop path) is moved onto it (`cuts.py`). The render tightens the clip in
+  the attempt workspace first (`tighten.py`), then composes as before. Pauses come only from real
+  word timing; the editor mirrors the server's rules in `lib/cuts.ts`.
 - Shorts library: a Short is one rendered version (`ClipEdit`); a draft is a clip without a
   version. Its creator-level status is derived only in `services/shorts_library.py` and worded
   only in `lib/shorts-rules.ts` — never re-derive status words on a page. Never call an upload

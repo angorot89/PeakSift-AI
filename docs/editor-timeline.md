@@ -2,7 +2,9 @@
 
 The Short editor's timeline is the **visual map of the Short**: what happens and when, what is
 selected, and what can change. It is creator-first visual editing, not a professional NLE: no
-splitting, ripple edits, keyframes, nested timelines or arbitrary tracks.
+ripple edits, keyframes, nested timelines or arbitrary tracks. Parts of the clip can be left out
+with **Tighten** (remove pauses, split and remove a part; see [tighten.md](tighten.md)); the
+timeline then shows the shorter Short, with each join marked on the video track.
 
 ## Source of truth
 
@@ -115,8 +117,8 @@ TIMELINE_ACCEPTANCE_EMAIL=… TIMELINE_ACCEPTANCE_PASSWORD=… \
 
 ## Limitations
 
-- No splitting, trimming the source clip, ripple edits, keyframes, transitions beyond a fade, or
-  extra tracks; music always starts with the Short (its start point and loop are set in Sound).
+- Splitting and removing parts happen in the Tighten tool (not by dragging on the video track);
+  no ripple edits, keyframes, transitions beyond a fade, or extra tracks; music always starts with the Short (its start point and loop are set in Sound).
 - Captions and music do not drag; caption timing comes from word sync or the transcript.
 - The preview's sizes are close, not pixel-exact; the rendered Short is the final result.
 - Timeline edits are saved as a version only when rendered (no autosave).

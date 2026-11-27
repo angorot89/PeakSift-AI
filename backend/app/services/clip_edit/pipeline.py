@@ -51,7 +51,7 @@ from app.services.clip_edit.brand import logo_plan
 from app.services.clip_edit.brand_render import BrandLayers, end_card_ass
 from app.services.clip_edit.caption_styles import build_ass_document
 from app.services.clip_edit.caption_v2 import build_dynamic_ass
-from app.services.clip_edit.captions import SourceSegment, build_cues
+from app.services.clip_edit.captions import Cue, SourceSegment, build_cues
 from app.services.clip_edit.composition import ComposedShort, compose_short
 from app.services.clip_edit.config import (
     CAPTION_RENDERER_V2,
@@ -60,12 +60,14 @@ from app.services.clip_edit.config import (
     EditConfig,
     Layout,
 )
+from app.services.clip_edit.cuts import remap_crop_points
 from app.services.clip_edit.dynamic_text import DynamicCaptionError, dynamic_cues
 from app.services.clip_edit.emoji import emoji_font
 from app.services.clip_edit.hook import hook_ass
 from app.services.clip_edit.safe_area import caption_placement
 from app.services.clip_edit.smart_crop import CropPoint, crop_points_from
 from app.services.clip_edit.storage import EditArtifactStore
+from app.services.clip_edit.tighten import tighten_clip
 from app.services.clip_render.pipeline import render_options_from
 from app.services.clip_render.renderer import RenderError
 from app.services.ffprobe import ProbeError, probe, probe_audio
@@ -229,6 +231,15 @@ def _execute(
     if clip.status != ClipStatus.READY or not clip.storage_key:
         raise PipelineFailure("clip_not_ready", "The source clip is not ready")
     crop_points = _crop_path(edit, db, config) if config.layout == Layout.SMART_REFRAME else None
+    clip_seconds = float(clip.duration_seconds)
+    if config.cuts is not None:
+        try:
+            config.cuts.check(clip_seconds)
+        except ValueError as error:
+            raise PipelineFailure("invalid_cuts", str(error)) from None
+        if crop_points is not None:
+            crop_points = remap_crop_points(config.cuts, crop_points, clip_seconds)
+    short_seconds = config.output_seconds(clip_seconds)  # the Short's own timeline
 
     workspace = store.workspace(edit.id, attempt)
     # Inputs are read locally: the stored file itself, or a copy fetched into the workspace.
@@ -238,6 +249,15 @@ def _execute(
         source = store.storage.fetch(clip.storage_key, inputs)
     except (ObjectNotFound, InvalidStorageKey):
         raise PipelineFailure("clip_missing", "The source clip file is missing") from None
+    if config.cuts is not None:
+        # Tighten first: everything after this works on the kept parts, back to back.
+        source = tighten_clip(
+            source,
+            workspace,
+            config.cuts.kept(clip_seconds),
+            render_options_from(settings),
+            heartbeat=lambda: _heartbeat(edit, db, task_id),
+        )
     dynamic = config.caption_renderer == CAPTION_RENDERER_V2
     cues: list = []
     if config.captions_enabled and dynamic:
@@ -251,6 +271,12 @@ def _execute(
             max_words=settings.caption_max_words,
             max_chars=settings.caption_max_chars,
         )
+        if config.cuts is not None:
+            cues = [
+                Cue(*span, cue.text)
+                for cue in cues
+                if (span := config.cuts.span(cue.start, cue.end)) is not None
+            ]
         edit.caption_cue_count = len(cues)
     emoji_family = emoji_font(settings.ffmpeg_path) if dynamic or config.hook else None
     # The hook overlay shares the subtitle file (output-frame coordinates, safe area).
@@ -272,7 +298,7 @@ def _execute(
         card_styles, card_events = end_card_ass(
             brand.end_card,
             name=brand.name,
-            start=float(clip.duration_seconds),
+            start=short_seconds,
             font_family=settings.caption_font_family,
         )
         extra_styles += card_styles
@@ -322,11 +348,11 @@ def _execute(
         _heartbeat(edit, db, task_id)
 
     if config.visuals is not None:
-        extra["visuals"] = _prepare_visuals(edit, db, store, inputs, config)
+        extra["visuals"] = _prepare_visuals(edit, db, store, inputs, config, short_seconds)
         _heartbeat(edit, db, task_id)
 
     if brand is not None:
-        extra["brand"] = _prepare_brand(edit, db, store, inputs, config)
+        extra["brand"] = _prepare_brand(edit, db, store, inputs, config, short_seconds)
 
     composed = composer(
         source,
@@ -377,13 +403,18 @@ def _execute(
 
 
 def _prepare_visuals(
-    edit: ClipEdit, db: Session, store: EditArtifactStore, inputs: Path, config: EditConfig
+    edit: ClipEdit,
+    db: Session,
+    store: EditArtifactStore,
+    inputs: Path,
+    config: EditConfig,
+    short_seconds: float,
 ) -> list[VisualLayer]:
     """The snapshot's visuals, re-checked against today's assets and the clip, with each asset
     fetched into this attempt's workspace (the stored file itself on local storage)."""
     assets = load_visual_assets(db, edit.clip.video.project_id, config.visuals.asset_ids)
     try:
-        check_visuals(config.visuals, assets, float(edit.clip.duration_seconds))
+        check_visuals(config.visuals, assets, short_seconds)
     except VisualsProblem as problem:
         raise PipelineFailure(problem.code, problem.message) from None
     paths: dict[str, Path] = {}
@@ -408,12 +439,16 @@ def _prepare_visuals(
 
 
 def _prepare_brand(
-    edit: ClipEdit, db: Session, store: EditArtifactStore, inputs: Path, config: EditConfig
+    edit: ClipEdit,
+    db: Session,
+    store: EditArtifactStore,
+    inputs: Path,
+    config: EditConfig,
+    short_seconds: float,
 ) -> BrandLayers:
     """The snapshot's brand, with its logo re-checked (still one of the creator's images) and
     fetched into this attempt's workspace, and where/when the corner logo shows."""
     brand = config.brand
-    clip_seconds = float(edit.clip.duration_seconds)
     path, plan = None, None
     if brand.logo is not None:
         owner = edit.clip.video.project.user_id
@@ -442,7 +477,7 @@ def _prepare_brand(
             hook_seconds=config.hook.duration if config.hook else 0.0,
             insets=insets,
         )
-    return BrandLayers(clip_seconds, path, plan, brand.end_card)
+    return BrandLayers(short_seconds, path, plan, brand.end_card)
 
 
 def _prepare_audio(
@@ -586,6 +621,7 @@ def _dynamic_cues(edit: ClipEdit, db: Session, settings: Settings, config: EditC
             position=config.caption_position,
             timing=config.caption_timing,
             track_id=config.caption_track_id,
+            cuts=config.cuts,
         )
     except DynamicCaptionError as error:
         raise PipelineFailure(error.code, error.message) from None

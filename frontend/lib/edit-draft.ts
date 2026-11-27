@@ -3,6 +3,7 @@
  * never silently with defaults. Type imports only: unit-tested with node --test. */
 import type { AudioRequest, DuckingStrength } from "@/lib/audio-mix";
 import type { CaptionTiming, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
+import { cutsFromConfiguration, type Range } from "./cuts.ts";
 import type { CaptionPosition, PickableLayout } from "@/lib/edits";
 import type {
   VisualElementDraft,
@@ -36,6 +37,8 @@ export type EditorDraft = {
   visuals: VisualElementDraft[];
   /** The version's brand section (without its version tag), kept as it was. */
   brand: Record<string, unknown> | null;
+  /** Tighten: the parts of the clip this Short leaves out, in the clip's own time. */
+  cuts: Range[];
 };
 
 export const DEFAULT_DRAFT: EditorDraft = {
@@ -55,6 +58,7 @@ export const DEFAULT_DRAFT: EditorDraft = {
   audioSection: false,
   visuals: [],
   brand: null,
+  cuts: [],
 };
 
 /** The analysis and word track the editor would use today (to say when a stored one differs). */
@@ -186,6 +190,7 @@ export function draftFromConfiguration(configuration: Snapshot | null | undefine
   draft.audio = audioFrom(config.audio);
   draft.audioSection = obj(config.audio) !== null;
   draft.visuals = visualsFrom(config.visuals);
+  draft.cuts = cutsFromConfiguration(config);
   const brand = obj(config.brand);
   if (brand) {
     const kept = { ...brand };

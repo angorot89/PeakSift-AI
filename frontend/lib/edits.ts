@@ -2,6 +2,7 @@ import { visualsFromConfiguration, visualsKey, visualsSummary, type VisualElemen
 import { API_URL, apiFetch, postJson } from "@/lib/api";
 import { audioFromConfiguration, audioSummary, normalizeAudio, sameAudio, type AudioRequest } from "@/lib/audio-mix";
 import type { CaptionTiming, DynamicPreset, HookPosition, HookStyle } from "@/lib/captions";
+import { cutsFromConfiguration, cutsKey, type Range } from "@/lib/cuts";
 import { stageRanks } from "@/lib/status-sync";
 
 export type EditStatus = "queued" | "rendering" | "validating" | "ready" | "failed";
@@ -40,6 +41,8 @@ export type EditRequest = {
   /** Optional brand identity (logo, caption emphasis, hook accent, end card), validated by the
    * server; copied into the version so later brand changes never alter it. */
   brand?: Record<string, unknown>;
+  /** Tighten: parts of the clip left out (clip time); everything else is on the Short's timeline. */
+  cuts?: { removed: Range[] };
   /** Display only: the template these settings started from. */
   origin_template_id?: string;
 };
@@ -173,7 +176,8 @@ type Described = Pick<
 export function describeEdit(edit: Described) {
   const audio = audioSummary(audioFromConfiguration(edit.configuration));
   const visuals = visualsSummary(visualsFromConfiguration(edit.configuration).length);
-  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}${audio ? ` · ${audio}` : ""}${visuals ? ` · ${visuals}` : ""}`;
+  const tightened = cutsFromConfiguration(edit.configuration).length ? " · Tightened" : "";
+  return `${layoutLabel(edit.layout)} · ${captionSummary(edit)}${audio ? ` · ${audio}` : ""}${visuals ? ` · ${visuals}` : ""}${tightened}`;
 }
 
 const round3 = (value: number | null | undefined) => (value == null ? null : Math.round(value * 1000) / 1000);
@@ -210,7 +214,8 @@ export function sameSettings(edit: ClipEdit, request: EditRequest) {
         round1(edit.hook_duration_seconds) === round1(request.hook_duration_seconds))) &&
     sameAudio(audioFromConfiguration(edit.configuration), normalizeAudio(request.audio)) &&
     visualsKey(visualsFromConfiguration(edit.configuration)) === visualsKey(request.visuals?.elements) &&
-    brandKey(edit.configuration.brand) === brandKey(request.brand)
+    brandKey(edit.configuration.brand) === brandKey(request.brand) &&
+    cutsKey(cutsFromConfiguration(edit.configuration)) === cutsKey(request.cuts?.removed ?? [])
   );
 }
 

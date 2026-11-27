@@ -29,6 +29,7 @@ from app.services.caption_timing.contract import TimedWord, TimingOutputError, v
 from app.services.clip_edit.caption_v2 import rules_for
 from app.services.clip_edit.captions import SourceSegment, build_cues
 from app.services.clip_edit.config import CaptionPosition, CaptionTiming, DynamicPreset
+from app.services.clip_edit.cuts import CutsConfig, remap_words
 from app.services.clip_edit.dynamic_cues import (
     SourceWord,
     WordCue,
@@ -70,8 +71,12 @@ def dynamic_cues(
     position: CaptionPosition,
     timing: CaptionTiming,
     track_id: str | uuid.UUID | None,
+    cuts: CutsConfig | None = None,
 ) -> list[WordCue]:
-    duration = float(clip.duration_seconds)
+    """Cues on the Short's timeline: with ``cuts``, words and phrases are moved past the
+    removed parts *before* they are grouped, so a cue never spans a join's old pause."""
+    clip_seconds = float(clip.duration_seconds)
+    duration = cuts.output_duration(clip_seconds) if cuts else clip_seconds
     rules = rules_for(preset, caption_placement(position).margin_h)
     if timing != CaptionTiming.ALIGNED_WORD:
         phrases = build_cues(
@@ -82,9 +87,10 @@ def dynamic_cues(
             max_chars=settings.caption_max_chars,
             keep_emoji=True,
         )
-        return phrase_cues(
-            [(c.start, c.end, c.text) for c in phrases], clip_duration=duration, rules=rules
-        )
+        spans = [(c.start, c.end, c.text) for c in phrases]
+        if cuts is not None:
+            spans = [(*span, text) for s, e, text in spans if (span := cuts.span(s, e)) is not None]
+        return phrase_cues(spans, clip_duration=duration, rules=rules)
     track = db.get(CaptionTrack, uuid.UUID(str(track_id))) if track_id else None
     usable = track is not None and track.status == CaptionTrackStatus.COMPLETED
     if not usable or track.clip_id != clip.id:
@@ -100,13 +106,14 @@ def dynamic_cues(
     try:  # persisted words are re-validated before use
         words, _ = validate_words(
             [TimedWord(r.start_time, r.end_time, r.text, r.confidence) for r in rows],
-            audio_duration=duration,
+            audio_duration=clip_seconds,
             tolerance=settings.caption_timing_tolerance_seconds,
         )
     except TimingOutputError:
         raise DynamicCaptionError(
             "caption_track_invalid", "The word timing for these captions is not valid"
         ) from None
-    return build_word_cues(
-        [SourceWord(w.text, w.start, w.end) for w in words], clip_duration=duration, rules=rules
-    )
+    source = [SourceWord(w.text, w.start, w.end) for w in words]
+    if cuts is not None:
+        source = remap_words(cuts, source, lambda w, start, end: SourceWord(w.text, start, end))
+    return build_word_cues(source, clip_duration=duration, rules=rules)

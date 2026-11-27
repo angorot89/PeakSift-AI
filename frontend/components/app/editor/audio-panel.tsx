@@ -2,6 +2,7 @@
 
 import { revealInPanel } from "@/lib/reveal";
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { useShortTime } from "@/components/app/editor/caption-layer";
 import { Info, Music2, Pause, Play, Plus, Trash2, Upload, Volume2, Waves } from "lucide-react";
 import { Waveform } from "@/components/app/editor/audio-timeline";
 import { ControlGroup, InlineCheck, OptionCard } from "@/components/app/editor/controls";
@@ -171,6 +172,7 @@ export function AudioPanel({
   selectedCue?: number | null;
 }) {
   const id = useId();
+  const toShort = useShortTime(); // Tighten: sounds are placed on the Short's timeline
   const listening = useAssetListening();
   const [playing, setPlaying] = useState<string | null>(null);
   useEffect(() => {
@@ -443,7 +445,7 @@ export function AudioPanel({
               set({
                 sfx: [
                   ...value.sfx,
-                  { asset_id: effects[0].id, at_seconds: Math.round(Math.min(duration, video?.currentTime ?? 0) * 10) / 10, gain_db: DEFAULT_SFX_GAIN_DB },
+                  { asset_id: effects[0].id, at_seconds: Math.round(Math.min(duration, toShort(video?.currentTime ?? 0)) * 10) / 10, gain_db: DEFAULT_SFX_GAIN_DB },
                 ],
               })
             }

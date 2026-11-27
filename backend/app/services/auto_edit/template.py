@@ -54,6 +54,7 @@ def _fields(config: EditConfig) -> dict[str, Any]:
         "audio": config.audio,
         "visuals": config.visuals,
         "brand": config.brand,
+        "cuts": config.cuts,
     }
 
 

@@ -44,8 +44,17 @@ function unload(element: HTMLAudioElement) {
  * the render, which is authoritative. Everything stops on pause, on unmount and when navigating
  * away.
  */
-export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPlan | null) {
+export function useAudioPreview(
+  video: HTMLVideoElement | null,
+  plan: PreviewPlan | null,
+  /** With Tighten: the clip's time on the Short's timeline (music and effects are placed there). */
+  toShort?: (t: number) => number,
+) {
   const latest = useRef(plan);
+  const mapTime = useRef(toShort);
+  useEffect(() => {
+    mapTime.current = toShort;
+  }, [toShort]);
   useEffect(() => {
     latest.current = plan;
   }, [plan]);
@@ -62,7 +71,8 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
       element.preload = "auto";
       return element;
     });
-    let last = video.currentTime;
+    const now = () => (mapTime.current ? mapTime.current(video.currentTime) : video.currentTime);
+    let last = now();
     let frame = 0;
 
     const syncLevels = () => {
@@ -77,7 +87,7 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     const syncMusic = (force: boolean) => {
       const current = latest.current;
       if (!music || !current?.music) return;
-      const t = video.currentTime;
+      const t = now();
       const { config, trackSeconds } = current.music;
       const position = musicPositionAt(t, config, trackSeconds, current.duration);
       if (position == null || video.paused || video.ended) {
@@ -91,7 +101,7 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     const stopEffects = () => effects.forEach((effect) => effect.pause());
     const fireCrossed = () => {
       const current = latest.current;
-      const t = video.currentTime;
+      const t = now();
       if (current && !video.paused) {
         crossedCues(current.cues, last, t).forEach((cue) => {
           const index = current.cues.indexOf(cue);
@@ -112,7 +122,7 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     };
 
     const onPlay = () => {
-      last = video.currentTime;
+      last = now();
       syncLevels();
       syncMusic(true);
       cancelAnimationFrame(frame);
@@ -125,10 +135,10 @@ export function useAudioPreview(video: HTMLVideoElement | null, plan: PreviewPla
     };
     const onSeeking = () => {
       stopEffects(); // a seek never fires (or keeps playing) effects
-      last = video.currentTime;
+      last = now();
     };
     const onSeeked = () => {
-      last = video.currentTime;
+      last = now();
       syncMusic(true);
     };
     // timeupdate keeps the preview honest when animation frames are throttled (background tab).
