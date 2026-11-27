@@ -526,3 +526,56 @@ export function relatedInsights<T extends InsightLike>(insights: { insights: T[]
     .filter((insight) => !insight.dismissed && insight.group.some((short) => short.id === contentId))
     .slice(0, 2);
 }
+
+// --- review queue -----------------------------------------------------------------------------
+
+export const REVIEW_HREF = "/shorts/review";
+
+/**
+ * The Shorts waiting to be posted, newest render first: rendered, ready, not scheduled and not
+ * hidden. The same set as the Ready tab, so the two never disagree.
+ */
+export function reviewQueue(items: ShortItem[]): ShortItem[] {
+  const when = (item: ShortItem) => item.rendered_at ?? item.updated_at;
+  return items
+    .filter((item) => item.kind === "short" && item.edit_id && item.preview === "short" && matchesFilter(item, "ready"))
+    .sort((a, b) => when(b).localeCompare(when(a)));
+}
+
+/** The first of the creator's free posting times not already taken in this review (or null). */
+export function nextFreeSlot(upcoming: string[], taken: string[], now: Date = new Date()): string | null {
+  const used = new Set(taken.map((at) => new Date(at).getTime()));
+  return upcoming.find((at) => new Date(at).getTime() > now.getTime() && !used.has(new Date(at).getTime())) ?? null;
+}
+
+export type ReviewOutcome = "published" | "scheduled" | "skipped";
+
+/** "2 scheduled · 1 published · 1 skipped" in a fixed order; "Nothing posted yet" for none. */
+export function reviewSummary(outcomes: Record<string, ReviewOutcome>): string {
+  const count = (kind: ReviewOutcome) => Object.values(outcomes).filter((value) => value === kind).length;
+  const parts = (["scheduled", "published", "skipped"] as const)
+    .map((kind) => [kind, count(kind)] as const)
+    .filter(([, n]) => n > 0)
+    .map(([kind, n]) => `${n} ${kind}`);
+  return parts.length ? parts.join(", ") : "Nothing posted yet";
+}
+
+/** The next Short to review after `index`, skipping ones already handled (null at the end). */
+export function nextToReview(queue: ShortItem[], index: number, outcomes: Record<string, ReviewOutcome>): number | null {
+  for (let step = 1; step <= queue.length; step += 1) {
+    const candidate = (index + step) % queue.length;
+    if (!(queue[candidate].id in outcomes)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * The queue after fresh data: unchanged while a review is under way (posting never reorders it),
+ * with Shorts that became ready since added at the end. Without a review under way, the fresh queue.
+ */
+export function mergeQueue(previous: ShortItem[] | null, fresh: ShortItem[], reviewing: boolean): ShortItem[] {
+  if (!previous || !reviewing) return fresh;
+  const known = new Set(previous.map((item) => item.id));
+  const added = fresh.filter((item) => !known.has(item.id));
+  return added.length ? [...previous, ...added] : previous;
+}

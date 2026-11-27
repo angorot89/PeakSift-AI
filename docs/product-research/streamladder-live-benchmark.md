@@ -85,7 +85,8 @@ landscape video), stream Schedule Maker, Clip Downloader, Emote Maker.
 1. **Quick start on Home** — one drop, automatic transcription and moments. Smallest change,
    seen by every creator in the first minute.
 2. **Find Clips in plain language** — ahead of StreamLadder, uses what PeakSift already knows.
-3. **Schedule & Post** — scheduled publish jobs, calendar, then posting slots and the review queue.
+3. **Schedule & Post** — scheduled publish jobs, calendar, then posting slots and the review queue
+   (built: `/shorts/review`, see [shorts-library.md](../shorts-library.md)).
 4. **Platform-neutral publishing** — lift the YouTube-only constraint in the data model so TikTok
    and Instagram can be added when credentials exist.
 5. Montage and editor workspaces — after the above, each needs its own product decision.

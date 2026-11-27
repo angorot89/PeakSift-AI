@@ -8,6 +8,9 @@ import {
   filterCounts,
   matchesSearch,
   menuActions,
+  mergeQueue,
+  nextFreeSlot,
+  nextToReview,
   primaryAction,
   projectsOf,
   quickActions,
@@ -15,6 +18,8 @@ import {
   performanceTotals,
   publishingView,
   relatedInsights,
+  reviewQueue,
+  reviewSummary,
   type ShortItem,
   type ShortStatus,
   statusDetail,
@@ -294,4 +299,54 @@ describe("state matrix: no contradictory status or action", () => {
       assert.ok(!(status !== "published" && /^Published/.test(statusLabel(status).label)));
     });
   }
+});
+
+describe("the review queue", () => {
+  it("holds exactly what the Ready tab holds, newest render first", () => {
+    const items = [
+      short({ id: "old", rendered_at: "2026-11-01T10:00:00Z" }),
+      short({ id: "new", rendered_at: "2026-11-05T10:00:00Z" }),
+      short({ id: "hidden", hidden: true }),
+      short({ id: "planned", schedule: { at: "2026-11-20T18:00:00Z", platform: "youtube" } }),
+      short({ id: "draft", kind: "draft", status: "draft", edit_id: null, preview: "clip" }),
+      published({ id: "out" }),
+    ];
+    assert.deepEqual(reviewQueue(items).map((item) => item.id), ["new", "old"]);
+    assert.deepEqual(
+      reviewQueue(items).map((item) => item.id).sort(),
+      visibleShorts(items, "ready", "", "updated").map((item) => item.id).sort(),
+    );
+  });
+
+  it("offers the next posting time nobody has taken, never one in the past", () => {
+    const upcoming = ["2026-11-11T11:00:00Z", "2026-11-11T19:00:00Z", "2026-11-12T19:00:00Z"];
+    assert.equal(nextFreeSlot(upcoming, [], NOW), "2026-11-11T19:00:00Z");
+    assert.equal(nextFreeSlot(upcoming, ["2026-11-11T19:00:00.000Z"], NOW), "2026-11-12T19:00:00Z");
+    assert.equal(nextFreeSlot(upcoming, ["2026-11-11T19:00:00Z", "2026-11-12T19:00:00Z"], NOW), null);
+    assert.equal(nextFreeSlot([], [], NOW), null);
+  });
+
+  it("moves on to the next Short not yet handled, wrapping, and stops at the end", () => {
+    const queue = [short({ id: "a" }), short({ id: "b" }), short({ id: "c" })];
+    assert.equal(nextToReview(queue, 0, {}), 1);
+    assert.equal(nextToReview(queue, 0, { b: "skipped" }), 2);
+    assert.equal(nextToReview(queue, 2, { a: "published" }), 1);
+    assert.equal(nextToReview(queue, 1, { a: "scheduled", b: "scheduled", c: "skipped" }), null);
+  });
+
+  it("keeps its order during a review and adds Shorts that became ready", () => {
+    const a = short({ id: "a" });
+    const b = short({ id: "b" });
+    const c = short({ id: "c" });
+    assert.deepEqual(mergeQueue(null, [a, b], false).map((item) => item.id), ["a", "b"]);
+    assert.deepEqual(mergeQueue([a, b], [c], false).map((item) => item.id), ["c"]);
+    assert.deepEqual(mergeQueue([a, b], [b, c], true).map((item) => item.id), ["a", "b", "c"]);
+    const same = [a, b];
+    assert.equal(mergeQueue(same, [b], true), same);
+  });
+
+  it("sums up the review in plain words", () => {
+    assert.equal(reviewSummary({}), "Nothing posted yet");
+    assert.equal(reviewSummary({ a: "skipped", b: "scheduled", c: "scheduled", d: "published" }), "2 scheduled, 1 published, 1 skipped");
+  });
 });

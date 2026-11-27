@@ -41,10 +41,13 @@ export function TikTokPublish({
   editId,
   durationSeconds = null,
   initialWhen,
+  onPosted,
 }: {
   editId: string;
   durationSeconds?: number | null;
   initialWhen?: string;
+  /** Called once with the new post when the creator publishes or schedules it. */
+  onPosted?: (job: PublishJob) => void;
 }) {
   const [panel, setPanel] = useState<PublishPanel | null>(null);
   const [creator, setCreator] = useState<TikTokCreator | null>(null);
@@ -133,7 +136,10 @@ export function TikTokPublish({
       creator={creator}
       durationSeconds={durationSeconds}
       initialWhen={initialWhen}
-      onPublished={setJob}
+      onPublished={(next) => {
+        setJob(next);
+        onPosted?.(next);
+      }}
     />
   );
 }

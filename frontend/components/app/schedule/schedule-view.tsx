@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, ChevronLeft, ChevronRight, Clock, Smartphone } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Clock, ListChecks, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { PublishBody } from "@/components/app/editor/publish-dialog";
@@ -32,7 +32,7 @@ import {
   weekStart,
   type PostTone,
 } from "@/lib/schedule-rules";
-import { getShorts, shortHref, type ShortItem } from "@/lib/shorts";
+import { getShorts, REVIEW_HREF, shortHref, type ShortItem } from "@/lib/shorts";
 import { useApi } from "@/lib/use-api";
 import { usePolling } from "@/lib/use-polling";
 
@@ -295,6 +295,14 @@ export function ScheduleView() {
           <SectionHeader
             id="ready-heading"
             title="Ready to schedule"
+            actions={
+              ready.length > 1 ? (
+                <ButtonLink href={REVIEW_HREF} variant="secondary" size="sm">
+                  <ListChecks aria-hidden="true" />
+                  Review them one by one
+                </ButtonLink>
+              ) : null
+            }
             description={
               ready.length
                 ? posting?.slots.length

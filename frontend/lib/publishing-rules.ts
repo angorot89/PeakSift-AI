@@ -180,9 +180,9 @@ const PRIVACY_LABELS: Record<Privacy, string> = {
 export const privacyLabel = (privacy: Privacy) => PRIVACY_LABELS[privacy];
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const RETURN_PATHS = [new RegExp(`^/shorts/${UUID}$`, "i"), new RegExp(`^/projects/${UUID}/clips/${UUID}(\\?edit=${UUID})?$`, "i")];
+const RETURN_PATHS = [/^\/shorts\/review$/, new RegExp(`^/shorts/${UUID}$`, "i"), new RegExp(`^/projects/${UUID}/clips/${UUID}(\\?edit=${UUID})?$`, "i")];
 
-/** Where to come back to after connecting YouTube: only a Short or an editor of this app, never
+/** Where to come back to after connecting YouTube: only a Short, the review queue or an editor of this app, never
  * an address from elsewhere (anything else is dropped). */
 export function safeReturnPath(path: string | null | undefined): string | null {
   if (!path) return null;

@@ -120,6 +120,8 @@ describe("coming back after connecting", () => {
   const ID = "3f1c0a1e-0000-4000-8000-000000000001";
   it("returns only to a Short or an editor of this app", () => {
     assert.equal(safeReturnPath(`/shorts/${ID}`), `/shorts/${ID}`);
+    assert.equal(safeReturnPath("/shorts/review"), "/shorts/review");
+    assert.equal(safeReturnPath("/shorts/review?x=//evil.example"), null);
     assert.equal(safeReturnPath(`/projects/${ID}/clips/${ID}?edit=${ID}`), `/projects/${ID}/clips/${ID}?edit=${ID}`);
     assert.equal(safeReturnPath(`/projects/${ID}/clips/${ID}`), `/projects/${ID}/clips/${ID}`);
   });

@@ -92,9 +92,13 @@ export function PublishBody(props: {
   initialWhen?: string;
   /** The Short's length, checked against the creator's TikTok limit. */
   durationSeconds?: number | null;
+  /** Called once with the new post when the creator publishes or schedules it (the review queue). */
+  onPosted?: (job: PublishJob) => void;
+  /** Start on this platform instead of YouTube. */
+  initialPlatform?: PlatformKey;
 }) {
   const { data } = useApi(getPlatforms);
-  const [chosen, setChosen] = useState<PlatformKey | null>(null);
+  const [chosen, setChosen] = useState<PlatformKey | null>(props.initialPlatform ?? null);
   const offered = (data ?? []).filter((platform) => platform.enabled);
   // One platform on this server: no choice to make. YouTube stays the default when offered.
   const platform: PlatformKey =
@@ -110,15 +114,16 @@ export function PublishBody(props: {
         />
       ) : null}
       {platform === "tiktok" ? (
-        <TikTokPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} />
+        <TikTokPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} onPosted={props.onPosted} />
       ) : platform === "instagram" ? (
-        <InstagramPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} />
+        <InstagramPublish editId={props.editId} durationSeconds={props.durationSeconds} initialWhen={props.initialWhen} onPosted={props.onPosted} />
       ) : (
         <YouTubePublishBody
           editId={props.editId}
           onClose={props.onClose}
           returnTo={props.returnTo}
           initialWhen={props.initialWhen}
+          onPosted={props.onPosted}
         />
       )}
     </div>
@@ -130,12 +135,14 @@ function YouTubePublishBody({
   onClose,
   returnTo,
   initialWhen,
+  onPosted,
 }: {
   editId: string;
   onClose: () => void;
   returnTo?: string;
   /** Open on "Schedule for later" with this time (a datetime-local value), e.g. the next posting slot. */
   initialWhen?: string;
+  onPosted?: (job: PublishJob) => void;
 }) {
   const [panel, setPanel] = useState<PublishPanel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -215,7 +222,17 @@ function YouTubePublishBody({
     );
   }
   if (job) return <JobProgress job={job} onChange={setJob} onClose={onClose} onNew={() => setJob(null)} />;
-  return <PublishForm editId={editId} panel={panel} onPublished={setJob} initialWhen={initialWhen} />;
+  return (
+    <PublishForm
+      editId={editId}
+      panel={panel}
+      initialWhen={initialWhen}
+      onPublished={(next) => {
+        setJob(next);
+        onPosted?.(next);
+      }}
+    />
+  );
 }
 
 /** Opens Google's consent; afterwards the browser comes back to `returnTo`. */

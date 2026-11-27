@@ -102,7 +102,7 @@ and confirm in the existing dialog), **Retry** / **Resume** (the same upload —
 video), **Publish again**, **Open on YouTube** (real uploads only). Failures are a plain title with
 the safe server message behind *Details*. Nothing publishes without the creator's click; the
 Copilot cannot publish. The return address after Google is kept in the tab's session storage and
-must be a Short or an editor of this app (`safeReturnPath`).
+must be a Short, the review queue or an editor of this app (`safeReturnPath`).
 
 ### Performance
 
@@ -113,6 +113,24 @@ whenever YouTube did not report a figure. Always one freshness line ("Updated th
 Engaged views over the first week (one chart), "Too early to compare" until the creator's own
 comparisons are reliable, and an observed pattern only when the insights engine's evidence
 includes this Short. Simulated figures are labelled.
+
+## Review & post (`/shorts/review`)
+
+StreamLadder's "review clip 1 of 12", for PeakSift's own rules. The queue is exactly the Ready tab
+(`reviewQueue`: rendered, ready, not scheduled, not hidden), newest render first. Each Short plays
+beside the existing publish form (`PublishBody`, every platform the server offers), which opens on
+**Schedule for later** at the creator's next free posting time (`nextFreeSlot`: the server's
+`upcoming` slots minus the times taken in this review); with no posting times it opens on
+Publish now and offers to set them (the Schedule page's own dialog). The creator publishes or
+schedules (the form's `onPosted`) or **Skips**; either moves to the next Short not yet handled
+(`nextToReview`), and a strip of frames shows each Short's outcome and jumps to any of them. The
+end sums up the review ("2 scheduled, 1 skipped") and leads to the schedule.
+
+Nothing is approved in bulk and nothing goes out without the creator's click in that Short's
+form; platform rules (YouTube metadata, TikTok's consents) are unchanged. The queue keeps its order
+while a review is under way, also when the page is shown again (Shorts that became ready since are
+added at the end, `mergeQueue`); a finished review starts over. Linked from the Shorts header
+("Review & post (N)", only when something is waiting) and the Schedule page's Ready section.
 
 ## Integration
 

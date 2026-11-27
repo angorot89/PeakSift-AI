@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, FolderOpen, LayoutGrid, List, Plus, Scissors, Search, SearchX } from "lucide-react";
+import { Clapperboard, FolderOpen, LayoutGrid, List, ListChecks, Plus, Scissors, Search, SearchX } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { ShortCard, ShortCardSkeleton, ShortRow, useShortAction } from "@/components/app/shorts/short-card";
@@ -17,6 +17,8 @@ import {
   type FilterKey,
   getShorts,
   projectsOf,
+  REVIEW_HREF,
+  reviewQueue,
   type ShortItem,
   SORTS,
   type SortKey,
@@ -232,6 +234,7 @@ function Library({ items: loaded, truncated }: { items: ShortItem[]; truncated: 
 export function ShortsLibraryView() {
   const { data, error, loading, reload } = useApi(getShorts);
   const items = data?.shorts ?? [];
+  const waiting = reviewQueue(items).length;
   return (
     <>
       <PageHeader
@@ -239,10 +242,18 @@ export function ShortsLibraryView() {
         title="Shorts"
         description="Everything you've created, ready to edit, publish or review."
         action={
-          <ButtonLink href={createHref(items)}>
-            <Plus aria-hidden="true" />
-            Create a Short
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            {waiting ? (
+              <ButtonLink href={REVIEW_HREF} variant="secondary">
+                <ListChecks aria-hidden="true" />
+                Review & post ({waiting})
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href={createHref(items)}>
+              <Plus aria-hidden="true" />
+              Create a Short
+            </ButtonLink>
+          </div>
         }
       />
       {loading && !data ? (

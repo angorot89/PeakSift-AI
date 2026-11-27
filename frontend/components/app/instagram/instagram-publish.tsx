@@ -31,10 +31,13 @@ export function InstagramPublish({
   editId,
   durationSeconds = null,
   initialWhen,
+  onPosted,
 }: {
   editId: string;
   durationSeconds?: number | null;
   initialWhen?: string;
+  /** Called once with the new post when the creator publishes or schedules it. */
+  onPosted?: (job: PublishJob) => void;
 }) {
   const [panel, setPanel] = useState<PublishPanel | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -100,7 +103,14 @@ export function InstagramPublish({
     );
   }
   if (job) return <InstagramJob job={job} onChange={setJob} onNew={() => setJob(null)} />;
-  return <ReelForm editId={editId} panel={panel} durationSeconds={durationSeconds} initialWhen={initialWhen} onPublished={setJob} />;
+  return (
+    <ReelForm editId={editId} panel={panel} durationSeconds={durationSeconds} initialWhen={initialWhen}
+      onPublished={(next) => {
+        setJob(next);
+        onPosted?.(next);
+      }}
+    />
+  );
 }
 
 function ReelForm({
