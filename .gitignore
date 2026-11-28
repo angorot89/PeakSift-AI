@@ -13,6 +13,8 @@ deploy/certs/
 backend/models/
 # Caption fonts (fetched by scripts/fetch_caption_fonts.py, never committed)
 backend/fonts/
+# The built-in library (installed by scripts/fetch_library.py, never committed)
+backend/library/
 
 # ---------- Python ----------
 __pycache__/

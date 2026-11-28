@@ -3,7 +3,8 @@
 Every asset records its **origin** — how the creator has the right to use it — chosen by the
 creator: made by them, owned by their company, licensed (with the licence or source written
 down), public domain, or CC0. There is deliberately no "from the internet" origin: PeakSift never
-fetches media, and a licensed asset without its licence written down is refused.
+fetches media, and a licensed asset without its licence written down is refused. Items added
+from PeakSift's own library arrive labelled CC0 or licensed with their licence and source.
 
 A creator may also mark an asset as **local** to a market (Morocco, "ma"), give it a **category**
 (organizational only — never a sign of popularity) and, for a local asset, a **location** from the

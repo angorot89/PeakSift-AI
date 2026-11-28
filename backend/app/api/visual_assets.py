@@ -3,8 +3,9 @@ metadata, a thumbnail and an owner-only preview stream (HTTP Range, for the edit
 
 Ownership chain: User → Project → VisualAsset; anything else is a 404 (401 without a session).
 Uploads are validated by content (Pillow / ffprobe), not by name, and stored under generated
-keys. Creators are responsible for the rights to what they upload; PeakSift ships no stock
-library and never fetches media from the internet.
+keys. Creators are responsible for the rights to what they upload; PeakSift never fetches media
+from the internet. Its own starter library (openly licensed stickers, sounds and music,
+installed by an operator) is added through the same validation (``services/library.py``).
 """
 
 import uuid

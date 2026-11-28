@@ -189,3 +189,6 @@ Particle Pack, Fluent Emoji's formats.
 6. **Editor, from the clip-editor study:** Tighten (remove pauses) with split / delete on the
    timeline → more caption styles and open-licence fonts → the built-in starter library (sounds,
    loops, stickers, overlays) → zoom, flash and shake → word censoring and the platform preview.
+   Built so far: Tighten ([tighten.md](../tighten.md)), caption styles
+   ([caption-styles.md](../caption-styles.md)) and the starter library without animated overlays
+   ([media-library.md](../media-library.md)).

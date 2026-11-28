@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useShortTime } from "@/components/app/editor/caption-layer";
+import { LibraryBrowser } from "@/components/app/editor/library-browser";
 import { AssetChooser } from "@/components/app/editor/asset-chooser";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -323,6 +324,21 @@ export function VisualsPanel({
           No visuals yet. Use a suggestion, or add one at the playhead. Upload only media you own or have permission to use.
         </p>
       )}
+
+      {/* A library sticker is added to the project and placed at the playhead as an overlay. */}
+      <LibraryBrowser
+        projectId={projectId}
+        kinds={["sticker"]}
+        onAdded={(result) => {
+          if (result.kind !== "visual") return;
+          const asset = result.visual_asset;
+          onUploaded(asset);
+          if (elements.length >= MAX_ELEMENTS) return;
+          const element = newElement(asset.id, asset, playhead(), duration, "overlay");
+          onChange([...elements, element].sort((a, b) => a.start_seconds - b.start_seconds));
+          setSelected(element.key);
+        }}
+      />
 
       <AssetChooser
         // Remounted on every open: the filter and search always start fresh.

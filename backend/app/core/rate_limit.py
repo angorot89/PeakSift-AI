@@ -40,6 +40,7 @@ DEFAULT_LIMITS: dict[str, Limit] = {
     "video_upload": Limit(30, HOUR),
     "audio_upload": Limit(100, HOUR),
     "visual_upload": Limit(200, HOUR),
+    "library_import": Limit(300, HOUR),
     "visual_search": Limit(600, HOUR),
     "visual_analysis": Limit(100, HOUR),
     "broll_suggest": Limit(60, HOUR),

@@ -23,6 +23,7 @@ from app.api.copilot import router as copilot_router
 from app.api.find_clips import router as find_clips_router
 from app.api.health import router as health_router
 from app.api.hooks import router as hooks_router
+from app.api.library import router as library_router
 from app.api.markets import router as markets_router
 from app.api.performance import router as performance_router
 from app.api.projects import router as projects_router
@@ -73,6 +74,7 @@ ROUTERS = (
     audio_limits_router,
     visual_assets_router,
     visual_limits_router,
+    library_router,
     publishing_router,
     publishing_platforms_router,
     publishing_tiktok_router,

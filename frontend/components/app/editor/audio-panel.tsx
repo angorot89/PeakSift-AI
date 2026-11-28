@@ -3,6 +3,7 @@
 import { revealInPanel } from "@/lib/reveal";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useShortTime } from "@/components/app/editor/caption-layer";
+import { LibraryBrowser } from "@/components/app/editor/library-browser";
 import { Info, Music2, Pause, Play, Plus, Trash2, Upload, Volume2, Waves } from "lucide-react";
 import { Waveform } from "@/components/app/editor/audio-timeline";
 import { ControlGroup, InlineCheck, OptionCard } from "@/components/app/editor/controls";
@@ -226,7 +227,7 @@ export function AudioPanel({
         </h3>
         <p className="flex items-start gap-1.5 text-xs text-subtle">
           <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          Upload audio you own or have permission to use. PeakSift doesn&apos;t provide a music library.
+          Use the PeakSift library, or upload audio you own or have permission to use.
         </p>
       </div>
 
@@ -458,6 +459,15 @@ export function AudioPanel({
         </div>
         {!effects.length ? <p className="text-caption text-subtle">Upload a short sound to place it. {effectLimitHint}</p> : null}
       </ControlGroup>
+
+      {/* Library music becomes the Short's music; a library effect lands at the playhead. */}
+      <LibraryBrowser
+        projectId={projectId}
+        kinds={["sfx", "music"]}
+        onAdded={(result) => {
+          if (result.kind === "audio") onUploaded(result.audio_asset);
+        }}
+      />
 
       <SwitchRow
         label="Normalize final mix"

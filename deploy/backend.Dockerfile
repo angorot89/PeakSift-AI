@@ -42,10 +42,14 @@ COPY scripts ./scripts
 # The caption style fonts (open-licence display fonts): exactly the pinned google/fonts files,
 # sha256-verified by the script, with their licence files, read-only for the service user.
 RUN python scripts/fetch_caption_fonts.py --dir /app/fonts
+# The starter library (CC0 sounds and music, MIT stickers): the pinned GitHub release archive,
+# sha256-verified as a whole and file by file.
+RUN python scripts/fetch_library.py --dir /app/library
 # Scratch for jobs and model caches live on volumes owned by the service user.
 RUN mkdir -p /work /models && chown peaksift:peaksift /work /models
 ENV WORK_ROOT=/work \
     CAPTION_FONTS_DIR=/app/fonts \
+    LIBRARY_DIR=/app/library \
     HF_HOME=/models/huggingface \
     REFRAME_MODEL_PATH=/models/face_detection_yunet_2023mar.onnx \
     SEMANTIC_MODEL_DIR=/models/clip-vit-b-32

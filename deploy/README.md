@@ -47,7 +47,7 @@ so the browser talks to one origin. If you publish to YouTube, register
 - **Models:** the worker keeps speech models in the `models` volume (`HF_HOME`). For smart
   reframing, install the face model once:
   `docker compose -f deploy/docker-compose.prod.yml exec worker python scripts/fetch_reframe_model.py` (it writes to `REFRAME_MODEL_PATH`, `/models/…` in the image)
-  (The caption style fonts need nothing: the image build installs the pinned, verified files into `/app/fonts`.)
+  (The caption style fonts and the starter library need nothing: the image build installs the pinned, verified files into `/app/fonts` and `/app/library`.)
   (pinned SHA-256; without it, smart framing reports itself unavailable).
   For semantic visual search (V1.3), install the local CLIP model once:
   `docker compose -f deploy/docker-compose.prod.yml exec worker python scripts/fetch_semantic_model.py`

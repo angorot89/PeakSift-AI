@@ -134,7 +134,8 @@ see [docs/creator-experience.md](docs/creator-experience.md) and
 [docs/publishing.md](docs/publishing.md). On `main` since 26 November 2026; not tagged. Then,
 from the StreamLadder clip-editor study (28 November 2026), **Tighten**: remove the pauses
 between words and cut parts by hand ([docs/tighten.md](docs/tighten.md)), and **creator caption
-styles** — 14 presets with six pinned open-licence display fonts ([docs/caption-styles.md](docs/caption-styles.md)). The
+styles** — 14 presets with six pinned open-licence display fonts ([docs/caption-styles.md](docs/caption-styles.md)), and
+the **starter library** — CC0 sound effects and music, MIT stickers ([docs/media-library.md](docs/media-library.md)). The
 list below still applies to everything else.
 
 **No later milestone has been defined.** Do not start new features (autonomous or scheduled publishing, multi-platform publishing,
@@ -248,6 +249,11 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   attempt workspace (`fontsdir=fonts`); a missing font makes the style unavailable, never a silent
   substitute. Emphasis tags come only from the preset. One word and Reveal need real word timing.
   The four original presets render exactly as before.
+- Starter library (`docs/media-library.md`): only CC0 / MIT material that may be redistributed and
+  used commercially without a per-video credit; the catalogue is `library_manifest.json`, the media
+  a pinned GitHub release installed by `scripts/fetch_library.py` (never committed, never fetched
+  by the app, every file sha256-verified). Using an item imports it through the normal upload
+  validation, labelled with its licence and source. Never add sources outside that rule.
 - Tighten (`docs/tighten.md`): an edit's `cuts` section lists removed ranges in the clip's own
   time, only when used (old fingerprints unchanged); validated and merged, never repaired.
   Everything the creator places is on the Short's timeline; only source data (word timings,

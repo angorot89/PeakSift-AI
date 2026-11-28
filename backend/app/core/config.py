@@ -228,6 +228,9 @@ class Settings(BaseSettings):
     # Caption style fonts (open-licence display fonts, installed by scripts/fetch_caption_fonts.py
     # and verified against pinned digests; a style whose font is missing cannot be rendered).
     caption_fonts_dir: str = "fonts"
+    # The built-in starter library (sounds, music, stickers): a release archive installed by
+    # scripts/fetch_library.py and verified against pinned digests; never fetched by the app.
+    library_dir: str = "library"
     caption_max_words: int = Field(default=7, ge=1, le=20)
     caption_max_chars: int = Field(default=32, ge=8, le=80)
 
