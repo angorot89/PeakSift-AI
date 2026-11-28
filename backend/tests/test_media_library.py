@@ -15,7 +15,7 @@ import pytest
 from PIL import Image
 
 from app.core.config import get_settings
-from app.services import library
+from app.services import library, library_catalogue
 from tests.test_audio_assets_api import audio_files, make_audio
 from tests.test_audio_assets_api import clean_media_root as _clean  # noqa: F401
 from tests.test_projects import create_project, sign_up
@@ -90,7 +90,7 @@ def installed(tmp_path, monkeypatch):
     manifest = build_library(root)
     catalogue = tmp_path / "catalogue.json"
     catalogue.write_text(json.dumps(manifest), encoding="utf-8")
-    monkeypatch.setattr(library, "MANIFEST_PATH", catalogue)
+    monkeypatch.setattr(library_catalogue, "MANIFEST_PATH", catalogue)
     monkeypatch.setenv("LIBRARY_DIR", str(root))
     library.manifest.cache_clear()
     library.items.cache_clear()

@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.library import MANIFEST_PATH, items, manifest  # noqa: E402
+from app.services.library_catalogue import MANIFEST_PATH, items, manifest  # noqa: E402
 
 RELEASE_URL = (
     "https://github.com/angorot89/PeakSift-AI/releases/download/library-v1/"
