@@ -19,6 +19,7 @@ from app.services import library, library_catalogue
 from tests.test_audio_assets_api import audio_files, make_audio
 from tests.test_audio_assets_api import clean_media_root as _clean  # noqa: F401
 from tests.test_projects import create_project, sign_up
+from tests.test_visual_render import transparent_video
 
 clean_media_root = _clean
 
@@ -32,6 +33,8 @@ def test_the_catalogue_is_complete_and_openly_licensed():
     assert len(kinds["sfx"]) >= 60 and len(kinds["music"]) >= 10 and len(kinds["sticker"]) >= 30
     assert {i.licence for i in items} <= {"CC0-1.0", "MIT"}
     assert all(i.licence == "MIT" for i in kinds["sticker"])  # Fluent Emoji
+    assert len(kinds["overlay"]) >= 8 and all(i.licence == "CC0-1.0" for i in kinds["overlay"])
+    assert all(i.file.endswith(".webm") and i.duration_seconds for i in kinds["overlay"])
     assert all(i.source_url.startswith("https://") and i.credit for i in items)
     assert len({i.id for i in items}) == len(items)
     assert all(i.duration_seconds and i.duration_seconds <= 30 for i in kinds["sfx"])
@@ -53,6 +56,8 @@ def build_library(root: Path) -> dict:
     (root / "sfx").mkdir(parents=True)
     (root / "music").mkdir()
     (root / "stickers").mkdir()
+    (root / "overlays").mkdir()
+    transparent_video(root / "overlays" / "fx-glow.webm", seconds=1.5)
     (root / "licences").mkdir()
     make_audio(root / "sfx" / "pop-1.ogg", seconds=0.6)
     make_audio(root / "music" / "calm-bed.ogg", seconds=4.0, freq=220)
@@ -77,6 +82,7 @@ def build_library(root: Path) -> dict:
             entry("sfx", "sfx/pop-1.ogg", "Pop 1", "CC0-1.0", "Kenney (kenney.nl), CC0", 0.6),
             entry("music", "music/calm-bed.ogg", "Calm bed", "CC0-1.0", "Someone, CC0", 4.0),
             entry("sticker", "stickers/fire.png", "Fire", "MIT", "Fluent Emoji, MIT licence"),
+            entry("overlay", "overlays/fx-glow.webm", "Glow", "CC0-1.0", "PeakSift, CC0", 1.5),
         ],
         "licences": ["licences/kenney-CC0.txt"],
     }
@@ -132,7 +138,7 @@ def test_the_installer_verifies_and_extracts_only_listed_files(installed, tmp_pa
     monkeypatch.setattr(
         fetch_library, "RELEASE_SHA256", hashlib.sha256(archive.read_bytes()).hexdigest()
     )
-    assert fetch_library.install(archive, target) == 3
+    assert fetch_library.install(archive, target) == 4
     assert library.installed(target) and not (tmp_path / "escape.txt").exists()
     assert sorted(p.name for p in (target / "sfx").iterdir()) == ["pop-1.ogg"]
 
@@ -199,3 +205,12 @@ def test_adding_is_owner_scoped_and_needs_the_library(client, project, installed
     (installed / "sfx" / "pop-1.ogg").unlink()
     response = client.post(f"/projects/{mine}/library/pop-1")
     assert response.status_code == 409 and "/" not in response.json()["detail"]
+
+
+def test_an_overlay_is_imported_as_a_transparent_video(client, project, installed):
+    response = client.post(f"/projects/{project}/library/fx-glow")
+    assert response.status_code == 201, response.text
+    visual = response.json()["visual_asset"]
+    assert visual["kind"] == "video" and visual["has_alpha"] is True
+    assert visual["origin"] == "cc0"
+    assert client.get("/library/fx-glow/content").headers["content-type"] == "video/webm"

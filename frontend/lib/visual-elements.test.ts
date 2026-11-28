@@ -22,7 +22,7 @@ const VIDEO: AssetFacts = { kind: "video", duration_seconds: 6, width: 1280, hei
 const LAYOUT: VisualLayout = {
   output: { width: 1080, height: 1920 },
   margins: { top: 192, bottom: 422, left: 97, right: 97 },
-  inset_width_fraction: { small: 0.34, medium: 0.44, large: 0.56 },
+  inset_width_fraction: { small: 0.34, medium: 0.44, large: 0.56, full: 1 },
   inset_max_aspect: 1.25,
   pip_border: 6,
   background: "#111113",
@@ -90,6 +90,9 @@ describe("visual elements", () => {
     assert.deepEqual(rect, { x: 97, y: 1010, width: 488, height: 488, border: 6 });
     const overlay = insetRect({ mode: "overlay", size: "small", position: "center" }, { width: 200, height: 200 }, LAYOUT);
     assert.deepEqual(overlay, { x: 356, y: 776, width: 368, height: 368, border: 0 });
+    // A full-frame overlay (an animated effect) covers the whole short, centred, whatever its position.
+    const effect = insetRect({ mode: "overlay", size: "full", position: "top_left" }, { width: 720, height: 1280 }, LAYOUT);
+    assert.deepEqual(effect, { x: 0, y: 0, width: 1080, height: 1920, border: 0 });
   });
 
   it("compares visuals like the server's fingerprint", () => {
@@ -121,5 +124,14 @@ describe("suggestion use", () => {
     assert.equal(fulfills(el(12.0, 14.0), moment), false); // 0.7 s of 2.5 s
     assert.equal(fulfills(el(12.7, 14.0), moment), false); // touching is not covering
     assert.equal(fulfills(el(10, 12), { start: 5, end: 5 }), false);
+  });
+});
+
+describe("transparent video overlays", () => {
+  it("are allowed as overlays, opaque videos are not", () => {
+    const element = { ...newElement("a", { ...VIDEO, has_alpha: true }, 0, 10, "overlay"), size: "full" as const };
+    assert.deepEqual(elementProblems(element, { ...VIDEO, has_alpha: true }, 10), []);
+    assert.ok(elementProblems(element, VIDEO, 10).some((p) => p.includes("transparent videos")));
+    assert.ok(elementProblems({ ...element, mode: "pip" }, VIDEO, 10).includes("Only overlays can fill the frame."));
   });
 });

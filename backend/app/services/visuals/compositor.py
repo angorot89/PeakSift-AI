@@ -48,6 +48,7 @@ class VisualLayer:
     has_alpha: bool = False
     width: int = 0  # display size of the asset (needed to flatten transparent images)
     height: int = 0
+    codec: str | None = None  # videos: the stream codec (a transparent one needs libvpx)
 
 
 def _t(seconds: float) -> str:
@@ -69,6 +70,10 @@ def layer_inputs(layers: list[VisualLayer], fps: float) -> list[str]:
             if element.loop:
                 args += ["-stream_loop", "-1"]
             args += ["-ss", _t(element.asset_offset_seconds), "-t", _t(element.duration), "-an"]
+            if layer.has_alpha:
+                # FFmpeg's own VP8/VP9 decoders drop the alpha channel; libvpx keeps it.
+                codec = "libvpx-vp9" if layer.codec == "vp9" else "libvpx"
+                args += ["-c:v", codec]
         args += ["-i", str(layer.path)]
     return args
 
@@ -137,7 +142,7 @@ def layers_graph(
             prep += f"fps={_rate(fps)},scale=trunc(iw*sar/2)*2:ih,setsar=1,"
         graph += f"{source}{prep.rstrip(',')}[p{index}];"
         source = f"[p{index}]"
-        if layer.kind == "image" and layer.has_alpha and element.mode != VisualMode.OVERLAY:
+        if layer.has_alpha and element.mode != VisualMode.OVERLAY:
             flat, source = _flatten(source, index, layer, fps)
             graph += flat
         if element.mode == VisualMode.CUTAWAY:

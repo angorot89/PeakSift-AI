@@ -13,7 +13,12 @@ def test_the_layout_is_published_to_signed_in_users(client):
     layout = client.get("/visual-layout").json()
     assert layout["output"] == {"width": 1080, "height": 1920}
     assert layout["margins"] == {"top": 192, "bottom": 422, "left": 97, "right": 97}
-    assert layout["inset_width_fraction"] == {"small": 0.34, "medium": 0.44, "large": 0.56}
+    assert layout["inset_width_fraction"] == {
+        "small": 0.34,
+        "medium": 0.44,
+        "large": 0.56,
+        "full": 1.0,
+    }
     assert layout["inset_max_aspect"] == 1.25 and layout["pip_border"] == 6
     assert layout["background"] == "#111113"
 

@@ -5,7 +5,7 @@ import { API_URL, apiFetch, postJson } from "@/lib/api";
 import type { AudioAsset } from "@/lib/audio";
 import type { VisualAsset } from "@/lib/visual-rules";
 
-export type LibraryKind = "sfx" | "music" | "sticker";
+export type LibraryKind = "sfx" | "music" | "sticker" | "overlay";
 
 export type LibraryItem = {
   id: string;

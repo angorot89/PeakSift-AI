@@ -317,3 +317,58 @@ def test_the_render_job_draws_visuals_and_reports_missing_assets(db_session, tmp
         for path in sorted(storage.root.rglob("*"), reverse=True):
             if path.is_file():
                 path.unlink()
+
+
+def transparent_video(path: Path, seconds: float = 2.0) -> Path:
+    """A VP9 WebM with an alpha channel: a red square in the middle, transparent elsewhere."""
+    subprocess.run(
+        [FFMPEG, "-v", "error", "-y", "-f", "lavfi",
+         "-i", f"color=c=red:s=360x640:r=30:d={seconds},format=rgba,"
+               "geq=r=255:g=0:b=0:a='255*between(X,120,239)*between(Y,260,379)'",
+         "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30",
+         "-auto-alt-ref", "0", str(path)],
+        check=True, capture_output=True, timeout=120,
+    )  # fmt: skip
+    return path
+
+
+@requires_ffmpeg
+def test_a_transparent_video_is_probed_as_such(tmp_path):
+    from app.services.visual_assets import inspect_video
+
+    found = inspect_video(
+        transparent_video(tmp_path / "fx.webm"), ".webm", tmp_path, get_settings()
+    )
+    assert found.kind.value == "video" and found.has_alpha is True and found.codec == "vp9"
+    opaque = inspect_video(solid_video(tmp_path / "plain.mp4"), ".mp4", tmp_path, get_settings())
+    assert opaque.has_alpha is False
+
+
+@requires_ffmpeg
+def test_a_transparent_video_overlay_fills_the_frame_and_keeps_its_transparency(tmp_path):
+    fx = transparent_video(tmp_path / "fx.webm")
+    effect = VisualLayer(
+        VisualElement.create({
+            "asset_id": str(uuid.uuid4()), "mode": "overlay", "size": "full",
+            "start_seconds": 0.5, "end_seconds": 2.5,
+        }),
+        fx, "video", True, 360, 640, codec="vp9",
+    )  # fmt: skip
+    assert effect.element.position == VisualPosition.CENTER  # a full-frame overlay is centred
+    inputs = layer_inputs([effect], 25.0)
+    assert inputs[inputs.index("-i") - 2 : inputs.index("-i")] == ["-c:v", "libvpx-vp9"]
+    out = render(tmp_path, [effect])
+    # 360×640 scaled to the 1080×1920 frame: the red square lands in the middle.
+    assert close(pixel(out, 540, 960, t=1.0), RED, tolerance=60)
+    assert close(pixel(out, 100, 300, t=1.0), GREY)  # transparent: the clip shows through
+    assert close(pixel(out, 540, 960, t=0.2), GREY)  # before the overlay starts
+    assert abs(probe(out).duration_seconds - 3.0) < 0.3
+
+
+def test_only_overlays_may_fill_the_frame():
+    import pytest
+
+    with pytest.raises(ValueError, match="Only overlays"):
+        VisualElement.create({"asset_id": str(uuid.uuid4()), "mode": "pip", "size": "full",
+                              "start_seconds": 0, "end_seconds": 1})  # fmt: skip
+    assert inset_box(VisualSize.FULL) == (1080, 1920)

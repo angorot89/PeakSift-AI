@@ -6,7 +6,8 @@
 export type VisualMode = "cutaway" | "pip" | "overlay";
 export type VisualFit = "fill" | "fit";
 export type VisualPosition = "top_left" | "top_right" | "bottom_left" | "bottom_right" | "center";
-export type VisualSize = "small" | "medium" | "large";
+/** `full` is for overlays only: the whole frame (full-screen animated effects). */
+export type VisualSize = "small" | "medium" | "large" | "full";
 export type VisualTransition = "none" | "fade";
 
 /** One element as the editor holds it (`key` is local only, never sent). */
@@ -43,7 +44,14 @@ export type VisualElementRequest = {
 };
 
 /** The part of a visual asset the rules need. */
-export type AssetFacts = { kind: "image" | "video"; duration_seconds: number | null; width: number; height: number };
+export type AssetFacts = {
+  kind: "image" | "video";
+  duration_seconds: number | null;
+  width: number;
+  height: number;
+  /** A transparent video (VP8/VP9 WebM with alpha) may be an overlay. */
+  has_alpha?: boolean;
+};
 
 /** Published by the server (`GET /visual-layout`): where insets sit in the 1080 × 1920 frame. */
 export type VisualLayout = {
@@ -143,7 +151,9 @@ export function elementProblems(element: VisualElementDraft, asset: AssetFacts |
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0) problems.push("Start must be 0 or later.");
   else if (end - start < MIN_ELEMENT_SECONDS) problems.push(`A visual must last at least ${MIN_ELEMENT_SECONDS} seconds.`);
   if (end > clipDuration + 0.01) problems.push("A visual ends after the end of the clip.");
-  if (element.mode === "overlay" && asset.kind === "video") problems.push("Overlays use images; use picture-in-picture for a video.");
+  if (element.mode === "overlay" && asset.kind === "video" && !asset.has_alpha)
+    problems.push("Overlays use images or transparent videos; use picture-in-picture for a video.");
+  if (element.size === "full" && element.mode !== "overlay") problems.push("Only overlays can fill the frame.");
   if (element.mode === "overlay" && (element.opacity < OPACITY_RANGE.min || element.opacity > OPACITY_RANGE.max))
     problems.push("Opacity must be between 20 % and 100 %.");
   if (asset.kind === "video") {
@@ -206,14 +216,15 @@ export function insetRect(
 ): { x: number; y: number; width: number; height: number; border: number } {
   const { width: W, height: H } = layout.output;
   const even = (v: number) => Math.max(2, Math.round(v / 2) * 2);
-  const boxW = even(W * layout.inset_width_fraction[element.size]);
-  const boxH = even(boxW * layout.inset_max_aspect);
+  const full = element.size === "full"; // the whole frame, centred (as the renderer)
+  const boxW = full ? W : even(W * layout.inset_width_fraction[element.size]);
+  const boxH = full ? H : even(boxW * layout.inset_max_aspect);
   const scale = Math.min(boxW / asset.width, boxH / asset.height);
   const border = element.mode === "pip" ? layout.pip_border : 0;
   const width = even(asset.width * scale) + 2 * border;
   const height = even(asset.height * scale) + 2 * border;
   const { left, right, top, bottom } = layout.margins;
-  const position = element.mode === "pip" && element.position === "center" ? "top_right" : element.position;
+  const position = full ? "center" : element.mode === "pip" && element.position === "center" ? "top_right" : element.position;
   const x = position.endsWith("left") ? left : position.endsWith("right") ? W - width - right : (W - width) / 2;
   const y = position.startsWith("top") ? top : position.startsWith("bottom") ? H - height - bottom : (H - height) / 2;
   return { x, y, width, height, border };

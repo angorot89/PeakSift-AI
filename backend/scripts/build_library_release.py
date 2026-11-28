@@ -7,6 +7,8 @@
 - ``kenney/x-<pack>/``: Kenney audio packs, CC0 (kenney.nl)
 - ``oga/<slug>.<ext>`` + ``oga/sources.json``: CC0 music from OpenGameArt.org
 - ``fluent/*.png`` + ``fluent/LICENSE`` + ``fluent/sources.json``: Microsoft Fluent Emoji, MIT
+- ``overlays/*.webm`` + ``overlays/overlays.json``: animated overlays made by
+  ``scripts/build_overlays.py`` from Kenney's Particle Pack (CC0), transparent WebM
 
 It picks the starter set below, converts every sound to Ogg Vorbis (loudness unchanged),
 copies stickers as PNG, writes ``manifest.json`` (each file's sha256, licence and source) and
@@ -24,7 +26,7 @@ import sys
 import tarfile
 from pathlib import Path
 
-VERSION = "library-v1"
+VERSION = "library-v2"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 FFPROBE = shutil.which("ffprobe") or "ffprobe"
 
@@ -122,7 +124,7 @@ def to_ogg(source: Path, target: Path, quality: int, max_seconds: float | None =
 def main(sources: Path, out: Path) -> int:
     root = out / VERSION
     shutil.rmtree(root, ignore_errors=True)
-    for folder in ("sfx", "music", "stickers", "licences"):
+    for folder in ("sfx", "music", "stickers", "overlays", "licences"):
         (root / folder).mkdir(parents=True)
     items: list[dict] = []
 
@@ -141,7 +143,7 @@ def main(sources: Path, out: Path) -> int:
             "source": {"name": source["name"], "url": source["url"]},
             "credit": credit,
         }
-        if kind in ("sfx", "music"):
+        if kind in ("sfx", "music", "overlay"):
             item["duration_seconds"] = duration(file)
         items.append(item)
 
@@ -189,6 +191,14 @@ def main(sources: Path, out: Path) -> int:
         shutil.copyfile(path, target)
         add("sticker", target, entry["name"], "emoji", [entry["name"].lower()], FLUENT,
             "Microsoft Fluent Emoji, MIT licence")  # fmt: skip
+    particles = {"name": "Kenney Particle Pack", "url": "https://kenney.nl/assets/particle-pack",
+                 "licence": "CC0-1.0"}  # fmt: skip
+    for entry in json.loads((sources / "overlays" / "overlays.json").read_text())["items"]:
+        target = root / "overlays" / f"fx-{entry['slug']}.webm"
+        shutil.copyfile(sources / "overlays" / f"{entry['slug']}.webm", target)
+        add("overlay", target, entry["title"], entry["category"], entry["tags"], particles,
+            "PeakSift, made from Kenney's Particle Pack (CC0)")  # fmt: skip
+
     shutil.copyfile(sources / "fluent" / "LICENSE", root / "licences" / "fluent-emoji-MIT.txt")
     kenney_licence = next((kenney / "x-interface-sounds").rglob("License.txt"))
     shutil.copyfile(kenney_licence, root / "licences" / "kenney-CC0.txt")
@@ -205,7 +215,8 @@ def main(sources: Path, out: Path) -> int:
     with tarfile.open(archive, "w:gz") as tar:
         tar.add(root, arcname=VERSION)
     counts = {
-        kind: sum(1 for i in items if i["kind"] == kind) for kind in ("sfx", "music", "sticker")
+        kind: sum(1 for i in items if i["kind"] == kind)
+        for kind in ("sfx", "music", "sticker", "overlay")
     }
     print(f"{archive.name}: {counts}, {archive.stat().st_size} bytes, sha256 {sha256(archive)}")
     return 0

@@ -439,6 +439,7 @@ def _prepare_visuals(
             path=paths[element.asset_id],
             kind=assets[element.asset_id].kind,
             has_alpha=assets[element.asset_id].has_alpha,
+            codec=assets[element.asset_id].codec,
             width=assets[element.asset_id].width,
             height=assets[element.asset_id].height,
         )

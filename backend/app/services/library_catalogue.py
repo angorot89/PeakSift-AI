@@ -12,10 +12,10 @@ from functools import lru_cache
 from pathlib import Path
 
 MANIFEST_PATH = Path(__file__).with_name("library_manifest.json")
-KINDS = ("sfx", "music", "sticker")
+KINDS = ("sfx", "music", "sticker", "overlay")
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
-_FILE = re.compile(r"^(sfx|music|stickers)/[a-z0-9][a-z0-9-]{0,79}\.(ogg|png)$")
-CONTENT_TYPES = {".ogg": "audio/ogg", ".png": "image/png"}
+_FILE = re.compile(r"^(sfx|music|stickers|overlays)/[a-z0-9][a-z0-9-]{0,79}\.(ogg|png|webm)$")
+CONTENT_TYPES = {".ogg": "audio/ogg", ".png": "image/png", ".webm": "video/webm"}
 
 
 @dataclass(frozen=True)

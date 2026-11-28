@@ -284,6 +284,15 @@ class VideoProbe:
     duration_seconds: float
     fps: float | None
     has_audio: bool
+    # VP8/VP9 with an alpha channel (WebM marks it with the ALPHA_MODE tag): a transparent
+    # video that may be drawn as an overlay (decoded with libvpx, which keeps the alpha).
+    has_alpha: bool = False
+
+
+def _alpha_video(stream: dict[str, Any]) -> bool:
+    tags = stream.get("tags") if isinstance(stream.get("tags"), dict) else {}
+    mode = next((str(v) for k, v in tags.items() if str(k).lower() == "alpha_mode"), "")
+    return stream.get("codec_name") in ("vp8", "vp9") and mode.strip() == "1"
 
 
 def parse_video_probe(data: dict[str, Any], extension: str) -> VideoProbe:
@@ -331,6 +340,7 @@ def parse_video_probe(data: dict[str, Any], extension: str) -> VideoProbe:
         duration_seconds=round(duration, 3),
         fps=round(fps, 3) if fps else None,
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
+        has_alpha=_alpha_video(video),
     )
 
 
@@ -392,6 +402,7 @@ def inspect_video(path: Path, extension: str, work: Path, settings: Settings) ->
         codec=probed.codec,
         container=probed.container,
         has_audio=probed.has_audio,
+        has_alpha=probed.has_alpha,
         duration_seconds=probed.duration_seconds,
         fps=probed.fps,
         thumbnail_path=thumbnail,

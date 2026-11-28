@@ -66,6 +66,7 @@ class VisualSize(StrEnum):
     SMALL = "small"
     MEDIUM = "medium"
     LARGE = "large"
+    FULL = "full"  # overlays only: the whole frame, centred (full-screen animated effects)
 
 
 DEFAULT_FIT = VisualFit.FILL
@@ -147,6 +148,10 @@ class VisualElement:
             if position == VisualPosition.CENTER and mode == VisualMode.PIP:
                 raise ValueError("Picture-in-picture goes in a corner")
             size = _enum(VisualSize, data.get("size") or DEFAULT_SIZE, "size")
+            if size == VisualSize.FULL:
+                if mode != VisualMode.OVERLAY:
+                    raise ValueError("Only overlays can fill the frame")
+                position = VisualPosition.CENTER  # a full-frame overlay has one place
         if mode == VisualMode.OVERLAY:
             raw = data.get("opacity", 1.0)
             value = _number(1.0 if raw is None else raw, "Opacity")

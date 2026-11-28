@@ -57,7 +57,7 @@ def import_into(
         upload = UploadFile(
             file=handle, filename=name, headers=Headers({"content-type": item.content_type})
         )
-        if item.kind == "sticker":
+        if item.kind in ("sticker", "overlay"):
             asset, created = store_visual_upload(db, storage, project, upload, settings)
             family = "visual"
         else:

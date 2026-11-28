@@ -254,6 +254,9 @@ split screen, speaker diarization or active-speaker detection, generic object tr
   a pinned GitHub release installed by `scripts/fetch_library.py` (never committed, never fetched
   by the app, every file sha256-verified). Using an item imports it through the normal upload
   validation, labelled with its licence and source. Never add sources outside that rule.
+  Animated overlays are transparent VP9 WebM made by `scripts/build_overlays.py` from CC0
+  particles; transparent video (`has_alpha`, VP8/VP9 only) may be an overlay, decoded with
+  libvpx, and only overlays may use the `full` size.
 - Tighten (`docs/tighten.md`): an edit's `cuts` section lists removed ranges in the clip's own
   time, only when used (old fingerprints unchanged); validated and merged, never repaired.
   Everything the creator places is on the Short's timeline; only source data (word timings,

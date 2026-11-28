@@ -2,10 +2,10 @@
 
 Used by the API when an edit is requested and again by the render job before anything is
 drawn (an asset could have been deleted, or a snapshot written by an older version): every
-referenced asset must belong to the edit's project; overlays need images; images take no
-video start or loop; a video's start must lie inside it, and without loop the video must
-last as long as the element; and no element may end after the clip. Messages are safe to
-show and never echo values.
+referenced asset must belong to the edit's project; overlays need images or transparent
+videos; images take no video start or loop; a video's start must lie inside it, and without
+loop the video must last as long as the element; and no element may end after the clip.
+Messages are safe to show and never echo values.
 """
 
 import uuid
@@ -67,10 +67,10 @@ def check_visuals(
                     "visual_image_options", "Images have no video start or loop", 422
                 )
             continue
-        if element.mode == VisualMode.OVERLAY:
+        if element.mode == VisualMode.OVERLAY and not asset.has_alpha:
             raise VisualsProblem(
                 "visual_overlay_video",
-                "Overlays use images; use picture-in-picture for a video",
+                "Overlays use images or transparent videos; use picture-in-picture for a video",
                 422,
             )
         duration = float(asset.duration_seconds or 0.0)

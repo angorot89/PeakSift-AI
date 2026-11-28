@@ -17,7 +17,12 @@ from app.services.clip_edit.config import OUTPUT_HEIGHT, OUTPUT_WIDTH
 from app.services.clip_edit.safe_area import GENERAL_SOCIAL
 from app.services.visuals.config import VisualPosition, VisualSize
 
-INSET_WIDTH_FRACTION = {VisualSize.SMALL: 0.34, VisualSize.MEDIUM: 0.44, VisualSize.LARGE: 0.56}
+INSET_WIDTH_FRACTION = {
+    VisualSize.SMALL: 0.34,
+    VisualSize.MEDIUM: 0.44,
+    VisualSize.LARGE: 0.56,
+    VisualSize.FULL: 1.0,
+}
 INSET_MAX_ASPECT = 1.25  # box height = width × 1.25 (portrait assets stay large enough)
 PIP_BORDER = 6  # pixels of white frame around a picture-in-picture
 BACKGROUND = "0x111113"  # behind transparent parts of cutaways and picture-in-picture
@@ -31,6 +36,8 @@ def _even(value: float) -> int:
 
 def inset_box(size: VisualSize) -> tuple[int, int]:
     """The (width, height) box an inset is fitted into, before any frame."""
+    if size == VisualSize.FULL:  # a full-frame overlay: the whole short
+        return OUTPUT_WIDTH, OUTPUT_HEIGHT
     width = _even(OUTPUT_WIDTH * INSET_WIDTH_FRACTION[size])
     return width, _even(width * INSET_MAX_ASPECT)
 

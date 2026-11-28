@@ -11,6 +11,7 @@ creators' published, commercial videos without a credit they must add.
 | Sound effects: transitions, hits & booms, clicks & pops, alerts, funny, money, stings | 90 | [Kenney](https://kenney.nl) audio packs | CC0 1.0 |
 | Music: calm, chill, cinematic, upbeat, energetic, suspense, playful (≤ 3 min, long ones faded) | 13 | Their authors on [OpenGameArt.org](https://opengameart.org) (each page in the manifest) | CC0 1.0 |
 | Stickers: emoji reactions (256 px, transparent) | 46 | [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) | MIT |
+| Animated overlays: confetti, sparkle burst, rising hearts, fire, explosion, speed lines, flash, smoke puff, magic swirl, twinkling stars | 10 | Made by PeakSift (`scripts/build_overlays.py`) from [Kenney's Particle Pack](https://kenney.nl/assets/particle-pack) and drawn shapes | CC0 1.0 |
 
 Rejected sources and why are in the benchmark (YouTube Audio Library, Pixabay, Mixkit, Pexels,
 ZapSplat, Sonniss, BBC, Freesound non-commercial, Kevin MacLeod / CC-BY, Twemoji, OpenMoji,
@@ -30,6 +31,23 @@ meme sounds such as the "Vine boom" or "bruh", anything from YouTube, Tenor or G
    paths outside the target), each must match its own sha256, and the manifest must equal the
    committed one before anything replaces an installed library. The production image does this at
    build time (`/app/library`). The app itself never downloads anything.
+
+## Animated overlays (library v2)
+
+`scripts/build_overlays.py` draws each effect frame by frame with Pillow (fixed seeds, so the
+output is reproducible) from the particle sprites — tinted, or filled solid through their own
+alpha for flames — and plain shapes (confetti, hearts, speed lines), then encodes **VP9 with an
+alpha channel** in WebM (720 × 1280, 30 fps, 0.6–3 s, 22 MB for the whole library). Item ids
+start with `fx-`.
+
+The visuals pipeline gained **transparent videos**: a VP8/VP9 WebM whose stream carries the
+`ALPHA_MODE` tag is recorded with `has_alpha` (a migration allows it for VP8/VP9 only); the render
+decodes it with libvpx (FFmpeg's own VP9 decoder drops alpha); such a video may be an **overlay**
+(any other video still may not), and overlays have a new size, **Full** — the whole frame,
+centred (`VisualSize.FULL`, overlays only; snapshot and fingerprints change only when used). In
+the editor, the Visuals panel's library has an **Animated** tab (looping previews); adding an
+effect places it at the playhead, full frame, for its whole length. Chrome-based browsers show
+the transparency in the preview; the render is authoritative everywhere.
 
 ## Using it
 
@@ -55,6 +73,11 @@ the playhead. *Sources & licences* lists the sources and the MIT notice.
   labelled audio and visual assets (again = same asset), owner scoping, a missing file (409).
 - Build checks: no silent file, every effect ≤ 30 s, stickers transparent at 256 px (the Kenney
   speech bubbles were left out: 32 px is too small for 1080 × 1920).
+- Overlays: `tests/test_visual_render.py` (a transparent WebM is probed as such; a full-frame
+  overlay renders with its transparency, decoded by libvpx; only overlays may fill the frame),
+  the library import of an overlay as a transparent video, `visual-elements.test.ts`. Real
+  browser: Confetti from the Animated tab → Overlay · Full · 5.0–8.0 s → a real render with the
+  confetti over the clip and the captions on top.
 - Real browser on a local test stack: search "whoosh" → add → a cue at the playhead; "8-bit
   Bossa" → the Short's music; Fire sticker → an overlay; a real render with all three (sticker
   transparent on top, mix at −14.2 LUFS), each asset labelled with its licence.
@@ -62,6 +85,8 @@ the playhead. *Sources & licences* lists the sources and the MIT notice.
 ## Limitations
 
 - A starter set, not a stock library: no internet search, no uploads by other creators.
-- No animated overlays yet (fire, confetti, flash as video with transparency); the Kenney
-  Particle Pack (CC0) is the planned source.
+- Two insets (overlays or picture-in-picture) still cannot overlap, so a sticker and an effect
+  play one after the other.
+- Safari's preview may show an effect's transparent areas as black (it lacks VP9 alpha); the
+  rendered Short is correct.
 - Music is game-music flavoured (what CC0 offers); creators can still upload what they own.

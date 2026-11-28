@@ -26,12 +26,17 @@ from app.services.video_upload import UploadValidationError
 router = APIRouter(tags=["library"])
 
 LICENCE_LABELS = {"CC0-1.0": "CC0 (no rights reserved)", "MIT": "MIT licence"}
-KIND_LABELS = {"sfx": "Sound effects", "music": "Music", "sticker": "Stickers"}
+KIND_LABELS = {
+    "sfx": "Sound effects",
+    "music": "Music",
+    "sticker": "Stickers",
+    "overlay": "Animated overlays",
+}
 
 
 class LibraryItemRead(BaseModel):
     id: str
-    kind: Literal["sfx", "music", "sticker"]
+    kind: Literal["sfx", "music", "sticker", "overlay"]
     title: str
     category: str
     tags: list[str]
@@ -140,7 +145,7 @@ def import_library_item(
         raise HTTPException(status_code=error.status_code, detail=error.message) from None
     if not created:
         response.status_code = status.HTTP_200_OK
-    if item.kind == "sticker":
+    if item.kind in ("sticker", "overlay"):
         start_indexing_quietly(db, asset, settings)
         return LibraryImportRead(kind="visual", created=created, visual_asset=read_visual(asset))
     return LibraryImportRead(

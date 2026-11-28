@@ -24,10 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.services.library_catalogue import MANIFEST_PATH, items, manifest  # noqa: E402
 
 RELEASE_URL = (
-    "https://github.com/angorot89/PeakSift-AI/releases/download/library-v1/"
-    "peaksift-library-v1.tar.gz"
+    "https://github.com/angorot89/PeakSift-AI/releases/download/library-v2/"
+    "peaksift-library-v2.tar.gz"
 )
-RELEASE_SHA256 = "83c3fa96769705b5e99bfce4287e0ff384bc359057ca7241df55ad05b3d19776"
+RELEASE_SHA256 = "6069fb55e3b76b55d76698962e81c69dae3ef2efba951eec938903df083c9eb2"
 MAX_BYTES = 200 * 1024 * 1024
 
 

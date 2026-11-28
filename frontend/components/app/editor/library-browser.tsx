@@ -8,7 +8,12 @@ import { errorMessage } from "@/lib/api";
 import { addLibraryItem, getLibrary, libraryContentUrl, type Library, type LibraryImport, type LibraryKind } from "@/lib/library";
 import { categoriesOf, categoryLabel, filterLibrary, lengthLabel } from "@/lib/library-rules";
 
-const KIND_LABELS: Record<LibraryKind, string> = { sfx: "Sound effects", music: "Music", sticker: "Stickers" };
+const KIND_LABELS: Record<LibraryKind, string> = {
+  sfx: "Sound effects",
+  music: "Music",
+  sticker: "Stickers",
+  overlay: "Animated",
+};
 
 /**
  * PeakSift's built-in starter library inside an editor panel: browse, listen or look, then add
@@ -132,7 +137,15 @@ export function LibraryBrowser({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={kind === "sticker" ? "Search stickers" : kind === "music" ? "Search music" : "Search sounds (whoosh, pop, boom…)"}
+              placeholder={
+                kind === "sticker"
+                  ? "Search stickers"
+                  : kind === "overlay"
+                    ? "Search effects (confetti, fire…)"
+                    : kind === "music"
+                      ? "Search music"
+                      : "Search sounds (whoosh, pop, boom…)"
+              }
               className="h-9 w-full rounded-control border border-border bg-background pr-3 pl-8 text-small text-foreground placeholder:text-subtle focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
             />
           </label>
@@ -154,7 +167,40 @@ export function LibraryBrowser({
             </div>
           ) : null}
 
-          {kind === "sticker" ? (
+          {kind === "overlay" ? (
+            <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]" aria-label="Animated overlays">
+              {shown.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => void add(item.id)}
+                    disabled={busy !== null}
+                    aria-label={`Add ${item.title}`}
+                    title={item.title}
+                    className="group relative block w-full overflow-hidden rounded-control border border-border bg-[#2b3a55] transition-colors hover:border-accent/60 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
+                  >
+                    {/* A muted looping preview of the effect over a neutral backdrop. */}
+                    <video
+                      src={libraryContentUrl(item.id)}
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      aria-hidden="true"
+                      className="aspect-[9/16] w-full object-cover"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1.5 py-1 text-left text-caption text-white">
+                      {item.title}
+                    </span>
+                    {busy === item.id ? <Loader2 aria-hidden="true" className="absolute top-1.5 right-1.5 size-4 animate-spin text-white" /> : null}
+                    {added.has(item.id) ? <Check aria-hidden="true" className="absolute top-1.5 right-1.5 size-4 rounded-full bg-success p-0.5 text-black" /> : null}
+                  </button>
+                </li>
+              ))}
+              {!shown.length ? <li className="col-span-3 px-1 py-2 text-caption text-subtle">Nothing matches. Try another word.</li> : null}
+            </ul>
+          ) : kind === "sticker" ? (
             <ul className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]" aria-label="Stickers">
               {shown.map((item) => (
                 <li key={item.id}>
@@ -228,8 +274,9 @@ export function LibraryBrowser({
           ))}
         </ul>
         <p className="mt-4 text-caption text-pretty text-subtle">
-          Microsoft Fluent Emoji: Copyright (c) Microsoft Corporation, MIT licence. Sounds from Kenney and music from OpenGameArt.org
-          authors are dedicated to the public domain (CC0). Each item&apos;s source and licence are kept on the asset when you add it.
+          Microsoft Fluent Emoji: Copyright (c) Microsoft Corporation, MIT licence. Sounds from Kenney, music from OpenGameArt.org
+          authors and the animated overlays (made by PeakSift from Kenney&apos;s Particle Pack) are dedicated to the public domain
+          (CC0). Each item&apos;s source and licence are kept on the asset when you add it.
         </p>
       </Dialog>
     </section>

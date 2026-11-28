@@ -70,12 +70,13 @@ class VisualAsset(Base):
         CheckConstraint("length(sha256) = 64", name="ck_visual_assets_sha256"),
         CheckConstraint("length(description) <= 500", name="ck_visual_assets_description"),
         CheckConstraint("jsonb_typeof(tags) = 'array'", name="ck_visual_assets_tags"),
-        # Images have no duration, frame rate or audio; videos have a positive duration.
+        # Images have no duration, frame rate or audio; videos have a positive duration (a
+        # VP8/VP9 WebM may carry transparency: an animated overlay).
         CheckConstraint(
             "(kind = 'image' AND duration_seconds IS NULL AND fps IS NULL AND NOT has_audio) "
             "OR (kind = 'video' AND duration_seconds IS NOT NULL AND duration_seconds > 0 "
             "AND (fps IS NULL OR fps > 0) "
-            "AND NOT has_alpha)",
+            "AND (NOT has_alpha OR codec IN ('vp8', 'vp9')))",
             name="ck_visual_assets_kind_metadata",
         ),
     )

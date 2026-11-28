@@ -1,5 +1,5 @@
 {
- "version": "library-v1",
+ "version": "library-v2",
  "items": [
   {
    "id": "click-1",
@@ -11,7 +11,7 @@
     "tap"
    ],
    "file": "sfx/click-1.ogg",
-   "sha256": "6579beae1345401251909ef3485fe215a8a2feb9740ea0331b296746256688ff",
+   "sha256": "d862fa43a3a8f161125452f393b4c5f0d556f87d661039dfd91b5d42c7311489",
    "bytes": 4390,
    "licence": "CC0-1.0",
    "source": {
@@ -31,7 +31,7 @@
     "tap"
    ],
    "file": "sfx/click-2.ogg",
-   "sha256": "4926d7cdf4184bcafc096a3f23c4d1fcfacf05dfbfedbb0d482f1b17154beca1",
+   "sha256": "2985974c9bce6d88d85d2f145e04449d21b3af5844560f531cd2a80329406b41",
    "bytes": 3845,
    "licence": "CC0-1.0",
    "source": {
@@ -51,7 +51,7 @@
     "tap"
    ],
    "file": "sfx/click-3.ogg",
-   "sha256": "b07fab7b52178b4087a944a15e200e714750c627f67c1cdd8c31ad418ac7c1e6",
+   "sha256": "65329d2fe5d5dd5fbaf0e65dc8f18fc2cc878dd64f54be209e963fde68693be8",
    "bytes": 3899,
    "licence": "CC0-1.0",
    "source": {
@@ -71,7 +71,7 @@
     "drop"
    ],
    "file": "sfx/pop-1.ogg",
-   "sha256": "cdee161bafb91ab11c7a6f1a9f2a3e59891e9b1cc685ec5b2eb7f824c4ee0037",
+   "sha256": "a3fb456e8c9e9b92f06271e0482d4597ee627ffc9b957b11de82f6d33daf41a3",
    "bytes": 5533,
    "licence": "CC0-1.0",
    "source": {
@@ -91,7 +91,7 @@
     "drop"
    ],
    "file": "sfx/pop-2.ogg",
-   "sha256": "e0d143c101667ac9e7c2031b43e8f734e9f9a0d6807b02ccfc1cd9df9e6ee0ec",
+   "sha256": "fc9f3b5ba9154f2d759d05223673895bda2a8e726361dfced02017ae5a60d92e",
    "bytes": 5949,
    "licence": "CC0-1.0",
    "source": {
@@ -111,7 +111,7 @@
     "clock"
    ],
    "file": "sfx/tick-1.ogg",
-   "sha256": "40e3140a1ded316d676e3d2eb4f3424177495722647177559714441a284d40fd",
+   "sha256": "a176456f6f18cece0db271df63c43699f7f6712b38bdca345825b95944afbd19",
    "bytes": 3998,
    "licence": "CC0-1.0",
    "source": {
@@ -131,7 +131,7 @@
     "clock"
    ],
    "file": "sfx/tick-2.ogg",
-   "sha256": "17e850842bef7c3553b812e8099e63ba644a4aa41d0c8f3065d6bed39ebd446f",
+   "sha256": "3fd4595a0c19ded7d3ae693b469f8126256755000688104c3acd6dce2f724107",
    "bytes": 3971,
    "licence": "CC0-1.0",
    "source": {
@@ -151,7 +151,7 @@
     "toggle"
    ],
    "file": "sfx/switch-1.ogg",
-   "sha256": "f78a58cfbbafcb815f1f489d7fd07550a6ef5d0fb54a88424ab0773c4a5f7e21",
+   "sha256": "95801ec73271c563636679a6b464fe6bbef9a210f6a543316bf89620d0f6d174",
    "bytes": 5553,
    "licence": "CC0-1.0",
    "source": {
@@ -171,7 +171,7 @@
     "toggle"
    ],
    "file": "sfx/switch-2.ogg",
-   "sha256": "91c3d0c4fde422a36266cf12f40a6dca1a6caf4f36a5fc3b4c4f6adf773b98f4",
+   "sha256": "dab39effd9cbfa9d14d490370f6122196fce8789f9e2a49864deba55f72b4335",
    "bytes": 5739,
    "licence": "CC0-1.0",
    "source": {
@@ -190,7 +190,7 @@
     "pluck"
    ],
    "file": "sfx/pluck-1.ogg",
-   "sha256": "80261936e4996d49fe98ef018ff3196f653cbd26b1f2e88712b3a8a7c2ab43f4",
+   "sha256": "4cf924367fa37fd811cf6405999f1ef2a7884794734ffbd7ab270afd0ceeb409",
    "bytes": 5494,
    "licence": "CC0-1.0",
    "source": {
@@ -209,7 +209,7 @@
     "pluck"
    ],
    "file": "sfx/pluck-2.ogg",
-   "sha256": "866633d5a3c0c04f2b7b295246171a9fdc3755184f4d363bba237bd6eea73385",
+   "sha256": "4ae7270ed2562e93920bb758051d0f76f26ee5927f0161e25a0877cd8a03ba55",
    "bytes": 6012,
    "licence": "CC0-1.0",
    "source": {
@@ -229,7 +229,7 @@
     "yes"
    ],
    "file": "sfx/success-1.ogg",
-   "sha256": "5eea503e01d863d9d20b2666684ed8081bc925a0b679882a40b5c1dfdcd7bf09",
+   "sha256": "85370baebe3a2777471521439196c7127fd113bbf01e5e8d3e5f77fb558700c6",
    "bytes": 4767,
    "licence": "CC0-1.0",
    "source": {
@@ -249,7 +249,7 @@
     "yes"
    ],
    "file": "sfx/success-2.ogg",
-   "sha256": "0cada358592bd0dfa7cafaa152f60ceff39a16ed617041db7ad4f4a9eeafdb30",
+   "sha256": "87f66f10b65c5d96c7a877558f223a118e2ba2ce48ae0667626ee2c91a4ae0e5",
    "bytes": 7161,
    "licence": "CC0-1.0",
    "source": {
@@ -269,7 +269,7 @@
     "yes"
    ],
    "file": "sfx/success-3.ogg",
-   "sha256": "a3733c052aca0804fc691ee7dfce594dc04bf74d72689d8fd0e7b9a500e09c2c",
+   "sha256": "3aaba2b763b344b7804ecfce7bd25c7763b38107d0df94bafbe0d9b68cd46e10",
    "bytes": 5405,
    "licence": "CC0-1.0",
    "source": {
@@ -290,7 +290,7 @@
     "no"
    ],
    "file": "sfx/error-1.ogg",
-   "sha256": "abe300c028b6883020ce417a15cb0063e85da5ccac53522d2b4f019b6935d751",
+   "sha256": "dd99aa57b32852a89e4257be97517bea0ea642786f0b46580dce47b94e39d102",
    "bytes": 6688,
    "licence": "CC0-1.0",
    "source": {
@@ -311,7 +311,7 @@
     "no"
    ],
    "file": "sfx/error-2.ogg",
-   "sha256": "60bdd39a0980404de09d8e88c4024346c52cd995770985f04b2b936d2f360512",
+   "sha256": "6c7a5965cc3dc135028c56135fa445fd9ac3820657bdcbfe6d6af308e2c83b0a",
    "bytes": 6082,
    "licence": "CC0-1.0",
    "source": {
@@ -332,7 +332,7 @@
     "no"
    ],
    "file": "sfx/error-3.ogg",
-   "sha256": "53729f7a551a649788ce8c516718881d5abc60c9700360a8ea035362c75ba193",
+   "sha256": "98c5486c170ae42370a72eab4c72074b15da7d1c61767ee3c52ccb006ee45189",
    "bytes": 10529,
    "licence": "CC0-1.0",
    "source": {
@@ -352,7 +352,7 @@
     "huh"
    ],
    "file": "sfx/question-1.ogg",
-   "sha256": "bf19840478c7bf0b7e0f36c84b307eb732511534c9df1af3e79cbdb89377d5bb",
+   "sha256": "5412dfa86bdc9b4e9431ac258e5173c8aefb57a3a3e02b3df73acecf6b3e01c1",
    "bytes": 5591,
    "licence": "CC0-1.0",
    "source": {
@@ -372,7 +372,7 @@
     "huh"
    ],
    "file": "sfx/question-2.ogg",
-   "sha256": "94ab4d3d09e0aeb2d1f0b6efa986b0e7ab232eb08acdbb08a004bdbdd939f005",
+   "sha256": "9327aae9f0b9415dd38739868ca1da03707db80503e3629fcb09061eb69a2672",
    "bytes": 4946,
    "licence": "CC0-1.0",
    "source": {
@@ -392,7 +392,7 @@
     "gong"
    ],
    "file": "sfx/bong.ogg",
-   "sha256": "f6dba8ea35fad6b1273eef85fc9085067945dd47c9ee372a0b1ad91dd73cea27",
+   "sha256": "0b0d3b18d154982c9afe3cbf3da14d20116f79cf1a647b8920bb470f30d11f7e",
    "bytes": 4137,
    "licence": "CC0-1.0",
    "source": {
@@ -412,7 +412,7 @@
     "glass"
    ],
    "file": "sfx/glass-ding-1.ogg",
-   "sha256": "cf7fdd36f58654daa098b4228d4fb4954d27b8a09fc45704a9f043dcb6c511f1",
+   "sha256": "cdcb6d73dbee5fdbe1a4b0830908f7825b810ab91b6f9400037f477fbb71ecd3",
    "bytes": 5333,
    "licence": "CC0-1.0",
    "source": {
@@ -432,7 +432,7 @@
     "glass"
    ],
    "file": "sfx/glass-ding-2.ogg",
-   "sha256": "2e8e5ff6ecb6c7654b4fd1ebc660d67d040214c29322587374f7b384da4e8759",
+   "sha256": "8303c66e69802785dd69f5cacfbe4fab30df00d0abb2f9348d09a7e40d84e7f1",
    "bytes": 4328,
    "licence": "CC0-1.0",
    "source": {
@@ -452,7 +452,7 @@
     "digital"
    ],
    "file": "sfx/glitch-1.ogg",
-   "sha256": "eda912be79203b621ab90bb20f5cf2af6c64323d774aa8bbf6d10dfa21a7893b",
+   "sha256": "164b21068b626448c6d8411c4479fc1ed59f7b3ebf866dfdabd568ae38207d56",
    "bytes": 4786,
    "licence": "CC0-1.0",
    "source": {
@@ -472,7 +472,7 @@
     "digital"
    ],
    "file": "sfx/glitch-2.ogg",
-   "sha256": "84e0021e635232fe9f916fa37a723fd9c3dd9cb70305749e2e86e25de8e75a44",
+   "sha256": "e65abc493f63f4c3b50bebafec738ebc8f07992b03402d8aa330d34181a69352",
    "bytes": 4977,
    "licence": "CC0-1.0",
    "source": {
@@ -492,7 +492,7 @@
     "digital"
    ],
    "file": "sfx/glitch-3.ogg",
-   "sha256": "2de040c37f510f41e59dc0622ae67250ff778041fcd34c3371dff38195a5a117",
+   "sha256": "e8c8597c4fb9734d050e5cdd24f08e9cc4dcbcc2be7b9501f9b285e5ca1424b3",
    "bytes": 4620,
    "licence": "CC0-1.0",
    "source": {
@@ -512,7 +512,7 @@
     "digital"
    ],
    "file": "sfx/glitch-4.ogg",
-   "sha256": "5b13853bc37c69359594324f1b779605e959d387438fcd13a6c6076a7927b21b",
+   "sha256": "8f4bf1c6a2974c267140da172769d1fdb87fd4e618dbd9de5fd9bdfe88a19b9a",
    "bytes": 4911,
    "licence": "CC0-1.0",
    "source": {
@@ -532,7 +532,7 @@
     "record"
    ],
    "file": "sfx/scratch-1.ogg",
-   "sha256": "0fcc6ee1f43f39dd79d30c57ddb2deca6f8c6c670105e1ba9b6c1eaa2814838c",
+   "sha256": "5f5fcb49c7f898385f5ab67c89cd3c4e01d823be21b6373aa5240575764487ee",
    "bytes": 5135,
    "licence": "CC0-1.0",
    "source": {
@@ -552,7 +552,7 @@
     "record"
    ],
    "file": "sfx/scratch-2.ogg",
-   "sha256": "8c67ead07fbdff787c9418958e6d941082c2777f8a19f2c58041e273aaba0ef4",
+   "sha256": "19b8a53e6287948989cb4eec3a12058a4d735e8eec1a658f35b46e05b6028d9a",
    "bytes": 5570,
    "licence": "CC0-1.0",
    "source": {
@@ -572,7 +572,7 @@
     "record"
    ],
    "file": "sfx/scratch-3.ogg",
-   "sha256": "d4acd5b417ce2646a94e7e915adb0ee3bf8183d42ce19a372a2db48a77e10ed2",
+   "sha256": "9ac116c9573cc5257ff2cae4cc1afe531f80ba220309f39d4b0a3fec93ae3b3c",
    "bytes": 5381,
    "licence": "CC0-1.0",
    "source": {
@@ -592,7 +592,7 @@
     "up"
    ],
    "file": "sfx/swoosh-up-1.ogg",
-   "sha256": "0a50bc3d320ee7b6d0dd3ef33d2ff62dff6ec8675f42fcc081b06e7bc7df2cc6",
+   "sha256": "bb27794100d70676de130132f35be951c48c9e4d8cc06b9c15738fc5e7b08ab4",
    "bytes": 6472,
    "licence": "CC0-1.0",
    "source": {
@@ -612,7 +612,7 @@
     "up"
    ],
    "file": "sfx/swoosh-up-2.ogg",
-   "sha256": "5addb0f659294ef7b211f43f700eb14c75387c6c3a745c6176fc307f53500afc",
+   "sha256": "4cf23117030545fa88c717a4ef0e48049632892a2d3180a2c4dc67bdbff819a4",
    "bytes": 4957,
    "licence": "CC0-1.0",
    "source": {
@@ -632,7 +632,7 @@
     "up"
    ],
    "file": "sfx/swoosh-up-3.ogg",
-   "sha256": "bd09a7b345f0928351c821e07b49908555e3a5a46876e57907c1c5c9b72367ce",
+   "sha256": "c0f279a44e239b835c9dd329dad26d538c30f0fc2f36c12b57239d6aac941eb5",
    "bytes": 6193,
    "licence": "CC0-1.0",
    "source": {
@@ -651,7 +651,7 @@
     "swoosh"
    ],
    "file": "sfx/swoosh-down-1.ogg",
-   "sha256": "a325ac15762da36e0d41cf6fc579ef0e00a8d3a5dafe766619cf42c224c8fc45",
+   "sha256": "ae0de80f2164e38923e98118e52d3fe190c4def89e0ffdb233d7a53af5fc1852",
    "bytes": 6381,
    "licence": "CC0-1.0",
    "source": {
@@ -670,7 +670,7 @@
     "swoosh"
    ],
    "file": "sfx/swoosh-down-2.ogg",
-   "sha256": "1ad96e7050128f5c7407c79b1e5ca807bbc3b15831d2be7cc75298b2466db34e",
+   "sha256": "6b2bb532843fc1b334d7a7acd5ecd2f67a0fa037a945cad2598dadb3d8a6faef",
    "bytes": 5085,
    "licence": "CC0-1.0",
    "source": {
@@ -689,7 +689,7 @@
     "swoosh"
    ],
    "file": "sfx/swoosh-down-3.ogg",
-   "sha256": "48dd82902d0ac8ed8da94ab59b51a50e5d2bad5a836111d032ea8f4ab116da6d",
+   "sha256": "6f6fbd9b9c267ba7d46bf29992d9e64d9a7dc24d846b41c076862624b4473323",
    "bytes": 6057,
    "licence": "CC0-1.0",
    "source": {
@@ -709,7 +709,7 @@
     "hit"
    ],
    "file": "sfx/punch-1.ogg",
-   "sha256": "41662b469eb6182131f1444851a56b8d87b02dfc08da71634998d855367badee",
+   "sha256": "87a0f52a8f0848c33d6b9bdfea7064b5988002a00bafabf6fcf2f052e05cedb9",
    "bytes": 10200,
    "licence": "CC0-1.0",
    "source": {
@@ -729,7 +729,7 @@
     "hit"
    ],
    "file": "sfx/punch-2.ogg",
-   "sha256": "980fe5e2fac3be36796c3802b7e74075797e7e14426e0e704b198b966b1c154c",
+   "sha256": "88fe68ab33ab4f9170d9aa763cabec3757496c70ef03e088e6ffcb37cdc60735",
    "bytes": 9488,
    "licence": "CC0-1.0",
    "source": {
@@ -749,7 +749,7 @@
     "hit"
    ],
    "file": "sfx/punch-3.ogg",
-   "sha256": "e6af6fd9cbcf667e5ec4393fd801a0f709605f5767c4f10f20404c4b75f27577",
+   "sha256": "07bc440ee025b38c322d1281f1d24d83619423243f4e11ec56bd76b5e941e149",
    "bytes": 7984,
    "licence": "CC0-1.0",
    "source": {
@@ -769,7 +769,7 @@
     "hit"
    ],
    "file": "sfx/bell-hit-1.ogg",
-   "sha256": "28bd52aa608f9f7f8f1c347272bfec83d3c216e6619252fa09357012f8088659",
+   "sha256": "a2a0861dad054150df976a0dd46f5966ce0bc92d44048c96b405c29db9ad099a",
    "bytes": 11966,
    "licence": "CC0-1.0",
    "source": {
@@ -789,7 +789,7 @@
     "hit"
    ],
    "file": "sfx/bell-hit-2.ogg",
-   "sha256": "848e64ce24141e99b594ddefabc8bd72a068e34625863ae1a5182077ec5c25fb",
+   "sha256": "416b5056c4205504617e034f50e2af11bf809ae322745abeab0ba65700b5437c",
    "bytes": 13213,
    "licence": "CC0-1.0",
    "source": {
@@ -809,7 +809,7 @@
     "smash"
    ],
    "file": "sfx/glass-smash-1.ogg",
-   "sha256": "b8744a9d001c01599e7c4039acb941bcc418cc5c7da66d193fb6139e542bb0d0",
+   "sha256": "177b3b421132ea8955126e45d28f9968c7e00275001444d289c2aa60262f18f7",
    "bytes": 6406,
    "licence": "CC0-1.0",
    "source": {
@@ -829,7 +829,7 @@
     "smash"
    ],
    "file": "sfx/glass-smash-2.ogg",
-   "sha256": "678325445dc3180b0ba4f22b485c24f93dfb5e83eaa1aa52e8c1999ab472cc92",
+   "sha256": "dd8990998e7088bbab11cd5b899259cfe43125e1e8fb1abf4cb3c09b7a7f3e38",
    "bytes": 7429,
    "licence": "CC0-1.0",
    "source": {
@@ -849,7 +849,7 @@
     "clang"
    ],
    "file": "sfx/metal-hit-1.ogg",
-   "sha256": "518726735f19c1e1ff2c23bef19d7c17e15c58724167db9849650e0d1ab80333",
+   "sha256": "6e1b28a2404cc39ec4fa2fcbab51821b02ab06b83289ae4f3e1caeab29d29df1",
    "bytes": 5607,
    "licence": "CC0-1.0",
    "source": {
@@ -869,7 +869,7 @@
     "clang"
    ],
    "file": "sfx/metal-hit-2.ogg",
-   "sha256": "68121c52186426cb7642501c2fc9bfc2f5a9defd714cfb31e79d985abec1cf46",
+   "sha256": "d3e52cb46f0dd284a635b7779991a41ce4f2dcbfd1df8d681051834acc32fda4",
    "bytes": 6481,
    "licence": "CC0-1.0",
    "source": {
@@ -889,7 +889,7 @@
     "fall"
    ],
    "file": "sfx/thud-1.ogg",
-   "sha256": "bba6771f8f014f1653d1b6d3ce77db111c6fda2abc77763f12d6fbef505abc56",
+   "sha256": "5a5edcc00b73afbcc51b353a67584ce7f9a1a5b0fca7f25bec3d7fa1e72b3be9",
    "bytes": 5842,
    "licence": "CC0-1.0",
    "source": {
@@ -909,7 +909,7 @@
     "fall"
    ],
    "file": "sfx/thud-2.ogg",
-   "sha256": "5d9c58c50e97dd61d07dd1608939140a18d1be6d49fe082701fa0acba6a1040c",
+   "sha256": "599507dbd53d62d8380db2a719471e3e1a6fe907775a4c758e0be6a82ce3af08",
    "bytes": 6022,
    "licence": "CC0-1.0",
    "source": {
@@ -929,7 +929,7 @@
     "wood"
    ],
    "file": "sfx/wood-knock-1.ogg",
-   "sha256": "8c3839f093e30e0ffbf0504709850d9a2e5d2e180e11ab42601dbc2d54ee7844",
+   "sha256": "0323f5a4ea2f25be3026cdf8f60239b79b5e5878a9ba3c413142d77a49454830",
    "bytes": 5498,
    "licence": "CC0-1.0",
    "source": {
@@ -949,7 +949,7 @@
     "wood"
    ],
    "file": "sfx/wood-knock-2.ogg",
-   "sha256": "75497e9d7a7424314d6245de9d9aa1f0110d0d533bc95afdc4e126a9e4b5feb4",
+   "sha256": "7798cbde6750184acedb0601b405e7b219c346b514d094c434de95d52ce7deec",
    "bytes": 5505,
    "licence": "CC0-1.0",
    "source": {
@@ -969,7 +969,7 @@
     "boom"
    ],
    "file": "sfx/explosion-1.ogg",
-   "sha256": "e5fc8ee6b70619c0b767cec9657d5add4042c208d911db4bbea90279481aeed0",
+   "sha256": "1dd8f1f316b41c6078d9fae3af64c41d64eea76132f54eb5daa2706659b59893",
    "bytes": 10612,
    "licence": "CC0-1.0",
    "source": {
@@ -989,7 +989,7 @@
     "boom"
    ],
    "file": "sfx/explosion-2.ogg",
-   "sha256": "e618de0987e2970654db408d3fa6ea0762a078b6a1613947e31f58c6423cd8fe",
+   "sha256": "e3923703cc9428da4a00b35342319a7ef33852776c7072bcc9d7b5f8bf1f83c6",
    "bytes": 16408,
    "licence": "CC0-1.0",
    "source": {
@@ -1009,7 +1009,7 @@
     "boom"
    ],
    "file": "sfx/explosion-3.ogg",
-   "sha256": "83aa9fc5347015160e73efc00f32737fa204fdc7c21c36d7c405c00ebd67e664",
+   "sha256": "519a1df704533c6c18ad99641ca090b1adbe90696f87852180c6c2ab69525573",
    "bytes": 15555,
    "licence": "CC0-1.0",
    "source": {
@@ -1029,7 +1029,7 @@
     "bass"
    ],
    "file": "sfx/deep-boom-1.ogg",
-   "sha256": "edf9f01fb060a2b1b7e91f8c9e9dad1c1da063eeaf7fbe9acd6cb7528e2f741d",
+   "sha256": "b35c885f8033027301818090cee5deb626d618d61ff40f551bc103d17b60ed77",
    "bytes": 12904,
    "licence": "CC0-1.0",
    "source": {
@@ -1049,7 +1049,7 @@
     "bass"
    ],
    "file": "sfx/deep-boom-2.ogg",
-   "sha256": "5b9b5f97ba2723ff173f206dd7aeb146484434836e60899e324818b9e5bff923",
+   "sha256": "19359ba2590f2e8be23fbaa42792a89784e1d81d0df4a4b3a8e4c233293f724f",
    "bytes": 8502,
    "licence": "CC0-1.0",
    "source": {
@@ -1069,7 +1069,7 @@
     "magic"
    ],
    "file": "sfx/shimmer-1.ogg",
-   "sha256": "3b74ffd85f1d2831082e4492b1feacd0dbd68a9bd11dd6383b1b56d84a641232",
+   "sha256": "bd16f89b9052ab6dd4e8ef372842b04f41528366c81fbc20f5262c90374ee4dc",
    "bytes": 11711,
    "licence": "CC0-1.0",
    "source": {
@@ -1089,7 +1089,7 @@
     "magic"
    ],
    "file": "sfx/shimmer-2.ogg",
-   "sha256": "231b7c066390194b9bdbf4c0989af761928e48b344695b6f9114a4963f791399",
+   "sha256": "d7933ab0c0604e88ca3be4ab62dab2e893704dc908e080bd8798f450c8c3012f",
    "bytes": 11381,
    "licence": "CC0-1.0",
    "source": {
@@ -1109,7 +1109,7 @@
     "rush"
    ],
    "file": "sfx/whoosh-1.ogg",
-   "sha256": "5338d482d86ef8882c40b2ce73b4047d229cf851ec3853a723b649a3ccb84576",
+   "sha256": "c76b3d477bb3c3bca9825bbfff96cad9c4ce74aff3437c36b7bf94fca27eb7d9",
    "bytes": 53372,
    "licence": "CC0-1.0",
    "source": {
@@ -1129,7 +1129,7 @@
     "rush"
    ],
    "file": "sfx/whoosh-2.ogg",
-   "sha256": "6060b1f4d938da522a126cc3aa5cdfc83b984a9b985bb1d0166b477aa2d99837",
+   "sha256": "082f945697ee2debdc9ebbef02fdf149c4370e6fdad53da99f94ab6988b9bbc4",
    "bytes": 52559,
    "licence": "CC0-1.0",
    "source": {
@@ -1149,7 +1149,7 @@
     "retro"
    ],
    "file": "sfx/retro-laser-1.ogg",
-   "sha256": "be5f1e6fb19f8bec4741cd02b81609ebae9ac8fde5ed52375ae34007940d7a82",
+   "sha256": "201ffea9afd8afb7f6968ea3d1d5f07d39e4cba1397996a83dfecb80bfc58f66",
    "bytes": 6308,
    "licence": "CC0-1.0",
    "source": {
@@ -1169,7 +1169,7 @@
     "retro"
    ],
    "file": "sfx/retro-laser-2.ogg",
-   "sha256": "60b71d78f12683f6742ad92ae1ccaa2036f41558e7b77ec6f9bf7cbdf712056c",
+   "sha256": "fc95e5841ac7b04b42348b538ba04ee874e47b290ec8b21fd78e38f1377abd6a",
    "bytes": 6212,
    "licence": "CC0-1.0",
    "source": {
@@ -1189,7 +1189,7 @@
     "retro"
    ],
    "file": "sfx/retro-laser-3.ogg",
-   "sha256": "4af70a3fb18c12e604e18a753cf91c6cb13296be9c76f8b696908849553b7fe3",
+   "sha256": "03fa9d12c2fa2d092e321e555a7561c691848ba1d6c78d5cd249aa19f9d2184a",
    "bytes": 6665,
    "licence": "CC0-1.0",
    "source": {
@@ -1209,7 +1209,7 @@
     "level up"
    ],
    "file": "sfx/power-up-1.ogg",
-   "sha256": "f6a4f06da8438d2283efdacce7d37c171f666364228081ac1819ac3a47745f1b",
+   "sha256": "35ead847e1dd721b30c344e14cebc1e60b2097b19ec063188c130aa176ab3428",
    "bytes": 10659,
    "licence": "CC0-1.0",
    "source": {
@@ -1229,7 +1229,7 @@
     "level up"
    ],
    "file": "sfx/power-up-2.ogg",
-   "sha256": "81ef6f8ac81defb3fc1846891eb2c69d05ebcff91ce5b9a85dc58732a81cd2aa",
+   "sha256": "51da805d15e1e2aba89134f9a74b11fc000e2f918391a23d52683b24e624180c",
    "bytes": 6186,
    "licence": "CC0-1.0",
    "source": {
@@ -1249,7 +1249,7 @@
     "level up"
    ],
    "file": "sfx/power-up-3.ogg",
-   "sha256": "1329162ec02deb5a0c7d1404fde677f21e41601fe91bebae40038584677c6ec5",
+   "sha256": "a00c293a1d7981ad170761bc2708e22f8734581081f73ac36f29196cc39efb9b",
    "bytes": 10218,
    "licence": "CC0-1.0",
    "source": {
@@ -1269,7 +1269,7 @@
     "riser"
    ],
    "file": "sfx/rise-1.ogg",
-   "sha256": "8d185551980bf89447b668b2c616408a9975e041a862229e6f9c2ef95f59839d",
+   "sha256": "df17d43967dcd57ff5db83da3dbe342499587442607a1ebaf50b58c3d3aa8f61",
    "bytes": 8739,
    "licence": "CC0-1.0",
    "source": {
@@ -1289,7 +1289,7 @@
     "riser"
    ],
    "file": "sfx/rise-2.ogg",
-   "sha256": "79457c609d8bce5cc2c1e9f0144c49977f69cbb2be55a353a35b93229b9f98bb",
+   "sha256": "ceade086b4dd795c400046b8d08eec3ffd3ecfb85492bc23e084692b51e17de4",
    "bytes": 8037,
    "licence": "CC0-1.0",
    "source": {
@@ -1309,7 +1309,7 @@
     "drop"
    ],
    "file": "sfx/fall-1.ogg",
-   "sha256": "fcbee246a5672f79d16c6cec0477abc4b8de72eed55de69942482f8838a1048f",
+   "sha256": "cf6d02abc22509ea5d8289762bb0fd0cda3826b48031608418b8566fc5bd3312",
    "bytes": 8526,
    "licence": "CC0-1.0",
    "source": {
@@ -1329,7 +1329,7 @@
     "drop"
    ],
    "file": "sfx/fall-2.ogg",
-   "sha256": "d59a3d723d2f0a5cddeb32c893ec70fa1fcea16236543a2cd31917af0307ed16",
+   "sha256": "aef1925d16c7a6992fd7351c805bd367fc3285027d906f03ab3b95fb399a4f6a",
    "bytes": 7023,
    "licence": "CC0-1.0",
    "source": {
@@ -1348,7 +1348,7 @@
     "zap"
    ],
    "file": "sfx/zap-1.ogg",
-   "sha256": "69e8e1e5065f7d9a43804477658405119db4a8d2511537e78c415ef81601381f",
+   "sha256": "0fbfa1905a6dc3213b658fbde5700d35a307af0d820b0d5fb719b863cae12280",
    "bytes": 8829,
    "licence": "CC0-1.0",
    "source": {
@@ -1367,7 +1367,7 @@
     "zap"
    ],
    "file": "sfx/zap-2.ogg",
-   "sha256": "fedbdb09cef069f1606eea5e7cabb087ba73cdaba4b6c6cd0ef4172efdaa841a",
+   "sha256": "2eed063d35331bc52f5cf09ce382e60f764e53fb32096a6d82ec4fe5a4ec1605",
    "bytes": 13151,
    "licence": "CC0-1.0",
    "source": {
@@ -1387,7 +1387,7 @@
     "beep"
    ],
    "file": "sfx/blip-1.ogg",
-   "sha256": "f224b23ec86f3ee49bea36f0e5905d4e910fa6731977f0dc3d27bfe26d50fee3",
+   "sha256": "dfae5fbd736851c80900051d8c2e9889053b662d711ea21af211ad120c8f2b64",
    "bytes": 6434,
    "licence": "CC0-1.0",
    "source": {
@@ -1407,7 +1407,7 @@
     "beep"
    ],
    "file": "sfx/blip-2.ogg",
-   "sha256": "f7f9fae1941d181ae00055ff60324c401d9cb82879229249c2b937ec62b323a1",
+   "sha256": "fd5a42319003056a95b40407be95b85d45fba59f296b7c907f7fad097984fc1b",
    "bytes": 6439,
    "licence": "CC0-1.0",
    "source": {
@@ -1427,7 +1427,7 @@
     "beep"
    ],
    "file": "sfx/blip-3.ogg",
-   "sha256": "814d47027fb33864e2d7559c18238de3007f5c4c76b1269c14bbcfaa3840cec5",
+   "sha256": "e3de055c513fad4e0df44fb712c693cf2d3518336b26e286341bb67069ea6189",
    "bytes": 6052,
    "licence": "CC0-1.0",
    "source": {
@@ -1447,7 +1447,7 @@
     "notification"
    ],
    "file": "sfx/three-tones-1.ogg",
-   "sha256": "7c27d011a6320b76c1f226a4272700985e282befed1a828863d428093cb71f45",
+   "sha256": "6c17fd82d081cb168de04b70d9f743b08af331004ef7df4df526cec01ab77131",
    "bytes": 8484,
    "licence": "CC0-1.0",
    "source": {
@@ -1467,7 +1467,7 @@
     "notification"
    ],
    "file": "sfx/three-tones-2.ogg",
-   "sha256": "6de3edbbd36b786924bbf209698fa742a445168eb1694627f150b65fa626910c",
+   "sha256": "525d730b4d8ab73e22179c89d32b8ce87c9e1b96442ede73100ebc4e4b183f1d",
    "bytes": 8858,
    "licence": "CC0-1.0",
    "source": {
@@ -1488,7 +1488,7 @@
     "cash"
    ],
    "file": "sfx/coins-1.ogg",
-   "sha256": "227862c543dc577bddc7e04204e33ca7d0c3fe930b1ec4d59a448b5dce2b593f",
+   "sha256": "e8d8ac84547d4497dcb0ca9da9d5f229cfdb4d5401a2e2abb409e68af6b822e9",
    "bytes": 7597,
    "licence": "CC0-1.0",
    "source": {
@@ -1509,7 +1509,7 @@
     "cash"
    ],
    "file": "sfx/coins-2.ogg",
-   "sha256": "fa78db9ed0990eab9bd11f560781bc9defecaf06d53c98e082e14e481dd497e1",
+   "sha256": "fd0bd1780c819f5f2c3ab0b2bf1e5fe04f7402cb6a962bce50a55109e3d12d7f",
    "bytes": 6709,
    "licence": "CC0-1.0",
    "source": {
@@ -1529,7 +1529,7 @@
     "slide"
    ],
    "file": "sfx/swipe-1.ogg",
-   "sha256": "ba820a092913f6fa474ba0bb7d897411811ed5be44305e59582505e330cece20",
+   "sha256": "57209276bef2afb31c8f92c225f637314de21137a91068e4cfe28f3a5bb53dc9",
    "bytes": 11020,
    "licence": "CC0-1.0",
    "source": {
@@ -1549,7 +1549,7 @@
     "slide"
    ],
    "file": "sfx/swipe-2.ogg",
-   "sha256": "f8659782435dedd03f07ce75ae0af5610af527aaa53ac6bedca07347875d8119",
+   "sha256": "a99f50af6025a2916916fa452aa0f7d15bcd5f7592fb6fe39740177faa20a925",
    "bytes": 10096,
    "licence": "CC0-1.0",
    "source": {
@@ -1569,7 +1569,7 @@
     "soft"
    ],
    "file": "sfx/hover-1.ogg",
-   "sha256": "e3d0fe408018c4ffd2d34dfe7131a77eae9a37f7678ed28bd94eba43680fb567",
+   "sha256": "63ed734d1321335cdd5cf087eae91cd3f22f1b1e5a7e885d5fefd03d68119c16",
    "bytes": 6888,
    "licence": "CC0-1.0",
    "source": {
@@ -1589,7 +1589,7 @@
     "soft"
    ],
    "file": "sfx/hover-2.ogg",
-   "sha256": "21d168c17da51db8336c6d849cfcf81abac6940303680f8777bbb3b7c2bdfc13",
+   "sha256": "8361bcfa27c6a4f276c3e4b3dc7d6d47cc33e37b9bd06dde527edf6d238accae",
    "bytes": 5523,
    "licence": "CC0-1.0",
    "source": {
@@ -1610,7 +1610,7 @@
     "sting"
    ],
    "file": "sfx/sax-sting-1.ogg",
-   "sha256": "9ccd05163950b8442a4725529d679ce5339cf251e8f1fd30866df7f25734cd6b",
+   "sha256": "1372ec4ecfff426c68fde6f5981502645c66e70926b08e692d737ca2dab5ea52",
    "bytes": 7777,
    "licence": "CC0-1.0",
    "source": {
@@ -1631,7 +1631,7 @@
     "sting"
    ],
    "file": "sfx/sax-sting-2.ogg",
-   "sha256": "e77289371ec5ab3d8e4d94b62482b8820e83e77088ea18ebf587b4e7f2df119d",
+   "sha256": "3b1b0f0d39fd0316a5991be327429f7aa8eef5cb5c88edfab7949c9b6333451b",
    "bytes": 11857,
    "licence": "CC0-1.0",
    "source": {
@@ -1652,7 +1652,7 @@
     "sting"
    ],
    "file": "sfx/sax-sting-3.ogg",
-   "sha256": "0e18b1c06a7ffacd7cf58dd4371519b1d5d239b7b8ef2dd91fcd38be45206145",
+   "sha256": "16cc3c9c21f66529d9596a36e7f44d1c1a427e731547c65ac59996529159daa3",
    "bytes": 11703,
    "licence": "CC0-1.0",
    "source": {
@@ -1673,7 +1673,7 @@
     "reveal"
    ],
    "file": "sfx/hit-sting-1.ogg",
-   "sha256": "82fc24361e27d597c292002270ec541ef816ad4cf3b563b2ae5682dccb3d41a3",
+   "sha256": "3a65c1b0329e4f331691926d8c59a95b7dacc13a4696a79548974e0d5752ea80",
    "bytes": 7432,
    "licence": "CC0-1.0",
    "source": {
@@ -1694,7 +1694,7 @@
     "reveal"
    ],
    "file": "sfx/hit-sting-2.ogg",
-   "sha256": "317d0568bc40cf1053b5c4b76f21c55b01e6d72ba98bf6ddb1934ca9df85e98f",
+   "sha256": "60ba591f026b67f4252455492a0fb1bd7e6a952af7bb9c4051b2b3ef4b534446",
    "bytes": 8944,
    "licence": "CC0-1.0",
    "source": {
@@ -1715,7 +1715,7 @@
     "reveal"
    ],
    "file": "sfx/hit-sting-3.ogg",
-   "sha256": "4fa0882e3f37eedd57ce0c0c33aecb7f1534347d6512f6dceb2cb7ca92d3581d",
+   "sha256": "864c07372005ee053b43ef3bdc830e5945ca8a7587e435f0ba4bfa4222c1b02f",
    "bytes": 8993,
    "licence": "CC0-1.0",
    "source": {
@@ -1735,7 +1735,7 @@
     "sneaky"
    ],
    "file": "sfx/pizzicato-sting-1.ogg",
-   "sha256": "b73c7e129b06a51b82c59dc2dfd46e67fea258cef30b1f8a1598b189ab3c9b8b",
+   "sha256": "2652b23424b3c37164d2e1a22135a5853ace4840f0e8c8b9dd5718b123d5d688",
    "bytes": 9079,
    "licence": "CC0-1.0",
    "source": {
@@ -1755,7 +1755,7 @@
     "sneaky"
    ],
    "file": "sfx/pizzicato-sting-2.ogg",
-   "sha256": "c5f2253af4e202daf80915bb437d8fc89ae2ab7132f56aff90a7497e2d0bb0a3",
+   "sha256": "81fc1f5146cf9cfd47f07fbae8d1c720bec2634eaf85e8d3bfd68da8e36ffc59",
    "bytes": 13659,
    "licence": "CC0-1.0",
    "source": {
@@ -1775,7 +1775,7 @@
     "happy"
    ],
    "file": "sfx/steel-drum-sting-1.ogg",
-   "sha256": "1fb51fa9668e3c431b704bc525eb2bcaee63a2f8020b55b92bf9420298535e7f",
+   "sha256": "c66cfa900c021c3eba424c5722e537bde34a721a7886dd868de16aeaaf7d205b",
    "bytes": 12714,
    "licence": "CC0-1.0",
    "source": {
@@ -1795,7 +1795,7 @@
     "happy"
    ],
    "file": "sfx/steel-drum-sting-2.ogg",
-   "sha256": "425cbe9ae8338b8caac01f215c918c876214799de1557320a66756b77a006621",
+   "sha256": "dabe433cf87f708813c1fbc18ea943147eae8091c1082d3b48ae67ba50c5a34e",
    "bytes": 16521,
    "licence": "CC0-1.0",
    "source": {
@@ -1815,7 +1815,7 @@
     "dreamy"
    ],
    "file": "music/crystal-cave.ogg",
-   "sha256": "37765239fdc8bec443f8ced70a5ac60900fbbfd385f358ecf12d85971a11cc8f",
+   "sha256": "19f346eeb8b8eae70ba7281886b8886f49598b9d1600642bed5e123b18313af7",
    "bytes": 542013,
    "licence": "CC0-1.0",
    "source": {
@@ -1835,7 +1835,7 @@
     "electronic"
    ],
    "file": "music/loading-screen-loop.ogg",
-   "sha256": "0f72427c370c7abc59822df38f19321a20095099d5e1a0e6ab0e80d07671b515",
+   "sha256": "a0db08fc5b6acd04944aa0d1edfe74edb31f703c10a062808043a0079ca47df5",
    "bytes": 375322,
    "licence": "CC0-1.0",
    "source": {
@@ -1855,7 +1855,7 @@
     "hopeful"
    ],
    "file": "music/field-of-dreams.ogg",
-   "sha256": "215304003494d21ee5b4058fcf2675ac49c6878bcfd7a245a537752b22ad6913",
+   "sha256": "efa65994c32fd2956ff1c2fc5a5b5a3085d46a3cac9931de0d81bcffc7edfe85",
    "bytes": 1654128,
    "licence": "CC0-1.0",
    "source": {
@@ -1875,7 +1875,7 @@
     "upbeat"
    ],
    "file": "music/menu-music.ogg",
-   "sha256": "7a880b50cc3804674205b746d3ef8984422612a79e9a2edde1dd3497e987bad9",
+   "sha256": "68ea4f8112632dd358b6a8bb8a77a86ec0cdf4e173c27e03aeeee281f65ede62",
    "bytes": 906254,
    "licence": "CC0-1.0",
    "source": {
@@ -1895,7 +1895,7 @@
     "retro"
    ],
    "file": "music/bossa-nova.ogg",
-   "sha256": "9c6176e9cf992dc098de50bf049503ff8a91916a075ad83ef3b42f3d3e628188",
+   "sha256": "bfe185032842bbb8b92d117ea7347161b5b28c05cc1f272e1acb4fbcf1bb4083",
    "bytes": 927356,
    "licence": "CC0-1.0",
    "source": {
@@ -1915,7 +1915,7 @@
     "piano"
    ],
    "file": "music/next-to-you.ogg",
-   "sha256": "5624d41e1f7ed7e84bd9c47c9209cb87b0b4745919c159eb41cda06241e84de6",
+   "sha256": "1e1a789e1265c95de6bc5e82ba076dc6b43c72f8ccd53a2e27073bf5c2faa6e4",
    "bytes": 232976,
    "licence": "CC0-1.0",
    "source": {
@@ -1935,7 +1935,7 @@
     "winter"
    ],
    "file": "music/snowfall.ogg",
-   "sha256": "2e1a85455fd797b8b5d03f067d50638b76a167f6332d4f57dece6e3659b56762",
+   "sha256": "3be746c068c4bdfa489daeb74c427afa275872ea706315d64c3e62297193b456",
    "bytes": 754260,
    "licence": "CC0-1.0",
    "source": {
@@ -1955,7 +1955,7 @@
     "game"
    ],
    "file": "music/tower-defense.ogg",
-   "sha256": "e205aa816340cf966b04b7509e129ff4ea527017fb6fb15ab7487012b403547b",
+   "sha256": "a6d702dc18bc9cf489970ca069a604897af4ec56a8e5211e7c224d99fd24ac12",
    "bytes": 3650357,
    "licence": "CC0-1.0",
    "source": {
@@ -1976,7 +1976,7 @@
     "loop"
    ],
    "file": "music/fast-fight.ogg",
-   "sha256": "a19e04ddb2ec09b4333dfd784cfda4ac7d8de5d137659bd4ddddfd124b209b33",
+   "sha256": "840a09fc7ee95c08d821bbe224e77d1524545cdbc710a520e72acb290a0177ff",
    "bytes": 468072,
    "licence": "CC0-1.0",
    "source": {
@@ -1996,7 +1996,7 @@
     "tension"
    ],
    "file": "music/i-swear-i-saw-it.ogg",
-   "sha256": "b7ed3a43f54866eb806bf6b21c175047eb656dad5bf862dd3d29693f6e6e7754",
+   "sha256": "92cc1f93d4761641e16719b9fc592ac4a3b6c313151e62923f5b598d5de03cba",
    "bytes": 1455410,
    "licence": "CC0-1.0",
    "source": {
@@ -2016,7 +2016,7 @@
     "cute"
    ],
    "file": "music/happy-lullaby.ogg",
-   "sha256": "9fef55fe20c6618113057370725277f0099b8ebddf914315084b8e6549edf608",
+   "sha256": "cd043b0997c5a6974d48c2efe56d4114f826a83df2485720eda0ea3897b04317",
    "bytes": 489777,
    "licence": "CC0-1.0",
    "source": {
@@ -2036,7 +2036,7 @@
     "spooky"
    ],
    "file": "music/zombies-march.ogg",
-   "sha256": "84a140e2147f2e00c165001bcf99f0a51fe36a60a1895ad8f5f67d154dcf19c9",
+   "sha256": "eaefb3f085b950c7072bfd4cde3484cd7f96618a1e53ea1fce7c24493651f488",
    "bytes": 1565721,
    "licence": "CC0-1.0",
    "source": {
@@ -2056,7 +2056,7 @@
     "loop"
    ],
    "file": "music/insistent.ogg",
-   "sha256": "f669cede6380e808f9e8a54a99807fd4919dd457a248d9bfc866873f11192fc7",
+   "sha256": "725c5c50be48c7b04b97e8531d0233576ba347e5f8a989c7e2d2f86f7bd7205d",
    "bytes": 1699840,
    "licence": "CC0-1.0",
    "source": {
@@ -2893,6 +2893,217 @@
     "url": "https://github.com/microsoft/fluentui-emoji"
    },
    "credit": "Microsoft Fluent Emoji, MIT licence"
+  },
+  {
+   "id": "fx-confetti",
+   "kind": "overlay",
+   "title": "Confetti",
+   "category": "celebrate",
+   "tags": [
+    "confetti",
+    "party",
+    "win"
+   ],
+   "file": "overlays/fx-confetti.webm",
+   "sha256": "3dd73627ab7df51fc59824e2dc217b37b49e4ecad4b43a8a1514fc07d3ecab1a",
+   "bytes": 2078993,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 3.0
+  },
+  {
+   "id": "fx-sparkle-burst",
+   "kind": "overlay",
+   "title": "Sparkle burst",
+   "category": "celebrate",
+   "tags": [
+    "sparkle",
+    "shine",
+    "reveal"
+   ],
+   "file": "overlays/fx-sparkle-burst.webm",
+   "sha256": "f86471e49ef173db55769f554ed439cd4e64c05eedbf7d021d6de4954acdc099",
+   "bytes": 293812,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 1.5
+  },
+  {
+   "id": "fx-hearts",
+   "kind": "overlay",
+   "title": "Rising hearts",
+   "category": "celebrate",
+   "tags": [
+    "hearts",
+    "love",
+    "cute"
+   ],
+   "file": "overlays/fx-hearts.webm",
+   "sha256": "49b9f67520a8ac4a0d77e8e941a4180b1bd5e5a6c41fe2735d813bcaa32778ef",
+   "bytes": 792009,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 3.0
+  },
+  {
+   "id": "fx-fire",
+   "kind": "overlay",
+   "title": "Fire",
+   "category": "energy",
+   "tags": [
+    "fire",
+    "hot",
+    "flames"
+   ],
+   "file": "overlays/fx-fire.webm",
+   "sha256": "38f71b4e81fb78717e039412e097d50c5c85a099cd68213d018c554d9a68ceaa",
+   "bytes": 509150,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 2.0
+  },
+  {
+   "id": "fx-explosion",
+   "kind": "overlay",
+   "title": "Explosion",
+   "category": "energy",
+   "tags": [
+    "explosion",
+    "boom",
+    "blast"
+   ],
+   "file": "overlays/fx-explosion.webm",
+   "sha256": "216946a39b61098ba36089ce2275a140fa473abf88a94f269aa87a7fe4dbe4f1",
+   "bytes": 209470,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 1.4
+  },
+  {
+   "id": "fx-speed-lines",
+   "kind": "overlay",
+   "title": "Speed lines",
+   "category": "energy",
+   "tags": [
+    "speed",
+    "anime",
+    "focus",
+    "shock"
+   ],
+   "file": "overlays/fx-speed-lines.webm",
+   "sha256": "4fb0b0f0364165b84ebe5ae9879e6df64a09c20774ec8f5ca65b16c6569b0857",
+   "bytes": 164318,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 1.0
+  },
+  {
+   "id": "fx-flash",
+   "kind": "overlay",
+   "title": "Flash",
+   "category": "transitions",
+   "tags": [
+    "flash",
+    "white",
+    "cut"
+   ],
+   "file": "overlays/fx-flash.webm",
+   "sha256": "a6a5be06981b8309791e34dad7e59d1c67df47ea3741af6b6476c2ea8c310d78",
+   "bytes": 10591,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 0.6
+  },
+  {
+   "id": "fx-smoke-puff",
+   "kind": "overlay",
+   "title": "Smoke puff",
+   "category": "transitions",
+   "tags": [
+    "smoke",
+    "poof",
+    "appear"
+   ],
+   "file": "overlays/fx-smoke-puff.webm",
+   "sha256": "9dae3e41ba149ac2407ff7ca8240ac45ede341b69251db0230c5645c2b82b87f",
+   "bytes": 338581,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 1.8
+  },
+  {
+   "id": "fx-magic-swirl",
+   "kind": "overlay",
+   "title": "Magic swirl",
+   "category": "magic",
+   "tags": [
+    "magic",
+    "swirl",
+    "transform"
+   ],
+   "file": "overlays/fx-magic-swirl.webm",
+   "sha256": "1d298a39b3b04b0e388b35921196e00a033d70132d0bf4359c2bdbe1b40d9a21",
+   "bytes": 565005,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 2.0
+  },
+  {
+   "id": "fx-twinkles",
+   "kind": "overlay",
+   "title": "Twinkling stars",
+   "category": "magic",
+   "tags": [
+    "stars",
+    "twinkle",
+    "dreamy"
+   ],
+   "file": "overlays/fx-twinkles.webm",
+   "sha256": "76df93f1223e81982c34a93f726d5d99fe232928db040b19ed1cb7d9908f7042",
+   "bytes": 609204,
+   "licence": "CC0-1.0",
+   "source": {
+    "name": "Kenney Particle Pack",
+    "url": "https://kenney.nl/assets/particle-pack"
+   },
+   "credit": "PeakSift, made from Kenney's Particle Pack (CC0)",
+   "duration_seconds": 3.0
   }
  ],
  "licences": [

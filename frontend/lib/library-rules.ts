@@ -17,6 +17,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   suspense: "Suspense",
   playful: "Playful",
   emoji: "Emoji",
+  celebrate: "Celebrate",
+  energy: "Energy",
+  magic: "Magic",
 };
 
 export const categoryLabel = (category: string) =>

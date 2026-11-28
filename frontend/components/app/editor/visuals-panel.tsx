@@ -169,7 +169,8 @@ export function VisualsPanel({
         asset_id: asset.id,
         asset_offset_seconds: 0,
         loop: false,
-        mode: asset.kind === "video" && e.mode === "overlay" ? "pip" : e.mode,
+        mode: asset.kind === "video" && !asset.has_alpha && e.mode === "overlay" ? "pip" : e.mode,
+        size: e.size === "full" && !(e.mode === "overlay") ? "medium" : e.size,
       });
       onChange(elements.map((e) => (e.key === context.replace ? replaced(e) : e)));
       return;
@@ -328,13 +329,15 @@ export function VisualsPanel({
       {/* A library sticker is added to the project and placed at the playhead as an overlay. */}
       <LibraryBrowser
         projectId={projectId}
-        kinds={["sticker"]}
+        kinds={["sticker", "overlay"]}
         onAdded={(result) => {
           if (result.kind !== "visual") return;
           const asset = result.visual_asset;
           onUploaded(asset);
           if (elements.length >= MAX_ELEMENTS) return;
-          const element = newElement(asset.id, asset, playhead(), duration, "overlay");
+          const created = newElement(asset.id, asset, playhead(), duration, "overlay");
+          // An animated effect fills the frame for as long as it plays; a sticker sits in a corner.
+          const element = asset.kind === "video" ? { ...created, size: "full" as const, position: "center" as const } : created;
           onChange([...elements, element].sort((a, b) => a.start_seconds - b.start_seconds));
           setSelected(element.key);
         }}
@@ -773,7 +776,7 @@ function ElementEditor({
         <div className="grid grid-cols-3 gap-1.5">
           {(Object.keys(MODE_LABELS) as VisualMode[]).map((mode) => {
             const Icon = MODE_ICONS[mode];
-            const unavailable = mode === "overlay" && isVideo;
+            const unavailable = mode === "overlay" && isVideo && !asset?.has_alpha;
             return (
               <label
                 key={mode}
@@ -864,8 +867,9 @@ function ElementEditor({
                 { value: "small", label: "S" },
                 { value: "medium", label: "M" },
                 { value: "large", label: "L" },
+                ...(element.mode === "overlay" ? [{ value: "full" as const, label: "Full" }] : []),
               ]}
-              onChange={(size) => set({ size })}
+              onChange={(size) => set(size === "full" ? { size, position: "center" } : { size })}
             />
           </div>
         </div>
